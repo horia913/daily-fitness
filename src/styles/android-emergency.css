@@ -1,0 +1,272 @@
+/* Android Emergency CSS Fixes - Direct Injection */
+
+/* Target Android WebKit specifically */
+@supports (-webkit-appearance: none) {
+  /* Force hardware acceleration for all elements */
+  * {
+    -webkit-transform: translateZ(0) !important;
+    transform: translateZ(0) !important;
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+  }
+
+  /* Fix body rendering */
+  body {
+    -webkit-text-size-adjust: 100% !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    text-rendering: optimizeLegibility !important;
+  }
+
+  /* Force all structural elements to render */
+  div, section, article, aside, header, footer, nav, main {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+  }
+
+  /* Force button elements */
+  button, [role="button"], .btn, a[role="button"] {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    cursor: pointer !important;
+  }
+
+  /* Force input elements */
+  input, textarea, select {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+  }
+
+  /* Force icon elements */
+  svg, [class*="lucide"], i, .icon, [data-icon] {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  /* Force image elements */
+  img {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Force text elements */
+  span, p, h1, h2, h3, h4, h5, h6, label, small {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: inherit !important;
+  }
+
+  /* Force list elements */
+  ul, ol, li {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  ul {
+    list-style-type: disc !important;
+  }
+
+  ol {
+    list-style-type: decimal !important;
+  }
+
+  li {
+    display: list-item !important;
+  }
+
+  /* Force table elements */
+  table, tr, td, th {
+    display: table !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  tr {
+    display: table-row !important;
+  }
+
+  td, th {
+    display: table-cell !important;
+  }
+
+  /* Force flexbox elements */
+  .flex, [class*="flex-"] {
+    display: flex !important;
+  }
+
+  .flex-col {
+    flex-direction: column !important;
+  }
+
+  .flex-row {
+    flex-direction: row !important;
+  }
+
+  .flex-1 {
+    flex: 1 !important;
+  }
+
+  /* Force grid elements */
+  .grid, [class*="grid-"] {
+    display: grid !important;
+  }
+
+  /* Force spacing */
+  .p-4 {
+    padding: 1rem !important;
+  }
+
+  .p-6 {
+    padding: 1.5rem !important;
+  }
+
+  .px-4 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .py-4 {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  .m-4 {
+    margin: 1rem !important;
+  }
+
+  .mx-4 {
+    margin-left: 1rem !important;
+    margin-right: 1rem !important;
+  }
+
+  .my-4 {
+    margin-top: 1rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Force background colors */
+  .bg-white {
+    background-color: white !important;
+  }
+
+  .bg-slate-50 {
+    background-color: #f8fafc !important;
+  }
+
+  .bg-slate-100 {
+    background-color: #f1f5f9 !important;
+  }
+
+  .bg-blue-50 {
+    background-color: #eff6ff !important;
+  }
+
+  /* Force text colors */
+  .text-slate-900 {
+    color: #0f172a !important;
+  }
+
+  .text-slate-600 {
+    color: #475569 !important;
+  }
+
+  .text-slate-500 {
+    color: #64748b !important;
+  }
+
+  /* Force border radius */
+  .rounded-lg {
+    border-radius: 0.5rem !important;
+  }
+
+  .rounded-xl {
+    border-radius: 0.75rem !important;
+  }
+
+  .rounded-2xl {
+    border-radius: 1rem !important;
+  }
+
+  /* Force shadows */
+  .shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  .shadow-xl {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  /* Force borders */
+  .border {
+    border-width: 1px !important;
+    border-style: solid !important;
+  }
+
+  .border-slate-200 {
+    border-color: #e2e8f0 !important;
+  }
+
+  .border-slate-300 {
+    border-color: #cbd5e1 !important;
+  }
+
+  /* Force overflow */
+  .overflow-hidden {
+    overflow: hidden !important;
+  }
+
+  .overflow-y-auto {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Force positioning */
+  .relative {
+    position: relative !important;
+  }
+
+  .absolute {
+    position: absolute !important;
+  }
+
+  .fixed {
+    position: fixed !important;
+  }
+
+  /* Force z-index */
+  .z-10 {
+    z-index: 10 !important;
+  }
+
+  .z-20 {
+    z-index: 20 !important;
+  }
+
+  .z-30 {
+    z-index: 30 !important;
+  }
+
+  .z-40 {
+    z-index: 40 !important;
+  }
+
+  .z-50 {
+    z-index: 50 !important;
+  }
+}

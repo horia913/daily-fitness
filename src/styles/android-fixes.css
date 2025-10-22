@@ -1,0 +1,341 @@
+/* Android-specific layout fixes - only applied when .android-device class is present */
+
+/* Core Android rendering fixes */
+.android-device {
+  /* Fix Android Chrome text rendering */
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Android scrolling fixes */
+.android-device html,
+.android-device body {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  /* Ensure body takes full viewport height */
+  height: 100vh;
+  height: -webkit-fill-available;
+  /* Allow normal scrolling but prevent horizontal overflow */
+  overflow-x: hidden;
+  /* Ensure no transforms that could affect fixed positioning */
+  transform: none !important;
+  -webkit-transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Android app layout container - Apply flexbox layout via CSS */
+.android-device .min-h-screen {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+  min-height: -webkit-fill-available !important;
+  /* Ensure no transforms that could interfere with fixed positioning */
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+/* Android main content scrolling - Allow normal scrolling */
+.android-device main {
+  flex: 1; /* Allow main content to take available space */
+  -webkit-overflow-scrolling: touch; /* Enable smooth native scrolling */
+  overscroll-behavior: contain; /* Prevent scroll chaining */
+  touch-action: pan-y; /* Allow vertical panning */
+  /* Add padding to prevent content from being hidden by fixed nav */
+  padding-bottom: 80px !important;
+  box-sizing: border-box !important;
+  /* Ensure no transforms that could interfere with fixed positioning */
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+/* Bottom navigation fixes for Android */
+.android-device nav.fixed.bottom-0,
+.android-device nav[class*="fixed"][class*="bottom-0"] {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  flex-shrink: 0 !important; /* Prevent it from shrinking */
+  /* Ensure it has a solid background to cover content */
+  background-color: rgba(255, 255, 255, 0.95) !important; /* Light mode background */
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important; /* Add a subtle shadow for separation */
+  padding-bottom: env(safe-area-inset-bottom) !important; /* Account for gesture bar on modern Android */
+  /* Ensure no transforms that could interfere with fixed positioning */
+  transform: none !important;
+  -webkit-transform: none !important;
+  /* Prevent any scrolling interference */
+  overflow: hidden !important;
+  touch-action: manipulation !important;
+}
+
+/* Android bottom navigation inner container */
+.android-device nav.fixed.bottom-0.left-0.right-0 > div {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-around !important;
+  height: 100% !important;
+  width: 100% !important;
+  padding: 0 8px !important;
+  max-width: none !important;
+  /* Ensure equal spacing between buttons */
+  gap: 0 !important;
+}
+
+/* Android bottom navigation inner container - second level */
+.android-device nav.fixed.bottom-0.left-0.right-0 > div > div {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-around !important;
+  height: 100% !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+/* Android bottom navigation items */
+.android-device nav.fixed.bottom-0.left-0.right-0 a,
+.android-device nav.fixed.bottom-0.left-0.right-0 button {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  min-width: 60px !important;
+  flex: 1 !important;
+  /* Ensure equal distribution */
+  margin: 0 4px !important;
+  padding: 8px 4px !important;
+}
+
+/* Android bottom navigation icons */
+.android-device nav.fixed.bottom-0.left-0.right-0 svg,
+.android-device nav.fixed.bottom-0.left-0.right-0 [class*="lucide"] {
+  display: block !important;
+  margin: 0 auto !important;
+  text-align: center !important;
+}
+
+/* Android bottom navigation text */
+.android-device nav.fixed.bottom-0.left-0.right-0 span {
+  text-align: center !important;
+  display: block !important;
+  margin: 0 auto !important;
+}
+
+/* Android dark mode bottom navigation background */
+.android-device.dark nav.fixed.bottom-0,
+.android-device.dark nav[class*="fixed"][class*="bottom-0"] {
+  background-color: rgba(15, 23, 42, 0.95) !important; /* Dark mode background */
+}
+
+/* Android header fixes */
+.android-device header {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+/* Android header container fixes - ensure proper alignment */
+.android-device header > div {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Android header left side (app title/icon) */
+.android-device header .flex.items-center.gap-2:first-child {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  flex-shrink: 0 !important;
+}
+
+/* Android header right side (action buttons) */
+.android-device header .flex.items-center.gap-2:last-child {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-shrink: 0 !important;
+  margin-left: auto !important;
+}
+
+/* Android card rendering fixes */
+.android-device .card,
+.android-device [class*="bg-white"],
+.android-device [class*="bg-slate"] {
+  position: relative;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Android button fixes */
+.android-device button,
+.android-device [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Android input fixes */
+.android-device input,
+.android-device textarea,
+.android-device select {
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 0.5rem;
+}
+
+/* Android modal fixes */
+.android-device .fixed.inset-0 {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9999 !important;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Android modal content scrolling */
+.android-device .modal-content,
+.android-device .overflow-y-auto {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+/* Android flexbox fixes */
+.android-device .flex {
+  display: flex !important;
+}
+
+.android-device .flex-col {
+  flex-direction: column !important;
+}
+
+.android-device .flex-row {
+  flex-direction: row !important;
+}
+
+.android-device .flex-1 {
+  flex: 1 !important;
+}
+
+/* Android grid fixes */
+.android-device .grid {
+  display: grid !important;
+}
+
+.android-device .grid-cols-2 {
+  grid-template-columns: repeat(2, 1fr) !important;
+}
+
+.android-device .grid-cols-3 {
+  grid-template-columns: repeat(3, 1fr) !important;
+}
+
+.android-device .grid-cols-4 {
+  grid-template-columns: repeat(4, 1fr) !important;
+}
+
+/* Android spacing fixes */
+.android-device .space-y-4 > * + * {
+  margin-top: 1rem !important;
+}
+
+.android-device .space-y-6 > * + * {
+  margin-top: 1.5rem !important;
+}
+
+/* Android overflow fixes */
+.android-device .overflow-hidden {
+  overflow: hidden !important;
+}
+
+.android-device .overflow-y-auto {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Android gradient fixes */
+.android-device [class*="bg-gradient"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Android hardware acceleration for better performance */
+.android-device .gpu-accelerated,
+.android-device [class*="transform"],
+.android-device [class*="transition"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Android text rendering improvements */
+.android-device p,
+.android-device span,
+.android-device div,
+.android-device h1,
+.android-device h2,
+.android-device h3,
+.android-device h4,
+.android-device h5,
+.android-device h6 {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Android icon fixes */
+.android-device svg,
+.android-device [class*="lucide"] {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Android image fixes */
+.android-device img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Android list fixes */
+.android-device ul,
+.android-device ol,
+.android-device li {
+  display: block;
+}
+
+/* Android table fixes */
+.android-device table {
+  display: table;
+}
+
+.android-device tr {
+  display: table-row;
+}
+
+.android-device td,
+.android-device th {
+  display: table-cell;
+}

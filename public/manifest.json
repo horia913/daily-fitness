@@ -1,0 +1,55 @@
+{
+  "name": "DailyFitness",
+  "short_name": "DailyFitness",
+  "description": "Personal training and fitness management app",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3B82F6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["fitness", "health", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "features": [
+    "Cross Platform",
+    "fast",
+    "simple"
+  ],
+  "permissions": [
+    "notifications"
+  ],
+  "notification": {
+    "action": [
+      {
+        "action": "view",
+        "title": "View"
+      },
+      {
+        "action": "dismiss",
+        "title": "Dismiss"
+      }
+    ]
+  }
+}
