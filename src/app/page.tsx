@@ -1,7 +1,12 @@
-'use client'
+"use client";
 
-import { AuthWrapper } from '@/components/hybrid/AuthWrapper'
+import { AuthWrapper } from "@/components/hybrid/AuthWrapper";
+import { Suspense } from "react";
 
 export default function AuthPage() {
-  return <AuthWrapper />
+  return (
+    <Suspense>
+      <AuthWrapper />
+    </Suspense>
+  );
 }
