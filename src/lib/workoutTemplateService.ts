@@ -94,17 +94,15 @@ export interface ProgramSchedule {
 export interface ProgressionRule {
   id: string
   program_id: string
-  exercise_id: string
+  template_exercise_id: string
   week_number: number
   sets: number
-  reps: string
+  reps: number // Database stores as integer (first number of rep range)
   weight_guidance?: string
-  rest_seconds: number
-  rpe_target?: number
-  notes?: string
+  rest_time: number
+  notes?: string // Contains JSON with original rep range and full config
   created_at: string
   updated_at: string
-  exercise?: Exercise
 }
 
 export interface DailyWorkout {
