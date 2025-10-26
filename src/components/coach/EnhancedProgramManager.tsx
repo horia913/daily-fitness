@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { useTheme } from "@/contexts/ThemeContext";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import {
@@ -107,9 +109,6 @@ export default function EnhancedProgramManager({
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   const [showProgramDetails, setShowProgramDetails] = useState(false);
-
-  // Flag to prevent database reload when actively editing schedule
-  const [isEditingSchedule, setIsEditingSchedule] = useState<boolean>(false);
 
   // Assignment states
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
@@ -1070,9 +1069,6 @@ export default function EnhancedProgramManager({
             templates={templates}
             exercises={exercises}
             onTemplatesUpdate={setTemplates}
-            onDataReload={loadData}
-            isEditingSchedule={isEditingSchedule}
-            setIsEditingSchedule={setIsEditingSchedule}
             onSave={async (data) => {
               try {
                 console.log("🔧 Saving program with data:", data);
@@ -1401,17 +1397,14 @@ export default function EnhancedProgramManager({
                 loadData();
                 setShowCreateProgram(false);
                 setEditingProgram(null);
-                setIsEditingSchedule(false); // Reset editing flag
               } catch (error) {
                 console.error("❌ Error saving program:", error);
                 alert("Error saving program. Please try again.");
-                setIsEditingSchedule(false); // Reset editing flag even on error
               }
             }}
             onClose={() => {
               setShowCreateProgram(false);
               setEditingProgram(null);
-              setIsEditingSchedule(false); // Reset editing flag when closing
             }}
           />
         )}
@@ -2418,9 +2411,6 @@ interface ProgramCreateFormProps {
   onSave: (data: any) => void;
   onClose: () => void;
   onTemplatesUpdate?: (templates: WorkoutTemplate[]) => void;
-  onDataReload?: () => void;
-  isEditingSchedule: boolean;
-  setIsEditingSchedule: (value: boolean) => void;
 }
 
 function ProgramCreateForm({
@@ -2430,9 +2420,6 @@ function ProgramCreateForm({
   onSave,
   onClose,
   onTemplatesUpdate,
-  onDataReload,
-  isEditingSchedule,
-  setIsEditingSchedule,
 }: ProgramCreateFormProps) {
   const [formData, setFormData] = useState({
     name: program?.name || "",
@@ -2585,11 +2572,11 @@ function ProgramCreateForm({
 
   // Load existing schedule when editing a program
   useEffect(() => {
-    if (program?.schedule && !isEditingSchedule) {
+    if (program?.schedule) {
       console.log("🔧 Loading existing schedule:", program.schedule);
       setSchedule(program.schedule);
     }
-  }, [program, isEditingSchedule]);
+  }, [program]);
 
   /**
    * Handles replacing an exercise for a specific week.
@@ -2601,162 +2588,394 @@ function ProgramCreateForm({
     newExercise: any,
     config?: any
   ) => {
-    console.log("🚀 Starting exercise replacement with progression rules...");
-    console.log("Context:", {
-      dayOfWeek,
-      originalExerciseId,
-      newExercise,
-      config,
-      selectedWeek,
-    });
-
     if (!program?.id) {
-      console.error("❌ No program ID available for exercise replacement");
-      alert("Cannot save changes: Program ID is missing.");
+      console.error("No program ID available for exercise replacement");
       return;
     }
-
-    if (!replacementContext) {
-      console.error("❌ Replacement context is missing.");
-      alert("Cannot save changes: Context is missing.");
-      return;
-    }
-
-    const { exerciseIndex, scheduleItem } = replacementContext;
-    const targetWeek = scheduleItem?.week_number || selectedWeek;
-    const originalTemplateExercise = (templates.find(
-      (t) => t.id === scheduleItem.template_id
-    )?.exercises || [])[exerciseIndex];
-
-    // Create progression rule with the correct database schema
-    // Note: Since the database expects reps as INTEGER, we'll extract the first number from rep ranges
-    const repValue = config?.reps || "8-12";
-    const repNumber =
-      typeof repValue === "string"
-        ? parseInt(repValue.split("-")[0]) || 8
-        : repValue;
-
-    const progressionRule = {
-      program_id: program.id,
-      template_exercise_id: originalTemplateExercise?.id,
-      week_number: targetWeek,
-      sets: config?.sets || 3,
-      reps: repNumber, // Convert rep range to integer (use first number)
-      weight_guidance: config?.weight_guidance || null,
-      rest_time: config?.rest_seconds || 60,
-      notes: JSON.stringify({
-        original_exercise_id: originalExerciseId,
-        new_exercise_id: newExercise.id,
-        template_id: scheduleItem.template_id,
-        exercise_index: exerciseIndex,
-        config: {
-          ...config,
-          reps: repValue, // Store the original rep range in config
-        },
-      }),
-    };
-    console.log("📝 Generated progression rule:", progressionRule);
 
     try {
+      // Find the current schedule item to get the original template
+      const scheduleItem = schedule.find(
+        (s) =>
+          s.program_day === dayOfWeek && (s.week_number || 1) === selectedWeek
+      );
+
+      if (!scheduleItem) {
+        console.error(
+          `No schedule item found for day ${dayOfWeek}, week ${selectedWeek}`
+        );
+        return;
+      }
+
+      // Get the original template to preserve its structure
+      const originalTemplate = templates.find(
+        (t) => t.id === scheduleItem.template_id
+      );
+      if (!originalTemplate) {
+        console.error(
+          `Original template not found for template_id: ${scheduleItem.template_id}`
+        );
+        return;
+      }
+
+      // Create a new template with the replaced exercise
+      const newTemplateData = {
+        name: `${originalTemplate.name} (Modified)`,
+        description: originalTemplate.description || "",
+        difficulty_level: originalTemplate.difficulty_level || "intermediate",
+        coach_id: originalTemplate.coach_id,
+        is_public: false, // Keep it private since it's a modification
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Insert the new template
+      const { data: newTemplate, error: templateError } = await supabase
+        .from("workout_templates")
+        .insert(newTemplateData)
+        .select()
+        .single();
+
+      if (templateError || !newTemplate) {
+        console.error("Failed to create new template:", templateError);
+        alert("Failed to create replacement template. Please try again.");
+        return;
+      }
+
+      // Copy all exercises from the original template, replacing the target exercise
+      const originalExercises = originalTemplate.exercises || [];
       console.log(
-        `🗑️ Deleting existing rules for Week ${targetWeek}, Exercise ${exerciseIndex}...`
+        "🔍 Replacing exercise at index:",
+        replacementContext?.exerciseIndex
       );
-      const { error: deleteError } = await supabase
-        .from("program_progression_rules")
-        .delete()
+      console.log("🔍 Original exercises count:", originalExercises.length);
+      console.log("🔍 New exercise:", newExercise.name);
+
+      const modifiedExercises = originalExercises.map(
+        (exercise: any, index: number) => {
+          // Replace the exercise at the specified index
+          if (index === replacementContext?.exerciseIndex) {
+            console.log(
+              "✅ Replacing exercise at index:",
+              index,
+              "with:",
+              newExercise.name
+            );
+            const exerciseData = {
+              ...exercise,
+              exercise_id: newExercise.id,
+              exercise: newExercise,
+              sets: config?.sets || exercise.sets || 3,
+              reps: config?.reps || exercise.reps || "8-12",
+              rest_seconds: config?.rest_seconds || exercise.rest_seconds || 60,
+              rir: config?.rir || exercise.rir || "",
+              tempo: config?.tempo || exercise.tempo || "",
+              exercise_type:
+                config?.exercise_type ||
+                exercise.exercise_type ||
+                "straight_set",
+            };
+
+            // Add multi-exercise configuration data
+            if (
+              config?.exercise_type === "superset" &&
+              config?.superset_exercise_id
+            ) {
+              exerciseData.superset_exercise_id = config.superset_exercise_id;
+              exerciseData.superset_reps = config.superset_reps;
+            }
+
+            if (
+              config?.exercise_type === "giant_set" &&
+              config?.giant_set_exercises?.length > 0
+            ) {
+              exerciseData.giant_set_exercises = config.giant_set_exercises;
+            }
+
+            if (
+              config?.exercise_type === "circuit" &&
+              config?.circuit_exercises?.length > 0
+            ) {
+              exerciseData.circuit_exercises = config.circuit_exercises;
+            }
+
+            if (
+              config?.exercise_type === "tabata" &&
+              config?.tabata_exercises?.length > 0
+            ) {
+              exerciseData.tabata_exercises = config.tabata_exercises;
+            }
+
+            // Add specific exercise type parameters
+            if (config?.exercise_type === "drop_set") {
+              exerciseData.drop_percentage = config.drop_percentage;
+              exerciseData.drop_set_reps = config.drop_set_reps;
+            }
+
+            if (config?.exercise_type === "amrap") {
+              exerciseData.amrap_duration = config.amrap_duration;
+              exerciseData.target_reps = config.target_reps;
+            }
+
+            if (config?.exercise_type === "emom") {
+              exerciseData.emom_duration = config.emom_duration;
+              exerciseData.emom_reps = config.emom_reps;
+              exerciseData.emom_mode = config.emom_mode;
+            }
+
+            if (config?.exercise_type === "tabata") {
+              exerciseData.rounds = config.rounds;
+              exerciseData.work_seconds = config.work_seconds;
+              exerciseData.rest_after = config.rest_after;
+            }
+
+            return exerciseData;
+          }
+          console.log(
+            "⏭️ Keeping exercise at index:",
+            index,
+            ":",
+            exercise.exercise?.name || exercise.name
+          );
+          return exercise;
+        }
+      );
+
+      // Insert the modified exercises into the new template
+      const exerciseInserts = modifiedExercises.map(
+        (exercise: any, index: number) => {
+          console.log(
+            "📝 Processing exercise at index:",
+            index,
+            "exercise_id:",
+            exercise.exercise_id,
+            "exercise:",
+            exercise.exercise?.name || exercise.name
+          );
+
+          // For unchanged exercises, preserve their original configuration from notes
+          let exerciseConfig;
+          if (index === replacementContext?.exerciseIndex) {
+            // This is the replaced exercise - use the new configuration
+            exerciseConfig = {
+              sets: exercise.sets,
+              reps: exercise.reps,
+              rest_seconds: exercise.rest_seconds,
+              rir: exercise.rir,
+              tempo: exercise.tempo,
+              exercise_type: exercise.exercise_type,
+              superset_exercise_id: exercise.superset_exercise_id,
+              superset_reps: exercise.superset_reps,
+              giant_set_exercises: exercise.giant_set_exercises,
+              circuit_exercises: exercise.circuit_exercises,
+              tabata_exercises: exercise.tabata_exercises,
+              drop_percentage: exercise.drop_percentage,
+              drop_set_reps: exercise.drop_set_reps,
+              amrap_duration: exercise.amrap_duration,
+              target_reps: exercise.target_reps,
+              emom_duration: exercise.emom_duration,
+              emom_reps: exercise.emom_reps,
+              emom_mode: exercise.emom_mode,
+              rounds: exercise.rounds,
+              work_seconds: exercise.work_seconds,
+              rest_after: exercise.rest_after,
+            };
+            console.log(
+              "🔄 Using NEW config for replaced exercise:",
+              exerciseConfig.exercise_type
+            );
+          } else {
+            // This is an unchanged exercise - preserve original configuration
+            const originalExercise = originalExercises[index];
+            if (originalExercise?.notes) {
+              try {
+                exerciseConfig = JSON.parse(originalExercise.notes);
+                console.log(
+                  "💾 Preserving ORIGINAL config for unchanged exercise:",
+                  exerciseConfig.exercise_type || "straight_set"
+                );
+              } catch (error) {
+                console.error(
+                  "Failed to parse original exercise config:",
+                  error
+                );
+                exerciseConfig = {
+                  sets: 3,
+                  reps: "8-12",
+                  rest_seconds: 60,
+                  rir: "",
+                  tempo: "",
+                  exercise_type: "straight_set",
+                };
+              }
+            } else {
+              exerciseConfig = {
+                sets: 3,
+                reps: "8-12",
+                rest_seconds: 60,
+                rir: "",
+                tempo: "",
+                exercise_type: "straight_set",
+              };
+            }
+          }
+
+          return {
+            template_id: newTemplate.id,
+            exercise_id: exercise.exercise_id,
+            order_index: index + 1,
+            notes: JSON.stringify(exerciseConfig),
+          };
+        }
+      );
+
+      const { error: exercisesError } = await supabase
+        .from("workout_template_exercises")
+        .insert(exerciseInserts);
+
+      if (exercisesError) {
+        console.error(
+          "Failed to insert exercises into new template:",
+          exercisesError
+        );
+        // Clean up the template if exercise insertion failed
+        await supabase
+          .from("workout_templates")
+          .delete()
+          .eq("id", newTemplate.id);
+        alert("Failed to create replacement template. Please try again.");
+        return;
+      }
+
+      // Update the program_schedule to use the new template
+      // Use the week number from the replacement context to ensure we only update the specific week
+      const dbTargetWeek =
+        replacementContext?.scheduleItem?.week_number || selectedWeek;
+      console.log(
+        `🎯 Updating schedule for day ${dayOfWeek}, week ${dbTargetWeek} with new template ${newTemplate.id}`
+      );
+      const { error } = await supabase
+        .from("program_schedule")
+        .update({
+          template_id: newTemplate.id,
+          updated_at: new Date().toISOString(),
+        })
         .eq("program_id", program.id)
-        .eq("week_number", targetWeek)
-        .eq("template_exercise_id", originalTemplateExercise?.id);
+        .eq("day_of_week", dayOfWeek)
+        .eq("week_number", dbTargetWeek);
 
-      if (deleteError) {
-        console.error(
-          "❌ Failed to delete old progression rules:",
-          deleteError
-        );
-        throw deleteError;
+      if (error) {
+        console.error("Failed to update program schedule:", error);
+        alert("Failed to save exercise replacement. Please try again.");
+        return;
       }
 
-      console.log("💾 Inserting new progression rule...");
-      const { error: insertError } = await supabase
-        .from("program_progression_rules")
-        .insert([progressionRule]);
-
-      if (insertError) {
-        console.error(
-          "❌ Failed to insert new progression rules:",
-          insertError
-        );
-        throw insertError;
-      }
-
-      alert(
-        `Exercise override for Week ${targetWeek} has been saved successfully! This change only applies to this specific program and week.`
+      // Update the local state to immediately reflect the change in the UI
+      // Use the week number from the replacement context to ensure we only update the specific week
+      const stateTargetWeek =
+        replacementContext?.scheduleItem?.week_number || selectedWeek;
+      updateLocalPlanStateWithReplacement(
+        dayOfWeek,
+        originalExerciseId,
+        newExercise,
+        newTemplate.id,
+        stateTargetWeek
       );
-      console.log("✅ Exercise replacement saved as progression rules.");
 
-      // Reload progression rules to show the changes immediately
-      console.log("🔄 Reloading progression rules to show changes...");
-      const { data: updatedRules, error: rulesError } = await supabase
-        .from("program_progression_rules")
-        .select("*")
-        .eq("program_id", program?.id);
+      // Reload templates to include the new template
+      if (onTemplatesUpdate) {
+        try {
+          const templatesData =
+            await WorkoutTemplateService.getWorkoutTemplates(program.coach_id);
+          const parsedTemplates = templatesData.map((template) => ({
+            ...template,
+            exercises: template.exercises?.map((exercise) => {
+              // Parse exercise configuration from notes field
+              let config = null;
+              if (exercise.notes) {
+                try {
+                  config = JSON.parse(exercise.notes);
+                } catch (error) {
+                  console.error("Failed to parse exercise config:", error);
+                }
+              }
 
-      if (!rulesError && Array.isArray(updatedRules)) {
-        const mappedRules = updatedRules.map((r: any) => ({
-          id: r.id,
-          program_id: r.program_id,
-          template_exercise_id: r.template_exercise_id,
-          week_number: r.week_number,
-          sets: r.sets,
-          reps: r.reps,
-          weight_guidance: r.weight_guidance,
-          rest_time: r.rest_time,
-          notes: r.notes || null,
-          created_at: r.created_at,
-          updated_at: r.updated_at,
-        }));
-        console.log("🔁 Updated progression rules:", mappedRules);
-        setProgressionRules(mappedRules);
+              return {
+                ...exercise,
+                config: config,
+              };
+            }),
+          }));
+          onTemplatesUpdate(parsedTemplates);
+          console.log("🔄 Templates reloaded after exercise replacement");
+        } catch (error) {
+          console.error("Failed to reload templates:", error);
+        }
       }
 
-      // Close the replacement modal
-      setShowExerciseReplacementModal(false);
-      setSelectedReplacementExercise(null);
-      setExerciseConfig({
-        exercise_type: "straight_set",
-        sets: 3,
-        reps: "8-12",
-        rest_seconds: 60,
-        rir: "",
-        tempo: "",
-        superset_exercise_id: "",
-        superset_reps: "",
-        circuit_exercises: [],
-        giant_set_exercises: [],
-        tabata_exercises: [],
-        rounds: 1,
-        work_seconds: 20,
-        rest_seconds_tabata: 10,
-        drop_percentage: 0,
-        drop_set_reps: "",
-        amrap_duration: 0,
-        target_reps: 0,
-        emom_duration: 0,
-        emom_reps: 0,
-        emom_mode: "",
-        rest_after: 0,
-        cluster_sets: 0,
-        cluster_rest: 0,
-      });
+      console.log(
+        `✅ Exercise replacement saved: ${originalExerciseId} -> ${newExercise.id}`
+      );
     } catch (error) {
-      console.error(
-        "❌ Error saving exercise replacement as progression rules:",
-        error
-      );
+      console.error("Error in handleReplaceExercise:", error);
       alert(
-        "An error occurred while saving the exercise override. Please check the console and try again."
+        "An error occurred while replacing the exercise. Please try again."
       );
     }
+  };
+
+  /**
+   * Updates the local plan state to reflect exercise replacement in the UI
+   */
+  const updateLocalPlanStateWithReplacement = (
+    dayOfWeek: number,
+    originalExerciseId: string,
+    newExercise: any,
+    newTemplateId: string,
+    targetWeek?: number
+  ) => {
+    // Find the schedule item for this day and week using the replacement context
+    const weekToUse =
+      targetWeek ||
+      replacementContext?.scheduleItem?.week_number ||
+      selectedWeek;
+    const scheduleItem =
+      replacementContext?.scheduleItem ||
+      schedule.find(
+        (s) => s.program_day === dayOfWeek && (s.week_number || 1) === weekToUse
+      );
+
+    if (!scheduleItem) {
+      console.error(
+        `No schedule item found for day ${dayOfWeek}, week ${weekToUse}`
+      );
+      return;
+    }
+
+    // Update the template_id in the schedule to reflect the new template
+    setSchedule((prev) =>
+      prev.map((s) => {
+        if (s.id === scheduleItem.id) {
+          return {
+            ...s,
+            template_id: newTemplateId, // Use the new template ID
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return s;
+      })
+    );
+
+    // Update the templateExercisesById cache with the new template
+    // We'll need to load the exercises for the new template
+    setTemplateExercisesById((prev) => ({
+      ...prev,
+      [newTemplateId]: [], // Initialize empty, will be loaded by useEffect
+    }));
+
+    console.log(
+      `✅ Updated local state: Day ${dayOfWeek}, Week ${selectedWeek} now uses template ${newTemplateId}`
+    );
   };
 
   // Reliable auto-population function for empty weeks
@@ -2995,11 +3214,7 @@ function ProgramCreateForm({
             };
           });
           console.log("🔁 Setting schedule from DB:", mapped);
-
-          // Only set schedule if we're not currently editing (to prevent overriding user changes)
-          if (!isEditingSchedule) {
-            setSchedule(mapped);
-          }
+          setSchedule(mapped);
           // Always start at Week 1 - the first week should always be Week 1
           setSelectedWeek(1);
 
@@ -3084,15 +3299,12 @@ function ProgramCreateForm({
           const mappedRules = rules.map((r: any) => ({
             id: r.id,
             program_id: r.program_id,
-            template_exercise_id: r.template_exercise_id,
             week_number: r.week_number,
-            sets: r.sets,
-            reps: r.reps,
-            weight_guidance: r.weight_guidance,
-            rest_time: r.rest_time,
+            exercise_id: r.exercise_id,
+            field: r.field,
+            change_type: r.change_type,
+            amount: r.amount,
             notes: r.notes || null,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
           }));
           console.log("🔁 Setting progression rules from DB:", mappedRules);
           setProgressionRules(mappedRules);
@@ -3114,7 +3326,7 @@ function ProgramCreateForm({
     };
 
     loadProgramDetails();
-  }, [program?.id, isEditingSchedule]);
+  }, [program?.id]);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-[9999]">
@@ -3422,147 +3634,39 @@ function ProgramCreateForm({
                             )?.template_id || "rest"
                           }
                           onValueChange={async (value) => {
-                            console.log("🔄 Schedule change detected:", {
-                              dayIndex: dayIndex + 1,
-                              selectedWeek,
-                              newTemplateId: value,
-                              dayName: dayNames[dayIndex],
-                            });
-
-                            // Set editing flag to prevent database reload
-                            setIsEditingSchedule(true);
-
                             if (value === "rest") {
-                              setSchedule((prev) => {
-                                const newSchedule = prev.filter(
+                              setSchedule((prev) =>
+                                prev.filter(
                                   (s) =>
                                     !(
                                       s.program_day === dayIndex + 1 &&
                                       (s.week_number || 1) === selectedWeek
                                     )
-                                );
-                                console.log(
-                                  "🗑️ Removed workout from schedule:",
-                                  newSchedule
-                                );
-
-                                // Clear progression rules for this day/week since workout was removed
-                                console.log(
-                                  "🧹 Clearing progression rules for removed workout:",
-                                  {
-                                    dayIndex: dayIndex + 1,
-                                    selectedWeek,
-                                  }
-                                );
-
-                                setProgressionRules((prevRules) => {
-                                  const clearedRules = prevRules.filter(
-                                    (rule) =>
-                                      !(
-                                        rule.week_number === selectedWeek &&
-                                        rule.notes &&
-                                        JSON.parse(rule.notes).template_id ===
-                                          prev.find(
-                                            (s) =>
-                                              s.program_day === dayIndex + 1 &&
-                                              (s.week_number || 1) ===
-                                                selectedWeek
-                                          )?.template_id
-                                      )
-                                  );
-                                  console.log(
-                                    "🧹 Cleared progression rules for removed workout:",
-                                    {
-                                      beforeCount: prevRules.length,
-                                      afterCount: clearedRules.length,
-                                      clearedCount:
-                                        prevRules.length - clearedRules.length,
-                                    }
-                                  );
-                                  return clearedRules;
-                                });
-
-                                return newSchedule;
-                              });
+                                )
+                              );
                             } else {
                               const template = templates.find(
                                 (t) => t.id === value
                               );
                               if (template) {
-                                setSchedule((prev) => {
-                                  const newSchedule = [
-                                    ...prev.filter(
-                                      (s) =>
-                                        !(
-                                          s.program_day === dayIndex + 1 &&
-                                          (s.week_number || 1) === selectedWeek
-                                        )
-                                    ),
-                                    {
-                                      id: `${program?.id || "new"}-${dayIndex}`,
-                                      program_id: program?.id || "",
-                                      program_day: dayIndex + 1,
-                                      week_number: selectedWeek,
-                                      template_id: value,
-                                      is_optional: false,
-                                      is_active: true,
-                                    },
-                                  ];
-                                  // Sort by program_day to maintain correct day order
-                                  const sortedSchedule = newSchedule.sort(
-                                    (a, b) => a.program_day - b.program_day
-                                  );
-                                  console.log(
-                                    "✅ Added workout to schedule:",
-                                    sortedSchedule
-                                  );
-
-                                  // Clear progression rules for this day/week since template changed
-                                  console.log(
-                                    "🧹 Clearing progression rules for changed template:",
-                                    {
-                                      dayIndex: dayIndex + 1,
-                                      selectedWeek,
-                                      oldTemplateId: prev.find(
-                                        (s) =>
-                                          s.program_day === dayIndex + 1 &&
-                                          (s.week_number || 1) === selectedWeek
-                                      )?.template_id,
-                                      newTemplateId: value,
-                                    }
-                                  );
-
-                                  setProgressionRules((prevRules) => {
-                                    const clearedRules = prevRules.filter(
-                                      (rule) =>
-                                        !(
-                                          rule.week_number === selectedWeek &&
-                                          rule.notes &&
-                                          JSON.parse(rule.notes).template_id ===
-                                            prev.find(
-                                              (s) =>
-                                                s.program_day ===
-                                                  dayIndex + 1 &&
-                                                (s.week_number || 1) ===
-                                                  selectedWeek
-                                            )?.template_id
-                                        )
-                                    );
-                                    console.log(
-                                      "🧹 Cleared progression rules:",
-                                      {
-                                        beforeCount: prevRules.length,
-                                        afterCount: clearedRules.length,
-                                        clearedCount:
-                                          prevRules.length -
-                                          clearedRules.length,
-                                      }
-                                    );
-                                    return clearedRules;
-                                  });
-
-                                  return sortedSchedule;
-                                });
+                                setSchedule((prev) => [
+                                  ...prev.filter(
+                                    (s) =>
+                                      !(
+                                        s.program_day === dayIndex + 1 &&
+                                        (s.week_number || 1) === selectedWeek
+                                      )
+                                  ),
+                                  {
+                                    id: `${program?.id || "new"}-${dayIndex}`,
+                                    program_id: program?.id || "",
+                                    program_day: dayIndex + 1,
+                                    week_number: selectedWeek,
+                                    template_id: value,
+                                    is_optional: false,
+                                    is_active: true,
+                                  },
+                                ]);
                                 // Hydrate exercises for this template immediately for the Progression tab
                                 if (
                                   !(template as any).exercises &&
@@ -3788,16 +3892,12 @@ function ProgramCreateForm({
                                 </div>
 
                                 <div className="space-y-4">
-                                  {getResolvedExercises(
+                                  {(
                                     template?.exercises ||
-                                      templateExercisesById[
-                                        scheduleItem.template_id
-                                      ] ||
-                                      [],
-                                    progressionRules,
-                                    selectedWeek,
-                                    scheduleItem.template_id,
-                                    exercises
+                                    templateExercisesById[
+                                      scheduleItem.template_id
+                                    ] ||
+                                    []
                                   ).map((exercise, exerciseIndex) => {
                                     const colors = [
                                       "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
@@ -3825,18 +3925,12 @@ function ProgramCreateForm({
                                         typeof (exercise as any).notes ===
                                           "string"
                                       ) {
-                                        const notesData = JSON.parse(
-                                          (exercise as any).notes
-                                        );
                                         parsed = {
                                           ...parsed,
-                                          ...notesData,
+                                          ...JSON.parse(
+                                            (exercise as any).notes
+                                          ),
                                         };
-                                        // If this is a progression rule, also extract config.exercise_type
-                                        if (notesData.config?.exercise_type) {
-                                          parsed.exercise_type =
-                                            notesData.config.exercise_type;
-                                        }
                                       } else if ((exercise as any)?.config) {
                                         // Use the pre-parsed config if available
                                         parsed = {
@@ -3847,81 +3941,26 @@ function ProgramCreateForm({
                                     } catch (_) {
                                       // Keep default values
                                     }
-                                    // Multi-exercise types will be defined after exerciseType
-
-                                    // Resolve the base exercise details from global list if missing
-                                    const baseExercise =
-                                      (exercise as any)?.exercise ||
-                                      exercises.find(
-                                        (e) =>
-                                          e.id ===
-                                          (exercise as any)?.exercise_id
-                                      );
-
-                                    // Check if this exercise has been modified via progression rules
-                                    const hasProgressionRule =
-                                      progressionRules?.some((rule) => {
-                                        if (rule.week_number !== selectedWeek)
-                                          return false;
-                                        try {
-                                          const notesData = rule.notes
-                                            ? JSON.parse(rule.notes)
-                                            : null;
-
-                                          // Enhanced debugging for progression rule detection
-                                          console.log(
-                                            "🔍 Progression rule detection debug:",
-                                            {
-                                              ruleWeek: rule.week_number,
-                                              selectedWeek,
-                                              ruleTemplateId:
-                                                notesData?.template_id,
-                                              scheduleTemplateId:
-                                                scheduleItem.template_id,
-                                              ruleExerciseIndex:
-                                                notesData?.exercise_index,
-                                              currentExerciseIndex:
-                                                exerciseIndex,
-                                              templateIdMatch:
-                                                notesData?.template_id ===
-                                                scheduleItem.template_id,
-                                              exerciseIndexMatch:
-                                                notesData?.exercise_index ===
-                                                exerciseIndex,
-                                              fullMatch:
-                                                notesData &&
-                                                notesData.template_id ===
-                                                  scheduleItem.template_id &&
-                                                notesData.exercise_index ===
-                                                  exerciseIndex,
-                                            }
-                                          );
-
-                                          return (
-                                            notesData &&
-                                            notesData.template_id ===
-                                              scheduleItem.template_id &&
-                                            notesData.exercise_index ===
-                                              exerciseIndex
-                                          );
-                                        } catch (e) {
-                                          console.error(
-                                            "❌ Error parsing progression rule notes:",
-                                            e
-                                          );
-                                          return false;
-                                        }
-                                      });
-
-                                    // Determine exercise type (after hasProgressionRule is defined)
                                     const exerciseType: string | undefined =
                                       (exercise as any)?.exercise_type ||
                                       parsed.exercise_type ||
                                       (exercise as any)?.config
                                         ?.exercise_type ||
-                                      (hasProgressionRule &&
-                                        parsed.config?.exercise_type) ||
                                       "straight_set";
+
+                                    // Debug logging
+                                    if (exerciseIndex === 0) {
+                                      console.log(
+                                        "🔍 Exercise display debug:",
+                                        {
+                                          exerciseIndex,
+                                          exerciseType,
+                                          parsed,
+                                          config: (exercise as any)?.config,
+                                          notes: (exercise as any)?.notes,
+                                        }
+                                      );
+                                    }
 
                                     // Define multi-exercise types that should show the type name
                                     const multiExerciseTypes = [
@@ -3944,20 +3983,14 @@ function ProgramCreateForm({
                                         ? "Giant Set"
                                         : undefined;
 
-                                    // Debug logging
-                                    if (exerciseIndex === 0) {
-                                      console.log(
-                                        "🔍 Exercise display debug:",
-                                        {
-                                          exerciseIndex,
-                                          exerciseType,
-                                          parsed,
-                                          config: (exercise as any)?.config,
-                                          notes: (exercise as any)?.notes,
-                                          hasProgressionRule,
-                                        }
+                                    // Resolve the base exercise details from global list if missing
+                                    const baseExercise =
+                                      (exercise as any)?.exercise ||
+                                      exercises.find(
+                                        (e) =>
+                                          e.id ===
+                                          (exercise as any)?.exercise_id
                                       );
-                                    }
 
                                     // For single exercise types, show exercise name; for multi-exercise types, show type name
                                     const displayName = isMultiExercise
@@ -3979,19 +4012,9 @@ function ProgramCreateForm({
                                         {/* Exercise Header */}
                                         <div className="mb-4">
                                           <div className="flex justify-between items-start mb-2">
-                                            <div className="flex items-center gap-2">
-                                              <h5 className="font-semibold text-lg">
-                                                {displayName}
-                                              </h5>
-                                              {hasProgressionRule && (
-                                                <span
-                                                  className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full"
-                                                  title="This exercise has been modified for this program week"
-                                                >
-                                                  Modified
-                                                </span>
-                                              )}
-                                            </div>
+                                            <h5 className="font-semibold text-lg">
+                                              {displayName}
+                                            </h5>
                                             <Button
                                               variant="outline"
                                               size="sm"
@@ -4043,9 +4066,7 @@ function ProgramCreateForm({
                                                     };
                                                     console.log(
                                                       "📋 Loading existing exercise config:",
-                                                      existingConfig.exercise_type,
-                                                      "Full config:",
-                                                      existingConfig
+                                                      existingConfig.exercise_type
                                                     );
                                                   } catch (error) {
                                                     console.error(
@@ -4151,26 +4172,14 @@ function ProgramCreateForm({
                                               const p = parsed || {};
                                               const type = exerciseType;
                                               if (type === "tabata") {
-                                                // For replaced exercises, prioritize progression rule parameters
                                                 const rounds =
-                                                  hasProgressionRule
-                                                    ? p.rounds || ex.rounds || 8
-                                                    : ex.rounds ||
-                                                      p.rounds ||
-                                                      8;
-                                                const work = hasProgressionRule
-                                                  ? p.work_seconds ||
-                                                    ex.work_seconds ||
-                                                    20
-                                                  : ex.work_seconds ||
-                                                    p.work_seconds ||
-                                                    20;
+                                                  ex.rounds || p.rounds || 8;
+                                                const work =
+                                                  ex.work_seconds ||
+                                                  p.work_seconds ||
+                                                  20;
                                                 const restAfter =
-                                                  hasProgressionRule
-                                                    ? p.rest_after ||
-                                                      ex.rest_after
-                                                    : ex.rest_after ||
-                                                      p.rest_after;
+                                                  ex.rest_after || p.rest_after;
                                                 return (
                                                   <>
                                                     Rounds: {rounds} • Work:{" "}
@@ -4182,23 +4191,15 @@ function ProgramCreateForm({
                                                 );
                                               }
                                               if (type === "circuit") {
-                                                // For replaced exercises, prioritize progression rule parameters
                                                 const rounds =
-                                                  hasProgressionRule
-                                                    ? p.sets || ex.sets
-                                                    : ex.sets || p.sets;
-                                                const count = hasProgressionRule
-                                                  ? p.circuit_sets?.length ||
-                                                    ex.circuit_sets?.length ||
-                                                    0
-                                                  : ex.circuit_sets?.length ||
-                                                    p.circuit_sets?.length ||
-                                                    0;
-                                                const rest = hasProgressionRule
-                                                  ? p.rest_seconds ||
-                                                    ex.rest_seconds
-                                                  : ex.rest_seconds ||
-                                                    p.rest_seconds;
+                                                  ex.sets || p.sets;
+                                                const count =
+                                                  ex.circuit_sets?.length ||
+                                                  p.circuit_sets?.length ||
+                                                  0;
+                                                const rest =
+                                                  ex.rest_seconds ||
+                                                  p.rest_seconds;
                                                 return (
                                                   <>
                                                     {rounds
@@ -4213,12 +4214,9 @@ function ProgramCreateForm({
                                                 );
                                               }
                                               if (type === "amrap") {
-                                                // For replaced exercises, prioritize progression rule parameters
-                                                const dur = hasProgressionRule
-                                                  ? p.amrap_duration ||
-                                                    ex.amrap_duration
-                                                  : ex.amrap_duration ||
-                                                    p.amrap_duration;
+                                                const dur =
+                                                  ex.amrap_duration ||
+                                                  p.amrap_duration;
                                                 return (
                                                   <>
                                                     {dur
@@ -4228,20 +4226,14 @@ function ProgramCreateForm({
                                                 );
                                               }
                                               if (type === "emom") {
-                                                // For replaced exercises, prioritize progression rule parameters
-                                                const dur = hasProgressionRule
-                                                  ? p.emom_duration ||
-                                                    ex.emom_duration
-                                                  : ex.emom_duration ||
-                                                    p.emom_duration;
-                                                const reps = hasProgressionRule
-                                                  ? p.emom_reps || ex.emom_reps
-                                                  : ex.emom_reps || p.emom_reps;
-                                                const work = hasProgressionRule
-                                                  ? p.work_seconds ||
-                                                    ex.work_seconds
-                                                  : ex.work_seconds ||
-                                                    p.work_seconds;
+                                                const dur =
+                                                  ex.emom_duration ||
+                                                  p.emom_duration;
+                                                const reps =
+                                                  ex.emom_reps || p.emom_reps;
+                                                const work =
+                                                  ex.work_seconds ||
+                                                  p.work_seconds;
                                                 return (
                                                   <>
                                                     {dur
@@ -4257,26 +4249,16 @@ function ProgramCreateForm({
                                                 );
                                               }
                                               if (type === "giant_set") {
-                                                // For replaced exercises, prioritize progression rule parameters
-                                                const sets = hasProgressionRule
-                                                  ? p.sets || ex.sets
-                                                  : ex.sets || p.sets;
-                                                const count = hasProgressionRule
-                                                  ? p.giant_set_exercises
-                                                      ?.length ||
-                                                    ex.giant_set_exercises
-                                                      ?.length ||
-                                                    0
-                                                  : ex.giant_set_exercises
-                                                      ?.length ||
-                                                    p.giant_set_exercises
-                                                      ?.length ||
-                                                    0;
-                                                const rest = hasProgressionRule
-                                                  ? p.rest_seconds ||
-                                                    ex.rest_seconds
-                                                  : ex.rest_seconds ||
-                                                    p.rest_seconds;
+                                                const sets = ex.sets || p.sets;
+                                                const count =
+                                                  ex.giant_set_exercises
+                                                    ?.length ||
+                                                  p.giant_set_exercises
+                                                    ?.length ||
+                                                  0;
+                                                const rest =
+                                                  ex.rest_seconds ||
+                                                  p.rest_seconds;
                                                 return (
                                                   <>
                                                     {sets
@@ -4293,32 +4275,18 @@ function ProgramCreateForm({
                                                 type === "cluster_set" ||
                                                 type === "cluster"
                                               ) {
-                                                // For replaced exercises, prioritize progression rule parameters
                                                 const clusters =
-                                                  hasProgressionRule
-                                                    ? p.sets || ex.sets
-                                                    : ex.sets || p.sets;
+                                                  ex.sets || p.sets;
                                                 const setsPerCluster =
-                                                  hasProgressionRule
-                                                    ? p.cluster_sets ||
-                                                      ex.cluster_sets
-                                                    : ex.cluster_sets ||
-                                                      p.cluster_sets;
-                                                const reps = hasProgressionRule
-                                                  ? p.reps || ex.reps
-                                                  : ex.reps || p.reps;
+                                                  ex.cluster_sets ||
+                                                  p.cluster_sets;
+                                                const reps = ex.reps || p.reps;
                                                 const restBetweenSets =
-                                                  hasProgressionRule
-                                                    ? p.rest_seconds ||
-                                                      ex.rest_seconds
-                                                    : ex.rest_seconds ||
-                                                      p.rest_seconds;
+                                                  ex.rest_seconds ||
+                                                  p.rest_seconds;
                                                 const restBetweenClusters =
-                                                  hasProgressionRule
-                                                    ? p.cluster_rest ||
-                                                      ex.cluster_rest
-                                                    : ex.cluster_rest ||
-                                                      p.cluster_rest;
+                                                  ex.cluster_rest ||
+                                                  p.cluster_rest;
                                                 return (
                                                   <>
                                                     Clusters: {clusters}
@@ -4336,30 +4304,17 @@ function ProgramCreateForm({
                                                 );
                                               }
                                               if (type === "drop_set") {
-                                                // For replaced exercises, prioritize progression rule parameters
-                                                const sets = hasProgressionRule
-                                                  ? p.sets || ex.sets
-                                                  : ex.sets || p.sets;
-                                                const reps = hasProgressionRule
-                                                  ? p.reps || ex.reps
-                                                  : ex.reps || p.reps;
+                                                const sets = ex.sets || p.sets;
+                                                const reps = ex.reps || p.reps;
                                                 const dropPercentage =
-                                                  hasProgressionRule
-                                                    ? p.drop_percentage ||
-                                                      ex.drop_percentage
-                                                    : ex.drop_percentage ||
-                                                      p.drop_percentage;
+                                                  ex.drop_percentage ||
+                                                  p.drop_percentage;
                                                 const dropReps =
-                                                  hasProgressionRule
-                                                    ? p.drop_set_reps ||
-                                                      ex.drop_set_reps
-                                                    : ex.drop_set_reps ||
-                                                      p.drop_set_reps;
-                                                const rest = hasProgressionRule
-                                                  ? p.rest_seconds ||
-                                                    ex.rest_seconds
-                                                  : ex.rest_seconds ||
-                                                    p.rest_seconds;
+                                                  ex.drop_set_reps ||
+                                                  p.drop_set_reps;
+                                                const rest =
+                                                  ex.rest_seconds ||
+                                                  p.rest_seconds;
                                                 return (
                                                   <>
                                                     Sets: {sets} • Reps: {reps}
@@ -4376,18 +4331,11 @@ function ProgramCreateForm({
                                                 );
                                               }
                                               if (type === "superset") {
-                                                // For replaced exercises, prioritize progression rule parameters
-                                                const sets = hasProgressionRule
-                                                  ? p.sets || ex.sets
-                                                  : ex.sets || p.sets;
-                                                const reps = hasProgressionRule
-                                                  ? p.reps || ex.reps
-                                                  : ex.reps || p.reps;
-                                                const rest = hasProgressionRule
-                                                  ? p.rest_seconds ||
-                                                    ex.rest_seconds
-                                                  : ex.rest_seconds ||
-                                                    p.rest_seconds;
+                                                const sets = ex.sets || p.sets;
+                                                const reps = ex.reps || p.reps;
+                                                const rest =
+                                                  ex.rest_seconds ||
+                                                  p.rest_seconds;
                                                 return (
                                                   <>
                                                     Sets: {sets} • Reps: {reps}
@@ -4469,6 +4417,8 @@ function ProgramCreateForm({
                                             "circuit",
                                             "giant_set",
                                             "superset",
+                                            "cluster",
+                                            "pre_exhaustion",
                                           ].includes(exerciseType || "") && (
                                             <div className="col-span-2 md:col-span-4 space-y-3">
                                               {(() => {
@@ -4545,6 +4495,40 @@ function ProgramCreateForm({
                                                       parsed.superset_exercise_id
                                                     );
                                                 }
+                                                if (
+                                                  exerciseType === "cluster" &&
+                                                  (exercise as any).exercise_id
+                                                ) {
+                                                  idSet.add(
+                                                    (exercise as any)
+                                                      .exercise_id
+                                                  );
+                                                }
+                                                if (
+                                                  exerciseType ===
+                                                  "pre_exhaustion"
+                                                ) {
+                                                  // Add main exercise
+                                                  if (
+                                                    (exercise as any)
+                                                      .exercise_id
+                                                  ) {
+                                                    idSet.add(
+                                                      (exercise as any)
+                                                        .exercise_id
+                                                    );
+                                                  }
+                                                  // Add compound exercise
+                                                  if (
+                                                    (exercise as any)
+                                                      .compound_exercise_id
+                                                  ) {
+                                                    idSet.add(
+                                                      (exercise as any)
+                                                        .compound_exercise_id
+                                                    );
+                                                  }
+                                                }
                                                 const ids = Array.from(idSet);
                                                 return ids.map(
                                                   (id: string, idx: number) => {
@@ -4555,113 +4539,1241 @@ function ProgramCreateForm({
                                                     return (
                                                       <div
                                                         key={`${id}-${idx}`}
-                                                        className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
+                                                        className="space-y-3 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
                                                       >
-                                                        <div className="md:col-span-2">
+                                                        <div className="block md:hidden">
                                                           <span className="text-sm font-medium">
                                                             {exInfo?.name ||
                                                               "Exercise"}
                                                           </span>
                                                         </div>
-                                                        {exerciseType ===
-                                                          "tabata" ||
-                                                        exerciseType ===
-                                                          "circuit" ? (
-                                                          <>
-                                                            <div>
-                                                              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                                                                Work (sec)
-                                                              </label>
-                                                              <Input
-                                                                type="number"
-                                                                className="rounded-lg"
-                                                                value={getWeekValue(
-                                                                  selectedWeek,
-                                                                  getExKey(
-                                                                    scheduleItem,
-                                                                    exerciseIndex,
-                                                                    `${id}-${idx}`
-                                                                  ),
-                                                                  "work_seconds",
-                                                                  parsed.work_seconds ||
-                                                                    ""
+                                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                                          <div className="hidden md:block md:col-span-2">
+                                                            <span className="text-sm font-medium">
+                                                              {exInfo?.name ||
+                                                                "Exercise"}
+                                                            </span>
+                                                          </div>
+                                                          {exerciseType ===
+                                                          "tabata" ? (
+                                                            <div className="col-span-1 md:col-span-2">
+                                                              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700 space-y-4">
+                                                                <div className="flex items-center justify-between mb-3">
+                                                                  <h4 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                                                    <Zap className="w-4 h-4 text-purple-600" />
+                                                                    Tabata
+                                                                  </h4>
+                                                                </div>
+
+                                                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
+                                                                  Fixed timing
+                                                                  for all
+                                                                  exercises
+                                                                </p>
+
+                                                                {/* Tabata Timing - 3 grid */}
+                                                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      Work (sec)
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="number"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "work_seconds",
+                                                                        parsed.work_seconds ||
+                                                                          ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "work_seconds",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      min="10"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      Rest (sec)
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="number"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "rest_seconds",
+                                                                        parsed.rest_seconds ||
+                                                                          ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "rest_seconds",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      min="5"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      Rounds
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="number"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "rounds",
+                                                                        parsed.rounds ||
+                                                                          ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "rounds",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      min="4"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                </div>
+
+                                                                {/* Add Set Button */}
+                                                                <div className="mt-3">
+                                                                  <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                      // TODO: Implement add set functionality
+                                                                    }}
+                                                                    className="w-full border-dashed border-purple-300 dark:border-purple-600 text-purple-600 dark:text-purple-400"
+                                                                  >
+                                                                    <span className="text-xs">
+                                                                      + Add Set
+                                                                    </span>
+                                                                  </Button>
+                                                                </div>
+
+                                                                {/* Sets List */}
+                                                                {(
+                                                                  parsed.tabata_sets ||
+                                                                  []
+                                                                ).length >
+                                                                  0 && (
+                                                                  <div className="mt-3 space-y-2">
+                                                                    {parsed.tabata_sets.map(
+                                                                      (
+                                                                        set: any,
+                                                                        setIndex: number
+                                                                      ) => (
+                                                                        <div
+                                                                          key={
+                                                                            setIndex
+                                                                          }
+                                                                          className="p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-600"
+                                                                        >
+                                                                          <div className="flex items-center justify-between mb-2">
+                                                                            <h5 className="font-medium text-xs text-slate-900 dark:text-slate-100">
+                                                                              Set{" "}
+                                                                              {setIndex +
+                                                                                1}
+                                                                            </h5>
+                                                                            <Button
+                                                                              type="button"
+                                                                              variant="ghost"
+                                                                              size="sm"
+                                                                              onClick={() => {
+                                                                                // TODO: Implement remove set functionality
+                                                                              }}
+                                                                              className="text-red-500 hover:text-red-700 p-1 h-5"
+                                                                            >
+                                                                              <span className="text-xs">
+                                                                                Remove
+                                                                              </span>
+                                                                            </Button>
+                                                                          </div>
+
+                                                                          {/* Exercises in this set */}
+                                                                          <div className="space-y-1">
+                                                                            {set.exercises?.map(
+                                                                              (
+                                                                                ex: any,
+                                                                                exIndex: number
+                                                                              ) => (
+                                                                                <div
+                                                                                  key={
+                                                                                    exIndex
+                                                                                  }
+                                                                                  className="flex items-center gap-2 text-xs"
+                                                                                >
+                                                                                  <span className="text-slate-500 w-6">
+                                                                                    {exIndex +
+                                                                                      1}
+
+                                                                                    .
+                                                                                  </span>
+                                                                                  <div className="flex-1">
+                                                                                    {exercises.find(
+                                                                                      (
+                                                                                        e
+                                                                                      ) =>
+                                                                                        e.id ===
+                                                                                        ex.exercise_id
+                                                                                    )
+                                                                                      ?.name ||
+                                                                                      "Exercise"}
+                                                                                  </div>
+                                                                                  <Button
+                                                                                    type="button"
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    onClick={() => {
+                                                                                      // TODO: Implement remove exercise functionality
+                                                                                    }}
+                                                                                    className="text-red-500 hover:text-red-700 p-1 h-5"
+                                                                                  >
+                                                                                    <span className="text-xs">
+                                                                                      Remove
+                                                                                    </span>
+                                                                                  </Button>
+                                                                                </div>
+                                                                              )
+                                                                            )}
+                                                                          </div>
+
+                                                                          {/* Add Exercise Button */}
+                                                                          <div className="mt-2">
+                                                                            <Button
+                                                                              type="button"
+                                                                              variant="outline"
+                                                                              size="sm"
+                                                                              onClick={() => {
+                                                                                // TODO: Implement add exercise functionality
+                                                                              }}
+                                                                              className="w-full border-dashed text-xs"
+                                                                            >
+                                                                              <span className="text-xs">
+                                                                                +
+                                                                                Add
+                                                                                Exercise
+                                                                              </span>
+                                                                            </Button>
+                                                                          </div>
+
+                                                                          {/* Rest between sets */}
+                                                                          <div className="mt-2">
+                                                                            <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                              Rest
+                                                                              After
+                                                                              Set
+                                                                              (sec)
+                                                                            </Label>
+                                                                            <Input
+                                                                              type="number"
+                                                                              value={getWeekValue(
+                                                                                selectedWeek,
+                                                                                getExKey(
+                                                                                  scheduleItem,
+                                                                                  exerciseIndex,
+                                                                                  `${id}-${idx}-set-${setIndex}`
+                                                                                ),
+                                                                                "rest_between_sets",
+                                                                                ""
+                                                                              )}
+                                                                              onChange={(
+                                                                                e
+                                                                              ) =>
+                                                                                setWeekValue(
+                                                                                  selectedWeek,
+                                                                                  getExKey(
+                                                                                    scheduleItem,
+                                                                                    exerciseIndex,
+                                                                                    `${id}-${idx}-set-${setIndex}`
+                                                                                  ),
+                                                                                  "rest_between_sets",
+                                                                                  e
+                                                                                    .target
+                                                                                    .value
+                                                                                )
+                                                                              }
+                                                                              min="0"
+                                                                              className="mt-1 rounded text-xs h-7"
+                                                                            />
+                                                                          </div>
+                                                                        </div>
+                                                                      )
+                                                                    )}
+                                                                  </div>
                                                                 )}
-                                                                onChange={(e) =>
-                                                                  setWeekValue(
-                                                                    selectedWeek,
-                                                                    getExKey(
-                                                                      scheduleItem,
-                                                                      exerciseIndex,
-                                                                      `${id}-${idx}`
-                                                                    ),
-                                                                    "work_seconds",
-                                                                    e.target
-                                                                      .value
-                                                                  )
-                                                                }
-                                                                min="0"
-                                                              />
+                                                              </div>
                                                             </div>
-                                                            <div>
-                                                              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                                                                Rest after (sec)
-                                                              </label>
-                                                              <Input
-                                                                type="number"
-                                                                className="rounded-lg"
-                                                                value={getWeekValue(
-                                                                  selectedWeek,
-                                                                  getExKey(
-                                                                    scheduleItem,
-                                                                    exerciseIndex,
-                                                                    `${id}-${idx}`
-                                                                  ),
-                                                                  "rest_after",
-                                                                  parsed.rest_after ||
-                                                                    ""
+                                                          ) : exerciseType ===
+                                                            "circuit" ? (
+                                                            <div className="col-span-1 md:col-span-2">
+                                                              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-700 space-y-4">
+                                                                <div className="flex items-center justify-between mb-3">
+                                                                  <h4 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                                                    <Zap className="w-4 h-4 text-yellow-600" />
+                                                                    Circuit
+                                                                  </h4>
+                                                                </div>
+
+                                                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
+                                                                  Multiple
+                                                                  exercises in
+                                                                  sequence with
+                                                                  individual
+                                                                  timing
+                                                                </p>
+
+                                                                {/* Add Set Button */}
+                                                                <div className="mt-3">
+                                                                  <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                      // TODO: Implement add set functionality
+                                                                    }}
+                                                                    className="w-full border-dashed border-yellow-300 dark:border-yellow-600 text-yellow-600 dark:text-yellow-400"
+                                                                  >
+                                                                    <span className="text-xs">
+                                                                      + Add Set
+                                                                    </span>
+                                                                  </Button>
+                                                                </div>
+
+                                                                {/* Sets List */}
+                                                                {(
+                                                                  parsed.circuit_sets ||
+                                                                  []
+                                                                ).length >
+                                                                  0 && (
+                                                                  <div className="mt-3 space-y-2">
+                                                                    {parsed.circuit_sets.map(
+                                                                      (
+                                                                        set: any,
+                                                                        setIndex: number
+                                                                      ) => (
+                                                                        <div
+                                                                          key={
+                                                                            setIndex
+                                                                          }
+                                                                          className="p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-600"
+                                                                        >
+                                                                          <div className="flex items-center justify-between mb-2">
+                                                                            <h5 className="font-medium text-xs text-slate-900 dark:text-slate-100">
+                                                                              Set{" "}
+                                                                              {setIndex +
+                                                                                1}
+                                                                            </h5>
+                                                                            <Button
+                                                                              type="button"
+                                                                              variant="ghost"
+                                                                              size="sm"
+                                                                              onClick={() => {
+                                                                                // TODO: Implement remove set functionality
+                                                                              }}
+                                                                              className="text-red-500 hover:text-red-700 p-1 h-5"
+                                                                            >
+                                                                              <span className="text-xs">
+                                                                                Remove
+                                                                              </span>
+                                                                            </Button>
+                                                                          </div>
+
+                                                                          {/* Exercises in this set */}
+                                                                          <div className="space-y-1">
+                                                                            {set.exercises?.map(
+                                                                              (
+                                                                                ex: any,
+                                                                                exIndex: number
+                                                                              ) => (
+                                                                                <div
+                                                                                  key={
+                                                                                    exIndex
+                                                                                  }
+                                                                                  className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600"
+                                                                                >
+                                                                                  <div className="flex items-center gap-2 mb-2">
+                                                                                    <span className="text-xs text-slate-500 w-6">
+                                                                                      {exIndex +
+                                                                                        1}
+
+                                                                                      .
+                                                                                    </span>
+                                                                                    <div className="flex-1 text-sm">
+                                                                                      {exercises.find(
+                                                                                        (
+                                                                                          e
+                                                                                        ) =>
+                                                                                          e.id ===
+                                                                                          ex.exercise_id
+                                                                                      )
+                                                                                        ?.name ||
+                                                                                        "Exercise"}
+                                                                                    </div>
+                                                                                    <Button
+                                                                                      type="button"
+                                                                                      variant="ghost"
+                                                                                      size="sm"
+                                                                                      onClick={() => {
+                                                                                        // TODO: Implement remove exercise functionality
+                                                                                      }}
+                                                                                      className="text-red-500 hover:text-red-700 p-1 h-5"
+                                                                                    >
+                                                                                      <span className="text-xs">
+                                                                                        Remove
+                                                                                      </span>
+                                                                                    </Button>
+                                                                                  </div>
+
+                                                                                  {/* Individual exercise work and rest time */}
+                                                                                  <div className="grid grid-cols-2 gap-2">
+                                                                                    <div>
+                                                                                      <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                                        Work
+                                                                                        (sec)
+                                                                                      </Label>
+                                                                                      <Input
+                                                                                        type="number"
+                                                                                        value={getWeekValue(
+                                                                                          selectedWeek,
+                                                                                          getExKey(
+                                                                                            scheduleItem,
+                                                                                            exerciseIndex,
+                                                                                            `${id}-${idx}-set-${setIndex}-ex-${exIndex}`
+                                                                                          ),
+                                                                                          "work_seconds",
+                                                                                          ""
+                                                                                        )}
+                                                                                        onChange={(
+                                                                                          e
+                                                                                        ) =>
+                                                                                          setWeekValue(
+                                                                                            selectedWeek,
+                                                                                            getExKey(
+                                                                                              scheduleItem,
+                                                                                              exerciseIndex,
+                                                                                              `${id}-${idx}-set-${setIndex}-ex-${exIndex}`
+                                                                                            ),
+                                                                                            "work_seconds",
+                                                                                            e
+                                                                                              .target
+                                                                                              .value
+                                                                                          )
+                                                                                        }
+                                                                                        min="0"
+                                                                                        className="mt-1 rounded text-xs h-7"
+                                                                                      />
+                                                                                    </div>
+                                                                                    <div>
+                                                                                      <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                                        Rest
+                                                                                        (sec)
+                                                                                      </Label>
+                                                                                      <Input
+                                                                                        type="number"
+                                                                                        value={getWeekValue(
+                                                                                          selectedWeek,
+                                                                                          getExKey(
+                                                                                            scheduleItem,
+                                                                                            exerciseIndex,
+                                                                                            `${id}-${idx}-set-${setIndex}-ex-${exIndex}`
+                                                                                          ),
+                                                                                          "rest_after",
+                                                                                          ""
+                                                                                        )}
+                                                                                        onChange={(
+                                                                                          e
+                                                                                        ) =>
+                                                                                          setWeekValue(
+                                                                                            selectedWeek,
+                                                                                            getExKey(
+                                                                                              scheduleItem,
+                                                                                              exerciseIndex,
+                                                                                              `${id}-${idx}-set-${setIndex}-ex-${exIndex}`
+                                                                                            ),
+                                                                                            "rest_after",
+                                                                                            e
+                                                                                              .target
+                                                                                              .value
+                                                                                          )
+                                                                                        }
+                                                                                        min="0"
+                                                                                        className="mt-1 rounded text-xs h-7"
+                                                                                      />
+                                                                                    </div>
+                                                                                  </div>
+                                                                                </div>
+                                                                              )
+                                                                            )}
+                                                                          </div>
+
+                                                                          {/* Add Exercise Button */}
+                                                                          <div className="mt-2">
+                                                                            <Button
+                                                                              type="button"
+                                                                              variant="outline"
+                                                                              size="sm"
+                                                                              onClick={() => {
+                                                                                // TODO: Implement add exercise functionality
+                                                                              }}
+                                                                              className="w-full border-dashed text-xs"
+                                                                            >
+                                                                              <span className="text-xs">
+                                                                                +
+                                                                                Add
+                                                                                Exercise
+                                                                              </span>
+                                                                            </Button>
+                                                                          </div>
+
+                                                                          {/* Rest after this set */}
+                                                                          <div className="mt-2">
+                                                                            <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                              Rest
+                                                                              After
+                                                                              Set
+                                                                              (sec)
+                                                                            </Label>
+                                                                            <Input
+                                                                              type="number"
+                                                                              value={getWeekValue(
+                                                                                selectedWeek,
+                                                                                getExKey(
+                                                                                  scheduleItem,
+                                                                                  exerciseIndex,
+                                                                                  `${id}-${idx}-set-${setIndex}`
+                                                                                ),
+                                                                                "rest_between_sets",
+                                                                                ""
+                                                                              )}
+                                                                              onChange={(
+                                                                                e
+                                                                              ) =>
+                                                                                setWeekValue(
+                                                                                  selectedWeek,
+                                                                                  getExKey(
+                                                                                    scheduleItem,
+                                                                                    exerciseIndex,
+                                                                                    `${id}-${idx}-set-${setIndex}`
+                                                                                  ),
+                                                                                  "rest_between_sets",
+                                                                                  e
+                                                                                    .target
+                                                                                    .value
+                                                                                )
+                                                                              }
+                                                                              min="0"
+                                                                              className="mt-1 rounded text-xs h-7"
+                                                                            />
+                                                                          </div>
+                                                                        </div>
+                                                                      )
+                                                                    )}
+                                                                  </div>
                                                                 )}
-                                                                onChange={(e) =>
-                                                                  setWeekValue(
-                                                                    selectedWeek,
-                                                                    getExKey(
-                                                                      scheduleItem,
-                                                                      exerciseIndex,
-                                                                      `${id}-${idx}`
-                                                                    ),
-                                                                    "rest_after",
-                                                                    e.target
-                                                                      .value
-                                                                  )
-                                                                }
-                                                                min="0"
-                                                              />
+                                                              </div>
                                                             </div>
-                                                          </>
-                                                        ) : exerciseType ===
-                                                            "giant_set" ||
-                                                          exerciseType ===
+                                                          ) : exerciseType ===
                                                             "superset" ? (
-                                                          <>
-                                                            <div>
-                                                              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                                                                Reps
-                                                              </label>
-                                                              <Input
-                                                                className="rounded-lg"
-                                                                value={getWeekValue(
-                                                                  selectedWeek,
-                                                                  getExKey(
-                                                                    scheduleItem,
-                                                                    exerciseIndex,
-                                                                    `${id}-${idx}`
-                                                                  ),
-                                                                  "reps",
-                                                                  (
-                                                                    exercise as any
-                                                                  ).reps || ""
+                                                            <div className="space-y-1 col-span-1 md:col-span-2">
+                                                              <div className="p-1 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-700">
+                                                                <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-1 flex items-center gap-1 text-xs">
+                                                                  <Zap className="w-3 h-3 text-purple-600" />
+                                                                  Superset
+                                                                </h4>
+                                                                <div>
+                                                                  <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                    Second
+                                                                    Exercise
+                                                                  </Label>
+                                                                  <SearchableSelect
+                                                                    value={getWeekValue(
+                                                                      selectedWeek,
+                                                                      getExKey(
+                                                                        scheduleItem,
+                                                                        exerciseIndex,
+                                                                        `${id}-${idx}`
+                                                                      ),
+                                                                      "superset_exercise_id",
+                                                                      ""
+                                                                    )}
+                                                                    onValueChange={(
+                                                                      value
+                                                                    ) =>
+                                                                      setWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "superset_exercise_id",
+                                                                        value
+                                                                      )
+                                                                    }
+                                                                    placeholder="Select..."
+                                                                    items={exercises.map(
+                                                                      (ex) => ({
+                                                                        id: ex.id,
+                                                                        name: ex.name,
+                                                                        description:
+                                                                          ex.description,
+                                                                      })
+                                                                    )}
+                                                                    className="mt-1"
+                                                                  />
+                                                                </div>
+                                                                <div className="grid grid-cols-2 gap-1">
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      Sets
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="number"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "sets",
+                                                                        (
+                                                                          exercise as any
+                                                                        )
+                                                                          .sets ||
+                                                                          ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "sets",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      min="1"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      Rest
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="number"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "rest_seconds",
+                                                                        (
+                                                                          exercise as any
+                                                                        )
+                                                                          .rest_seconds ||
+                                                                          ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "rest_seconds",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      min="0"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-2 gap-1">
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      First Reps
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="text"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "reps",
+                                                                        (
+                                                                          exercise as any
+                                                                        )
+                                                                          .reps ||
+                                                                          ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "reps",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      placeholder="8-12"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      Second
+                                                                      Reps
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="text"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "superset_reps",
+                                                                        ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "superset_reps",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      placeholder="8-12"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                </div>
+                                                              </div>
+                                                            </div>
+                                                          ) : exerciseType ===
+                                                            "cluster" ? (
+                                                            <div className="space-y-1 col-span-1 md:col-span-2">
+                                                              <div className="p-1 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
+                                                                <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-1 flex items-center gap-1 text-xs">
+                                                                  <Zap className="w-3 h-3 text-blue-600" />
+                                                                  Cluster Set
+                                                                </h4>
+                                                                <div className="grid grid-cols-2 gap-1">
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      Clusters
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="number"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "sets",
+                                                                        (
+                                                                          exercise as any
+                                                                        )
+                                                                          .sets ||
+                                                                          ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "sets",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      min="1"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      Sets/Cluster
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="number"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "cluster_sets",
+                                                                        ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "cluster_sets",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      min="1"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                </div>
+                                                                <div className="grid grid-cols-2 gap-1">
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      Reps
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="text"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "reps",
+                                                                        (
+                                                                          exercise as any
+                                                                        )
+                                                                          .reps ||
+                                                                          ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "reps",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      placeholder="8-12"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                  <div>
+                                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                      Rest (sec)
+                                                                    </Label>
+                                                                    <Input
+                                                                      type="number"
+                                                                      value={getWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "rest_seconds",
+                                                                        (
+                                                                          exercise as any
+                                                                        )
+                                                                          .rest_seconds ||
+                                                                          ""
+                                                                      )}
+                                                                      onChange={(
+                                                                        e
+                                                                      ) =>
+                                                                        setWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `${id}-${idx}`
+                                                                          ),
+                                                                          "rest_seconds",
+                                                                          e
+                                                                            .target
+                                                                            .value
+                                                                        )
+                                                                      }
+                                                                      min="0"
+                                                                      className="mt-1 rounded text-xs h-7"
+                                                                    />
+                                                                  </div>
+                                                                </div>
+                                                                <div>
+                                                                  <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                    Cluster Rest
+                                                                    (sec)
+                                                                  </Label>
+                                                                  <Input
+                                                                    type="number"
+                                                                    value={getWeekValue(
+                                                                      selectedWeek,
+                                                                      getExKey(
+                                                                        scheduleItem,
+                                                                        exerciseIndex,
+                                                                        `${id}-${idx}`
+                                                                      ),
+                                                                      "cluster_rest",
+                                                                      ""
+                                                                    )}
+                                                                    onChange={(
+                                                                      e
+                                                                    ) =>
+                                                                      setWeekValue(
+                                                                        selectedWeek,
+                                                                        getExKey(
+                                                                          scheduleItem,
+                                                                          exerciseIndex,
+                                                                          `${id}-${idx}`
+                                                                        ),
+                                                                        "cluster_rest",
+                                                                        e.target
+                                                                          .value
+                                                                      )
+                                                                    }
+                                                                    min="30"
+                                                                    className="mt-1 rounded text-xs h-7"
+                                                                  />
+                                                                </div>
+                                                              </div>
+                                                            </div>
+                                                          ) : exerciseType ===
+                                                            "pre_exhaustion" ? (
+                                                            <div className="col-span-1 md:col-span-2">
+                                                              <div className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-xl border border-pink-200 dark:border-pink-700 space-y-4">
+                                                                <div className="flex items-center justify-between mb-3">
+                                                                  <h4 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                                                    <Zap className="w-4 h-4 text-pink-600" />
+                                                                    Pre-Exhaustion
+                                                                  </h4>
+                                                                </div>
+
+                                                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
+                                                                  Isolation
+                                                                  exercise
+                                                                  followed by
+                                                                  compound
+                                                                  movement
+                                                                </p>
+
+                                                                {/* Display the two exercises */}
+                                                                {exInfo && (
+                                                                  <div className="space-y-3">
+                                                                    {/* Pre-exhaustion exercise (first one) */}
+                                                                    {idx ===
+                                                                      0 && (
+                                                                      <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
+                                                                        <div className="flex items-center gap-2 mb-2">
+                                                                          <span className="text-xs text-slate-500 w-6">
+                                                                            1.
+                                                                          </span>
+                                                                          <div className="flex-1 text-sm">
+                                                                            {
+                                                                              exInfo.name
+                                                                            }
+                                                                          </div>
+                                                                        </div>
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                          <div>
+                                                                            <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                              Isolation
+                                                                              Reps
+                                                                            </Label>
+                                                                            <Input
+                                                                              type="text"
+                                                                              value={getWeekValue(
+                                                                                selectedWeek,
+                                                                                getExKey(
+                                                                                  scheduleItem,
+                                                                                  exerciseIndex,
+                                                                                  `${id}-${idx}`
+                                                                                ),
+                                                                                "isolation_reps",
+                                                                                ""
+                                                                              )}
+                                                                              onChange={(
+                                                                                e
+                                                                              ) =>
+                                                                                setWeekValue(
+                                                                                  selectedWeek,
+                                                                                  getExKey(
+                                                                                    scheduleItem,
+                                                                                    exerciseIndex,
+                                                                                    `${id}-${idx}`
+                                                                                  ),
+                                                                                  "isolation_reps",
+                                                                                  e
+                                                                                    .target
+                                                                                    .value
+                                                                                )
+                                                                              }
+                                                                              placeholder="12-15"
+                                                                              className="mt-1 rounded text-xs h-7"
+                                                                            />
+                                                                          </div>
+                                                                          <div>
+                                                                            <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                              Rest
+                                                                              (sec)
+                                                                            </Label>
+                                                                            <Input
+                                                                              type="number"
+                                                                              value={getWeekValue(
+                                                                                selectedWeek,
+                                                                                getExKey(
+                                                                                  scheduleItem,
+                                                                                  exerciseIndex,
+                                                                                  `${id}-${idx}`
+                                                                                ),
+                                                                                "rest_seconds",
+                                                                                (
+                                                                                  exercise as any
+                                                                                )
+                                                                                  .rest_seconds ||
+                                                                                  ""
+                                                                              )}
+                                                                              onChange={(
+                                                                                e
+                                                                              ) =>
+                                                                                setWeekValue(
+                                                                                  selectedWeek,
+                                                                                  getExKey(
+                                                                                    scheduleItem,
+                                                                                    exerciseIndex,
+                                                                                    `${id}-${idx}`
+                                                                                  ),
+                                                                                  "rest_seconds",
+                                                                                  e
+                                                                                    .target
+                                                                                    .value
+                                                                                )
+                                                                              }
+                                                                              min="0"
+                                                                              className="mt-1 rounded text-xs h-7"
+                                                                            />
+                                                                          </div>
+                                                                        </div>
+                                                                      </div>
+                                                                    )}
+
+                                                                    {/* Compound exercise (second one) */}
+                                                                    {idx ===
+                                                                      1 && (
+                                                                      <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
+                                                                        <div className="flex items-center gap-2 mb-2">
+                                                                          <span className="text-xs text-slate-500 w-6">
+                                                                            2.
+                                                                          </span>
+                                                                          <div className="flex-1 text-sm">
+                                                                            {
+                                                                              exInfo.name
+                                                                            }
+                                                                          </div>
+                                                                        </div>
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                          <div>
+                                                                            <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                              Compound
+                                                                              Reps
+                                                                            </Label>
+                                                                            <Input
+                                                                              type="text"
+                                                                              value={getWeekValue(
+                                                                                selectedWeek,
+                                                                                getExKey(
+                                                                                  scheduleItem,
+                                                                                  exerciseIndex,
+                                                                                  `${id}-${idx}`
+                                                                                ),
+                                                                                "compound_reps",
+                                                                                ""
+                                                                              )}
+                                                                              onChange={(
+                                                                                e
+                                                                              ) =>
+                                                                                setWeekValue(
+                                                                                  selectedWeek,
+                                                                                  getExKey(
+                                                                                    scheduleItem,
+                                                                                    exerciseIndex,
+                                                                                    `${id}-${idx}`
+                                                                                  ),
+                                                                                  "compound_reps",
+                                                                                  e
+                                                                                    .target
+                                                                                    .value
+                                                                                )
+                                                                              }
+                                                                              placeholder="6-8"
+                                                                              className="mt-1 rounded text-xs h-7"
+                                                                            />
+                                                                          </div>
+                                                                          <div>
+                                                                            <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                              Rest
+                                                                              (sec)
+                                                                            </Label>
+                                                                            <Input
+                                                                              type="number"
+                                                                              value={getWeekValue(
+                                                                                selectedWeek,
+                                                                                getExKey(
+                                                                                  scheduleItem,
+                                                                                  exerciseIndex,
+                                                                                  `${id}-${idx}`
+                                                                                ),
+                                                                                "rest_seconds",
+                                                                                (
+                                                                                  exercise as any
+                                                                                )
+                                                                                  .rest_seconds ||
+                                                                                  ""
+                                                                              )}
+                                                                              onChange={(
+                                                                                e
+                                                                              ) =>
+                                                                                setWeekValue(
+                                                                                  selectedWeek,
+                                                                                  getExKey(
+                                                                                    scheduleItem,
+                                                                                    exerciseIndex,
+                                                                                    `${id}-${idx}`
+                                                                                  ),
+                                                                                  "rest_seconds",
+                                                                                  e
+                                                                                    .target
+                                                                                    .value
+                                                                                )
+                                                                              }
+                                                                              min="0"
+                                                                              className="mt-1 rounded text-xs h-7"
+                                                                            />
+                                                                          </div>
+                                                                        </div>
+                                                                      </div>
+                                                                    )}
+                                                                  </div>
                                                                 )}
-                                                                onChange={(e) =>
-                                                                  setWeekValue(
+                                                              </div>
+                                                            </div>
+                                                          ) : exerciseType ===
+                                                            "giant_set" ? (
+                                                            <>
+                                                              <div>
+                                                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                                                                  Reps
+                                                                </label>
+                                                                <Input
+                                                                  className="rounded-lg"
+                                                                  value={getWeekValue(
                                                                     selectedWeek,
                                                                     getExKey(
                                                                       scheduleItem,
@@ -4669,36 +5781,36 @@ function ProgramCreateForm({
                                                                       `${id}-${idx}`
                                                                     ),
                                                                     "reps",
-                                                                    e.target
-                                                                      .value
-                                                                  )
-                                                                }
-                                                                placeholder="8-10"
-                                                              />
-                                                            </div>
-                                                            <div>
-                                                              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                                                                Rest (sec)
-                                                              </label>
-                                                              <Input
-                                                                type="number"
-                                                                className="rounded-lg"
-                                                                value={getWeekValue(
-                                                                  selectedWeek,
-                                                                  getExKey(
-                                                                    scheduleItem,
-                                                                    exerciseIndex,
-                                                                    `${id}-${idx}`
-                                                                  ),
-                                                                  "rest_seconds",
-                                                                  (
-                                                                    exercise as any
-                                                                  )
-                                                                    .rest_seconds ||
-                                                                    ""
-                                                                )}
-                                                                onChange={(e) =>
-                                                                  setWeekValue(
+                                                                    (
+                                                                      exercise as any
+                                                                    ).reps || ""
+                                                                  )}
+                                                                  onChange={(
+                                                                    e
+                                                                  ) =>
+                                                                    setWeekValue(
+                                                                      selectedWeek,
+                                                                      getExKey(
+                                                                        scheduleItem,
+                                                                        exerciseIndex,
+                                                                        `${id}-${idx}`
+                                                                      ),
+                                                                      "reps",
+                                                                      e.target
+                                                                        .value
+                                                                    )
+                                                                  }
+                                                                  placeholder="8-10"
+                                                                />
+                                                              </div>
+                                                              <div>
+                                                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                                                                  Rest (sec)
+                                                                </label>
+                                                                <Input
+                                                                  type="number"
+                                                                  className="rounded-lg"
+                                                                  value={getWeekValue(
                                                                     selectedWeek,
                                                                     getExKey(
                                                                       scheduleItem,
@@ -4706,15 +5818,33 @@ function ProgramCreateForm({
                                                                       `${id}-${idx}`
                                                                     ),
                                                                     "rest_seconds",
-                                                                    e.target
-                                                                      .value
-                                                                  )
-                                                                }
-                                                                min="0"
-                                                              />
-                                                            </div>
-                                                          </>
-                                                        ) : null}
+                                                                    (
+                                                                      exercise as any
+                                                                    )
+                                                                      .rest_seconds ||
+                                                                      ""
+                                                                  )}
+                                                                  onChange={(
+                                                                    e
+                                                                  ) =>
+                                                                    setWeekValue(
+                                                                      selectedWeek,
+                                                                      getExKey(
+                                                                        scheduleItem,
+                                                                        exerciseIndex,
+                                                                        `${id}-${idx}`
+                                                                      ),
+                                                                      "rest_seconds",
+                                                                      e.target
+                                                                        .value
+                                                                    )
+                                                                  }
+                                                                  min="0"
+                                                                />
+                                                              </div>
+                                                            </>
+                                                          ) : null}
+                                                        </div>
                                                       </div>
                                                     );
                                                   }
@@ -4722,120 +5852,16 @@ function ProgramCreateForm({
                                               })()}
                                             </div>
                                           )}
-                                          {[
+                                          {![
                                             "tabata",
                                             "circuit",
                                             "giant_set",
                                             "superset",
+                                            "cluster",
+                                            "drop_set",
+                                            "amrap",
                                           ].includes(exerciseType || "") &&
-                                          exerciseType === "tabata" ? (
-                                            <>
-                                              <div>
-                                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                                                  Rounds
-                                                </label>
-                                                <Input
-                                                  type="number"
-                                                  className="rounded-lg"
-                                                  value={getWeekValue(
-                                                    selectedWeek,
-                                                    getExKey(
-                                                      scheduleItem,
-                                                      exerciseIndex
-                                                    ),
-                                                    "rounds",
-                                                    (exercise as any).rounds ||
-                                                      parsed.rounds ||
-                                                      8
-                                                  )}
-                                                  onChange={(e) =>
-                                                    setWeekValue(
-                                                      selectedWeek,
-                                                      getExKey(
-                                                        scheduleItem,
-                                                        exerciseIndex
-                                                      ),
-                                                      "rounds",
-                                                      e.target.value
-                                                    )
-                                                  }
-                                                  min="1"
-                                                />
-                                              </div>
-                                              <div>
-                                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                                                  Work (sec)
-                                                </label>
-                                                <Input
-                                                  type="number"
-                                                  className="rounded-lg"
-                                                  value={getWeekValue(
-                                                    selectedWeek,
-                                                    getExKey(
-                                                      scheduleItem,
-                                                      exerciseIndex
-                                                    ),
-                                                    "work_seconds",
-                                                    (exercise as any)
-                                                      .work_seconds ||
-                                                      parsed.work_seconds ||
-                                                      20
-                                                  )}
-                                                  onChange={(e) =>
-                                                    setWeekValue(
-                                                      selectedWeek,
-                                                      getExKey(
-                                                        scheduleItem,
-                                                        exerciseIndex
-                                                      ),
-                                                      "work_seconds",
-                                                      e.target.value
-                                                    )
-                                                  }
-                                                  min="5"
-                                                />
-                                              </div>
-                                              <div>
-                                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                                                  Rest after (sec)
-                                                </label>
-                                                <Input
-                                                  type="number"
-                                                  className="rounded-lg"
-                                                  value={getWeekValue(
-                                                    selectedWeek,
-                                                    getExKey(
-                                                      scheduleItem,
-                                                      exerciseIndex
-                                                    ),
-                                                    "rest_after",
-                                                    (exercise as any)
-                                                      .rest_after ||
-                                                      parsed.rest_after ||
-                                                      ""
-                                                  )}
-                                                  onChange={(e) =>
-                                                    setWeekValue(
-                                                      selectedWeek,
-                                                      getExKey(
-                                                        scheduleItem,
-                                                        exerciseIndex
-                                                      ),
-                                                      "rest_after",
-                                                      e.target.value
-                                                    )
-                                                  }
-                                                  min="0"
-                                                />
-                                              </div>
-                                            </>
-                                          ) : [
-                                              "tabata",
-                                              "circuit",
-                                              "giant_set",
-                                              "superset",
-                                            ].includes(exerciseType || "") &&
-                                            exerciseType === "circuit" ? (
+                                          exerciseType === "circuit" ? (
                                             <>
                                               <div>
                                                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
@@ -4937,71 +5963,142 @@ function ProgramCreateForm({
                                               </div>
                                             </>
                                           ) : exerciseType === "amrap" ? (
-                                            <>
-                                              <div>
-                                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                                                  Duration (min)
-                                                </label>
-                                                <Input
-                                                  type="number"
-                                                  className="rounded-lg"
-                                                  value={getWeekValue(
-                                                    selectedWeek,
-                                                    getExKey(
-                                                      scheduleItem,
-                                                      exerciseIndex
-                                                    ),
-                                                    "amrap_duration",
-                                                    (exercise as any)
-                                                      .amrap_duration ||
-                                                      parsed.amrap_duration ||
-                                                      ""
-                                                  )}
-                                                  onChange={(e) =>
-                                                    setWeekValue(
-                                                      selectedWeek,
-                                                      getExKey(
-                                                        scheduleItem,
-                                                        exerciseIndex
-                                                      ),
-                                                      "amrap_duration",
-                                                      e.target.value
-                                                    )
-                                                  }
-                                                  min="1"
-                                                />
+                                            <div className="space-y-1 col-span-2 md:col-span-4">
+                                              <div className="p-1 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-700">
+                                                <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-1 flex items-center gap-1 text-xs">
+                                                  <Zap className="w-3 h-3 text-green-600" />
+                                                  AMRAP
+                                                </h4>
+                                                <div className="grid grid-cols-2 gap-1">
+                                                  <div>
+                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                      Duration (min)
+                                                    </Label>
+                                                    <Input
+                                                      type="number"
+                                                      value={getWeekValue(
+                                                        selectedWeek,
+                                                        getExKey(
+                                                          scheduleItem,
+                                                          exerciseIndex
+                                                        ),
+                                                        "amrap_duration",
+                                                        (exercise as any)
+                                                          .amrap_duration || ""
+                                                      )}
+                                                      onChange={(e) =>
+                                                        setWeekValue(
+                                                          selectedWeek,
+                                                          getExKey(
+                                                            scheduleItem,
+                                                            exerciseIndex
+                                                          ),
+                                                          "amrap_duration",
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      min="1"
+                                                      className="mt-1 rounded text-xs h-7"
+                                                    />
+                                                  </div>
+                                                  <div>
+                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                      Target Reps
+                                                    </Label>
+                                                    <Input
+                                                      type="number"
+                                                      value={getWeekValue(
+                                                        selectedWeek,
+                                                        getExKey(
+                                                          scheduleItem,
+                                                          exerciseIndex
+                                                        ),
+                                                        "target_reps",
+                                                        (exercise as any)
+                                                          .target_reps || ""
+                                                      )}
+                                                      onChange={(e) =>
+                                                        setWeekValue(
+                                                          selectedWeek,
+                                                          getExKey(
+                                                            scheduleItem,
+                                                            exerciseIndex
+                                                          ),
+                                                          "target_reps",
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      min="1"
+                                                      className="mt-1 rounded text-xs h-7"
+                                                    />
+                                                  </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-1">
+                                                  <div>
+                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                      Reps/Round
+                                                    </Label>
+                                                    <Input
+                                                      type="text"
+                                                      value={getWeekValue(
+                                                        selectedWeek,
+                                                        getExKey(
+                                                          scheduleItem,
+                                                          exerciseIndex
+                                                        ),
+                                                        "reps",
+                                                        (exercise as any)
+                                                          .reps || ""
+                                                      )}
+                                                      onChange={(e) =>
+                                                        setWeekValue(
+                                                          selectedWeek,
+                                                          getExKey(
+                                                            scheduleItem,
+                                                            exerciseIndex
+                                                          ),
+                                                          "reps",
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      placeholder="10"
+                                                      className="mt-1 rounded text-xs h-7"
+                                                    />
+                                                  </div>
+                                                  <div>
+                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                      Rest (sec)
+                                                    </Label>
+                                                    <Input
+                                                      type="number"
+                                                      value={getWeekValue(
+                                                        selectedWeek,
+                                                        getExKey(
+                                                          scheduleItem,
+                                                          exerciseIndex
+                                                        ),
+                                                        "rest_seconds",
+                                                        (exercise as any)
+                                                          .rest_seconds || ""
+                                                      )}
+                                                      onChange={(e) =>
+                                                        setWeekValue(
+                                                          selectedWeek,
+                                                          getExKey(
+                                                            scheduleItem,
+                                                            exerciseIndex
+                                                          ),
+                                                          "rest_seconds",
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      min="0"
+                                                      className="mt-1 rounded text-xs h-7"
+                                                    />
+                                                  </div>
+                                                </div>
                                               </div>
-                                              <div>
-                                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                                                  Reps/round
-                                                </label>
-                                                <Input
-                                                  className="rounded-lg"
-                                                  value={getWeekValue(
-                                                    selectedWeek,
-                                                    getExKey(
-                                                      scheduleItem,
-                                                      exerciseIndex
-                                                    ),
-                                                    "reps",
-                                                    (exercise as any).reps ||
-                                                      parsed.reps ||
-                                                      ""
-                                                  )}
-                                                  onChange={(e) =>
-                                                    setWeekValue(
-                                                      selectedWeek,
-                                                      getExKey(
-                                                        scheduleItem,
-                                                        exerciseIndex
-                                                      ),
-                                                      "reps",
-                                                      e.target.value
-                                                    )
-                                                  }
-                                                />
-                                              </div>
-                                            </>
+                                            </div>
                                           ) : exerciseType === "emom" ? (
                                             <>
                                               <div>
@@ -5172,11 +6269,181 @@ function ProgramCreateForm({
                                                 />
                                               </div>
                                             </>
+                                          ) : exerciseType === "drop_set" ? (
+                                            <div className="space-y-1 col-span-2 md:col-span-4">
+                                              <div className="p-1 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-700">
+                                                <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-1 flex items-center gap-1 text-xs">
+                                                  <Zap className="w-3 h-3 text-orange-600" />
+                                                  Drop Set
+                                                </h4>
+                                                <div className="grid grid-cols-2 gap-1">
+                                                  <div>
+                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                      Sets
+                                                    </Label>
+                                                    <Input
+                                                      type="number"
+                                                      value={getWeekValue(
+                                                        selectedWeek,
+                                                        getExKey(
+                                                          scheduleItem,
+                                                          exerciseIndex
+                                                        ),
+                                                        "sets",
+                                                        (exercise as any)
+                                                          .sets || ""
+                                                      )}
+                                                      onChange={(e) =>
+                                                        setWeekValue(
+                                                          selectedWeek,
+                                                          getExKey(
+                                                            scheduleItem,
+                                                            exerciseIndex
+                                                          ),
+                                                          "sets",
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      min="1"
+                                                      className="mt-1 rounded text-xs h-7"
+                                                    />
+                                                  </div>
+                                                  <div>
+                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                      Initial Reps
+                                                    </Label>
+                                                    <Input
+                                                      type="text"
+                                                      value={getWeekValue(
+                                                        selectedWeek,
+                                                        getExKey(
+                                                          scheduleItem,
+                                                          exerciseIndex
+                                                        ),
+                                                        "reps",
+                                                        (exercise as any)
+                                                          .reps || ""
+                                                      )}
+                                                      onChange={(e) =>
+                                                        setWeekValue(
+                                                          selectedWeek,
+                                                          getExKey(
+                                                            scheduleItem,
+                                                            exerciseIndex
+                                                          ),
+                                                          "reps",
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      placeholder="8-10"
+                                                      className="mt-1 rounded text-xs h-7"
+                                                    />
+                                                  </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-1">
+                                                  <div>
+                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                      Drop %
+                                                    </Label>
+                                                    <Input
+                                                      type="number"
+                                                      value={getWeekValue(
+                                                        selectedWeek,
+                                                        getExKey(
+                                                          scheduleItem,
+                                                          exerciseIndex
+                                                        ),
+                                                        "drop_percentage",
+                                                        ""
+                                                      )}
+                                                      onChange={(e) =>
+                                                        setWeekValue(
+                                                          selectedWeek,
+                                                          getExKey(
+                                                            scheduleItem,
+                                                            exerciseIndex
+                                                          ),
+                                                          "drop_percentage",
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      placeholder="20"
+                                                      className="mt-1 rounded text-xs h-7"
+                                                    />
+                                                  </div>
+                                                  <div>
+                                                    <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                      Drop Reps
+                                                    </Label>
+                                                    <Input
+                                                      type="text"
+                                                      value={getWeekValue(
+                                                        selectedWeek,
+                                                        getExKey(
+                                                          scheduleItem,
+                                                          exerciseIndex
+                                                        ),
+                                                        "drop_set_reps",
+                                                        ""
+                                                      )}
+                                                      onChange={(e) =>
+                                                        setWeekValue(
+                                                          selectedWeek,
+                                                          getExKey(
+                                                            scheduleItem,
+                                                            exerciseIndex
+                                                          ),
+                                                          "drop_set_reps",
+                                                          e.target.value
+                                                        )
+                                                      }
+                                                      placeholder="6-8"
+                                                      className="mt-1 rounded text-xs h-7"
+                                                    />
+                                                  </div>
+                                                </div>
+                                                <div>
+                                                  <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                    Rest (sec)
+                                                  </Label>
+                                                  <Input
+                                                    type="number"
+                                                    value={getWeekValue(
+                                                      selectedWeek,
+                                                      getExKey(
+                                                        scheduleItem,
+                                                        exerciseIndex
+                                                      ),
+                                                      "rest_seconds",
+                                                      (exercise as any)
+                                                        .rest_seconds || ""
+                                                    )}
+                                                    onChange={(e) =>
+                                                      setWeekValue(
+                                                        selectedWeek,
+                                                        getExKey(
+                                                          scheduleItem,
+                                                          exerciseIndex
+                                                        ),
+                                                        "rest_seconds",
+                                                        e.target.value
+                                                      )
+                                                    }
+                                                    min="0"
+                                                    className="mt-1 rounded text-xs h-7"
+                                                  />
+                                                </div>
+                                              </div>
+                                            </div>
                                           ) : ![
                                               "tabata",
                                               "circuit",
                                               "giant_set",
                                               "superset",
+                                              "cluster",
+                                              "drop_set",
+                                              "amrap",
+                                              "pre_exhaustion",
                                             ].includes(exerciseType || "") ? (
                                             <>
                                               <div>
@@ -5668,18 +6935,812 @@ function ProgramCreateForm({
                       <SelectItem value="tabata">Tabata</SelectItem>
                       <SelectItem value="circuit">Circuit</SelectItem>
                       <SelectItem value="giant_set">Giant Set</SelectItem>
+                      <SelectItem value="pre_exhaustion">
+                        Pre-Exhaustion
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Information Message */}
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    <strong>Note:</strong> Exercise parameters (sets, reps, rest
-                    time, etc.) will be configured in the Progression Rules tab
-                    after saving this replacement.
-                  </p>
-                </div>
+                {/* Exercise Parameters - Dynamic based on exercise type */}
+                {exerciseConfig.exercise_type === "cluster" && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> Exercise parameters (clusters,
+                      sets/cluster, rest time, etc.) will be configured in the
+                      Progression Rules tab after saving this replacement.
+                    </p>
+                  </div>
+                )}
+
+                {exerciseConfig.exercise_type === "straight_set" && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> Exercise parameters (sets, reps,
+                      rest time, etc.) will be configured in the Progression
+                      Rules tab after saving this replacement.
+                    </p>
+                  </div>
+                )}
+
+                {exerciseConfig.exercise_type === "superset" && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> Exercise parameters (sets, reps,
+                      rest time, etc.) will be configured in the Progression
+                      Rules tab after saving this replacement.
+                    </p>
+                  </div>
+                )}
+
+                {exerciseConfig.exercise_type === "drop_set" && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> Exercise parameters (sets, reps,
+                      drop percentage, rest time, etc.) will be configured in
+                      the Progression Rules tab after saving this replacement.
+                    </p>
+                  </div>
+                )}
+
+                {exerciseConfig.exercise_type === "amrap" && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> Exercise parameters (duration,
+                      target reps, rest time, etc.) will be configured in the
+                      Progression Rules tab after saving this replacement.
+                    </p>
+                  </div>
+                )}
+
+                {exerciseConfig.exercise_type === "emom" && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> Exercise parameters (duration, reps
+                      per minute, mode, etc.) will be configured in the
+                      Progression Rules tab after saving this replacement.
+                    </p>
+                  </div>
+                )}
+
+                {exerciseConfig.exercise_type === "tabata" && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> Tabata parameters (work time, rest
+                      time, rounds, etc.) will be configured in the Progression
+                      Rules tab after saving this replacement.
+                    </p>
+                  </div>
+                )}
+
+                {false && exerciseConfig.exercise_type === "tabata-removed" && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+                        <strong>Tabata:</strong> High-intensity intervals with
+                        multiple exercises. Each exercise performed for work
+                        time, then rest before next exercise.
+                      </p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Rounds
+                          </label>
+                          <Input
+                            type="number"
+                            value={exerciseConfig.rounds || 8}
+                            onChange={(e) =>
+                              setExerciseConfig((prev) => ({
+                                ...prev,
+                                rounds: parseInt(e.target.value) || 8,
+                              }))
+                            }
+                            min="1"
+                            max="20"
+                            className="rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Work Time (seconds)
+                          </label>
+                          <Input
+                            type="number"
+                            value={exerciseConfig.work_seconds || 20}
+                            onChange={(e) =>
+                              setExerciseConfig((prev) => ({
+                                ...prev,
+                                work_seconds: parseInt(e.target.value) || 20,
+                              }))
+                            }
+                            min="10"
+                            max="60"
+                            className="rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Rest Time (seconds)
+                          </label>
+                          <Input
+                            type="number"
+                            value={exerciseConfig.rest_after || 10}
+                            onChange={(e) =>
+                              setExerciseConfig((prev) => ({
+                                ...prev,
+                                rest_after: parseInt(e.target.value) || 10,
+                              }))
+                            }
+                            min="5"
+                            max="30"
+                            className="rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tabata Exercises */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                        Tabata Exercises
+                      </h4>
+
+                      {/* Primary Exercise */}
+                      <div className="p-3 bg-white dark:bg-gray-800 border rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-medium">
+                              1.{" "}
+                              {selectedReplacementExercise?.name ||
+                                "Primary Exercise"}
+                            </h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {selectedReplacementExercise?.type ||
+                                "Exercise Type"}{" "}
+                              •{" "}
+                              {selectedReplacementExercise?.category?.name ||
+                                selectedReplacementExercise?.category ||
+                                "Category"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Additional Tabata Exercises */}
+                      {exerciseConfig.tabata_exercises.map(
+                        (exercise: any, index: number) => (
+                          <div
+                            key={`tabata-${exercise.id}-${index}`}
+                            className="p-3 bg-white dark:bg-gray-800 border rounded-lg"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-medium">
+                                  {index + 2}. {exercise.name}
+                                </h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                  {exercise.type} •{" "}
+                                  {exercise.category?.name || exercise.category}
+                                </p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setExerciseConfig((prev) => ({
+                                    ...prev,
+                                    tabata_exercises:
+                                      prev.tabata_exercises.filter(
+                                        (ex: any) => ex.id !== exercise.id
+                                      ),
+                                  }));
+                                }}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      )}
+
+                      {/* Add Exercise Button */}
+                      <div className="mt-2">
+                        <Select
+                          onValueChange={(exerciseId) => {
+                            const exercise = exercises.find(
+                              (e) => e.id === exerciseId
+                            );
+                            if (exercise) {
+                              setExerciseConfig((prev) => ({
+                                ...prev,
+                                tabata_exercises: [
+                                  ...prev.tabata_exercises,
+                                  exercise,
+                                ],
+                              }));
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Add another exercise to Tabata" />
+                          </SelectTrigger>
+                          <SelectContent className="z-[10000]">
+                            {exercises
+                              .filter(
+                                (exercise) =>
+                                  !exerciseConfig.tabata_exercises.some(
+                                    (ex: any) => ex.id === exercise.id
+                                  ) &&
+                                  exercise.id !==
+                                    selectedReplacementExercise?.id
+                              )
+                              .map((exercise) => (
+                                <SelectItem
+                                  key={exercise.id}
+                                  value={exercise.id}
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <span>{exercise.name}</span>
+                                    <span className="text-xs text-gray-500">
+                                      (
+                                      {exercise.category?.name ||
+                                        exercise.category}
+                                      )
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {exerciseConfig.exercise_type === "giant_set" && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                      <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-3">
+                        <strong>Giant Set:</strong> 4+ exercises performed in
+                        sequence with minimal rest between exercises.
+                      </p>
+                      <div className="space-y-4">
+                        {/* Giant Set Exercises */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Giant Set Exercises
+                          </label>
+                          <div className="space-y-2">
+                            {/* Exercise 1 (Primary) */}
+                            <div className="p-3 bg-white dark:bg-gray-800 border rounded-lg">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="font-medium">
+                                    1. {selectedReplacementExercise?.name}
+                                  </h4>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    {selectedReplacementExercise?.type} •{" "}
+                                    {selectedReplacementExercise?.category
+                                      ?.name ||
+                                      selectedReplacementExercise?.category}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Additional Giant Set Exercises */}
+                            {exerciseConfig.giant_set_exercises.map(
+                              (exercise: any, index: number) => (
+                                <div
+                                  key={`giant-set-${exercise.id}-${index}`}
+                                  className="p-3 bg-white dark:bg-gray-800 border rounded-lg"
+                                >
+                                  <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                      <h4 className="font-medium">
+                                        {index + 2}. {exercise.name}
+                                      </h4>
+                                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        {exercise.type} •{" "}
+                                        {exercise.category?.name ||
+                                          exercise.category}
+                                      </p>
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setExerciseConfig((prev) => ({
+                                          ...prev,
+                                          giant_set_exercises:
+                                            prev.giant_set_exercises.filter(
+                                              (ex: any) => ex.id !== exercise.id
+                                            ),
+                                        }));
+                                      }}
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        Reps
+                                      </label>
+                                      <Input
+                                        value={exercise.reps || ""}
+                                        onChange={(e) => {
+                                          setExerciseConfig((prev) => ({
+                                            ...prev,
+                                            giant_set_exercises:
+                                              prev.giant_set_exercises.map(
+                                                (ex: any) =>
+                                                  ex.id === exercise.id
+                                                    ? {
+                                                        ...ex,
+                                                        reps: e.target.value,
+                                                      }
+                                                    : ex
+                                              ),
+                                          }));
+                                        }}
+                                        placeholder="8-12"
+                                        className="rounded-lg text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            )}
+
+                            {/* Add Exercise Button */}
+                            <div className="mt-2">
+                              <Select
+                                value=""
+                                onValueChange={(value) => {
+                                  const exercise = exercises.find(
+                                    (ex) => ex.id === value
+                                  );
+                                  if (
+                                    exercise &&
+                                    !exerciseConfig.giant_set_exercises.some(
+                                      (ex: any) => ex.id === exercise.id
+                                    )
+                                  ) {
+                                    setExerciseConfig((prev) => ({
+                                      ...prev,
+                                      giant_set_exercises: [
+                                        ...prev.giant_set_exercises,
+                                        exercise,
+                                      ],
+                                    }));
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="rounded-lg">
+                                  <SelectValue placeholder="Add exercise to giant set" />
+                                </SelectTrigger>
+                                <SelectContent className="z-[10000]">
+                                  {exercises
+                                    .filter(
+                                      (exercise) =>
+                                        exercise.id !==
+                                          selectedReplacementExercise?.id &&
+                                        !exerciseConfig.giant_set_exercises.some(
+                                          (ex: any) => ex.id === exercise.id
+                                        )
+                                    )
+                                    .map((exercise) => (
+                                      <SelectItem
+                                        key={exercise.id}
+                                        value={exercise.id}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span>{exercise.name}</span>
+                                          <span className="text-xs text-gray-500">
+                                            ({exercise.type})
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Giant Set Parameters */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Sets
+                            </label>
+                            <Input
+                              type="number"
+                              value={exerciseConfig.sets}
+                              onChange={(e) =>
+                                setExerciseConfig((prev) => ({
+                                  ...prev,
+                                  sets: parseInt(e.target.value) || 3,
+                                }))
+                              }
+                              min="1"
+                              className="rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Reps Per Exercise
+                            </label>
+                            <Input
+                              value={exerciseConfig.reps}
+                              onChange={(e) =>
+                                setExerciseConfig((prev) => ({
+                                  ...prev,
+                                  reps: e.target.value,
+                                }))
+                              }
+                              placeholder="8-12"
+                              className="rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Rest Between Sets (sec)
+                            </label>
+                            <Input
+                              type="number"
+                              value={exerciseConfig.rest_seconds}
+                              onChange={(e) =>
+                                setExerciseConfig((prev) => ({
+                                  ...prev,
+                                  rest_seconds: parseInt(e.target.value) || 90,
+                                }))
+                              }
+                              min="0"
+                              className="rounded-lg"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {exerciseConfig.exercise_type === "circuit" && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> Circuit parameters (exercises,
+                      sets, work time, rest time, etc.) will be configured in
+                      the Progression Rules tab after saving this replacement.
+                    </p>
+                  </div>
+                )}
+
+                {exerciseConfig.exercise_type === "pre_exhaustion" && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> Pre-exhaustion parameters
+                      (isolation reps, compound reps, rest time, etc.) will be
+                      configured in the Progression Rules tab after saving this
+                      replacement.
+                    </p>
+                  </div>
+                )}
+
+                {false && exerciseConfig.exercise_type === "circuit-old" && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                      <p className="text-sm text-indigo-700 dark:text-indigo-300 mb-3">
+                        <strong>Circuit:</strong> Multiple exercises performed
+                        in sequence with minimal rest between exercises.
+                      </p>
+                      <div className="space-y-4">
+                        {/* Circuit Exercises */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Circuit Exercises
+                          </label>
+                          <div className="space-y-2">
+                            {/* Exercise 1 (Primary) */}
+                            <div className="p-3 bg-white dark:bg-gray-800 border rounded-lg">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="font-medium">
+                                    1. {selectedReplacementExercise?.name}
+                                  </h4>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    {selectedReplacementExercise?.type} •{" "}
+                                    {selectedReplacementExercise?.category
+                                      ?.name ||
+                                      selectedReplacementExercise?.category}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Additional Circuit Exercises */}
+                            {exerciseConfig.circuit_exercises.map(
+                              (exercise: any, index: number) => (
+                                <div
+                                  key={`circuit-${exercise.id}-${index}`}
+                                  className="p-3 bg-white dark:bg-gray-800 border rounded-lg"
+                                >
+                                  <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                      <h4 className="font-medium">
+                                        {index + 2}. {exercise.name}
+                                      </h4>
+                                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        {exercise.type} •{" "}
+                                        {exercise.category?.name ||
+                                          exercise.category}
+                                      </p>
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setExerciseConfig((prev) => ({
+                                          ...prev,
+                                          circuit_exercises:
+                                            prev.circuit_exercises.filter(
+                                              (ex: any) => ex.id !== exercise.id
+                                            ),
+                                        }));
+                                      }}
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        Reps
+                                      </label>
+                                      <Input
+                                        value={exercise.reps || ""}
+                                        onChange={(e) => {
+                                          setExerciseConfig((prev) => ({
+                                            ...prev,
+                                            circuit_exercises:
+                                              prev.circuit_exercises.map(
+                                                (ex: any) =>
+                                                  ex.id === exercise.id
+                                                    ? {
+                                                        ...ex,
+                                                        reps: e.target.value,
+                                                      }
+                                                    : ex
+                                              ),
+                                          }));
+                                        }}
+                                        placeholder="8-12"
+                                        className="rounded-lg text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        Work Time (sec)
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        value={exercise.work_seconds || 30}
+                                        onChange={(e) => {
+                                          setExerciseConfig((prev) => ({
+                                            ...prev,
+                                            circuit_exercises:
+                                              prev.circuit_exercises.map(
+                                                (ex: any) =>
+                                                  ex.id === exercise.id
+                                                    ? {
+                                                        ...ex,
+                                                        work_seconds:
+                                                          parseInt(
+                                                            e.target.value
+                                                          ) || 30,
+                                                      }
+                                                    : ex
+                                              ),
+                                          }));
+                                        }}
+                                        min="10"
+                                        max="300"
+                                        className="rounded-lg text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                        Rest After (sec)
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        value={exercise.rest_after || 15}
+                                        onChange={(e) => {
+                                          setExerciseConfig((prev) => ({
+                                            ...prev,
+                                            circuit_exercises:
+                                              prev.circuit_exercises.map(
+                                                (ex: any) =>
+                                                  ex.id === exercise.id
+                                                    ? {
+                                                        ...ex,
+                                                        rest_after:
+                                                          parseInt(
+                                                            e.target.value
+                                                          ) || 15,
+                                                      }
+                                                    : ex
+                                              ),
+                                          }));
+                                        }}
+                                        min="0"
+                                        max="60"
+                                        className="rounded-lg text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            )}
+
+                            {/* Add Exercise Button */}
+                            <div className="mt-2">
+                              <Select
+                                value=""
+                                onValueChange={(value) => {
+                                  const exercise = exercises.find(
+                                    (ex) => ex.id === value
+                                  );
+                                  if (
+                                    exercise &&
+                                    !exerciseConfig.circuit_exercises.some(
+                                      (ex: any) => ex.id === exercise.id
+                                    )
+                                  ) {
+                                    setExerciseConfig((prev) => ({
+                                      ...prev,
+                                      circuit_exercises: [
+                                        ...prev.circuit_exercises,
+                                        exercise,
+                                      ],
+                                    }));
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="rounded-lg">
+                                  <SelectValue placeholder="Add exercise to circuit" />
+                                </SelectTrigger>
+                                <SelectContent className="z-[10000]">
+                                  {exercises
+                                    .filter(
+                                      (exercise) =>
+                                        exercise.id !==
+                                          selectedReplacementExercise?.id &&
+                                        !exerciseConfig.circuit_exercises.some(
+                                          (ex: any) => ex.id === exercise.id
+                                        )
+                                    )
+                                    .map((exercise) => (
+                                      <SelectItem
+                                        key={exercise.id}
+                                        value={exercise.id}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span>{exercise.name}</span>
+                                          <span className="text-xs text-gray-500">
+                                            ({exercise.type})
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Circuit Parameters */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Rounds
+                            </label>
+                            <Input
+                              type="number"
+                              value={exerciseConfig.sets}
+                              onChange={(e) =>
+                                setExerciseConfig((prev) => ({
+                                  ...prev,
+                                  sets: parseInt(e.target.value) || 3,
+                                }))
+                              }
+                              min="1"
+                              className="rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Work Time (sec)
+                            </label>
+                            <Input
+                              type="number"
+                              value={exerciseConfig.work_seconds || 30}
+                              onChange={(e) =>
+                                setExerciseConfig((prev) => ({
+                                  ...prev,
+                                  work_seconds: parseInt(e.target.value) || 30,
+                                }))
+                              }
+                              min="10"
+                              max="300"
+                              className="rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Rest Between Exercises (sec)
+                            </label>
+                            <Input
+                              type="number"
+                              value={exerciseConfig.rest_after || 15}
+                              onChange={(e) =>
+                                setExerciseConfig((prev) => ({
+                                  ...prev,
+                                  rest_after: parseInt(e.target.value) || 15,
+                                }))
+                              }
+                              min="0"
+                              max="60"
+                              className="rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Rest After Round (sec)
+                            </label>
+                            <Input
+                              type="number"
+                              value={exerciseConfig.rest_seconds}
+                              onChange={(e) =>
+                                setExerciseConfig((prev) => ({
+                                  ...prev,
+                                  rest_seconds: parseInt(e.target.value) || 60,
+                                }))
+                              }
+                              min="0"
+                              className="rounded-lg"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Default parameters for other exercise types */}
+                {![
+                  "straight_set",
+                  "superset",
+                  "drop_set",
+                  "amrap",
+                  "emom",
+                  "tabata",
+                  "circuit",
+                  "giant_set",
+                  "cluster",
+                ].includes(exerciseConfig.exercise_type) && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Note:</strong> Exercise parameters (sets, reps,
+                      rest time, etc.) will be configured in the Progression
+                      Rules tab after saving this replacement.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -5687,62 +7748,4 @@ function ProgramCreateForm({
       </ResponsiveModal>
     </div>
   );
-}
-
-function getResolvedExercises(
-  baseExercises: TemplateExercise[],
-  progressionRules: ProgressionRule[],
-  week: number,
-  templateId: string,
-  allExercises: Exercise[]
-) {
-  if (!progressionRules || progressionRules.length === 0) {
-    return baseExercises;
-  }
-
-  const weeklyRules = progressionRules.filter(
-    (rule) => rule.week_number === week
-  );
-  if (weeklyRules.length === 0) {
-    return baseExercises;
-  }
-
-  const templateRules = weeklyRules.filter((rule) => {
-    try {
-      const notesData = rule.notes ? JSON.parse(rule.notes) : {};
-      return notesData.template_id === templateId;
-    } catch (e) {
-      console.error("Failed to parse progression rule notes:", e);
-      return false;
-    }
-  });
-  if (templateRules.length === 0) {
-    return baseExercises;
-  }
-
-  const resolvedExercises = [...baseExercises];
-
-  templateRules.forEach((rule) => {
-    try {
-      const notesData = rule.notes ? JSON.parse(rule.notes) : {};
-      const exerciseIndex = notesData.exercise_index;
-      const newExerciseId = notesData.new_exercise_id;
-
-      if (exerciseIndex >= 0 && exerciseIndex < resolvedExercises.length) {
-        const newExercise = allExercises.find((ex) => ex.id === newExerciseId);
-        if (newExercise) {
-          resolvedExercises[exerciseIndex] = {
-            ...resolvedExercises[exerciseIndex],
-            exercise_id: newExerciseId,
-            exercise: newExercise,
-            notes: rule.notes,
-          };
-        }
-      }
-    } catch (e) {
-      console.error("Failed to parse progression rule notes:", e);
-    }
-  });
-
-  return resolvedExercises;
 }
