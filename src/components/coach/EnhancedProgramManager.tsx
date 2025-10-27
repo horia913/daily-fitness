@@ -5664,42 +5664,135 @@ function ProgramCreateForm({
                                                                       </div>
                                                                     )}
 
-                                                                    {/* Compound exercise (second one) */}
-                                                                    {idx ===
-                                                                      1 && (
-                                                                      <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
-                                                                        <div className="flex items-center gap-2 mb-2">
-                                                                          <span className="text-xs text-slate-500 w-6">
-                                                                            2.
-                                                                          </span>
-                                                                          <div className="flex-1 text-sm">
-                                                                            {
-                                                                              exInfo.name
-                                                                            }
+                                                                    {/* Compound exercise selection */}
+                                                                    <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
+                                                                      <div className="mb-2">
+                                                                        <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                          Select
+                                                                          Compound
+                                                                          Exercise
+                                                                        </Label>
+                                                                        <SearchableSelect
+                                                                          value={getWeekValue(
+                                                                            selectedWeek,
+                                                                            getExKey(
+                                                                              scheduleItem,
+                                                                              exerciseIndex,
+                                                                              `compound`
+                                                                            ),
+                                                                            "compound_exercise_id",
+                                                                            parsed.compound_exercise_id ||
+                                                                              (
+                                                                                exercise as any
+                                                                              )
+                                                                                .compound_exercise_id ||
+                                                                              ""
+                                                                          )}
+                                                                          onValueChange={(
+                                                                            value
+                                                                          ) => {
+                                                                            setWeekValue(
+                                                                              selectedWeek,
+                                                                              getExKey(
+                                                                                scheduleItem,
+                                                                                exerciseIndex,
+                                                                                `compound`
+                                                                              ),
+                                                                              "compound_exercise_id",
+                                                                              value
+                                                                            );
+                                                                          }}
+                                                                          placeholder="Select compound exercise..."
+                                                                          items={exercises
+                                                                            .filter(
+                                                                              (
+                                                                                ex
+                                                                              ) =>
+                                                                                ex.id !==
+                                                                                (
+                                                                                  exercise as any
+                                                                                )
+                                                                                  .exercise_id
+                                                                            )
+                                                                            .map(
+                                                                              (
+                                                                                ex
+                                                                              ) => ({
+                                                                                id: ex.id,
+                                                                                name: ex.name,
+                                                                                description:
+                                                                                  ex.description,
+                                                                              })
+                                                                            )}
+                                                                          className="mt-1"
+                                                                        />
+                                                                      </div>
+                                                                    </div>
+
+                                                                    {/* Compound exercise display */}
+                                                                    {(() => {
+                                                                      const compoundExerciseId =
+                                                                        getWeekValue(
+                                                                          selectedWeek,
+                                                                          getExKey(
+                                                                            scheduleItem,
+                                                                            exerciseIndex,
+                                                                            `compound`
+                                                                          ),
+                                                                          "compound_exercise_id",
+                                                                          parsed.compound_exercise_id ||
+                                                                            (
+                                                                              exercise as any
+                                                                            )
+                                                                              .compound_exercise_id ||
+                                                                            ""
+                                                                        );
+                                                                      const compoundExercise =
+                                                                        exercises.find(
+                                                                          (
+                                                                            ex
+                                                                          ) =>
+                                                                            ex.id ===
+                                                                            compoundExerciseId
+                                                                        );
+                                                                      return compoundExercise ? (
+                                                                        <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
+                                                                          <div className="flex items-center gap-2 mb-2">
+                                                                            <span className="text-xs text-slate-500 w-6">
+                                                                              2.
+                                                                            </span>
+                                                                            <div className="flex-1 text-sm">
+                                                                              {
+                                                                                compoundExercise.name
+                                                                              }
+                                                                            </div>
                                                                           </div>
                                                                         </div>
-                                                                        <div className="grid grid-cols-2 gap-2">
-                                                                          <div>
-                                                                            <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                                                                              Compound
-                                                                              Reps
-                                                                            </Label>
-                                                                            <Input
-                                                                              type="text"
-                                                                              value={getWeekValue(
-                                                                                selectedWeek,
-                                                                                getExKey(
-                                                                                  scheduleItem,
-                                                                                  exerciseIndex,
-                                                                                  `${id}-${idx}`
-                                                                                ),
-                                                                                "compound_reps",
-                                                                                ""
-                                                                              )}
-                                                                              onChange={(
-                                                                                e
-                                                                              ) =>
-                                                                                setWeekValue(
+                                                                      ) : null;
+                                                                    })()}
+                                                                    {idx ===
+                                                                      1 &&
+                                                                      exInfo && (
+                                                                        <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
+                                                                          <div className="flex items-center gap-2 mb-2">
+                                                                            <span className="text-xs text-slate-500 w-6">
+                                                                              2.
+                                                                            </span>
+                                                                            <div className="flex-1 text-sm">
+                                                                              {
+                                                                                exInfo.name
+                                                                              }
+                                                                            </div>
+                                                                          </div>
+                                                                          <div className="grid grid-cols-2 gap-2">
+                                                                            <div>
+                                                                              <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                                Compound
+                                                                                Reps
+                                                                              </Label>
+                                                                              <Input
+                                                                                type="text"
+                                                                                value={getWeekValue(
                                                                                   selectedWeek,
                                                                                   getExKey(
                                                                                     scheduleItem,
@@ -5707,40 +5800,36 @@ function ProgramCreateForm({
                                                                                     `${id}-${idx}`
                                                                                   ),
                                                                                   "compound_reps",
-                                                                                  e
-                                                                                    .target
-                                                                                    .value
-                                                                                )
-                                                                              }
-                                                                              placeholder="6-8"
-                                                                              className="mt-1 rounded text-xs h-7"
-                                                                            />
-                                                                          </div>
-                                                                          <div>
-                                                                            <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                                                                              Rest
-                                                                              (sec)
-                                                                            </Label>
-                                                                            <Input
-                                                                              type="number"
-                                                                              value={getWeekValue(
-                                                                                selectedWeek,
-                                                                                getExKey(
-                                                                                  scheduleItem,
-                                                                                  exerciseIndex,
-                                                                                  `${id}-${idx}`
-                                                                                ),
-                                                                                "rest_seconds",
-                                                                                (
-                                                                                  exercise as any
-                                                                                )
-                                                                                  .rest_seconds ||
                                                                                   ""
-                                                                              )}
-                                                                              onChange={(
-                                                                                e
-                                                                              ) =>
-                                                                                setWeekValue(
+                                                                                )}
+                                                                                onChange={(
+                                                                                  e
+                                                                                ) =>
+                                                                                  setWeekValue(
+                                                                                    selectedWeek,
+                                                                                    getExKey(
+                                                                                      scheduleItem,
+                                                                                      exerciseIndex,
+                                                                                      `${id}-${idx}`
+                                                                                    ),
+                                                                                    "compound_reps",
+                                                                                    e
+                                                                                      .target
+                                                                                      .value
+                                                                                  )
+                                                                                }
+                                                                                placeholder="6-8"
+                                                                                className="mt-1 rounded text-xs h-7"
+                                                                              />
+                                                                            </div>
+                                                                            <div>
+                                                                              <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                                Rest
+                                                                                (sec)
+                                                                              </Label>
+                                                                              <Input
+                                                                                type="number"
+                                                                                value={getWeekValue(
                                                                                   selectedWeek,
                                                                                   getExKey(
                                                                                     scheduleItem,
@@ -5748,18 +5837,35 @@ function ProgramCreateForm({
                                                                                     `${id}-${idx}`
                                                                                   ),
                                                                                   "rest_seconds",
+                                                                                  (
+                                                                                    exercise as any
+                                                                                  )
+                                                                                    .rest_seconds ||
+                                                                                    ""
+                                                                                )}
+                                                                                onChange={(
                                                                                   e
-                                                                                    .target
-                                                                                    .value
-                                                                                )
-                                                                              }
-                                                                              min="0"
-                                                                              className="mt-1 rounded text-xs h-7"
-                                                                            />
+                                                                                ) =>
+                                                                                  setWeekValue(
+                                                                                    selectedWeek,
+                                                                                    getExKey(
+                                                                                      scheduleItem,
+                                                                                      exerciseIndex,
+                                                                                      `${id}-${idx}`
+                                                                                    ),
+                                                                                    "rest_seconds",
+                                                                                    e
+                                                                                      .target
+                                                                                      .value
+                                                                                  )
+                                                                                }
+                                                                                min="0"
+                                                                                className="mt-1 rounded text-xs h-7"
+                                                                              />
+                                                                            </div>
                                                                           </div>
                                                                         </div>
-                                                                      </div>
-                                                                    )}
+                                                                      )}
                                                                   </div>
                                                                 )}
                                                               </div>
