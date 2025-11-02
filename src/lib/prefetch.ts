@@ -136,8 +136,7 @@ export class PrefetchService {
         .select(`
           *,
           template:workout_templates(
-            id, name, description, estimated_duration, difficulty_level,
-            category:workout_categories(name, color)
+            id, name, description, estimated_duration, difficulty_level
           )
         `)
         .eq('client_id', userId)
@@ -145,17 +144,23 @@ export class PrefetchService {
 
       if (error) throw error
 
-      // Pre-fetch exercise counts for all templates
+      // Pre-fetch exercise counts for all templates using WorkoutBlockService
+      const { WorkoutBlockService } = await import('./workoutBlockService')
       const assignmentsWithCounts = await Promise.all(
         (data || []).map(async (assignment) => {
-          const { count } = await supabase
-            .from('workout_template_exercises')
-            .select('*', { count: 'exact', head: true })
-            .eq('template_id', assignment.template_id)
+          let exercise_count = 0
+          try {
+            if (assignment.template?.id) {
+              const blocks = await WorkoutBlockService.getWorkoutBlocks(assignment.template.id)
+              exercise_count = blocks.reduce((total, block) => total + (block.exercises?.length || 0), 0)
+            }
+          } catch (error) {
+            console.error('Error getting exercise count for template:', error)
+          }
           
           return {
             ...assignment,
-            exercise_count: count || 0
+            exercise_count
           }
         })
       )

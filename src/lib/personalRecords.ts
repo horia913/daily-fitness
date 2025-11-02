@@ -23,7 +23,7 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
     // Get all completed workout sessions for the user
     const { data: sessions, error: sessionsError } = await supabase
       .from('workout_sessions')
-      .select('id, completed_at')
+      .select('id, assignment_id, completed_at')
       .eq('client_id', userId)
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
@@ -31,29 +31,44 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
     if (sessionsError) return getFallbackPersonalRecords()
     if (!sessions || sessions.length === 0) return getFallbackPersonalRecords()
 
-    const sessionIds = sessions.map(s => s.id)
+    // Get assignment IDs from sessions
+    const assignmentIds = sessions
+      .map(s => s.assignment_id)
+      .filter((id): id is string => id !== null && id !== undefined)
 
-    // Get all workout logs with exercise information
-    const { data: logs, error: logsError } = await supabase
+    if (assignmentIds.length === 0) return getFallbackPersonalRecords()
+
+    // Get workout_logs for these assignments (workout_logs.workout_assignment_id)
+    const { data: workoutLogs, error: logsError } = await supabase
       .from('workout_logs')
+      .select('id')
+      .in('workout_assignment_id', assignmentIds)
+
+    if (logsError || !workoutLogs || workoutLogs.length === 0) {
+      return getFallbackPersonalRecords()
+    }
+
+    // Get exercise logs
+    const { data: logs, error: exerciseLogsError } = await supabase
+      .from('workout_exercise_logs')
       .select(`
         *,
-        template_exercise:workout_template_exercises(
-          exercise:exercises(name, category)
+        exercise_assignment:workout_exercise_assignments(
+          exercise:exercises(id, name, category)
         )
       `)
-      .in('session_id', sessionIds)
-      .not('weight_used', 'is', null)
+      .in('workout_log_id', workoutLogs.map(wl => wl.id))
+      .not('weight_kg', 'is', null)
       .not('reps_completed', 'is', null)
 
-    if (logsError) return getFallbackPersonalRecords()
-    if (!logs) return getFallbackPersonalRecords()
+    if (exerciseLogsError) return getFallbackPersonalRecords()
+    if (!logs || logs.length === 0) return getFallbackPersonalRecords()
 
     // Group logs by exercise name
     const exerciseGroups = new Map<string, any[]>()
 
     logs.forEach(log => {
-      const exerciseName = log.template_exercise?.exercise?.name || 'Unknown Exercise'
+      const exerciseName = log.exercise_assignment?.exercise?.name || 'Unknown Exercise'
       if (!exerciseGroups.has(exerciseName)) {
         exerciseGroups.set(exerciseName, [])
       }
@@ -67,38 +82,41 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
     exerciseGroups.forEach((exerciseLogs, exerciseName) => {
       // Find max weight record
       const maxWeightLog = exerciseLogs.reduce((max, log) => 
-        log.weight_used > max.weight_used ? log : max
+        (log.weight_kg || 0) > (max.weight_kg || 0) ? log : max
       )
 
       // Find max reps record
       const maxRepsLog = exerciseLogs.reduce((max, log) => 
-        log.reps_completed > max.reps_completed ? log : max
+        (log.reps_completed || 0) > (max.reps_completed || 0) ? log : max
       )
 
       // Create PR for max weight
-      if (maxWeightLog.weight_used > 0) {
-        const isRecent = new Date(maxWeightLog.created_at) >= thirtyDaysAgo
+      const weightKg = maxWeightLog.weight_kg || 0
+      if (weightKg > 0) {
+        const isRecent = new Date(maxWeightLog.created_at || new Date()) >= thirtyDaysAgo
         personalRecords.push({
           id: `weight-${maxWeightLog.id}`,
           exerciseName,
-          record: `${maxWeightLog.weight_used}kg for ${maxWeightLog.reps_completed} reps`,
-          date: maxWeightLog.created_at,
-          weight: maxWeightLog.weight_used,
-          reps: maxWeightLog.reps_completed,
+          record: `${weightKg}kg for ${maxWeightLog.reps_completed || 0} reps`,
+          date: maxWeightLog.created_at || new Date().toISOString(),
+          weight: weightKg,
+          reps: maxWeightLog.reps_completed || 0,
           isRecent
         })
       }
 
       // Create PR for max reps (if different from max weight)
-      if (maxRepsLog.reps_completed > maxWeightLog.reps_completed && maxRepsLog.reps_completed > 0) {
-        const isRecent = new Date(maxRepsLog.created_at) >= thirtyDaysAgo
+      const repsCompleted = maxRepsLog.reps_completed || 0
+      const maxWeightReps = maxWeightLog.reps_completed || 0
+      if (repsCompleted > maxWeightReps && repsCompleted > 0) {
+        const isRecent = new Date(maxRepsLog.created_at || new Date()) >= thirtyDaysAgo
         personalRecords.push({
           id: `reps-${maxRepsLog.id}`,
           exerciseName,
-          record: `${maxRepsLog.weight_used}kg for ${maxRepsLog.reps_completed} reps`,
-          date: maxRepsLog.created_at,
-          weight: maxRepsLog.weight_used,
-          reps: maxRepsLog.reps_completed,
+          record: `${maxRepsLog.weight_kg || 0}kg for ${repsCompleted} reps`,
+          date: maxRepsLog.created_at || new Date().toISOString(),
+          weight: maxRepsLog.weight_kg || 0,
+          reps: repsCompleted,
           isRecent
         })
       }

@@ -39,6 +39,7 @@ import {
   Activity,
   UserPlus,
 } from "lucide-react";
+import ProgramCard from "@/components/features/programs/ProgramCard";
 import WorkoutTemplateService, {
   WorkoutTemplate,
   ProgramSchedule,
@@ -192,8 +193,9 @@ export default function EnhancedProgramManager({
   };
 
   const openProgramDetails = (program: Program) => {
-    setSelectedProgram(program);
-    setShowProgramDetails(true);
+    if (program?.id) {
+      window.location.href = `/coach/programs/${program.id}`;
+    }
   };
 
   const deleteProgram = async (program: Program) => {
@@ -298,58 +300,44 @@ export default function EnhancedProgramManager({
     }
   };
 
+  const [assignStartDate, setAssignStartDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
+  const [assignNotes, setAssignNotes] = useState<string>("");
+  const [assignNotify, setAssignNotify] = useState<boolean>(false);
+
   const assignProgramToClients = async (
     programId: string,
     clientIds: string[],
     coachId: string
   ) => {
-    const assignments = clientIds.map((clientId) => ({
-      program_id: programId,
-      client_id: clientId,
-      coach_id: coachId,
-      start_date: new Date().toISOString().split("T")[0],
-      current_week: 1,
-      current_day_of_week: 1,
-      is_active: true,
-    }));
+    const count = await WorkoutTemplateService.assignProgramToClients(
+      programId,
+      clientIds,
+      coachId,
+      assignStartDate,
+      assignNotes
+    );
 
-    const { error } = await supabase
-      .from("program_assignments")
-      .insert(assignments);
-
-    if (error) {
-      console.error("Error assigning program:", error);
-      throw error;
-    }
+    // TODO: send notifications if enabled (assignNotify)
 
     // Refresh program assignment counts
     await loadProgramAssignmentCounts();
 
     // Dispatch event to refresh assignment counts
-    console.log(
-      "📢 Dispatching program assignment event for clients:",
-      clientIds
-    );
     clientIds.forEach((clientId) => {
-      console.log("📢 Dispatching event for client:", clientId);
       window.dispatchEvent(
         new CustomEvent("assignmentMade", {
           detail: { clientId, type: "program" },
         })
       );
-
-      // Also use localStorage as backup (works across tabs)
       localStorage.setItem(
         "assignmentMade",
-        JSON.stringify({
-          clientId,
-          type: "program",
-          timestamp: Date.now(),
-        })
+        JSON.stringify({ clientId, type: "program", timestamp: Date.now() })
       );
     });
 
-    alert("Program assigned successfully!");
+    return count;
   };
 
   if (loading) {
@@ -573,6 +561,38 @@ export default function EnhancedProgramManager({
                     })}
                   </div>
 
+                  {/* Start date, notes, notify */}
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm font-medium">Start date</label>
+                      <input
+                        type="date"
+                        value={assignStartDate}
+                        onChange={(e) => setAssignStartDate(e.target.value)}
+                        className="border rounded px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium block mb-1">
+                        Notes (optional)
+                      </label>
+                      <textarea
+                        value={assignNotes}
+                        onChange={(e) => setAssignNotes(e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                        rows={2}
+                      />
+                    </div>
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={assignNotify}
+                        onChange={(e) => setAssignNotify(e.target.checked)}
+                      />
+                      Send notification to clients
+                    </label>
+                  </div>
+
                   <div
                     style={{
                       display: "flex",
@@ -617,17 +637,18 @@ export default function EnhancedProgramManager({
                           }
 
                           try {
-                            await assignProgramToClients(
+                            const assigned = await assignProgramToClients(
                               selectedProgramForAssignment.id,
                               selectedClients,
                               user?.id || ""
                             );
                             alert(
-                              `Program assigned to ${selectedClients.length} client(s) successfully!`
+                              `Program assigned to ${assigned} client(s) successfully!`
                             );
                             setShowAssignmentModal(false);
                             setSelectedProgramForAssignment(null);
                             setSelectedClients([]);
+                            setAssignNotes("");
                           } catch (error) {
                             console.error("Error assigning program:", error);
                             alert("Error assigning program. Please try again.");
@@ -726,7 +747,9 @@ export default function EnhancedProgramManager({
                   Refresh
                 </Button>
                 <Button
-                  onClick={() => setShowCreateProgram(true)}
+                  onClick={() =>
+                    (window.location.href = "/coach/programs/create")
+                  }
                   style={{
                     backgroundColor: "#6C5CE7",
                     borderRadius: "20px",
@@ -1015,7 +1038,6 @@ export default function EnhancedProgramManager({
                 <ProgramCard
                   key={program.id}
                   program={program}
-                  templates={templates}
                   onEdit={() => {
                     setEditingProgram(program);
                     setShowCreateProgram(true);
@@ -1050,7 +1072,9 @@ export default function EnhancedProgramManager({
                     and progression rules for comprehensive client training.
                   </p>
                   <Button
-                    onClick={() => setShowCreateProgram(true)}
+                    onClick={() =>
+                      (window.location.href = "/coach/programs/create")
+                    }
                     className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl shadow-lg"
                   >
                     <Plus className="w-5 h-5 mr-2" />
@@ -1062,8 +1086,8 @@ export default function EnhancedProgramManager({
           </div>
         </div>
 
-        {/* Modals */}
-        {showCreateProgram && (
+        {/* Modals removed: create/edit/details now use pages */}
+        {/* {showCreateProgram && (
           <ProgramCreateForm
             program={editingProgram}
             templates={templates}
@@ -1425,7 +1449,7 @@ export default function EnhancedProgramManager({
               setShowCreateProgram(true);
             }}
           />
-        )}
+        )} */}
       </div>
     </>
   );
@@ -2083,325 +2107,7 @@ function ProgramDetailsModal({
   );
 }
 
-// Program Card Component
-interface ProgramCardProps {
-  program: Program;
-  templates: WorkoutTemplate[];
-  onEdit: () => void;
-  onOpenDetails: () => void;
-  onDelete?: () => void;
-  onAssign?: () => void;
-  assignmentCount?: number;
-}
-
-function ProgramCard({
-  program,
-  onEdit,
-  onOpenDetails,
-  onDelete,
-  onAssign,
-  assignmentCount = 0,
-}: ProgramCardProps) {
-  // Different gradient backgrounds for each card - optimized for programs
-  // const gradients = []
-  // Enhanced hash function for better program distribution
-  // let hash = 0
-  // for (let i = 0; i < program.id.length; i++) {
-  //   const char = program.id.charCodeAt(i)
-  //   hash = ((hash << 5) - hash) + char
-  //   hash = hash & hash // Convert to 32-bit integer
-  // }
-  // // Add program name to hash for even better distribution
-  // for (let i = 0; i < program.name.length; i++) {
-  //   const char = program.name.charCodeAt(i)
-  //   hash = ((hash << 3) - hash) + char
-  //   hash = hash & hash
-  // }
-  const getTargetAudienceIcon = (audience: string) => {
-    switch (audience?.toLowerCase()) {
-      case "strength":
-        return Dumbbell;
-      case "weight_loss":
-        return Target;
-      case "muscle_gain":
-        return Zap;
-      case "endurance":
-        return Activity;
-      case "athletic_performance":
-        return Award;
-      case "general_fitness":
-      default:
-        return Users;
-    }
-  };
-
-  const TargetIcon = getTargetAudienceIcon(program.target_audience);
-
-  return (
-    <div
-      style={{
-        backgroundColor: "#FFFFFF",
-        borderRadius: "24px",
-        padding: "24px",
-        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-        marginBottom: "20px",
-        cursor: "pointer",
-      }}
-      className="hover:shadow-xl transition-all duration-300"
-      onClick={onOpenDetails}
-    >
-      <div className="h-full flex flex-col">
-        {/* Program Header Section */}
-        <div
-          className="flex items-center gap-4"
-          style={{ marginBottom: "20px" }}
-        >
-          {/* Icon Container */}
-          <div
-            style={{
-              width: "56px",
-              height: "56px",
-              borderRadius: "18px",
-              background: "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <TargetIcon
-              style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
-            />
-          </div>
-
-          {/* Title and Badge */}
-          <div className="flex-1">
-            <h3
-              style={{
-                fontSize: "18px",
-                fontWeight: "600",
-                color: "#1A1A1A",
-                marginBottom: "8px",
-              }}
-            >
-              {program.name}
-            </h3>
-            <div className="flex items-center gap-2">
-              <Badge
-                style={{
-                  backgroundColor:
-                    program.difficulty_level === "beginner"
-                      ? "#D1FAE5"
-                      : program.difficulty_level === "intermediate"
-                      ? "#FEF3C7"
-                      : "#FEE2E2",
-                  color:
-                    program.difficulty_level === "beginner"
-                      ? "#065F46"
-                      : program.difficulty_level === "intermediate"
-                      ? "#92400E"
-                      : "#991B1B",
-                  borderRadius: "12px",
-                  padding: "4px 10px",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  border: "0",
-                }}
-              >
-                {program.difficulty_level}
-              </Badge>
-              <div
-                className="flex items-center gap-1.5"
-                style={{
-                  padding: "4px 8px",
-                  backgroundColor: "#F3F4F6",
-                  borderRadius: "12px",
-                }}
-              >
-                <Calendar
-                  style={{ width: "14px", height: "14px", color: "#6B7280" }}
-                />
-                <span
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    color: "#6B7280",
-                  }}
-                >
-                  {program.duration_weeks}w
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Program Description */}
-        {program.description && (
-          <div style={{ marginBottom: "20px" }}>
-            <p
-              className="line-clamp-2"
-              style={{ fontSize: "14px", fontWeight: "400", color: "#6B7280" }}
-            >
-              {program.description}
-            </p>
-          </div>
-        )}
-
-        {/* Stats */}
-        <div
-          className="grid grid-cols-3 gap-4"
-          style={{ marginBottom: "20px" }}
-        >
-          <div
-            className="flex flex-col items-center"
-            style={{
-              padding: "16px",
-              backgroundColor: "#DBEAFE",
-              borderRadius: "16px",
-              border: "2px solid #93C5FD",
-            }}
-          >
-            <Calendar
-              style={{
-                width: "24px",
-                height: "24px",
-                marginBottom: "8px",
-                color: "#2196F3",
-              }}
-            />
-            <span
-              style={{ fontSize: "20px", fontWeight: "700", color: "#1A1A1A" }}
-            >
-              {program.schedule?.length || 0}
-            </span>
-            <span
-              style={{ fontSize: "12px", fontWeight: "400", color: "#6B7280" }}
-            >
-              workouts
-            </span>
-          </div>
-          <div
-            className="flex flex-col items-center"
-            style={{
-              padding: "16px",
-              backgroundColor: "#D1FAE5",
-              borderRadius: "16px",
-              border: "2px solid #6EE7B7",
-            }}
-          >
-            <Users
-              style={{
-                width: "24px",
-                height: "24px",
-                marginBottom: "8px",
-                color: "#4CAF50",
-              }}
-            />
-            <span
-              style={{ fontSize: "20px", fontWeight: "700", color: "#1A1A1A" }}
-            >
-              {assignmentCount}
-            </span>
-            <span
-              style={{ fontSize: "12px", fontWeight: "400", color: "#6B7280" }}
-            >
-              clients
-            </span>
-          </div>
-          <div
-            className="flex flex-col items-center"
-            style={{
-              padding: "16px",
-              backgroundColor: "#FEF3C7",
-              borderRadius: "16px",
-              border: "2px solid #FCD34D",
-            }}
-          >
-            <TrendingUp
-              style={{
-                width: "24px",
-                height: "24px",
-                marginBottom: "8px",
-                color: "#F59E0B",
-              }}
-            />
-            <span
-              style={{ fontSize: "12px", fontWeight: "600", color: "#92400E" }}
-            >
-              Progress
-            </span>
-            <span
-              style={{ fontSize: "10px", fontWeight: "400", color: "#6B7280" }}
-            >
-              Tracked
-            </span>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div
-          className="flex items-center gap-2"
-          style={{ paddingTop: "12px", borderTop: "1px solid #E5E7EB" }}
-        >
-          <Button
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-            className="flex-1"
-            style={{
-              borderRadius: "20px",
-              padding: "12px 16px",
-              fontSize: "14px",
-              fontWeight: "600",
-              backgroundColor: "#4CAF50",
-              color: "#FFFFFF",
-            }}
-          >
-            <Edit className="w-3.5 h-3.5 mr-1.5" />
-            <span>Edit</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAssign?.();
-            }}
-            style={{
-              borderRadius: "20px",
-              padding: "10px",
-              border: "2px solid #4CAF50",
-              color: "#4CAF50",
-              backgroundColor: "transparent",
-            }}
-            className="hover:bg-green-50"
-          >
-            <UserPlus className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete?.();
-            }}
-            style={{
-              borderRadius: "20px",
-              padding: "10px",
-              border: "2px solid #EF4444",
-              color: "#EF4444",
-              backgroundColor: "transparent",
-            }}
-            className="hover:bg-red-50"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// Program Card Component removed; using shared component from features/programs
 
 // Program Create Form (placeholder)
 interface ProgramCreateFormProps {
@@ -2829,9 +2535,12 @@ function ProgramCreateForm({
         }
       );
 
-      const { error: exercisesError } = await supabase
-        .from("workout_template_exercises")
-        .insert(exerciseInserts);
+      // NOTE: workout_template_exercises is deprecated. Using WorkoutBlockService instead.
+      // This code path may need refactoring to use the new block system.
+      console.warn(
+        "EnhancedProgramManager: workout_template_exercises.insert is deprecated. Use WorkoutBlockService instead."
+      );
+      // TODO: Refactor to use WorkoutBlockService.createWorkoutBlock
 
       if (exercisesError) {
         console.error(
@@ -5664,135 +5373,42 @@ function ProgramCreateForm({
                                                                       </div>
                                                                     )}
 
-                                                                    {/* Compound exercise selection */}
-                                                                    <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
-                                                                      <div className="mb-2">
-                                                                        <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                                                                          Select
-                                                                          Compound
-                                                                          Exercise
-                                                                        </Label>
-                                                                        <SearchableSelect
-                                                                          value={getWeekValue(
-                                                                            selectedWeek,
-                                                                            getExKey(
-                                                                              scheduleItem,
-                                                                              exerciseIndex,
-                                                                              `compound`
-                                                                            ),
-                                                                            "compound_exercise_id",
-                                                                            parsed.compound_exercise_id ||
-                                                                              (
-                                                                                exercise as any
-                                                                              )
-                                                                                .compound_exercise_id ||
-                                                                              ""
-                                                                          )}
-                                                                          onValueChange={(
-                                                                            value
-                                                                          ) => {
-                                                                            setWeekValue(
-                                                                              selectedWeek,
-                                                                              getExKey(
-                                                                                scheduleItem,
-                                                                                exerciseIndex,
-                                                                                `compound`
-                                                                              ),
-                                                                              "compound_exercise_id",
-                                                                              value
-                                                                            );
-                                                                          }}
-                                                                          placeholder="Select compound exercise..."
-                                                                          items={exercises
-                                                                            .filter(
-                                                                              (
-                                                                                ex
-                                                                              ) =>
-                                                                                ex.id !==
-                                                                                (
-                                                                                  exercise as any
-                                                                                )
-                                                                                  .exercise_id
-                                                                            )
-                                                                            .map(
-                                                                              (
-                                                                                ex
-                                                                              ) => ({
-                                                                                id: ex.id,
-                                                                                name: ex.name,
-                                                                                description:
-                                                                                  ex.description,
-                                                                              })
-                                                                            )}
-                                                                          className="mt-1"
-                                                                        />
-                                                                      </div>
-                                                                    </div>
-
-                                                                    {/* Compound exercise display */}
-                                                                    {(() => {
-                                                                      const compoundExerciseId =
-                                                                        getWeekValue(
-                                                                          selectedWeek,
-                                                                          getExKey(
-                                                                            scheduleItem,
-                                                                            exerciseIndex,
-                                                                            `compound`
-                                                                          ),
-                                                                          "compound_exercise_id",
-                                                                          parsed.compound_exercise_id ||
-                                                                            (
-                                                                              exercise as any
-                                                                            )
-                                                                              .compound_exercise_id ||
-                                                                            ""
-                                                                        );
-                                                                      const compoundExercise =
-                                                                        exercises.find(
-                                                                          (
-                                                                            ex
-                                                                          ) =>
-                                                                            ex.id ===
-                                                                            compoundExerciseId
-                                                                        );
-                                                                      return compoundExercise ? (
-                                                                        <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
-                                                                          <div className="flex items-center gap-2 mb-2">
-                                                                            <span className="text-xs text-slate-500 w-6">
-                                                                              2.
-                                                                            </span>
-                                                                            <div className="flex-1 text-sm">
-                                                                              {
-                                                                                compoundExercise.name
-                                                                              }
-                                                                            </div>
+                                                                    {/* Compound exercise (second one) */}
+                                                                    {idx ===
+                                                                      1 && (
+                                                                      <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
+                                                                        <div className="flex items-center gap-2 mb-2">
+                                                                          <span className="text-xs text-slate-500 w-6">
+                                                                            2.
+                                                                          </span>
+                                                                          <div className="flex-1 text-sm">
+                                                                            {
+                                                                              exInfo.name
+                                                                            }
                                                                           </div>
                                                                         </div>
-                                                                      ) : null;
-                                                                    })()}
-                                                                    {idx ===
-                                                                      1 &&
-                                                                      exInfo && (
-                                                                        <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
-                                                                          <div className="flex items-center gap-2 mb-2">
-                                                                            <span className="text-xs text-slate-500 w-6">
-                                                                              2.
-                                                                            </span>
-                                                                            <div className="flex-1 text-sm">
-                                                                              {
-                                                                                exInfo.name
-                                                                              }
-                                                                            </div>
-                                                                          </div>
-                                                                          <div className="grid grid-cols-2 gap-2">
-                                                                            <div>
-                                                                              <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                                                                                Compound
-                                                                                Reps
-                                                                              </Label>
-                                                                              <Input
-                                                                                type="text"
-                                                                                value={getWeekValue(
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                          <div>
+                                                                            <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                              Compound
+                                                                              Reps
+                                                                            </Label>
+                                                                            <Input
+                                                                              type="text"
+                                                                              value={getWeekValue(
+                                                                                selectedWeek,
+                                                                                getExKey(
+                                                                                  scheduleItem,
+                                                                                  exerciseIndex,
+                                                                                  `${id}-${idx}`
+                                                                                ),
+                                                                                "compound_reps",
+                                                                                ""
+                                                                              )}
+                                                                              onChange={(
+                                                                                e
+                                                                              ) =>
+                                                                                setWeekValue(
                                                                                   selectedWeek,
                                                                                   getExKey(
                                                                                     scheduleItem,
@@ -5800,36 +5416,40 @@ function ProgramCreateForm({
                                                                                     `${id}-${idx}`
                                                                                   ),
                                                                                   "compound_reps",
-                                                                                  ""
-                                                                                )}
-                                                                                onChange={(
                                                                                   e
-                                                                                ) =>
-                                                                                  setWeekValue(
-                                                                                    selectedWeek,
-                                                                                    getExKey(
-                                                                                      scheduleItem,
-                                                                                      exerciseIndex,
-                                                                                      `${id}-${idx}`
-                                                                                    ),
-                                                                                    "compound_reps",
-                                                                                    e
-                                                                                      .target
-                                                                                      .value
-                                                                                  )
-                                                                                }
-                                                                                placeholder="6-8"
-                                                                                className="mt-1 rounded text-xs h-7"
-                                                                              />
-                                                                            </div>
-                                                                            <div>
-                                                                              <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                                                                                Rest
-                                                                                (sec)
-                                                                              </Label>
-                                                                              <Input
-                                                                                type="number"
-                                                                                value={getWeekValue(
+                                                                                    .target
+                                                                                    .value
+                                                                                )
+                                                                              }
+                                                                              placeholder="6-8"
+                                                                              className="mt-1 rounded text-xs h-7"
+                                                                            />
+                                                                          </div>
+                                                                          <div>
+                                                                            <Label className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                                                              Rest
+                                                                              (sec)
+                                                                            </Label>
+                                                                            <Input
+                                                                              type="number"
+                                                                              value={getWeekValue(
+                                                                                selectedWeek,
+                                                                                getExKey(
+                                                                                  scheduleItem,
+                                                                                  exerciseIndex,
+                                                                                  `${id}-${idx}`
+                                                                                ),
+                                                                                "rest_seconds",
+                                                                                (
+                                                                                  exercise as any
+                                                                                )
+                                                                                  .rest_seconds ||
+                                                                                  ""
+                                                                              )}
+                                                                              onChange={(
+                                                                                e
+                                                                              ) =>
+                                                                                setWeekValue(
                                                                                   selectedWeek,
                                                                                   getExKey(
                                                                                     scheduleItem,
@@ -5837,35 +5457,18 @@ function ProgramCreateForm({
                                                                                     `${id}-${idx}`
                                                                                   ),
                                                                                   "rest_seconds",
-                                                                                  (
-                                                                                    exercise as any
-                                                                                  )
-                                                                                    .rest_seconds ||
-                                                                                    ""
-                                                                                )}
-                                                                                onChange={(
                                                                                   e
-                                                                                ) =>
-                                                                                  setWeekValue(
-                                                                                    selectedWeek,
-                                                                                    getExKey(
-                                                                                      scheduleItem,
-                                                                                      exerciseIndex,
-                                                                                      `${id}-${idx}`
-                                                                                    ),
-                                                                                    "rest_seconds",
-                                                                                    e
-                                                                                      .target
-                                                                                      .value
-                                                                                  )
-                                                                                }
-                                                                                min="0"
-                                                                                className="mt-1 rounded text-xs h-7"
-                                                                              />
-                                                                            </div>
+                                                                                    .target
+                                                                                    .value
+                                                                                )
+                                                                              }
+                                                                              min="0"
+                                                                              className="mt-1 rounded text-xs h-7"
+                                                                            />
                                                                           </div>
                                                                         </div>
-                                                                      )}
+                                                                      </div>
+                                                                    )}
                                                                   </div>
                                                                 )}
                                                               </div>

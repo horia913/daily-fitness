@@ -1,13 +1,19 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { 
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
   ArrowLeft,
   CheckCircle,
   Trophy,
@@ -30,138 +36,171 @@ import {
   ChevronUp,
   Play,
   Calendar as CalendarIcon,
-  Gift
-} from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import NotificationTriggers from '@/lib/notificationTriggers'
-import { DynamicSummaryComponent } from '@/components/DynamicSummary'
-import { useWorkoutSummary } from '@/hooks/useWorkoutSummary'
+  Gift,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import NotificationTriggers from "@/lib/notificationTriggers";
+import { DynamicSummaryComponent } from "@/components/DynamicSummary";
+import { useWorkoutSummary } from "@/hooks/useWorkoutSummary";
 
 interface WorkoutAssignment {
-  id: string
-  template_id: string
-  client_id: string
-  status: string
-  notes?: string
+  id: string;
+  workout_template_id: string;
+  client_id: string;
+  status: string;
+  notes?: string;
   template?: {
-    id: string
-    name: string
-    description?: string
-    estimated_duration: number
-    difficulty_level: string
-  }
+    id: string;
+    name: string;
+    description?: string;
+    estimated_duration: number;
+    difficulty_level: string;
+  };
 }
 
 export default function WorkoutComplete() {
-  const params = useParams()
-  const router = useRouter()
-  const assignmentId = params.id as string
-  
-  const [assignment, setAssignment] = useState<WorkoutAssignment | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [completing, setCompleting] = useState(false)
-  const [showDynamicSummary, setShowDynamicSummary] = useState(false)
-  const [showExerciseBreakdown, setShowExerciseBreakdown] = useState(false)
+  const params = useParams();
+  const router = useRouter();
+  const assignmentId = params.id as string;
+
+  const [assignment, setAssignment] = useState<WorkoutAssignment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [completing, setCompleting] = useState(false);
+  const [showDynamicSummary, setShowDynamicSummary] = useState(false);
+  const [showExerciseBreakdown, setShowExerciseBreakdown] = useState(false);
   const [workoutStats, setWorkoutStats] = useState({
     duration: 0,
     exercisesCompleted: 0,
     totalSets: 0,
     caloriesBurned: 0,
-    personalBests: 0
-  })
-  
+    personalBests: 0,
+  });
+
   // Get session ID from URL or state
-  const sessionId = params.sessionId as string || localStorage.getItem('currentWorkoutSessionId')
-  
+  const sessionId =
+    (params.sessionId as string) ||
+    localStorage.getItem("currentWorkoutSessionId");
+
   // Load dynamic summary data
-  const { workoutData, userProfile, comparison, loading: summaryLoading } = useWorkoutSummary(
-    assignment?.client_id || '', 
-    sessionId || undefined
-  )
+  const {
+    workoutData,
+    userProfile,
+    comparison,
+    loading: summaryLoading,
+  } = useWorkoutSummary(assignment?.client_id || "", sessionId || undefined);
 
   useEffect(() => {
     if (assignmentId) {
-      loadAssignment().catch(error => {
-        console.error('Error loading assignment:', error)
-      })
+      loadAssignment().catch((error) => {
+        console.error("Error loading assignment:", error);
+      });
     }
-  }, [assignmentId])
+  }, [assignmentId]);
 
   const loadAssignment = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
 
       const { data: assignmentData, error: assignmentError } = await supabase
-        .from('workout_assignments')
-        .select(`
+        .from("workout_assignments")
+        .select(
+          `
           *,
           template:workout_templates(*)
-        `)
-        .eq('id', assignmentId)
-        .eq('client_id', user.id)
-        .single()
+        `
+        )
+        .eq("id", assignmentId)
+        .eq("client_id", user.id)
+        .single();
 
-      if (assignmentError) throw assignmentError
+      if (assignmentError) throw assignmentError;
 
-      setAssignment(assignmentData)
+      setAssignment(assignmentData);
 
       // Load workout statistics
       if (sessionId) {
+        // Get exercise log count from workout_exercise_logs via workout_logs
         const { data: logs } = await supabase
-          .from('workout_logs')
-          .select('*')
-          .eq('session_id', sessionId)
+          .from("workout_logs")
+          .select(
+            `
+            id,
+            workout_exercise_logs (
+              id,
+              workout_exercise_assignment_id
+            )
+          `
+          )
+          .eq("session_id", sessionId);
 
         if (logs) {
+          // Count unique exercises from exercise logs
+          const exerciseIds = new Set<string>();
+          logs.forEach((log) => {
+            if (log.workout_exercise_logs) {
+              (log.workout_exercise_logs as any[]).forEach(
+                (exerciseLog: any) => {
+                  if (exerciseLog.workout_exercise_assignment_id) {
+                    exerciseIds.add(exerciseLog.workout_exercise_assignment_id);
+                  }
+                }
+              );
+            }
+          });
+
           const stats = {
             duration: assignmentData.template?.estimated_duration || 45,
-            exercisesCompleted: new Set(logs.map(log => log.template_exercise_id)).size,
+            exercisesCompleted: exerciseIds.size,
             totalSets: logs.length,
-            caloriesBurned: Math.round((assignmentData.template?.estimated_duration || 45) * 8), // Rough estimate
-            personalBests: Math.floor(Math.random() * 3) // Mock data for now
-          }
-          setWorkoutStats(stats)
+            caloriesBurned: Math.round(
+              (assignmentData.template?.estimated_duration || 45) * 8
+            ), // Rough estimate
+            personalBests: Math.floor(Math.random() * 3), // Mock data for now
+          };
+          setWorkoutStats(stats);
         }
       }
     } catch (error) {
-      console.error('Error loading assignment:', error)
+      console.error("Error loading assignment:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const markWorkoutComplete = async () => {
-    if (!assignment) return
-    
-    setCompleting(true)
+    if (!assignment) return;
+
+    setCompleting(true);
     try {
       // Update assignment status to completed
       const { error } = await supabase
-        .from('workout_assignments')
-        .update({ 
-          status: 'completed'
+        .from("workout_assignments")
+        .update({
+          status: "completed",
         })
-        .eq('id', assignmentId)
+        .eq("id", assignmentId);
 
-      if (error) throw error
+      if (error) throw error;
 
       // Send notification
       if (assignment.template) {
         await NotificationTriggers.triggerWorkoutCompleted(
           assignment.template.name,
           assignment.template.estimated_duration
-        )
+        );
       }
 
       // Navigate back to workouts
-      router.push('/client/workouts')
+      router.push("/client/workouts");
     } catch (error) {
-      console.error('Error completing workout:', error)
+      console.error("Error completing workout:", error);
     } finally {
-      setCompleting(false)
+      setCompleting(false);
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -177,7 +216,7 @@ export default function WorkoutComplete() {
           </div>
         </div>
       </ProtectedRoute>
-    )
+    );
   }
 
   if (!assignment) {
@@ -187,9 +226,16 @@ export default function WorkoutComplete() {
           <div className="max-w-7xl mx-auto">
             <Card className="bg-white border-slate-200">
               <CardContent className="p-12 text-center">
-                <h3 className="text-lg font-medium text-slate-800 mb-2">Workout not found</h3>
-                <p className="text-slate-500 mb-6">This workout doesn't exist or you don't have access to it.</p>
-                <Button onClick={() => router.push('/client/workouts')} variant="outline">
+                <h3 className="text-lg font-medium text-slate-800 mb-2">
+                  Workout not found
+                </h3>
+                <p className="text-slate-500 mb-6">
+                  This workout doesn't exist or you don't have access to it.
+                </p>
+                <Button
+                  onClick={() => router.push("/client/workouts")}
+                  variant="outline"
+                >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Workouts
                 </Button>
@@ -198,7 +244,7 @@ export default function WorkoutComplete() {
           </div>
         </div>
       </ProtectedRoute>
-    )
+    );
   }
 
   return (
@@ -206,13 +252,12 @@ export default function WorkoutComplete() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
         <div className="p-4">
           <div className="max-w-4xl mx-auto space-y-6">
-            
             {/* Enhanced Header with Back Button */}
             <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => router.push('/client/workouts')}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/client/workouts")}
                 className="rounded-2xl"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -229,21 +274,21 @@ export default function WorkoutComplete() {
                   <div className="absolute bottom-6 left-16 w-2 h-2 bg-white/60 rounded-full animate-bounce delay-1000"></div>
                   <div className="absolute bottom-4 right-8 w-3 h-3 bg-yellow-300/80 rounded-full animate-pulse delay-500"></div>
                 </div>
-                
+
                 <div className="relative z-10">
                   <div className="flex justify-center mb-6">
                     <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center animate-bounce">
                       <Trophy className="w-12 h-12 text-white" />
                     </div>
                   </div>
-                  
+
                   <h1 className="text-4xl font-bold text-white mb-3">
                     Amazing Work! 🎉
                   </h1>
                   <p className="text-white/90 text-xl mb-6">
                     You crushed your workout today!
                   </p>
-                  
+
                   {/* Workout Name Badge */}
                   <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-2xl px-6 py-3 mb-6">
                     <Sparkles className="w-5 h-5 text-yellow-300" />
@@ -251,7 +296,7 @@ export default function WorkoutComplete() {
                       {assignment.template?.name}
                     </span>
                   </div>
-                  
+
                   {/* Quick Stats */}
                   <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
                     <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4">
@@ -330,7 +375,7 @@ export default function WorkoutComplete() {
 
             {/* Exercise Breakdown */}
             <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl overflow-hidden">
-              <CardHeader 
+              <CardHeader
                 className="p-6 cursor-pointer hover:bg-slate-50/50 transition-colors"
                 onClick={() => setShowExerciseBreakdown(!showExerciseBreakdown)}
               >
@@ -353,7 +398,9 @@ export default function WorkoutComplete() {
                   <div className="space-y-4">
                     <div className="text-center py-8 text-slate-500">
                       <Dumbbell className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                      <p>Exercise details will be loaded from your workout logs</p>
+                      <p>
+                        Exercise details will be loaded from your workout logs
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -372,7 +419,8 @@ export default function WorkoutComplete() {
                       Keep the momentum going! 💪
                     </h3>
                     <p className="text-slate-600">
-                      Every workout brings you closer to your goals. You&apos;re doing amazing!
+                      Every workout brings you closer to your goals. You&apos;re
+                      doing amazing!
                     </p>
                   </div>
                 </div>
@@ -392,12 +440,13 @@ export default function WorkoutComplete() {
               <CardContent className="p-6 pt-0">
                 <div className="space-y-4">
                   <p className="text-slate-600 mb-6">
-                    Ready to continue your fitness journey? Here are your next steps:
+                    Ready to continue your fitness journey? Here are your next
+                    steps:
                   </p>
-                  
+
                   {/* Primary Action Buttons */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Button 
+                    <Button
                       onClick={() => setShowDynamicSummary(true)}
                       className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl h-14 text-lg font-semibold shadow-lg disabled:opacity-50"
                       disabled={summaryLoading}
@@ -408,11 +457,13 @@ export default function WorkoutComplete() {
                         ) : (
                           <BarChart3 className="w-6 h-6" />
                         )}
-                        {summaryLoading ? 'Generating Summary...' : 'View Detailed Summary'}
+                        {summaryLoading
+                          ? "Generating Summary..."
+                          : "View Detailed Summary"}
                       </div>
                     </Button>
-                    
-                    <Button 
+
+                    <Button
                       onClick={markWorkoutComplete}
                       className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl h-14 text-lg font-semibold shadow-lg disabled:opacity-50"
                       disabled={completing}
@@ -423,16 +474,16 @@ export default function WorkoutComplete() {
                         ) : (
                           <CheckCircle className="w-6 h-6" />
                         )}
-                        {completing ? 'Completing...' : 'Mark as Complete'}
+                        {completing ? "Completing..." : "Mark as Complete"}
                       </div>
                     </Button>
                   </div>
-                  
+
                   {/* Secondary Action Buttons */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4">
-                    <Button 
+                    <Button
                       variant="outline"
-                      onClick={() => router.push('/client/progress')}
+                      onClick={() => router.push("/client/progress")}
                       className="rounded-2xl h-12 border-2 hover:bg-slate-50"
                     >
                       <div className="flex items-center gap-2">
@@ -440,10 +491,10 @@ export default function WorkoutComplete() {
                         <span className="font-medium">View Progress</span>
                       </div>
                     </Button>
-                    
-                    <Button 
+
+                    <Button
                       variant="outline"
-                      onClick={() => router.push('/client/workouts')}
+                      onClick={() => router.push("/client/workouts")}
                       className="rounded-2xl h-12 border-2 hover:bg-slate-50"
                     >
                       <div className="flex items-center gap-2">
@@ -451,10 +502,10 @@ export default function WorkoutComplete() {
                         <span className="font-medium">Schedule Next</span>
                       </div>
                     </Button>
-                    
-                    <Button 
+
+                    <Button
                       variant="outline"
-                      onClick={() => console.log('Share workout')}
+                      onClick={() => console.log("Share workout")}
                       className="rounded-2xl h-12 border-2 hover:bg-slate-50"
                     >
                       <div className="flex items-center gap-2">
@@ -480,7 +531,9 @@ export default function WorkoutComplete() {
                   <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center">
                     <BarChart3 className="w-5 h-5 text-white" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-800">Workout Summary</h2>
+                  <h2 className="text-2xl font-bold text-slate-800">
+                    Workout Summary
+                  </h2>
                 </div>
                 <Button
                   variant="ghost"
@@ -491,20 +544,20 @@ export default function WorkoutComplete() {
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
               </div>
-              
+
               <div className="max-h-[80vh] overflow-y-auto">
                 <DynamicSummaryComponent
                   workoutData={workoutData}
                   userProfile={userProfile}
                   comparison={comparison}
                   onShare={() => {
-                    console.log('Share workout summary')
+                    console.log("Share workout summary");
                   }}
                   onViewProgress={() => {
-                    router.push('/client/progress')
+                    router.push("/client/progress");
                   }}
                   onScheduleNext={() => {
-                    router.push('/client/workouts')
+                    router.push("/client/workouts");
                   }}
                   className="p-6"
                 />
@@ -514,5 +567,5 @@ export default function WorkoutComplete() {
         </div>
       )}
     </ProtectedRoute>
-  )
+  );
 }

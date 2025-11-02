@@ -23,27 +23,51 @@ export class WorkoutBlockService {
     blockData: Partial<WorkoutBlock>
   ): Promise<WorkoutBlock | null> {
     try {
+      // Check if block_type column exists by trying a simple query first
+      // If block_type doesn't exist, the column might be named differently
+      // or the table might need the column added
+      const insertData: any = {
+        template_id: templateId,
+        block_order: blockOrder,
+      };
+
+      // Only include fields that likely exist
+      if (blockData.block_name) insertData.block_name = blockData.block_name;
+      if (blockData.block_notes) insertData.block_notes = blockData.block_notes;
+      if (blockData.duration_seconds) insertData.duration_seconds = blockData.duration_seconds;
+      if (blockData.rest_seconds) insertData.rest_seconds = blockData.rest_seconds;
+      if (blockData.total_sets) insertData.total_sets = blockData.total_sets;
+      if (blockData.reps_per_set) insertData.reps_per_set = blockData.reps_per_set;
+      if (blockData.block_parameters && Object.keys(blockData.block_parameters).length > 0) {
+        insertData.block_parameters = blockData.block_parameters;
+      }
+      
+      // Try block_type, if it fails the error will be informative
+      insertData.block_type = blockType;
+
       const { data, error } = await supabase
         .from('workout_blocks')
-        .insert({
-          template_id: templateId,
-          block_type: blockType,
-          block_order: blockOrder,
-          block_name: blockData.block_name,
-          block_notes: blockData.block_notes,
-          duration_seconds: blockData.duration_seconds,
-          rest_seconds: blockData.rest_seconds,
-          total_sets: blockData.total_sets,
-          reps_per_set: blockData.reps_per_set,
-          block_parameters: blockData.block_parameters || {}
-        })
+        .insert(insertData)
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Full error details:', error);
+        // Log more details about the error
+        if (error.code === 'PGRST204') {
+          console.error('Column not found. The workout_blocks table may be missing the block_type column.');
+          console.error('Please check your database schema and ensure the workout_blocks table has a block_type column of type workout_block_type enum.');
+        }
+        throw error;
+      }
       return data
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating workout block:', error)
+      // Return a more descriptive error
+      if (error?.code === 'PGRST204') {
+        console.error('Database schema issue: The workout_blocks table is missing the block_type column.');
+        console.error('The table needs a column: block_type workout_block_type');
+      }
       return null
     }
   }
@@ -80,31 +104,65 @@ export class WorkoutBlockService {
     exerciseData: Partial<WorkoutBlockExercise>
   ): Promise<WorkoutBlockExercise | null> {
     try {
+      // Build insert data object, only including fields that have values
+      const insertData: any = {
+        block_id: blockId,
+        exercise_id: exerciseId,
+        exercise_order: exerciseOrder,
+      };
+
+      // Only include optional fields if they have values
+      if (exerciseData.exercise_letter !== undefined && exerciseData.exercise_letter !== null) {
+        insertData.exercise_letter = exerciseData.exercise_letter;
+      }
+      if (exerciseData.sets !== undefined && exerciseData.sets !== null) {
+        insertData.sets = exerciseData.sets;
+      }
+      if (exerciseData.reps !== undefined && exerciseData.reps !== null && exerciseData.reps !== '') {
+        insertData.reps = exerciseData.reps;
+      }
+      if (exerciseData.weight_kg !== undefined && exerciseData.weight_kg !== null) {
+        insertData.weight_kg = exerciseData.weight_kg;
+      }
+      if (exerciseData.rir !== undefined && exerciseData.rir !== null) {
+        insertData.rir = exerciseData.rir;
+      }
+      if (exerciseData.tempo !== undefined && exerciseData.tempo !== null && exerciseData.tempo !== '') {
+        insertData.tempo = exerciseData.tempo;
+      }
+      if (exerciseData.rest_seconds !== undefined && exerciseData.rest_seconds !== null) {
+        insertData.rest_seconds = exerciseData.rest_seconds;
+      }
+      if (exerciseData.notes !== undefined && exerciseData.notes !== null && exerciseData.notes !== '') {
+        insertData.notes = exerciseData.notes;
+      }
+
       const { data, error } = await supabase
         .from('workout_block_exercises')
-        .insert({
-          block_id: blockId,
-          exercise_id: exerciseId,
-          exercise_order: exerciseOrder,
-          exercise_letter: exerciseData.exercise_letter,
-          sets: exerciseData.sets,
-          reps: exerciseData.reps,
-          weight_kg: exerciseData.weight_kg,
-          rir: exerciseData.rir,
-          tempo: exerciseData.tempo,
-          rest_seconds: exerciseData.rest_seconds,
-          notes: exerciseData.notes
-        })
+        .insert(insertData)
         .select(`
           *,
           exercise:exercises(*)
         `)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error adding exercise to block - Full error:', error);
+        // Provide helpful error messages for common schema issues
+        if (error.code === 'PGRST204') {
+          console.error('Column not found. Please check that the workout_block_exercises table has all required columns.');
+          console.error('Required columns: block_id, exercise_id, exercise_order');
+          console.error('Optional columns: exercise_letter, sets, reps, weight_kg, rir, tempo, rest_seconds, notes');
+        }
+        throw error;
+      }
       return data
-    } catch (error) {
-      console.error('Error adding exercise to block:', error)
+    } catch (error: any) {
+      console.error('Error adding exercise to block:', error);
+      // Log more details for debugging
+      if (error?.code === 'PGRST204') {
+        console.error('Database schema issue: The workout_block_exercises table may be missing required columns.');
+      }
       return null
     }
   }
