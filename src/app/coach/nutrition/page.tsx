@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,7 +94,7 @@ interface MealPlanAssignment {
 export default function CoachNutritionPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const { getThemeStyles } = useTheme();
+  const { getThemeStyles, performanceSettings } = useTheme();
   const theme = getThemeStyles();
 
   const [activeTab, setActiveTab] = useState("meal-plans");
@@ -437,180 +439,304 @@ export default function CoachNutritionPage() {
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className="min-h-screen bg-gray-50 pb-24">
-        <div className="max-w-7xl mx-auto p-6">
-          {/* Header */}
-          <Card className={`${theme.card} ${theme.shadow} rounded-2xl mb-6`}>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
-                  <Apple className="w-8 h-8 text-green-600 dark:text-green-400" />
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen pb-24">
+          <div className="max-w-7xl mx-auto p-6">
+            {/* Header */}
+            <Card className={`${theme.card} ${theme.shadow} rounded-2xl mb-6`}>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
+                    <Apple className="w-8 h-8 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <CardTitle className={`text-2xl ${theme.text}`}>
+                      Nutrition Planning Hub
+                    </CardTitle>
+                    <p className={`${theme.textSecondary}`}>
+                      Create meal plans, manage food databases, and assign
+                      nutrition programs to your clients
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <CardTitle className={`text-2xl ${theme.text}`}>
-                    Nutrition Planning Hub
-                  </CardTitle>
-                  <p className={`${theme.textSecondary}`}>
-                    Create meal plans, manage food databases, and assign
-                    nutrition programs to your clients
-                  </p>
+              </CardHeader>
+            </Card>
+
+            {/* Search */}
+            <Card className={`${theme.card} ${theme.shadow} rounded-2xl mb-6`}>
+              <CardContent className="pt-6">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    placeholder="Search meal plans, foods, and clients..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={`pl-10 ${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                  />
                 </div>
-              </div>
-            </CardHeader>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Search */}
-          <Card className={`${theme.card} ${theme.shadow} rounded-2xl mb-6`}>
-            <CardContent className="pt-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  placeholder="Search meal plans, foods, and clients..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`pl-10 ${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Tabs */}
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="space-y-6"
-          >
-            <TabsList
-              className={`grid w-full grid-cols-3 ${theme.card} ${theme.shadow} rounded-xl`}
+            {/* Tabs */}
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="space-y-6"
             >
-              <TabsTrigger
-                value="meal-plans"
-                className="flex items-center gap-2 rounded-xl"
+              <TabsList
+                className={`grid w-full grid-cols-3 ${theme.card} ${theme.shadow} rounded-xl`}
               >
-                <ChefHat className="w-4 h-4" />
-                <span className="hidden sm:inline">Meal Plans</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="foods"
-                className="flex items-center gap-2 rounded-xl"
-              >
-                <Utensils className="w-4 h-4" />
-                <span className="hidden sm:inline">Food Database</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="assignments"
-                className="flex items-center gap-2 rounded-xl"
-              >
-                <Users className="w-4 h-4" />
-                <span className="hidden sm:inline">Assignments</span>
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Meal Plans Tab */}
-            <TabsContent
-              value="meal-plans"
-              className="space-y-6 mt-24 sm:mt-28"
-            >
-              <div className="text-center py-12">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-green-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <ChefHat className="w-10 h-10 text-white" />
-                </div>
-                <h3 className={`text-2xl font-bold ${theme.text} mb-2`}>
-                  Meal Plans Management
-                </h3>
-                <p className={`${theme.textSecondary} mb-6 max-w-md mx-auto`}>
-                  Create and manage nutrition plans for your clients. Access the
-                  full meal plans interface for detailed meal planning.
-                </p>
-                <Button
-                  onClick={() => router.push("/coach/nutrition/meal-plans")}
-                  className="rounded-xl bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white"
+                <TabsTrigger
+                  value="meal-plans"
+                  className="flex items-center gap-2 rounded-xl"
                 >
-                  <ChefHat className="w-4 h-4 mr-2" />
-                  Go to Meal Plans
-                </Button>
-              </div>
-            </TabsContent>
+                  <ChefHat className="w-4 h-4" />
+                  <span className="hidden sm:inline">Meal Plans</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="foods"
+                  className="flex items-center gap-2 rounded-xl"
+                >
+                  <Utensils className="w-4 h-4" />
+                  <span className="hidden sm:inline">Food Database</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="assignments"
+                  className="flex items-center gap-2 rounded-xl"
+                >
+                  <Users className="w-4 h-4" />
+                  <span className="hidden sm:inline">Assignments</span>
+                </TabsTrigger>
+              </TabsList>
 
-            {/* Food Database Tab */}
-            <TabsContent value="foods" className="space-y-6 mt-24 sm:mt-28">
-              <OptimizedFoodDatabase coachId={user?.id || ""} />
-            </TabsContent>
-
-            {/* Assignments Tab */}
-            <TabsContent
-              value="assignments"
-              className="space-y-6 mt-24 sm:mt-28"
-            >
-              <OptimizedNutritionAssignments coachId={user?.id || ""} />
-            </TabsContent>
-          </Tabs>
-
-          {/* Add Food Modal */}
-          {showAddFood && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <Card
-                className={`w-full max-w-md max-h-[90vh] overflow-y-auto ${theme.card} ${theme.shadow} rounded-2xl`}
+              {/* Meal Plans Tab */}
+              <TabsContent
+                value="meal-plans"
+                className="space-y-6 mt-24 sm:mt-28"
               >
-                <CardHeader>
-                  <CardTitle className={`${theme.text}`}>
-                    Add New Food
-                  </CardTitle>
-                  <p className={`${theme.textSecondary}`}>
-                    Add a new food item to your database
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-green-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <ChefHat className="w-10 h-10 text-white" />
+                  </div>
+                  <h3 className={`text-2xl font-bold ${theme.text} mb-2`}>
+                    Meal Plans Management
+                  </h3>
+                  <p className={`${theme.textSecondary} mb-6 max-w-md mx-auto`}>
+                    Create and manage nutrition plans for your clients. Access
+                    the full meal plans interface for detailed meal planning.
                   </p>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleAddFood} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className={`${theme.text}`}>
-                        Food Name *
-                      </Label>
-                      <Input
-                        id="name"
-                        value={foodForm.name}
-                        onChange={(e) =>
-                          setFoodForm({ ...foodForm, name: e.target.value })
-                        }
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                        required
-                      />
-                    </div>
+                  <Button
+                    onClick={() => router.push("/coach/nutrition/meal-plans")}
+                    className="rounded-xl bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white"
+                  >
+                    <ChefHat className="w-4 h-4 mr-2" />
+                    Go to Meal Plans
+                  </Button>
+                </div>
+              </TabsContent>
 
-                    <div className="grid grid-cols-2 gap-4">
+              {/* Food Database Tab */}
+              <TabsContent value="foods" className="space-y-6 mt-24 sm:mt-28">
+                <OptimizedFoodDatabase coachId={user?.id || ""} />
+              </TabsContent>
+
+              {/* Assignments Tab */}
+              <TabsContent
+                value="assignments"
+                className="space-y-6 mt-24 sm:mt-28"
+              >
+                <OptimizedNutritionAssignments coachId={user?.id || ""} />
+              </TabsContent>
+            </Tabs>
+
+            {/* Add Food Modal */}
+            {showAddFood && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <Card
+                  className={`w-full max-w-md max-h-[90vh] overflow-y-auto ${theme.card} ${theme.shadow} rounded-2xl`}
+                >
+                  <CardHeader>
+                    <CardTitle className={`${theme.text}`}>
+                      Add New Food
+                    </CardTitle>
+                    <p className={`${theme.textSecondary}`}>
+                      Add a new food item to your database
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleAddFood} className="space-y-4">
                       <div className="space-y-2">
-                        <Label
-                          htmlFor="serving_size"
-                          className={`${theme.text}`}
-                        >
-                          Serving Size *
+                        <Label htmlFor="name" className={`${theme.text}`}>
+                          Food Name *
                         </Label>
                         <Input
-                          id="serving_size"
+                          id="name"
+                          value={foodForm.name}
+                          onChange={(e) =>
+                            setFoodForm({ ...foodForm, name: e.target.value })
+                          }
+                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="serving_size"
+                            className={`${theme.text}`}
+                          >
+                            Serving Size *
+                          </Label>
+                          <Input
+                            id="serving_size"
+                            type="number"
+                            step="0.1"
+                            value={foodForm.serving_size}
+                            onChange={(e) =>
+                              setFoodForm({
+                                ...foodForm,
+                                serving_size: e.target.value,
+                              })
+                            }
+                            className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="serving_unit"
+                            className={`${theme.text}`}
+                          >
+                            Unit *
+                          </Label>
+                          <Select
+                            value={foodForm.serving_unit}
+                            onValueChange={(value) =>
+                              setFoodForm({ ...foodForm, serving_unit: value })
+                            }
+                          >
+                            <SelectTrigger
+                              className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="g">g</SelectItem>
+                              <SelectItem value="ml">ml</SelectItem>
+                              <SelectItem value="cup">cup</SelectItem>
+                              <SelectItem value="tbsp">tbsp</SelectItem>
+                              <SelectItem value="tsp">tsp</SelectItem>
+                              <SelectItem value="piece">piece</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="calories_per_serving"
+                          className={`${theme.text}`}
+                        >
+                          Calories per Serving *
+                        </Label>
+                        <Input
+                          id="calories_per_serving"
                           type="number"
                           step="0.1"
-                          value={foodForm.serving_size}
+                          value={foodForm.calories_per_serving}
                           onChange={(e) =>
                             setFoodForm({
                               ...foodForm,
-                              serving_size: e.target.value,
+                              calories_per_serving: e.target.value,
                             })
                           }
                           className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                           required
                         />
                       </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="protein" className={`${theme.text}`}>
+                            Protein (g)
+                          </Label>
+                          <Input
+                            id="protein"
+                            type="number"
+                            step="0.1"
+                            value={foodForm.protein}
+                            onChange={(e) =>
+                              setFoodForm({
+                                ...foodForm,
+                                protein: e.target.value,
+                              })
+                            }
+                            className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="carbs" className={`${theme.text}`}>
+                            Carbs (g)
+                          </Label>
+                          <Input
+                            id="carbs"
+                            type="number"
+                            step="0.1"
+                            value={foodForm.carbs}
+                            onChange={(e) =>
+                              setFoodForm({
+                                ...foodForm,
+                                carbs: e.target.value,
+                              })
+                            }
+                            className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="fat" className={`${theme.text}`}>
+                            Fat (g)
+                          </Label>
+                          <Input
+                            id="fat"
+                            type="number"
+                            step="0.1"
+                            value={foodForm.fat}
+                            onChange={(e) =>
+                              setFoodForm({ ...foodForm, fat: e.target.value })
+                            }
+                            className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="fiber" className={`${theme.text}`}>
+                            Fiber (g)
+                          </Label>
+                          <Input
+                            id="fiber"
+                            type="number"
+                            step="0.1"
+                            value={foodForm.fiber}
+                            onChange={(e) =>
+                              setFoodForm({
+                                ...foodForm,
+                                fiber: e.target.value,
+                              })
+                            }
+                            className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                          />
+                        </div>
+                      </div>
+
                       <div className="space-y-2">
-                        <Label
-                          htmlFor="serving_unit"
-                          className={`${theme.text}`}
-                        >
-                          Unit *
+                        <Label htmlFor="category" className={`${theme.text}`}>
+                          Category
                         </Label>
                         <Select
-                          value={foodForm.serving_unit}
+                          value={foodForm.category}
                           onValueChange={(value) =>
-                            setFoodForm({ ...foodForm, serving_unit: value })
+                            setFoodForm({ ...foodForm, category: value })
                           }
                         >
                           <SelectTrigger
@@ -619,203 +745,280 @@ export default function CoachNutritionPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="g">g</SelectItem>
-                            <SelectItem value="ml">ml</SelectItem>
-                            <SelectItem value="cup">cup</SelectItem>
-                            <SelectItem value="tbsp">tbsp</SelectItem>
-                            <SelectItem value="tsp">tsp</SelectItem>
-                            <SelectItem value="piece">piece</SelectItem>
+                            <SelectItem value="Protein">Protein</SelectItem>
+                            <SelectItem value="Grains">Grains</SelectItem>
+                            <SelectItem value="Vegetables">
+                              Vegetables
+                            </SelectItem>
+                            <SelectItem value="Fruits">Fruits</SelectItem>
+                            <SelectItem value="Dairy">Dairy</SelectItem>
+                            <SelectItem value="Nuts">Nuts</SelectItem>
+                            <SelectItem value="General">General</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="calories_per_serving"
-                        className={`${theme.text}`}
-                      >
-                        Calories per Serving *
-                      </Label>
-                      <Input
-                        id="calories_per_serving"
-                        type="number"
-                        step="0.1"
-                        value={foodForm.calories_per_serving}
-                        onChange={(e) =>
-                          setFoodForm({
-                            ...foodForm,
-                            calories_per_serving: e.target.value,
-                          })
-                        }
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                        required
-                      />
-                    </div>
+                      <div className="flex gap-2 pt-4">
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          className={`flex-1 ${theme.gradient} ${theme.shadow} rounded-xl`}
+                        >
+                          {loading ? "Adding..." : "Add Food"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowAddFood(false)}
+                          className={`${theme.border} ${theme.textSecondary} rounded-xl`}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Add Meal Plan Modal */}
+            {showAddMealPlan && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <Card
+                  className={`w-full max-w-md ${theme.card} ${theme.shadow} rounded-2xl`}
+                >
+                  <CardHeader>
+                    <CardTitle className={`${theme.text}`}>
+                      Create Meal Plan
+                    </CardTitle>
+                    <p className={`${theme.textSecondary}`}>
+                      Create a new meal plan
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleAddMealPlan} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="protein" className={`${theme.text}`}>
-                          Protein (g)
+                        <Label
+                          htmlFor="meal_plan_name"
+                          className={`${theme.text}`}
+                        >
+                          Meal Plan Name *
                         </Label>
                         <Input
-                          id="protein"
-                          type="number"
-                          step="0.1"
-                          value={foodForm.protein}
+                          id="meal_plan_name"
+                          value={mealPlanForm.name}
                           onChange={(e) =>
-                            setFoodForm({
-                              ...foodForm,
-                              protein: e.target.value,
+                            setMealPlanForm({
+                              ...mealPlanForm,
+                              name: e.target.value,
+                            })
+                          }
+                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="notes" className={`${theme.text}`}>
+                          Notes
+                        </Label>
+                        <Textarea
+                          id="notes"
+                          value={mealPlanForm.notes}
+                          onChange={(e) =>
+                            setMealPlanForm({
+                              ...mealPlanForm,
+                              notes: e.target.value,
                             })
                           }
                           className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="carbs" className={`${theme.text}`}>
-                          Carbs (g)
-                        </Label>
-                        <Input
-                          id="carbs"
-                          type="number"
-                          step="0.1"
-                          value={foodForm.carbs}
-                          onChange={(e) =>
-                            setFoodForm({ ...foodForm, carbs: e.target.value })
-                          }
-                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="fat" className={`${theme.text}`}>
-                          Fat (g)
-                        </Label>
-                        <Input
-                          id="fat"
-                          type="number"
-                          step="0.1"
-                          value={foodForm.fat}
-                          onChange={(e) =>
-                            setFoodForm({ ...foodForm, fat: e.target.value })
-                          }
-                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="fiber" className={`${theme.text}`}>
-                          Fiber (g)
-                        </Label>
-                        <Input
-                          id="fiber"
-                          type="number"
-                          step="0.1"
-                          value={foodForm.fiber}
-                          onChange={(e) =>
-                            setFoodForm({ ...foodForm, fiber: e.target.value })
-                          }
-                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                        />
-                      </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="category" className={`${theme.text}`}>
-                        Category
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="target_calories"
+                          className={`${theme.text}`}
+                        >
+                          Target Calories (per day)
+                        </Label>
+                        <Input
+                          id="target_calories"
+                          type="number"
+                          value={mealPlanForm.target_calories}
+                          onChange={(e) =>
+                            setMealPlanForm({
+                              ...mealPlanForm,
+                              target_calories: e.target.value,
+                            })
+                          }
+                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-4">
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          className={`flex-1 ${theme.gradient} ${theme.shadow} rounded-xl`}
+                        >
+                          {loading ? "Creating..." : "Create Meal Plan"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowAddMealPlan(false)}
+                          className={`${theme.border} ${theme.textSecondary} rounded-xl`}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Meal Plan Assignment Modal */}
+            {showAssignMealPlan && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div
+                  className={`${theme.card} ${theme.shadow} rounded-2xl p-6 w-full max-w-md mx-4`}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className={`text-xl font-semibold ${theme.text}`}>
+                      Assign Meal Plan
+                    </h2>
+                    <button
+                      onClick={() => setShowAssignMealPlan(false)}
+                      className={`${theme.textSecondary} hover:${theme.text}`}
+                    >
+                      <Eye className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleAssignMealPlan} className="space-y-4">
+                    <div>
+                      <Label htmlFor="client" className={`${theme.text}`}>
+                        Select Client
                       </Label>
                       <Select
-                        value={foodForm.category}
+                        value={assignmentForm.client_id}
                         onValueChange={(value) =>
-                          setFoodForm({ ...foodForm, category: value })
+                          setAssignmentForm({
+                            ...assignmentForm,
+                            client_id: value,
+                          })
                         }
                       >
                         <SelectTrigger
                           className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                         >
-                          <SelectValue />
+                          <SelectValue placeholder="Choose a client" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Protein">Protein</SelectItem>
-                          <SelectItem value="Grains">Grains</SelectItem>
-                          <SelectItem value="Vegetables">Vegetables</SelectItem>
-                          <SelectItem value="Fruits">Fruits</SelectItem>
-                          <SelectItem value="Dairy">Dairy</SelectItem>
-                          <SelectItem value="Nuts">Nuts</SelectItem>
-                          <SelectItem value="General">General</SelectItem>
+                          {clients.map((client) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.first_name && client.last_name
+                                ? `${client.first_name} ${client.last_name}`
+                                : client.email}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      {clients.length === 0 && (
+                        <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                          No active clients found. Make sure you have clients
+                          assigned to you.
+                        </p>
+                      )}
                     </div>
 
-                    <div className="flex gap-2 pt-4">
-                      <Button
-                        type="submit"
-                        disabled={loading}
-                        className={`flex-1 ${theme.gradient} ${theme.shadow} rounded-xl`}
-                      >
-                        {loading ? "Adding..." : "Add Food"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowAddFood(false)}
-                        className={`${theme.border} ${theme.textSecondary} rounded-xl`}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Add Meal Plan Modal */}
-          {showAddMealPlan && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <Card
-                className={`w-full max-w-md ${theme.card} ${theme.shadow} rounded-2xl`}
-              >
-                <CardHeader>
-                  <CardTitle className={`${theme.text}`}>
-                    Create Meal Plan
-                  </CardTitle>
-                  <p className={`${theme.textSecondary}`}>
-                    Create a new meal plan
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleAddMealPlan} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="meal_plan_name"
-                        className={`${theme.text}`}
-                      >
-                        Meal Plan Name *
+                    <div>
+                      <Label htmlFor="mealPlan" className={`${theme.text}`}>
+                        Select Meal Plan
                       </Label>
-                      <Input
-                        id="meal_plan_name"
-                        value={mealPlanForm.name}
-                        onChange={(e) =>
-                          setMealPlanForm({
-                            ...mealPlanForm,
-                            name: e.target.value,
+                      <Select
+                        value={assignmentForm.meal_plan_id}
+                        onValueChange={(value) =>
+                          setAssignmentForm({
+                            ...assignmentForm,
+                            meal_plan_id: value,
                           })
                         }
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                        required
-                      />
+                      >
+                        <SelectTrigger
+                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                        >
+                          <SelectValue placeholder="Choose a meal plan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mealPlans.map((mealPlan) => (
+                            <SelectItem key={mealPlan.id} value={mealPlan.id}>
+                              {mealPlan.name}
+                              {mealPlan.target_calories &&
+                                ` (${mealPlan.target_calories} cal)`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {mealPlans.length === 0 && (
+                        <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                          No meal plans found. Create a meal plan first.
+                        </p>
+                      )}
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="startDate" className={`${theme.text}`}>
+                          Start Date
+                        </Label>
+                        <Input
+                          id="startDate"
+                          type="date"
+                          value={assignmentForm.start_date}
+                          onChange={(e) =>
+                            setAssignmentForm({
+                              ...assignmentForm,
+                              start_date: e.target.value,
+                            })
+                          }
+                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="endDate" className={`${theme.text}`}>
+                          End Date (Optional)
+                        </Label>
+                        <Input
+                          id="endDate"
+                          type="date"
+                          value={assignmentForm.end_date}
+                          onChange={(e) =>
+                            setAssignmentForm({
+                              ...assignmentForm,
+                              end_date: e.target.value,
+                            })
+                          }
+                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
                       <Label htmlFor="notes" className={`${theme.text}`}>
                         Notes
                       </Label>
                       <Textarea
                         id="notes"
-                        value={mealPlanForm.notes}
+                        placeholder="Add any special instructions..."
+                        rows={3}
+                        value={assignmentForm.notes}
                         onChange={(e) =>
-                          setMealPlanForm({
-                            ...mealPlanForm,
+                          setAssignmentForm({
+                            ...assignmentForm,
                             notes: e.target.value,
                           })
                         }
@@ -823,224 +1026,34 @@ export default function CoachNutritionPage() {
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="target_calories"
-                        className={`${theme.text}`}
-                      >
-                        Target Calories (per day)
-                      </Label>
-                      <Input
-                        id="target_calories"
-                        type="number"
-                        value={mealPlanForm.target_calories}
-                        onChange={(e) =>
-                          setMealPlanForm({
-                            ...mealPlanForm,
-                            target_calories: e.target.value,
-                          })
-                        }
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                      />
-                    </div>
-
-                    <div className="flex gap-2 pt-4">
-                      <Button
-                        type="submit"
-                        disabled={loading}
-                        className={`flex-1 ${theme.gradient} ${theme.shadow} rounded-xl`}
-                      >
-                        {loading ? "Creating..." : "Create Meal Plan"}
-                      </Button>
+                    <div className="flex gap-3 pt-4">
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setShowAddMealPlan(false)}
-                        className={`${theme.border} ${theme.textSecondary} rounded-xl`}
+                        onClick={() => setShowAssignMealPlan(false)}
+                        className={`flex-1 ${theme.border} ${theme.textSecondary} rounded-xl`}
                       >
                         Cancel
                       </Button>
+                      <Button
+                        type="submit"
+                        className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl"
+                        disabled={
+                          loading ||
+                          !assignmentForm.client_id ||
+                          !assignmentForm.meal_plan_id
+                        }
+                      >
+                        {loading ? "Assigning..." : "Assign Meal Plan"}
+                      </Button>
                     </div>
                   </form>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Meal Plan Assignment Modal */}
-          {showAssignMealPlan && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div
-                className={`${theme.card} ${theme.shadow} rounded-2xl p-6 w-full max-w-md mx-4`}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className={`text-xl font-semibold ${theme.text}`}>
-                    Assign Meal Plan
-                  </h2>
-                  <button
-                    onClick={() => setShowAssignMealPlan(false)}
-                    className={`${theme.textSecondary} hover:${theme.text}`}
-                  >
-                    <Eye className="w-5 h-5" />
-                  </button>
                 </div>
-
-                <form onSubmit={handleAssignMealPlan} className="space-y-4">
-                  <div>
-                    <Label htmlFor="client" className={`${theme.text}`}>
-                      Select Client
-                    </Label>
-                    <Select
-                      value={assignmentForm.client_id}
-                      onValueChange={(value) =>
-                        setAssignmentForm({
-                          ...assignmentForm,
-                          client_id: value,
-                        })
-                      }
-                    >
-                      <SelectTrigger
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                      >
-                        <SelectValue placeholder="Choose a client" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.first_name && client.last_name
-                              ? `${client.first_name} ${client.last_name}`
-                              : client.email}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {clients.length === 0 && (
-                      <p className={`text-xs ${theme.textSecondary} mt-1`}>
-                        No active clients found. Make sure you have clients
-                        assigned to you.
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="mealPlan" className={`${theme.text}`}>
-                      Select Meal Plan
-                    </Label>
-                    <Select
-                      value={assignmentForm.meal_plan_id}
-                      onValueChange={(value) =>
-                        setAssignmentForm({
-                          ...assignmentForm,
-                          meal_plan_id: value,
-                        })
-                      }
-                    >
-                      <SelectTrigger
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                      >
-                        <SelectValue placeholder="Choose a meal plan" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {mealPlans.map((mealPlan) => (
-                          <SelectItem key={mealPlan.id} value={mealPlan.id}>
-                            {mealPlan.name}
-                            {mealPlan.target_calories &&
-                              ` (${mealPlan.target_calories} cal)`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {mealPlans.length === 0 && (
-                      <p className={`text-xs ${theme.textSecondary} mt-1`}>
-                        No meal plans found. Create a meal plan first.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="startDate" className={`${theme.text}`}>
-                        Start Date
-                      </Label>
-                      <Input
-                        id="startDate"
-                        type="date"
-                        value={assignmentForm.start_date}
-                        onChange={(e) =>
-                          setAssignmentForm({
-                            ...assignmentForm,
-                            start_date: e.target.value,
-                          })
-                        }
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="endDate" className={`${theme.text}`}>
-                        End Date (Optional)
-                      </Label>
-                      <Input
-                        id="endDate"
-                        type="date"
-                        value={assignmentForm.end_date}
-                        onChange={(e) =>
-                          setAssignmentForm({
-                            ...assignmentForm,
-                            end_date: e.target.value,
-                          })
-                        }
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="notes" className={`${theme.text}`}>
-                      Notes
-                    </Label>
-                    <Textarea
-                      id="notes"
-                      placeholder="Add any special instructions..."
-                      rows={3}
-                      value={assignmentForm.notes}
-                      onChange={(e) =>
-                        setAssignmentForm({
-                          ...assignmentForm,
-                          notes: e.target.value,
-                        })
-                      }
-                      className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                    />
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowAssignMealPlan(false)}
-                      className={`flex-1 ${theme.border} ${theme.textSecondary} rounded-xl`}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl"
-                      disabled={
-                        loading ||
-                        !assignmentForm.client_id ||
-                        !assignmentForm.meal_plan_id
-                      }
-                    >
-                      {loading ? "Assigning..." : "Assign Meal Plan"}
-                    </Button>
-                  </div>
-                </form>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

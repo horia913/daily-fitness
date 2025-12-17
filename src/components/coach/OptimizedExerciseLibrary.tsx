@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -70,7 +72,7 @@ interface OptimizedExerciseLibraryProps {
 }
 
 export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryProps) {
-  const { isDark, getThemeStyles } = useTheme()
+  const { isDark, getThemeStyles, performanceSettings } = useTheme()
   const router = useRouter()
   const theme = getThemeStyles()
 
@@ -294,8 +296,10 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
   }
 
   return (
-    <div className={`min-h-screen ${theme.background}`}>
-      {/* Enhanced Header */}
+    <AnimatedBackground>
+      {performanceSettings.floatingParticles && <FloatingParticles />}
+      <div className="min-h-screen">
+        {/* Enhanced Header */}
       <div className={`p-4 sm:p-6 ${theme.background} relative overflow-hidden`}>
         {/* Floating background elements */}
         <div className="absolute inset-0 overflow-hidden">
@@ -899,6 +903,6 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
           )}
         </div>
       </div>
-    </div>
+    </AnimatedBackground>
   )
 }

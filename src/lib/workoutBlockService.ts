@@ -75,21 +75,86 @@ export class WorkoutBlockService {
   // Get all blocks for a workout template
   static async getWorkoutBlocks(templateId: string): Promise<WorkoutBlock[]> {
     try {
-      // Simplified query to only include tables that exist in the current schema
-      const { data, error } = await supabase
+      // 1) Fetch blocks + exercises (minimal join) first
+      const { data: blocks, error } = await supabase
         .from('workout_blocks')
         .select(`
           *,
           exercises:workout_block_exercises(
             *,
-            exercise:exercises(*)
+            exercise:exercises(id, name, description, video_url)
           )
         `)
         .eq('template_id', templateId)
         .order('block_order')
 
       if (error) throw error
-      return data || []
+      if (!blocks || blocks.length === 0) return []
+
+      // 2) Collect IDs for batch queries
+      const allBlockIds = blocks.map((b: any) => b.id)
+      const allExerciseIds = (
+        blocks.flatMap((b: any) => (b.exercises || []).map((e: any) => e.id))
+      ).filter(Boolean)
+
+      // If no exercises, still fetch time protocols and return quickly
+      // 3) Run related-table queries in parallel (batched)
+      const [timeProtocolsRes, dropRes, clusterRes, pyramidRes, ladderRes, restPauseRes] = await Promise.all([
+        supabase.from('workout_time_protocols').select('*').in('block_id', allBlockIds),
+        allExerciseIds.length > 0
+          ? supabase.from('workout_drop_sets').select('*').in('block_exercise_id', allExerciseIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        allExerciseIds.length > 0
+          ? supabase.from('workout_cluster_sets').select('*').in('block_exercise_id', allExerciseIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        allExerciseIds.length > 0
+          ? supabase.from('workout_pyramid_sets').select('*').in('block_exercise_id', allExerciseIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        allExerciseIds.length > 0
+          ? supabase.from('workout_ladder_sets').select('*').in('block_exercise_id', allExerciseIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        allExerciseIds.length > 0
+          ? supabase.from('workout_rest_pause_sets').select('*').in('block_exercise_id', allExerciseIds)
+          : Promise.resolve({ data: [], error: null } as any)
+      ])
+
+      // 4) Build lookup maps
+      const timeByBlock = new Map<string, any>()
+      ;(timeProtocolsRes.data || []).forEach((tp: any) => timeByBlock.set(tp.block_id, tp))
+
+      const groupBy = (arr: any[], key: string) => {
+        const map = new Map<string, any[]>()
+        arr.forEach((row: any) => {
+          const k = String(row[key])
+          if (!map.has(k)) map.set(k, [])
+          map.get(k)!.push(row)
+        })
+        return map
+      }
+
+      const dropByExercise = groupBy(dropRes.data || [], 'block_exercise_id')
+      const clusterByExercise = groupBy(clusterRes.data || [], 'block_exercise_id')
+      const pyramidByExercise = groupBy(pyramidRes.data || [], 'block_exercise_id')
+      const ladderByExercise = groupBy(ladderRes.data || [], 'block_exercise_id')
+      const restPauseByExercise = groupBy(restPauseRes.data || [], 'block_exercise_id')
+
+      // 5) Attach to blocks/exercises without further queries
+      const enriched = (blocks || []).map((block: any) => {
+        block.time_protocol = timeByBlock.get(block.id) || null
+        if (block.exercises && block.exercises.length > 0) {
+          block.exercises = block.exercises.map((ex: any) => ({
+            ...ex,
+            drop_sets: dropByExercise.get(ex.id) || [],
+            cluster_sets: clusterByExercise.get(ex.id) || [],
+            pyramid_sets: pyramidByExercise.get(ex.id) || [],
+            ladder_sets: ladderByExercise.get(ex.id) || [],
+            rest_pause_sets: restPauseByExercise.get(ex.id) || []
+          }))
+        }
+        return block
+      })
+
+      return enriched
     } catch (error) {
       console.error('Error fetching workout blocks:', error)
       return []

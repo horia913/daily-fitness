@@ -1,463 +1,608 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { TrophyRoom } from "@/components/progress/TrophyRoom";
-import { CheckIns } from "@/components/progress/CheckIns";
-import { WorkoutAnalytics } from "@/components/progress/WorkoutAnalytics";
-import { LifestyleAnalytics } from "@/components/progress/LifestyleAnalytics";
-import { CommunityLeaderboard } from "@/components/progress/CommunityLeaderboard";
-import { GoalsAndHabits } from "@/components/progress/GoalsAndHabits";
-import {
-  TrendingUp,
-  Dumbbell,
-  Trophy,
-  Camera,
-  BarChart3,
-  FileText,
-  Scale,
-  Target,
-  ChevronRight,
-  Flame,
-  CheckCircle,
-  Award,
-  ArrowLeft,
-  Calendar,
-  Activity,
-  Apple,
-} from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useRouter } from "next/navigation";
-import { fetchPersonalRecords, PersonalRecord } from "@/lib/personalRecords";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { Button } from "@/components/ui/button";
+import {
+  Trophy,
+  Award,
+  TrendingUp,
+  Flame,
+  Dumbbell,
+  ChevronRight,
+  Users,
+  Scale,
+  Target,
+  FileText,
+} from "lucide-react";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
-interface WorkoutStats {
+interface ProgressStats {
+  weeklyWorkouts: {
+    completed: number;
+    goal: number;
+  };
+  streak: number;
   totalWorkouts: number;
-  thisWeek: number;
-  thisMonth: number;
-  totalDuration: number;
-  averageDuration: number;
-  completionRate: number;
+  personalRecords: number;
+  leaderboardRank: number;
+  totalAthletes: number;
+  achievementsUnlocked: number;
+  achievementsInProgress: number;
+  currentWeight: number;
+  weightChange: number; // negative = lost, positive = gained
 }
 
-export default function ClientProgress() {
+function ProgressHubContent() {
   const { user } = useAuth();
-  const { isDark, getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [selectedView, setSelectedView] = useState<string | null>(null);
-  const [workoutStats, setWorkoutStats] = useState<WorkoutStats>({
-    totalWorkouts: 0,
-    thisWeek: 0,
-    thisMonth: 0,
-    totalDuration: 0,
-    averageDuration: 0,
-    completionRate: 0,
+  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+
+  const [stats, setStats] = useState<ProgressStats>({
+    weeklyWorkouts: { completed: 3, goal: 4 },
+    streak: 12,
+    totalWorkouts: 87,
+    personalRecords: 8,
+    leaderboardRank: 5,
+    totalAthletes: 24,
+    achievementsUnlocked: 12,
+    achievementsInProgress: 3,
+    currentWeight: 79.5,
+    weightChange: -2.5,
   });
-  const [streak, setStreak] = useState(0);
-  const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
 
-  // Check URL parameters on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const view = params.get("view");
-    if (view) {
-      setSelectedView(view);
-    }
-  }, []);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      loadProgressData();
-    }
+    loadProgressData();
   }, [user]);
 
   const loadProgressData = async () => {
     if (!user) return;
 
-    setLoading(true);
     try {
-      // Load workout sessions
-      const { data: sessionsData } = await supabase
-        .from("workout_sessions")
-        .select("*")
-        .eq("client_id", user.id)
-        .eq("status", "completed");
-
-      const now = new Date();
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-      const thisWeekSessions =
-        sessionsData?.filter((s) => new Date(s.completed_at) >= weekAgo) || [];
-      const thisMonthSessions =
-        sessionsData?.filter((s) => new Date(s.completed_at) >= monthAgo) || [];
-
-      setWorkoutStats({
-        totalWorkouts: sessionsData?.length || 0,
-        thisWeek: thisWeekSessions.length,
-        thisMonth: thisMonthSessions.length,
-        totalDuration:
-          sessionsData?.reduce((sum, s) => sum + (s.total_duration || 0), 0) ||
-          0,
-        averageDuration: sessionsData?.length
-          ? sessionsData.reduce((sum, s) => sum + (s.total_duration || 0), 0) /
-            sessionsData.length
-          : 0,
-        completionRate: 85,
-      });
-
-      // Calculate streak
-      const sortedSessions =
-        sessionsData?.sort(
-          (a, b) =>
-            new Date(b.completed_at).getTime() -
-            new Date(a.completed_at).getTime()
-        ) || [];
-
-      let currentStreak = 0;
-      let currentDate = new Date();
-
-      for (const session of sortedSessions) {
-        const sessionDate = new Date(session.completed_at);
-        const daysDiff = Math.floor(
-          (currentDate.getTime() - sessionDate.getTime()) /
-            (1000 * 60 * 60 * 24)
-        );
-
-        if (daysDiff <= 1) {
-          currentStreak++;
-          currentDate = sessionDate;
-        } else {
-          break;
-        }
-      }
-      setStreak(currentStreak);
-
-      // Load personal records
-      const personalRecordsData = await fetchPersonalRecords(user.id);
-      setPersonalRecords(personalRecordsData);
+      // TODO: Replace with actual Supabase queries
+      // Simulating data fetch
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setLoading(false);
     } catch (error) {
       console.error("Error loading progress data:", error);
-    } finally {
       setLoading(false);
     }
   };
 
-  // Progress menu items
-  const progressMenuItems = [
-    {
-      id: "body-metrics",
-      title: "Body Metrics",
-      description: "Track weight, measurements & composition",
-      icon: Scale,
-      gradient: "from-blue-500 to-cyan-600",
-      href: "/client/progress/body-metrics",
-    },
-    {
-      id: "checkins",
-      title: "Check-Ins",
-      description: "Weight, measurements & photos",
-      icon: Calendar,
-      gradient: "from-purple-500 to-indigo-600",
-    },
-    {
-      id: "workout-analytics",
-      title: "Workout Analytics",
-      description: "Performance, PRs & progress",
-      icon: Activity,
-      gradient: "from-blue-500 to-indigo-600",
-    },
-    {
-      id: "lifestyle-analytics",
-      title: "Lifestyle Analytics",
-      description: "Sleep, hydration & habits",
-      icon: Apple,
-      gradient: "from-green-500 to-emerald-600",
-    },
-    {
-      id: "leaderboard",
-      title: "Community Leaderboard",
-      description: "Compete & earn titles",
-      icon: Trophy,
-      gradient: "from-yellow-500 to-orange-600",
-    },
-    {
-      id: "personal-records",
-      title: "Personal Records",
-      description: "Your best lifts and achievements",
-      icon: Award,
-      gradient: "from-orange-500 to-red-600",
-      href: "/client/progress/personal-records",
-    },
-    {
-      id: "achievements",
-      title: "Achievements",
-      description: "Milestones and accomplishments",
-      icon: Trophy,
-      gradient: "from-yellow-500 to-amber-600",
-      href: "/client/progress/achievements",
-    },
-    {
-      id: "goals",
-      title: "Goals & Habits",
-      description: "Set targets and build consistency",
-      icon: Target,
-      gradient: "from-cyan-500 to-blue-600",
-      href: "/client/progress/goals",
-    },
-    {
-      id: "mobility",
-      title: "Mobility Metrics",
-      description: "Track flexibility and range of motion",
-      icon: Activity,
-      gradient: "from-green-500 to-emerald-600",
-      href: "/client/progress/mobility",
-    },
-  ];
+  const weeklyProgress =
+    (stats.weeklyWorkouts.completed / stats.weeklyWorkouts.goal) * 100;
 
-  if (loading) {
-    return (
-      <ProtectedRoute requiredRole="client">
-        <div className="p-4">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <div className="bg-white rounded-lg border border-slate-200 p-6">
-              <div className="animate-pulse">
-                <div className="h-8 bg-slate-200 rounded mb-2"></div>
-                <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  // Render specific view if selected
-  if (selectedView) {
-    return (
-      <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-900">
-          <div className="p-4 sm:p-6">
-            <div className="max-w-7xl mx-auto space-y-6">
-              {/* Back Button */}
-              <Button
-                onClick={() => setSelectedView(null)}
-                variant="outline"
-                className="rounded-xl"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Menu
-              </Button>
-
-              {/* Render selected view */}
-              {/* Personal Records */}
-              {selectedView === "personal-records" && (
-                <TrophyRoom
-                  personalRecords={personalRecords}
-                  loading={loading}
-                />
-              )}
-
-              {/* Check-Ins (Photos + Measurements) */}
-              {selectedView === "checkins" && <CheckIns loading={loading} />}
-
-              {/* Workout Analytics */}
-              {selectedView === "workout-analytics" && (
-                <WorkoutAnalytics loading={loading} />
-              )}
-
-              {/* Lifestyle Analytics */}
-              {selectedView === "lifestyle-analytics" && (
-                <LifestyleAnalytics loading={loading} />
-              )}
-
-              {/* Community Leaderboard */}
-              {selectedView === "leaderboard" && (
-                <CommunityLeaderboard
-                  loading={loading}
-                  currentUserId={user?.id}
-                />
-              )}
-
-              {/* Workout History - Removed, now part of Workout Analytics */}
-              {selectedView === "workout-logs" && (
-                <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-                  <Card
-                    className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}
-                  >
-                    <CardHeader className="p-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                          <FileText className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <CardTitle
-                            className={`text-2xl font-bold ${theme.text}`}
-                          >
-                            Workout History
-                          </CardTitle>
-                          <p className={`${theme.textSecondary}`}>
-                            All your completed workouts
-                          </p>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <p className={`${theme.textSecondary} text-center py-8`}>
-                        Workout history will be displayed here
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Goals & Habits */}
-              {selectedView === "goals" && <GoalsAndHabits loading={loading} />}
-            </div>
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  // Main menu view
   return (
-    <ProtectedRoute requiredRole="client">
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-900">
-        <div className="p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* Enhanced Header */}
-            <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-              <Card
-                className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}
+    <AnimatedBackground>
+      {performanceSettings.floatingParticles && <FloatingParticles />}
+
+      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header */}
+        <div className="mb-8">
+          <GlassCard elevation={1} className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1
+                  className="text-3xl font-bold mb-1"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  Your Progress
+                </h1>
+                <p
+                  className="text-sm"
+                  style={{
+                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                  }}
+                >
+                  Track your journey to greatness
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                style={{
+                  background: getSemanticColor("trust").gradient,
+                  boxShadow: `0 4px 12px ${
+                    getSemanticColor("trust").primary
+                  }30`,
+                }}
               >
-                <CardContent className="p-6 sm:p-8">
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                        <TrendingUp className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <h1 className={`text-3xl font-bold ${theme.text}`}>
-                          My Progress
-                        </h1>
-                        <p className={`${theme.textSecondary} text-lg`}>
-                          Your fitness journey and achievements
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Enhanced Progress Summary */}
-                    <div
-                      className={`p-5 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-2xl border-2 border-purple-200 dark:border-purple-700`}
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="text-center flex-1">
-                          <div className="flex items-center justify-center gap-2 mb-2">
-                            <Flame className="w-7 h-7 text-orange-500" />
-                            <div
-                              className={`text-2xl sm:text-3xl font-bold ${theme.text}`}
-                            >
-                              {workoutStats.totalWorkouts}
-                            </div>
-                          </div>
-                          <div
-                            className={`text-sm font-medium ${theme.textSecondary}`}
-                          >
-                            Workouts
-                          </div>
-                        </div>
-                        <div className={`w-px h-12 ${theme.border}`}></div>
-                        <div className="text-center flex-1">
-                          <div className="flex items-center justify-center gap-2 mb-2">
-                            <Flame className="w-7 h-7 text-orange-500" />
-                            <div
-                              className={`text-2xl sm:text-3xl font-bold ${theme.text}`}
-                            >
-                              {streak}
-                            </div>
-                          </div>
-                          <div
-                            className={`text-sm font-medium ${theme.textSecondary}`}
-                          >
-                            Day Streak
-                          </div>
-                        </div>
-                        <div className={`w-px h-12 ${theme.border}`}></div>
-                        <div className="text-center flex-1">
-                          <div className="flex items-center justify-center gap-2 mb-2">
-                            <Flame className="w-7 h-7 text-orange-500" />
-                            <div
-                              className={`text-2xl sm:text-3xl font-bold ${theme.text}`}
-                            >
-                              {workoutStats.thisMonth}
-                            </div>
-                          </div>
-                          <div
-                            className={`text-sm font-medium ${theme.textSecondary}`}
-                          >
-                            This Month
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                <TrendingUp className="w-5 h-5 mr-2" />
+                View Reports
+              </Button>
             </div>
+          </GlassCard>
+        </div>
 
-            {/* Progress Features Menu */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {progressMenuItems.map((item) => {
-                const handleClick = () => {
-                  if (item.href) {
-                    router.push(item.href);
-                    return;
-                  }
-                  setSelectedView(item.id);
-                };
+        {/* Hero: Weekly Progress Ring */}
+        <div className="mb-8">
+          <GlassCard elevation={2} className="p-8">
+            <div className="flex flex-col items-center">
+              <h2
+                className="text-xl font-bold mb-6"
+                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+              >
+                Weekly Progress
+              </h2>
 
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl cursor-pointer hover:shadow-2xl hover:scale-105 transition-all"
-                    onClick={handleClick}
+              {/* Progress Ring */}
+              <div className="relative mb-6">
+                <svg width="200" height="200" viewBox="0 0 200 200">
+                  {/* Background circle */}
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="85"
+                    fill="none"
+                    stroke={
+                      isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+                    }
+                    strokeWidth="12"
+                  />
+                  {/* Progress circle */}
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="85"
+                    fill="none"
+                    stroke="url(#weeklyGradient)"
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    strokeDasharray={`${
+                      (weeklyProgress / 100) * 534.07
+                    } 534.07`}
+                    transform="rotate(-90 100 100)"
+                    style={{
+                      transition: "stroke-dasharray 1s ease-out",
+                    }}
+                  />
+                  <defs>
+                    <linearGradient
+                      id="weeklyGradient"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="100%"
+                    >
+                      <stop
+                        offset="0%"
+                        stopColor={getSemanticColor("trust").primary}
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor={getSemanticColor("success").primary}
+                      />
+                    </linearGradient>
+                  </defs>
+                </svg>
+
+                {/* Center content */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <AnimatedNumber
+                    value={stats.weeklyWorkouts.completed}
+                    className="text-5xl font-bold"
+                    color={getSemanticColor("trust").primary}
+                  />
+                  <p
+                    className="text-sm font-medium"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.6)"
+                        : "rgba(0,0,0,0.6)",
+                    }}
                   >
-                    <Card
-                      className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl h-full`}
-                    >
-                      <CardContent className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div
-                            className={`w-14 h-14 bg-gradient-to-br ${item.gradient} rounded-2xl flex items-center justify-center flex-shrink-0`}
-                          >
-                            <item.icon className="w-7 h-7 text-white" />
-                          </div>
-                          <ChevronRight
-                            className={`w-5 h-5 ${theme.textSecondary}`}
-                          />
-                        </div>
-                        <h3 className={`text-xl font-bold ${theme.text} mb-2`}>
-                          {item.title}
-                        </h3>
-                        <p className={`text-sm ${theme.textSecondary}`}>
-                          {item.description}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                );
-              })}
+                    of {stats.weeklyWorkouts.goal} this week
+                  </p>
+                </div>
+              </div>
+
+              <p
+                className="text-center text-sm"
+                style={{
+                  color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
+                }}
+              >
+                {stats.weeklyWorkouts.completed === stats.weeklyWorkouts.goal
+                  ? "🎉 Weekly goal crushed!"
+                  : `${
+                      stats.weeklyWorkouts.goal - stats.weeklyWorkouts.completed
+                    } more to hit your goal!`}
+              </p>
             </div>
+          </GlassCard>
+        </div>
+
+        {/* Stats Summary */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+          {/* Streak */}
+          <GlassCard elevation={2} className="p-6">
+            <div
+              className="p-4 rounded-lg"
+              style={{
+                background: isDark
+                  ? "rgba(255,107,53,0.1)"
+                  : "rgba(255,107,53,0.05)",
+              }}
+            >
+              <Flame
+                className="w-8 h-8 mb-3"
+                style={{ color: getSemanticColor("energy").primary }}
+              />
+              <AnimatedNumber
+                value={stats.streak}
+                className="text-4xl font-bold mb-1"
+                color={getSemanticColor("energy").primary}
+              />
+              <p
+                className="text-sm font-medium mt-1"
+                style={{
+                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                }}
+              >
+                Day Streak
+              </p>
+            </div>
+          </GlassCard>
+
+          {/* Total Workouts */}
+          <GlassCard elevation={2} className="p-6">
+            <div
+              className="p-4 rounded-lg"
+              style={{
+                background: isDark
+                  ? "rgba(74,144,226,0.1)"
+                  : "rgba(74,144,226,0.05)",
+              }}
+            >
+              <Dumbbell
+                className="w-8 h-8 mb-3"
+                style={{ color: getSemanticColor("trust").primary }}
+              />
+              <AnimatedNumber
+                value={stats.totalWorkouts}
+                className="text-4xl font-bold mb-1"
+                color={getSemanticColor("trust").primary}
+              />
+              <p
+                className="text-sm font-medium mt-1"
+                style={{
+                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                }}
+              >
+                Total Workouts
+              </p>
+            </div>
+          </GlassCard>
+
+          {/* Personal Records */}
+          <GlassCard elevation={2} className="p-6">
+            <div
+              className="p-4 rounded-lg"
+              style={{
+                background: isDark
+                  ? "rgba(124,179,66,0.1)"
+                  : "rgba(124,179,66,0.05)",
+              }}
+            >
+              <Target
+                className="w-8 h-8 mb-3"
+                style={{ color: getSemanticColor("success").primary }}
+              />
+              <AnimatedNumber
+                value={stats.personalRecords}
+                className="text-4xl font-bold mb-1"
+                color={getSemanticColor("success").primary}
+              />
+              <p
+                className="text-sm font-medium mt-1"
+                style={{
+                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                }}
+              >
+                Personal Records
+              </p>
+            </div>
+          </GlassCard>
+        </div>
+
+        {/* Navigation Cards */}
+        <div className="mb-8">
+          <h2
+            className="text-2xl font-bold mb-6"
+            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+          >
+            Explore Your Progress
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Leaderboard Card */}
+            <Link href="/client/progress/leaderboard">
+              <GlassCard
+                elevation={2}
+                className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer h-full"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+                      boxShadow: "0 4px 12px rgba(255, 215, 0, 0.3)",
+                    }}
+                  >
+                    <Trophy className="w-7 h-7 text-white" />
+                  </div>
+                  <ChevronRight
+                    className="w-6 h-6"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.4)"
+                        : "rgba(0,0,0,0.4)",
+                    }}
+                  />
+                </div>
+
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  Leaderboard
+                </h3>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Users
+                      className="w-4 h-4"
+                      style={{
+                        color: isDark
+                          ? "rgba(255,255,255,0.6)"
+                          : "rgba(0,0,0,0.6)",
+                      }}
+                    />
+                    <p
+                      className="text-sm"
+                      style={{
+                        color: isDark
+                          ? "rgba(255,255,255,0.6)"
+                          : "rgba(0,0,0,0.6)",
+                      }}
+                    >
+                      Rank #{stats.leaderboardRank} of {stats.totalAthletes}{" "}
+                      athletes
+                    </p>
+                  </div>
+
+                  {stats.leaderboardRank <= 3 ? (
+                    <div
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+                        color: "#fff",
+                      }}
+                    >
+                      🏆 Top 3 Athlete
+                    </div>
+                  ) : (
+                    <p
+                      className="text-xs font-medium"
+                      style={{ color: getSemanticColor("energy").primary }}
+                    >
+                      {10 - stats.leaderboardRank > 0
+                        ? `${10 - stats.leaderboardRank} spots to Top 10!`
+                        : "You're in the Top 10! 🎉"}
+                    </p>
+                  )}
+                </div>
+              </GlassCard>
+            </Link>
+
+            {/* Achievements Card */}
+            <Link href="/client/progress/achievements">
+              <GlassCard
+                elevation={2}
+                className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer h-full"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)",
+                      boxShadow: "0 4px 12px rgba(139, 92, 246, 0.3)",
+                    }}
+                  >
+                    <Award className="w-7 h-7 text-white" />
+                  </div>
+                  <ChevronRight
+                    className="w-6 h-6"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.4)"
+                        : "rgba(0,0,0,0.4)",
+                    }}
+                  />
+                </div>
+
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  Achievements
+                </h3>
+
+                <div className="space-y-2">
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.6)"
+                        : "rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    {stats.achievementsUnlocked} unlocked ·{" "}
+                    {stats.achievementsInProgress} in progress
+                  </p>
+
+                  {stats.achievementsInProgress > 0 && (
+                    <p
+                      className="text-xs font-medium"
+                      style={{ color: getSemanticColor("energy").primary }}
+                    >
+                      {stats.achievementsInProgress} badges ready to unlock! 🎯
+                    </p>
+                  )}
+                </div>
+              </GlassCard>
+            </Link>
+
+            {/* Body Metrics Card */}
+            <Link href="/client/progress/body-metrics">
+              <GlassCard
+                elevation={2}
+                className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer h-full"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                      boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+                    }}
+                  >
+                    <Scale className="w-7 h-7 text-white" />
+                  </div>
+                  <ChevronRight
+                    className="w-6 h-6"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.4)"
+                        : "rgba(0,0,0,0.4)",
+                    }}
+                  />
+                </div>
+
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  Body Metrics
+                </h3>
+
+                <div className="space-y-2">
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.6)"
+                        : "rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    Weight: {stats.currentWeight} kg
+                  </p>
+
+                  <div className="flex items-center gap-1">
+                    <TrendingUp
+                      className={`w-4 h-4 ${
+                        stats.weightChange < 0 ? "rotate-180" : ""
+                      }`}
+                      style={{
+                        color:
+                          stats.weightChange < 0
+                            ? getSemanticColor("success").primary
+                            : getSemanticColor("warning").primary,
+                      }}
+                    />
+                    <p
+                      className="text-xs font-medium"
+                      style={{
+                        color:
+                          stats.weightChange < 0
+                            ? getSemanticColor("success").primary
+                            : getSemanticColor("warning").primary,
+                      }}
+                    >
+                      {Math.abs(stats.weightChange).toFixed(1)} kg this month
+                    </p>
+                  </div>
+                </div>
+              </GlassCard>
+            </Link>
+
+            {/* Workout Logs Card */}
+            <Link href="/client/progress/workout-logs">
+              <GlassCard
+                elevation={2}
+                className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer h-full"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)",
+                      boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
+                    }}
+                  >
+                    <FileText className="w-7 h-7 text-white" />
+                  </div>
+                  <ChevronRight
+                    className="w-6 h-6"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.4)"
+                        : "rgba(0,0,0,0.4)",
+                    }}
+                  />
+                </div>
+
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  Workout Logs
+                </h3>
+
+                <div className="space-y-2">
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.6)"
+                        : "rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    View your complete workout history
+                  </p>
+
+                  <p
+                    className="text-xs font-medium"
+                    style={{ color: getSemanticColor("trust").primary }}
+                  >
+                    Track all your completed workouts →
+                  </p>
+                </div>
+              </GlassCard>
+            </Link>
           </div>
         </div>
       </div>
+    </AnimatedBackground>
+  );
+}
+
+export default function ProgressHub() {
+  return (
+    <ProtectedRoute>
+      <ProgressHubContent />
     </ProtectedRoute>
   );
 }

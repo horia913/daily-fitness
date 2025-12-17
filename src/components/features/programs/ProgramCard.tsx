@@ -1,5 +1,9 @@
+"use client";
+
 import React from "react";
-import { Badge } from "@/components/ui/badge";
+import { useTheme } from "@/contexts/ThemeContext";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/button";
 import {
   Calendar,
@@ -10,6 +14,10 @@ import {
   Award,
   Zap,
   Activity,
+  Edit,
+  Trash2,
+  UserPlus,
+  Eye,
 } from "lucide-react";
 
 interface Program {
@@ -61,263 +69,288 @@ export default function ProgramCard({
   onAssign,
   assignmentCount = 0,
 }: ProgramCardProps) {
+  const { isDark, getSemanticColor } = useTheme();
   const TargetIcon = getTargetAudienceIcon(program.target_audience);
 
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case "beginner":
+        return getSemanticColor("success").primary;
+      case "intermediate":
+        return getSemanticColor("warning").primary;
+      case "advanced":
+        return getSemanticColor("critical").primary;
+      default:
+        return getSemanticColor("neutral").primary;
+    }
+  };
+
+  const difficultyColor = getDifficultyColor(program.difficulty_level);
+
   return (
-    <div
-      style={{
-        backgroundColor: "#FFFFFF",
-        borderRadius: "24px",
-        padding: "24px",
-        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-        marginBottom: "20px",
-        cursor: "pointer",
-      }}
-      className="hover:shadow-xl transition-all duration-300"
+    <GlassCard
+      elevation={2}
+      className="overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.02]"
       onClick={onOpenDetails}
+      style={{
+        boxShadow: isDark
+          ? "0 4px 12px rgba(0,0,0,0.3)"
+          : "0 4px 12px rgba(0,0,0,0.1)",
+      }}
     >
-      <div className="h-full flex flex-col">
+      {/* Header with gradient background */}
+      <div
+        className="relative h-24 flex items-center justify-center"
+        style={{
+          background: getSemanticColor("success").gradient,
+        }}
+      >
+        {/* Target Audience Icon */}
         <div
-          className="flex items-center gap-4"
-          style={{ marginBottom: "20px" }}
+          className="w-14 h-14 rounded-xl flex items-center justify-center"
+          style={{
+            background: "rgba(255,255,255,0.25)",
+            backdropFilter: "blur(10px)",
+          }}
         >
-          <div
+          <TargetIcon className="w-7 h-7 text-white" />
+        </div>
+
+        {/* Difficulty Badge */}
+        <div className="absolute top-3 left-3">
+          <span
+            className="px-3 py-1.5 rounded-full text-xs font-semibold capitalize"
             style={{
-              width: "56px",
-              height: "56px",
-              borderRadius: "18px",
-              background: "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              background: "#FFFFFF",
+              color: difficultyColor,
             }}
           >
-            <TargetIcon
-              style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
-            />
-          </div>
+            {program.difficulty_level}
+          </span>
+        </div>
 
-          <div className="flex-1">
-            <h3
-              style={{
-                fontSize: "18px",
-                fontWeight: "600",
-                color: "#1A1A1A",
-                marginBottom: "8px",
-              }}
+        {/* Duration Badge */}
+        <div className="absolute top-3 right-3">
+          <div
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+            style={{
+              background: "rgba(255,255,255,0.95)",
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            <Calendar className="w-3.5 h-3.5" style={{ color: "#6B7280" }} />
+            <span
+              className="text-xs font-semibold"
+              style={{ color: "#1A1A1A" }}
             >
-              {program.name}
-            </h3>
-            <div className="flex items-center gap-2">
-              <Badge
-                style={{
-                  backgroundColor:
-                    program.difficulty_level === "beginner"
-                      ? "#D1FAE5"
-                      : program.difficulty_level === "intermediate"
-                      ? "#FEF3C7"
-                      : "#FEE2E2",
-                  color:
-                    program.difficulty_level === "beginner"
-                      ? "#065F46"
-                      : program.difficulty_level === "intermediate"
-                      ? "#92400E"
-                      : "#991B1B",
-                  borderRadius: "12px",
-                  padding: "4px 10px",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  border: "0",
-                }}
-              >
-                {program.difficulty_level}
-              </Badge>
-              <div
-                className="flex items-center gap-1.5"
-                style={{
-                  padding: "4px 8px",
-                  backgroundColor: "#F3F4F6",
-                  borderRadius: "12px",
-                }}
-              >
-                <Calendar
-                  style={{ width: "14px", height: "14px", color: "#6B7280" }}
-                />
-                <span
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    color: "#6B7280",
-                  }}
-                >
-                  {program.duration_weeks}w
-                </span>
-              </div>
-            </div>
+              {program.duration_weeks}w
+            </span>
           </div>
         </div>
 
-        {program.description && (
-          <div style={{ marginBottom: "20px" }}>
+        {/* Active/Inactive Badge */}
+        {!program.is_active && (
+          <div className="absolute bottom-3 left-3">
+            <span
+              className="px-3 py-1 rounded-full text-xs font-semibold"
+              style={{
+                background: "#FFFFFF",
+                color: getSemanticColor("neutral").primary,
+              }}
+            >
+              Inactive
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="p-5 space-y-4">
+        {/* Title & Description */}
+        <div>
+          <h3
+            className="text-lg font-bold mb-1 line-clamp-2"
+            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+          >
+            {program.name}
+          </h3>
+          <span
+            className="text-sm font-semibold capitalize"
+            style={{ color: getSemanticColor("success").primary }}
+          >
+            {program.target_audience.replace(/_/g, " ")}
+          </span>
+          {program.description && (
             <p
-              className="line-clamp-2"
-              style={{ fontSize: "14px", fontWeight: "400", color: "#6B7280" }}
+              className="text-sm line-clamp-2 mt-2"
+              style={{
+                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+              }}
             >
               {program.description}
             </p>
-          </div>
-        )}
+          )}
+        </div>
 
-        <div
-          className="grid grid-cols-3 gap-4"
-          style={{ marginBottom: "20px" }}
-        >
+        {/* Stats Grid */}
+        <div className="grid grid-cols-3 gap-3">
+          {/* Duration */}
           <div
-            className="flex flex-col items-center"
+            className="flex flex-col items-center p-3 rounded-xl"
             style={{
-              padding: "16px",
-              backgroundColor: "#DBEAFE",
-              borderRadius: "16px",
-              border: "2px solid #93C5FD",
+              background: isDark
+                ? "rgba(255,255,255,0.05)"
+                : "rgba(0,0,0,0.03)",
             }}
           >
             <Calendar
-              style={{
-                width: "24px",
-                height: "24px",
-                marginBottom: "8px",
-                color: "#2196F3",
-              }}
+              className="w-5 h-5 mb-2"
+              style={{ color: getSemanticColor("trust").primary }}
+            />
+            <AnimatedNumber
+              value={program.duration_weeks}
+              className="text-xl font-bold"
+              color={isDark ? "#fff" : "#1A1A1A"}
             />
             <span
-              style={{ fontSize: "20px", fontWeight: "700", color: "#1A1A1A" }}
-            >
-              {program.duration_weeks}
-            </span>
-            <span
-              style={{ fontSize: "12px", fontWeight: "400", color: "#6B7280" }}
+              className="text-xs"
+              style={{
+                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
+              }}
             >
               weeks
             </span>
           </div>
+
+          {/* Clients */}
           <div
-            className="flex flex-col items-center"
+            className="flex flex-col items-center p-3 rounded-xl"
             style={{
-              padding: "16px",
-              backgroundColor: "#D1FAE5",
-              borderRadius: "16px",
-              border: "2px solid #6EE7B7",
+              background: isDark
+                ? "rgba(255,255,255,0.05)"
+                : "rgba(0,0,0,0.03)",
             }}
           >
             <Users
-              style={{
-                width: "24px",
-                height: "24px",
-                marginBottom: "8px",
-                color: "#4CAF50",
-              }}
+              className="w-5 h-5 mb-2"
+              style={{ color: getSemanticColor("success").primary }}
+            />
+            <AnimatedNumber
+              value={assignmentCount}
+              className="text-xl font-bold"
+              color={isDark ? "#fff" : "#1A1A1A"}
             />
             <span
-              style={{ fontSize: "20px", fontWeight: "700", color: "#1A1A1A" }}
-            >
-              {assignmentCount}
-            </span>
-            <span
-              style={{ fontSize: "12px", fontWeight: "400", color: "#6B7280" }}
+              className="text-xs"
+              style={{
+                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
+              }}
             >
               clients
             </span>
           </div>
+
+          {/* Progress */}
           <div
-            className="flex flex-col items-center"
+            className="flex flex-col items-center p-3 rounded-xl justify-center"
             style={{
-              padding: "16px",
-              backgroundColor: "#FEF3C7",
-              borderRadius: "16px",
-              border: "2px solid #FCD34D",
+              background: isDark
+                ? "rgba(255,255,255,0.05)"
+                : "rgba(0,0,0,0.03)",
             }}
           >
             <TrendingUp
-              style={{
-                width: "24px",
-                height: "24px",
-                marginBottom: "8px",
-                color: "#F59E0B",
-              }}
+              className="w-5 h-5 mb-1"
+              style={{ color: getSemanticColor("warning").primary }}
             />
             <span
-              style={{ fontSize: "12px", fontWeight: "600", color: "#92400E" }}
+              className="text-xs font-semibold text-center"
+              style={{
+                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
+              }}
             >
               Progress
             </span>
             <span
-              style={{ fontSize: "10px", fontWeight: "400", color: "#6B7280" }}
+              className="text-xs text-center"
+              style={{
+                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
+              }}
             >
               Tracked
             </span>
           </div>
         </div>
 
+        {/* Action Buttons */}
         <div
-          className="flex items-center gap-2"
-          style={{ paddingTop: "12px", borderTop: "1px solid #E5E7EB" }}
+          className="flex items-center gap-2 pt-4"
+          style={{
+            borderTop: `1px solid ${
+              isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+            }`,
+          }}
         >
           <Button
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              onEdit();
+              onOpenDetails();
             }}
             className="flex-1"
             style={{
-              borderRadius: "20px",
-              padding: "12px 16px",
-              fontSize: "14px",
-              fontWeight: "600",
-              backgroundColor: "#4CAF50",
-              color: "#FFFFFF",
+              background: getSemanticColor("success").gradient,
+              boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
             }}
           >
-            Edit
+            <Eye className="w-4 h-4 mr-2" />
+            View
           </Button>
+
+          {onAssign && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAssign();
+              }}
+              style={{
+                color: getSemanticColor("trust").primary,
+              }}
+            >
+              <UserPlus className="w-4 h-4" />
+            </Button>
+          )}
+
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              onAssign?.();
+              onEdit();
             }}
-            style={{
-              borderRadius: "20px",
-              padding: "10px",
-              border: "2px solid #4CAF50",
-              color: "#4CAF50",
-              backgroundColor: "transparent",
-            }}
-            className="hover:bg-green-50"
           >
-            Assign
+            <Edit className="w-4 h-4" />
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete?.();
-            }}
-            style={{
-              borderRadius: "20px",
-              padding: "10px",
-              border: "2px solid #EF4444",
-              color: "#EF4444",
-              backgroundColor: "transparent",
-            }}
-            className="hover:bg-red-50"
-          >
-            Delete
-          </Button>
+
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              style={{
+                color: getSemanticColor("critical").primary,
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </div>
-    </div>
+    </GlassCard>
   );
 }

@@ -50,6 +50,8 @@ import WorkoutTemplateService, {
 } from "@/lib/workoutTemplateService";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { ProgramProgressionService } from "@/lib/programProgressionService";
+import ProgramProgressionRulesEditor from "@/components/coach/ProgramProgressionRulesEditor";
 
 interface Program {
   id: string;
@@ -1233,6 +1235,9 @@ export default function EnhancedProgramManager({
                 );
 
                 // Upserts: update if exists (different template), else insert
+                // Track schedule IDs for copying workout data
+                const schedulesToCopy: Array<{ scheduleId: string; templateId: string; weekNumber: number }> = [];
+                
                 for (const [key, desired] of desiredByKey.entries()) {
                   const [dayStr, weekStr] = key.split("|");
                   const day = parseInt(dayStr, 10);
@@ -1240,6 +1245,7 @@ export default function EnhancedProgramManager({
                   const existing = existingByKey.get(key);
                   if (existing) {
                     if (existing.template_id !== desired.template_id) {
+                      // Template changed - need to copy new workout data
                       const { error: updateErr } = await supabase
                         .from("program_schedule")
                         .update({ template_id: desired.template_id })
@@ -1252,24 +1258,66 @@ export default function EnhancedProgramManager({
                           week,
                           updateErr,
                         });
+                      } else {
+                        // Queue for workout copy
+                        schedulesToCopy.push({
+                          scheduleId: existing.id,
+                          templateId: desired.template_id,
+                          weekNumber: week,
+                        });
                       }
                     }
                   } else {
-                    const { error: insertErr } = await supabase
+                    // New schedule - insert and copy workout data
+                    const { data: newSchedule, error: insertErr } = await supabase
                       .from("program_schedule")
                       .insert({
                         program_id: programId,
                         day_of_week: day,
                         week_number: week,
                         template_id: desired.template_id,
-                      });
+                      })
+                      .select()
+                      .single();
                     if (insertErr) {
                       console.error("Error inserting schedule row:", {
                         day,
                         week,
                         insertErr,
                       });
+                    } else if (newSchedule) {
+                      // Queue for workout copy
+                      schedulesToCopy.push({
+                        scheduleId: newSchedule.id,
+                        templateId: desired.template_id,
+                        weekNumber: week,
+                      });
                     }
+                  }
+                }
+
+                // REQUIREMENT 1: Copy workout data to program_progression_rules
+                console.log(`🔄 Copying ${schedulesToCopy.length} workouts to progression rules...`);
+                for (const { scheduleId, templateId, weekNumber } of schedulesToCopy) {
+                  try {
+                    // Delete existing progression rules for this schedule/week first
+                    await ProgramProgressionService.deleteProgressionRules(scheduleId, weekNumber);
+                    
+                    // Copy workout data
+                    const success = await ProgramProgressionService.copyWorkoutToProgram(
+                      programId,
+                      scheduleId,
+                      templateId,
+                      weekNumber
+                    );
+                    
+                    if (success) {
+                      console.log(`✅ Copied workout ${templateId} to schedule ${scheduleId}`);
+                    } else {
+                      console.warn(`⚠️ Failed to copy workout ${templateId}`);
+                    }
+                  } catch (copyError) {
+                    console.error(`❌ Error copying workout to progression rules:`, copyError);
                   }
                 }
 
@@ -2149,6 +2197,9 @@ function ProgramCreateForm({
     Record<number, Record<string, any>>
   >({});
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
+  
+  // State for progression rules editor
+  const [selectedScheduleForProgression, setSelectedScheduleForProgression] = useState<ProgramSchedule | null>(null);
 
   // State for exercise replacement modal
   const [showExerciseReplacementModal, setShowExerciseReplacementModal] =
@@ -3446,8 +3497,7 @@ function ProgramCreateForm({
                   Progression Rules
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                  Define how exercises progress week by week. Select a week and
-                  set progression for each exercise.
+                  Edit workout parameters week by week. Changes apply only to this program.
                 </p>
 
                 {schedule.filter((s) => (s.week_number || 1) === selectedWeek)
@@ -3465,19 +3515,17 @@ function ProgramCreateForm({
                 ) : (
                   <div className="space-y-6">
                     {/* Week Selector */}
-                    <div className="flex items-center gap-4 relative z-10">
+                    <div className="flex items-center gap-4">
                       <label className="text-sm font-medium">Week:</label>
                       <Select
                         value={String(selectedWeek)}
-                        onValueChange={async (v) => {
+                        onValueChange={(v) => {
                           const w = parseInt(v, 10) || 1;
                           setSelectedWeek(w);
-                          // Auto-populate empty week from immediately preceding non-empty week
-                          autoPopulateWeek(w);
-                          await preloadTemplateExercisesForWeek(w);
+                          setSelectedScheduleForProgression(null);
                         }}
                       >
-                        <SelectTrigger className="w-32 rounded-xl pointer-events-auto">
+                        <SelectTrigger className="w-32 rounded-xl">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="z-[10000]" position="popper">
@@ -3494,236 +3542,296 @@ function ProgramCreateForm({
                           )}
                         </SelectContent>
                       </Select>
-
-                      {/* Copy Previous Week Button */}
-                      {selectedWeek > 1 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const previousWeek = selectedWeek - 1;
-                            const previousWeekSchedule = schedule.filter(
-                              (s) => (s.week_number || 1) === previousWeek
-                            );
-                            const previousWeekRules = progressionRules.filter(
-                              (r) => (r.week_number || 1) === previousWeek
-                            );
-                            const previousWeekValues =
-                              weekValues[previousWeek] || {};
-
-                            if (previousWeekSchedule.length > 0) {
-                              // Copy schedule data
-                              setSchedule((prev) => {
-                                const withoutCurrentWeek = prev.filter(
-                                  (s) => (s.week_number || 1) !== selectedWeek
-                                );
-                                const copiedSchedule = previousWeekSchedule.map(
-                                  (s) => ({
-                                    ...s,
-                                    id: `${program?.id || "new"}-${
-                                      s.program_day
-                                    }-w${selectedWeek}`,
-                                    week_number: selectedWeek,
-                                  })
-                                );
-                                return [
-                                  ...withoutCurrentWeek,
-                                  ...copiedSchedule,
-                                ];
-                              });
-
-                              // Copy progression rules
-                              if (previousWeekRules.length > 0) {
-                                setProgressionRules((prev) => {
-                                  const withoutCurrentWeek = prev.filter(
-                                    (r) => (r.week_number || 1) !== selectedWeek
-                                  );
-                                  const copiedRules = previousWeekRules.map(
-                                    (r) => ({
-                                      ...r,
-                                      id: `${r.id}-w${selectedWeek}`,
-                                      week_number: selectedWeek,
-                                    })
-                                  );
-                                  return [
-                                    ...withoutCurrentWeek,
-                                    ...copiedRules,
-                                  ];
-                                });
-                              }
-
-                              // Copy form values
-                              if (Object.keys(previousWeekValues).length > 0) {
-                                setWeekValues((prev) => ({
-                                  ...prev,
-                                  [selectedWeek]: { ...previousWeekValues },
-                                }));
-                              }
-
-                              console.log(
-                                `✅ Copied Week ${previousWeek} data to Week ${selectedWeek}`
-                              );
-                            } else {
-                              alert(
-                                `No data found in Week ${previousWeek} to copy.`
-                              );
-                            }
-                          }}
-                          className="text-xs"
-                        >
-                          Copy from Week {selectedWeek - 1}
-                        </Button>
-                      )}
                     </div>
 
-                    {/* Exercises from Scheduled Workouts */}
-                    <div className="space-y-4">
+                    {/* Day Selector */}
+                    <div className="flex flex-wrap gap-2">
                       {schedule
                         .filter((s) => (s.week_number || 1) === selectedWeek)
-                        .map((scheduleItem, index) => {
+                        .map((scheduleItem) => {
                           const template = templates.find(
                             (t) => t.id === scheduleItem.template_id
                           );
-                          if (
-                            !template &&
-                            !templateExercisesById[scheduleItem.template_id]
-                          )
-                            return null;
-
                           return (
-                            <Card key={index} className="border-2 rounded-xl">
-                              <CardContent className="p-4">
-                                <div className="bg-gradient-to-r from-blue-200 via-purple-200 to-pink-200 dark:from-blue-700/40 dark:via-purple-700/40 dark:to-pink-700/40 px-4 py-3 border-b border-slate-200 dark:border-slate-700 shadow-sm mb-4">
-                                  <h4 className="font-bold text-blue-900 dark:text-blue-100 text-lg">
-                                    {dayNames[scheduleItem.program_day - 1]} -{" "}
-                                    {template?.name || "Workout Template"}
-                                  </h4>
-                                </div>
+                        <Button
+                              key={scheduleItem.id || scheduleItem.template_id}
+                              variant={
+                                selectedScheduleForProgression?.id === scheduleItem.id
+                                  ? "default"
+                                  : "outline"
+                              }
+                          onClick={() => {
+                                setSelectedScheduleForProgression(scheduleItem);
+                              }}
+                              className="rounded-lg"
+                            >
+                              {dayNames[scheduleItem.program_day - 1]}
+                              {template && ` - ${template.name}`}
+                            </Button>
+                          );
+                        })}
+                    </div>
 
-                                <div className="space-y-4">
-                                  {(
-                                    template?.exercises ||
-                                    templateExercisesById[
-                                      scheduleItem.template_id
-                                    ] ||
-                                    []
-                                  ).map((exercise, exerciseIndex) => {
-                                    const colors = [
-                                      "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
-                                      "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
-                                      "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800",
-                                      "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800",
-                                      "bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800",
-                                      "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800",
-                                    ];
-                                    const colorClass =
-                                      colors[exerciseIndex % colors.length];
+                    {/* Progression Rules Editor */}
+                    {selectedScheduleForProgression && program?.id && (
+                      <ProgramProgressionRulesEditor
+                        programId={program.id}
+                        programScheduleId={selectedScheduleForProgression.id || `temp-${selectedScheduleForProgression.template_id}-${selectedScheduleForProgression.program_day}`}
+                        weekNumber={selectedWeek}
+                        exercises={exercises}
+                        templates={templates}
+                        onUpdate={() => {
+                          // Reload schedule to get updated IDs if program was just created
+                          // The progression rules are saved automatically, no need to reload here
+                        }}
+                      />
+                    )}
 
-                                    // Parse complex data from notes (to mirror WorkoutTemplateDetails)
-                                    let parsed: any = {
+                    {!selectedScheduleForProgression && (
+                      <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                        <p>Select a day above to edit progression rules.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+
+        <div
+          className="flex-shrink-0 flex justify-end gap-2 p-6 pt-4 border-t"
+          style={{
+            borderTop: "1px solid #E5E7EB",
+            padding: "24px",
+            paddingTop: "16px",
+          }}
+        >
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="rounded-xl"
+            style={{
+              backgroundColor: "#FFFFFF",
+              color: "#6C5CE7",
+              border: "2px solid #6C5CE7",
+              borderRadius: "20px",
+              padding: "16px 32px",
+              fontSize: "16px",
+              fontWeight: "600",
+            }}
+          >
+            Cancel
+                        </Button>
+          <Button
+            onClick={() => {
+              onSave({
+                ...formData,
+                schedule,
+                progressionRules: [],
+                selectedWeek,
+                weekValues: {},
+              });
+            }}
+            className="rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+            style={{
+              backgroundColor: "#6C5CE7",
+              color: "#FFFFFF",
+              borderRadius: "20px",
+              padding: "16px 32px",
+              fontSize: "16px",
+              fontWeight: "600",
+              border: "none",
+            }}
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {program ? "Update Program" : "Create Program"}
+          </Button>
+                    </div>
+      </Card>
+
+      {/* Exercise Replacement Modal */}
+      <ResponsiveModal
+        isOpen={showExerciseReplacementModal}
+        onClose={() => {
+          setShowExerciseReplacementModal(false);
+          setReplacementContext(null);
+          setExerciseSearchTerm("");
+          setSelectedReplacementExercise(null);
+          setExerciseConfig({
+            sets: 3,
+            reps: "8-12",
+            rest_seconds: 60,
+            rir: "",
+            tempo: "",
                                       exercise_type: "straight_set",
+            superset_exercise_id: "",
+            superset_reps: "",
+            circuit_exercises: [],
+            giant_set_exercises: [],
+            tabata_exercises: [],
+            rounds: 8,
+            work_seconds: 20,
+            rest_seconds_tabata: 10,
+            drop_percentage: 20,
+            drop_set_reps: "8-10",
+            amrap_duration: 5,
+            target_reps: 10,
+            emom_duration: 10,
+            emom_reps: 5,
+            emom_mode: "fixed",
+            rest_after: 15,
+            cluster_sets: 2,
+            cluster_rest: 90,
+          });
+        }}
+        subtitle={
+          replacementContext
+            ? `Replacing: ${
+                replacementContext.originalExercise?.name || "Unknown Exercise"
+              } - Day ${replacementContext.dayOfWeek}, Week ${selectedWeek}`
+            : ""
+        }
+        maxWidth="3xl"
+        actions={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowExerciseReplacementModal(false);
+                setReplacementContext(null);
+                setExerciseSearchTerm("");
+                setSelectedReplacementExercise(null);
+                setExerciseConfig({
                                       sets: 3,
                                       reps: "8-12",
                                       rest_seconds: 60,
                                       rir: "",
                                       tempo: "",
-                                    };
-                                    try {
-                                      if (
-                                        (exercise as any)?.notes &&
-                                        typeof (exercise as any).notes ===
-                                          "string"
-                                      ) {
-                                        parsed = {
-                                          ...parsed,
-                                          ...JSON.parse(
-                                            (exercise as any).notes
-                                          ),
-                                        };
-                                      } else if ((exercise as any)?.config) {
-                                        // Use the pre-parsed config if available
-                                        parsed = {
-                                          ...parsed,
-                                          ...(exercise as any).config,
-                                        };
-                                      }
-                                    } catch (_) {
-                                      // Keep default values
-                                    }
-                                    const exerciseType: string | undefined =
-                                      (exercise as any)?.exercise_type ||
-                                      parsed.exercise_type ||
-                                      (exercise as any)?.config
-                                        ?.exercise_type ||
-                                      "straight_set";
+                  exercise_type: "straight_set",
+                  superset_exercise_id: "",
+                  superset_reps: "",
+                  circuit_exercises: [],
+                  giant_set_exercises: [],
+                  tabata_exercises: [],
+                  rounds: 8,
+                  work_seconds: 20,
+                  rest_seconds_tabata: 10,
+                  drop_percentage: 20,
+                  drop_set_reps: "8-10",
+                  amrap_duration: 5,
+                  target_reps: 10,
+                  emom_duration: 10,
+                  emom_reps: 5,
+                  emom_mode: "fixed",
+                  rest_after: 15,
+                  cluster_sets: 2,
+                  cluster_rest: 90,
+                });
+              }}
+            >
+              Cancel
+            </Button>
+            {selectedReplacementExercise && (
+              <Button
+                onClick={() => {
+                  if (replacementContext?.originalExercise) {
+                    handleReplaceExercise(
+                      replacementContext.dayOfWeek,
+                      replacementContext.originalExercise.id,
+                      selectedReplacementExercise,
+                      exerciseConfig
+                    );
+                  }
+                  setShowExerciseReplacementModal(false);
+                  setReplacementContext(null);
+                  setExerciseSearchTerm("");
+                  setSelectedReplacementExercise(null);
+                  setExerciseConfig({
+                    sets: 3,
+                    reps: "8-12",
+                    rest_seconds: 60,
+                    rir: "",
+                    tempo: "",
+                    exercise_type: "straight_set",
+                    superset_exercise_id: "",
+                    superset_reps: "",
+                    circuit_exercises: [],
+                    giant_set_exercises: [],
+                    tabata_exercises: [],
+                    rounds: 8,
+                    work_seconds: 20,
+                    rest_seconds_tabata: 10,
+                    drop_percentage: 20,
+                    drop_set_reps: "8-10",
+                    amrap_duration: 5,
+                    target_reps: 10,
+                    emom_duration: 10,
+                    emom_reps: 5,
+                    emom_mode: "fixed",
+                    rest_after: 15,
+                    cluster_sets: 2,
+                    cluster_rest: 90,
+                  });
+                }}
+              >
+                <Replace className="w-4 h-4 mr-2" />
+                Replace Exercise
+              </Button>
+            )}
+          </div>
+        }
+      >
+        {/* Modal content - exercise search and selection */}
+        <div className="space-y-4">
+          <div>
+            <Label>Search Exercise</Label>
+            <Input
+              value={exerciseSearchTerm}
+              onChange={(e) => setExerciseSearchTerm(e.target.value)}
+              placeholder="Search exercises..."
+              className="mt-1"
+            />
+          </div>
 
-                                    // Debug logging
-                                    if (exerciseIndex === 0) {
-                                      console.log(
-                                        "🔍 Exercise display debug:",
-                                        {
-                                          exerciseIndex,
-                                          exerciseType,
-                                          parsed,
-                                          config: (exercise as any)?.config,
-                                          notes: (exercise as any)?.notes,
-                                        }
-                                      );
-                                    }
+          <div className="max-h-96 overflow-y-auto space-y-2">
+            {exercises
+              .filter((ex) =>
+                ex.name
+                  .toLowerCase()
+                  .includes(exerciseSearchTerm.toLowerCase())
+              )
+              .slice(0, 50)
+              .map((ex) => (
+                <div
+                  key={ex.id}
+                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                    selectedReplacementExercise?.id === ex.id
+                      ? "bg-blue-100 border-blue-500"
+                      : "hover:bg-gray-50"
+                  }`}
+                  onClick={() => setSelectedReplacementExercise(ex)}
+                >
+                  <div className="font-medium">{ex.name}</div>
+                  {ex.description && (
+                    <div className="text-sm text-gray-600">{ex.description}</div>
+                  )}
+                </div>
+              ))}
+          </div>
 
-                                    // Define multi-exercise types that should show the type name
-                                    const multiExerciseTypes = [
-                                      "superset",
-                                      "circuit",
-                                      "giant_set",
-                                      "tabata",
-                                    ];
-                                    const isMultiExercise =
-                                      multiExerciseTypes.includes(exerciseType);
-
-                                    const typeLabel =
-                                      exerciseType === "tabata"
-                                        ? "Tabata Circuit"
-                                        : exerciseType === "circuit"
-                                        ? "Circuit"
-                                        : exerciseType === "superset"
-                                        ? "Superset"
-                                        : exerciseType === "giant_set"
-                                        ? "Giant Set"
-                                        : undefined;
-
-                                    // Resolve the base exercise details from global list if missing
-                                    const baseExercise =
-                                      (exercise as any)?.exercise ||
-                                      exercises.find(
-                                        (e) =>
-                                          e.id ===
-                                          (exercise as any)?.exercise_id
-                                      );
-
-                                    // For single exercise types, show exercise name; for multi-exercise types, show type name
-                                    const displayName = isMultiExercise
-                                      ? typeLabel ||
-                                        baseExercise?.name ||
-                                        (exercise as any)?.name ||
-                                        (exercise as any)?.title ||
-                                        "Exercise"
-                                      : baseExercise?.name ||
-                                        (exercise as any)?.name ||
-                                        (exercise as any)?.title ||
-                                        "Exercise";
-
-                                    return (
-                                      <div
-                                        key={exerciseIndex}
-                                        className={`p-4 ${colorClass} rounded-lg border`}
-                                      >
-                                        {/* Exercise Header */}
-                                        <div className="mb-4">
-                                          <div className="flex justify-between items-start mb-2">
-                                            <h5 className="font-semibold text-lg">
-                                              {displayName}
-                                            </h5>
+          {selectedReplacementExercise && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-700">
+                Selected: <strong>{selectedReplacementExercise.name}</strong>
+              </p>
+            </div>
+          )}
+        </div>
+      </ResponsiveModal>
+    </div>
+  );
+}
                                             <Button
                                               variant="outline"
                                               size="sm"

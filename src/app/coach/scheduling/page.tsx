@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
   Card,
@@ -127,7 +129,7 @@ const DAYS_OF_WEEK = [
 ];
 
 export default function CoachScheduling() {
-  const { getThemeStyles } = useTheme();
+  const { getThemeStyles, performanceSettings } = useTheme();
   const theme = getThemeStyles();
 
   const [availability, setAvailability] = useState<CoachAvailability[]>([]);
@@ -461,7 +463,9 @@ export default function CoachScheduling() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div className={`min-h-screen ${theme.background}`}>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="min-h-screen">
           <div className="p-6">
             <div className="max-w-7xl mx-auto space-y-6">
               <div className={`${theme.card} ${theme.shadow} rounded-2xl p-8`}>
@@ -487,14 +491,16 @@ export default function CoachScheduling() {
               </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className={`min-h-screen ${theme.background}`}>
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
         {/* Floating Background Elements */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl"></div>
@@ -1078,7 +1084,7 @@ export default function CoachScheduling() {
             </Dialog>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

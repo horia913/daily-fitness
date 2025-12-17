@@ -8,6 +8,10 @@ import { supabase } from "@/lib/supabase";
 import WorkoutTemplateService, {
   WorkoutTemplate,
 } from "@/lib/workoutTemplateService";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,14 +21,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RefreshCw, Plus, Dumbbell, Grid3X3, List, Search } from "lucide-react";
+import {
+  RefreshCw,
+  Plus,
+  Dumbbell,
+  Grid3X3,
+  List,
+  Search,
+  Clock,
+  BarChart3,
+  Users,
+  Edit,
+  Copy as CopyIcon,
+  Trash2,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import WorkoutTemplateCard from "@/components/features/workouts/WorkoutTemplateCard";
 
 export default function WorkoutTemplatesPage() {
   const { user } = useAuth();
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
+  const { isDark, getSemanticColor, performanceSettings } = useTheme();
   const router = useRouter();
 
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
@@ -174,12 +191,22 @@ export default function WorkoutTemplatesPage() {
             .in("id", profileIds);
 
           // Merge profiles into clients
-          const merged = clientsData.map((client) => ({
-            ...client,
-            profiles:
-              profilesData?.find((p) => p.id === client.client_id) || null,
-          }));
-          setClients(merged);
+          const merged = clientsData
+            .map((client) => {
+              const profile =
+                profilesData?.find((p) => p.id === client.client_id) || null;
+              if (!profile) {
+                return null;
+              }
+              return {
+                ...client,
+                id: client.id,
+                client_profile_id: client.client_id,
+                profiles: profile,
+              };
+            })
+            .filter(Boolean);
+          setClients(merged as any[]);
         } else {
           setClients([]);
         }
@@ -193,25 +220,76 @@ export default function WorkoutTemplatesPage() {
 
   const submitAssign = useCallback(async () => {
     if (!assignTemplateId || selectedClients.length === 0) return;
+    if (!coachId) {
+      alert("You must be signed in as a coach to assign workouts.");
+      return;
+    }
+
     try {
-      const assignments = selectedClients.map((clientId) => ({
-        workout_template_id: assignTemplateId,
-        client_id: clientId,
-        coach_id: coachId,
-        scheduled_date: assignStartDate,
-        status: "assigned",
-      }));
+      let successCount = 0;
+      let failureCount = 0;
 
-      const { error } = await supabase
-        .from("workout_assignments")
-        .insert(assignments);
+      for (const selectedId of selectedClients) {
+        const clientRecord = clients.find((client) => {
+          const possibleIds = [
+            client.id,
+            client.client_profile_id,
+            client.client_id,
+          ].filter(Boolean);
+          return possibleIds.includes(selectedId);
+        });
 
-      if (error) throw error;
+        if (!clientRecord) {
+          console.warn(
+            "[WorkoutAssign] Unable to locate client record for selection:",
+            selectedId
+          );
+          failureCount += 1;
+          continue;
+        }
 
-      alert(
-        `Workout template assigned to ${selectedClients.length} client(s) successfully!`
-      );
-      await loadAssignmentCounts(coachId);
+        const relationshipId = clientRecord.id || clientRecord.client_id;
+        const profileId =
+          clientRecord.client_profile_id || clientRecord.client_id || null;
+
+        if (!relationshipId || !profileId) {
+          console.warn(
+            "[WorkoutAssign] Missing relationship/profile ID for client:",
+            clientRecord
+          );
+          failureCount += 1;
+          continue;
+        }
+
+        const assignment = await WorkoutTemplateService.assignWorkoutToClient(
+          relationshipId,
+          profileId,
+          assignTemplateId,
+          coachId,
+          assignStartDate,
+          null
+        );
+
+        if (assignment) {
+          successCount += 1;
+        } else {
+          failureCount += 1;
+        }
+      }
+
+      if (failureCount > 0) {
+        alert(
+          `Assigned ${successCount} workout(s), but ${failureCount} failed. Check console for details.`
+        );
+      } else if (successCount > 0) {
+        alert(
+          `Workout template assigned to ${selectedClients.length} client(s) successfully!`
+        );
+      }
+
+      if (successCount > 0) {
+        await loadAssignmentCounts(coachId);
+      }
       setShowAssignModal(false);
       setClientSearchQuery("");
       setSelectedClients([]);
@@ -225,149 +303,280 @@ export default function WorkoutTemplatesPage() {
     coachId,
     assignStartDate,
     loadAssignmentCounts,
+    clients,
   ]);
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case "beginner":
+        return getSemanticColor("success").primary;
+      case "intermediate":
+        return getSemanticColor("warning").primary;
+      case "advanced":
+        return getSemanticColor("critical").primary;
+      default:
+        return getSemanticColor("neutral").primary;
+    }
+  };
 
   if (!coachId) {
     return (
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="max-w-7xl mx-auto p-4 sm:p-6">
-          <div className={`${theme.card} ${theme.shadow} rounded-2xl p-6`}>
-            <p className={`${theme.textSecondary}`}>
+      <AnimatedBackground>
+        <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+          <GlassCard elevation={2} className="p-6 max-w-md">
+            <p
+              className="text-center"
+              style={{
+                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
+              }}
+            >
               Please sign in to view workout templates.
             </p>
-          </div>
+          </GlassCard>
         </div>
-      </div>
+      </AnimatedBackground>
     );
   }
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="animate-pulse p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-          <div className={`${theme.card} rounded-2xl p-6`}>
-            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="relative z-10 min-h-screen p-4 sm:p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div className="animate-pulse space-y-6">
+              <GlassCard elevation={1} className="p-6">
                 <div
-                  key={i}
-                  className="h-24 bg-slate-200 dark:bg-slate-700 rounded-2xl"
+                  className="h-8 rounded mb-4"
+                  style={{
+                    background: isDark
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(0,0,0,0.1)",
+                  }}
                 ></div>
+                <div
+                  className="h-4 rounded w-2/3"
+                  style={{
+                    background: isDark
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(0,0,0,0.1)",
+                  }}
+                ></div>
+              </GlassCard>
+              {[...Array(3)].map((_, i) => (
+                <GlassCard key={i} elevation={2} className="p-6">
+                  <div
+                    className="h-24 rounded"
+                    style={{
+                      background: isDark
+                        ? "rgba(255,255,255,0.1)"
+                        : "rgba(0,0,0,0.1)",
+                    }}
+                  ></div>
+                </GlassCard>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     );
   }
 
   return (
     <>
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-8">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+
+        <div className="relative z-10 min-h-screen p-4 sm:p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
-            <div
-              className="relative overflow-hidden rounded-2xl"
-              style={{ backgroundColor: "#E8E9F3" }}
-            >
-              <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl"></div>
-                <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-green-500/10 rounded-full blur-3xl"></div>
-              </div>
-
-              <div className="relative z-10 p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-start gap-4">
-                    <div
-                      style={{
-                        width: "56px",
-                        height: "56px",
-                        borderRadius: "18px",
-                        background:
-                          "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Dumbbell
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          color: "#FFFFFF",
-                        }}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h1
-                        style={{
-                          fontSize: "28px",
-                          fontWeight: "700",
-                          color: "#1A1A1A",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Workout Templates
-                      </h1>
-                      <p
-                        style={{
-                          fontSize: "14px",
-                          fontWeight: "400",
-                          color: "#6B7280",
-                        }}
-                      >
-                        Create and manage workout templates for your clients
-                      </p>
-                    </div>
+            <GlassCard elevation={2} className="p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background: getSemanticColor("trust").gradient,
+                      boxShadow: `0 4px 12px ${
+                        getSemanticColor("trust").primary
+                      }30`,
+                    }}
+                  >
+                    <Dumbbell className="w-8 h-8 text-white" />
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        if (coachId) {
-                          loadTemplates(coachId);
-                          loadAssignmentCounts(coachId);
-                        }
-                      }}
+                  <div className="flex-1 min-w-0">
+                    <h1
+                      className="text-3xl font-bold mb-2"
+                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                    >
+                      Workout Templates
+                    </h1>
+                    <p
+                      className="text-sm"
                       style={{
-                        borderRadius: "20px",
-                        padding: "12px 20px",
-                        fontSize: "14px",
-                        fontWeight: "600",
+                        color: isDark
+                          ? "rgba(255,255,255,0.6)"
+                          : "rgba(0,0,0,0.6)",
                       }}
                     >
-                      <RefreshCw className="w-4 h-4" />
-                      Refresh
-                    </Button>
-                    <Link href="/coach/workouts/templates/create">
-                      <Button
-                        style={{
-                          backgroundColor: "#6C5CE7",
-                          borderRadius: "20px",
-                          padding: "12px 20px",
-                          fontSize: "14px",
-                          fontWeight: "600",
-                          color: "#FFFFFF",
-                        }}
-                      >
-                        <Plus className="w-4 h-4" />
-                        Create Template
-                      </Button>
-                    </Link>
+                      Create and manage workout templates for your clients
+                    </p>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      if (coachId) {
+                        loadTemplates(coachId);
+                        loadAssignmentCounts(coachId);
+                      }
+                    }}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                  <Link href="/coach/workouts/templates/create">
+                    <Button
+                      style={{
+                        background: getSemanticColor("energy").gradient,
+                        boxShadow: `0 4px 12px ${
+                          getSemanticColor("energy").primary
+                        }30`,
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Template
+                    </Button>
+                  </Link>
+                </div>
               </div>
+            </GlassCard>
+
+            {/* Stats Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <GlassCard elevation={2} className="p-6">
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center"
+                    style={{
+                      background: isDark
+                        ? "rgba(255,255,255,0.1)"
+                        : "rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    <Dumbbell
+                      className="w-6 h-6"
+                      style={{ color: getSemanticColor("trust").primary }}
+                    />
+                  </div>
+                  <div>
+                    <AnimatedNumber
+                      value={templates.length}
+                      className="text-2xl font-bold"
+                      color={isDark ? "#fff" : "#1A1A1A"}
+                    />
+                    <p
+                      className="text-sm"
+                      style={{
+                        color: isDark
+                          ? "rgba(255,255,255,0.6)"
+                          : "rgba(0,0,0,0.6)",
+                      }}
+                    >
+                      Total Templates
+                    </p>
+                  </div>
+                </div>
+              </GlassCard>
+
+              <GlassCard elevation={2} className="p-6">
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center"
+                    style={{
+                      background: isDark
+                        ? "rgba(255,255,255,0.1)"
+                        : "rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    <Users
+                      className="w-6 h-6"
+                      style={{ color: getSemanticColor("success").primary }}
+                    />
+                  </div>
+                  <div>
+                    <AnimatedNumber
+                      value={Object.values(assignmentCountByTemplate).reduce(
+                        (a, b) => a + b,
+                        0
+                      )}
+                      className="text-2xl font-bold"
+                      color={isDark ? "#fff" : "#1A1A1A"}
+                    />
+                    <p
+                      className="text-sm"
+                      style={{
+                        color: isDark
+                          ? "rgba(255,255,255,0.6)"
+                          : "rgba(0,0,0,0.6)",
+                      }}
+                    >
+                      Active Assignments
+                    </p>
+                  </div>
+                </div>
+              </GlassCard>
+
+              <GlassCard elevation={2} className="p-6">
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center"
+                    style={{
+                      background: isDark
+                        ? "rgba(255,255,255,0.1)"
+                        : "rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    <BarChart3
+                      className="w-6 h-6"
+                      style={{ color: getSemanticColor("warning").primary }}
+                    />
+                  </div>
+                  <div>
+                    <AnimatedNumber
+                      value={filteredAndSortedTemplates.length}
+                      className="text-2xl font-bold"
+                      color={isDark ? "#fff" : "#1A1A1A"}
+                    />
+                    <p
+                      className="text-sm"
+                      style={{
+                        color: isDark
+                          ? "rgba(255,255,255,0.6)"
+                          : "rgba(0,0,0,0.6)",
+                      }}
+                    >
+                      Showing Now
+                    </p>
+                  </div>
+                </div>
+              </GlassCard>
             </div>
 
             {/* Filters and Search */}
-            <div
-              className={`${theme.card} ${theme.shadow} rounded-2xl p-4 sm:p-6`}
-            >
+            <GlassCard elevation={2} className="p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.5)"
+                        : "rgba(0,0,0,0.5)",
+                    }}
+                  />
                   <Input
                     placeholder="Search templates..."
                     value={searchTerm}
@@ -408,6 +617,13 @@ export default function WorkoutTemplatesPage() {
                     variant={viewMode === "grid" ? "default" : "outline"}
                     onClick={() => setViewMode("grid")}
                     size="sm"
+                    style={
+                      viewMode === "grid"
+                        ? {
+                            background: getSemanticColor("trust").gradient,
+                          }
+                        : undefined
+                    }
                   >
                     <Grid3X3 className="w-4 h-4" />
                   </Button>
@@ -415,139 +631,192 @@ export default function WorkoutTemplatesPage() {
                     variant={viewMode === "list" ? "default" : "outline"}
                     onClick={() => setViewMode("list")}
                     size="sm"
+                    style={
+                      viewMode === "list"
+                        ? {
+                            background: getSemanticColor("trust").gradient,
+                          }
+                        : undefined
+                    }
                   >
                     <List className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
-            </div>
+            </GlassCard>
 
             {/* Templates List */}
-            <div
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-                  : "space-y-4"
-              }
-            >
-              {filteredAndSortedTemplates.map((template) => (
-                <WorkoutTemplateCard
-                  key={template.id}
-                  template={template}
-                  assignmentCount={assignmentCountByTemplate[template.id] || 0}
-                  onEdit={() => {
-                    router.push(
-                      `/coach/workouts/templates/${template.id}/edit`
-                    );
+            {filteredAndSortedTemplates.length === 0 ? (
+              <GlassCard elevation={2} className="p-12 text-center">
+                <Dumbbell
+                  className="w-24 h-24 mx-auto mb-6"
+                  style={{
+                    color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
                   }}
-                  onOpenDetails={() => {
-                    router.push(`/coach/workouts/templates/${template.id}`);
-                  }}
-                  onDelete={() => {
-                    // TODO: Add delete modal
-                    if (confirm("Delete this template?")) {
-                      WorkoutTemplateService.deleteWorkoutTemplate(
-                        template.id
-                      ).then(() => {
-                        loadTemplates(coachId);
-                      });
-                    }
-                  }}
-                  onDuplicate={async () => {
-                    const dup =
-                      await WorkoutTemplateService.duplicateWorkoutTemplate(
-                        template.id,
-                        `${template.name} (Copy)`
-                      );
-                    if (dup) loadTemplates(coachId);
-                  }}
-                  onAssign={() => openAssignModal(template.id)}
                 />
-              ))}
-            </div>
-
-            {/* Empty state */}
-            {filteredAndSortedTemplates.length === 0 && (
-              <div
-                className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}
-              >
-                <div className="text-center py-16 px-6">
-                  <Dumbbell className="w-20 h-20 text-slate-400 mx-auto mb-6" />
-                  <h3 className={`text-2xl font-semibold ${theme.text} mb-3`}>
-                    No workout templates yet
-                  </h3>
-                  <p
-                    className={`text-lg ${theme.textSecondary} mb-8 max-w-md mx-auto`}
+                <h3
+                  className="text-2xl font-bold mb-3"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  {searchTerm ||
+                  selectedDifficulty !== "all" ||
+                  selectedDuration !== "all"
+                    ? "No templates found"
+                    : "No workout templates yet"}
+                </h3>
+                <p
+                  className="text-sm mb-6 max-w-md mx-auto"
+                  style={{
+                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                  }}
+                >
+                  {searchTerm ||
+                  selectedDifficulty !== "all" ||
+                  selectedDuration !== "all"
+                    ? "Try adjusting your filters"
+                    : "Create your first workout template to get started"}
+                </p>
+                <Link href="/coach/workouts/templates/create">
+                  <Button
+                    style={{
+                      background: getSemanticColor("energy").gradient,
+                      boxShadow: `0 4px 12px ${
+                        getSemanticColor("energy").primary
+                      }30`,
+                    }}
                   >
-                    Create your first workout template to get started.
-                  </p>
-                  <Link href="/coach/workouts/templates/create">
-                    <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl shadow-lg">
-                      <Plus className="w-5 h-5 mr-2" />
-                      Create Your First Template
-                    </Button>
-                  </Link>
-                </div>
+                    <Plus className="w-5 h-5 mr-2" />
+                    Create Your First Template
+                  </Button>
+                </Link>
+              </GlassCard>
+            ) : (
+              <div
+                className={
+                  viewMode === "grid"
+                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                    : "space-y-4"
+                }
+              >
+                {filteredAndSortedTemplates.map((template) => (
+                  <WorkoutTemplateCard
+                    key={template.id}
+                    template={template}
+                    assignmentCount={
+                      assignmentCountByTemplate[template.id] || 0
+                    }
+                    onEdit={() => {
+                      router.push(
+                        `/coach/workouts/templates/${template.id}/edit`
+                      );
+                    }}
+                    onOpenDetails={() => {
+                      router.push(`/coach/workouts/templates/${template.id}`);
+                    }}
+                    onDelete={() => {
+                      if (confirm("Delete this template?")) {
+                        WorkoutTemplateService.deleteWorkoutTemplate(
+                          template.id
+                        ).then(() => {
+                          loadTemplates(coachId);
+                        });
+                      }
+                    }}
+                    onDuplicate={async () => {
+                      const dup =
+                        await WorkoutTemplateService.duplicateWorkoutTemplate(
+                          template.id,
+                          `${template.name} (Copy)`
+                        );
+                      if (dup) loadTemplates(coachId);
+                    }}
+                    onAssign={() => openAssignModal(template.id)}
+                  />
+                ))}
               </div>
             )}
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
 
       {/* Assignment Modal */}
       {showAssignModal && (
         <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "16px",
+            background: "rgba(0, 0, 0, 0.5)",
+            backdropFilter: "blur(4px)",
           }}
         >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 24,
-              maxWidth: 560,
-              width: "100%",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ padding: 24, borderBottom: "1px solid #E5E7EB" }}>
+          <GlassCard elevation={3} className="max-w-lg w-full">
+            <div
+              className="p-6"
+              style={{
+                borderBottom: `1px solid ${
+                  isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+                }`,
+              }}
+            >
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold">Assign Workout Template</h2>
+                <h2
+                  className="text-xl font-bold"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  Assign Workout Template
+                </h2>
                 <button
                   onClick={() => {
                     setShowAssignModal(false);
                     setClientSearchQuery("");
                     setSelectedClients([]);
                   }}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 rounded-lg transition-all hover:scale-110"
+                  style={{
+                    background: isDark
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(0,0,0,0.05)",
+                  }}
                 >
-                  ✕
+                  <X
+                    className="w-5 h-5"
+                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                  />
                 </button>
               </div>
             </div>
-            <div style={{ padding: 24 }}>
+
+            <div className="p-6">
               {/* Search bar */}
               <div className="mb-4">
-                <input
-                  type="text"
-                  placeholder="Search clients by name or email..."
-                  value={clientSearchQuery}
-                  onChange={(e) => setClientSearchQuery(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
+                <div className="relative">
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.5)"
+                        : "rgba(0,0,0,0.5)",
+                    }}
+                  />
+                  <Input
+                    type="text"
+                    placeholder="Search clients by name or email..."
+                    value={clientSearchQuery}
+                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
               </div>
 
               {/* Selected count badge */}
               {selectedClients.length > 0 && (
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-sm text-gray-600">
+                <div className="mb-3">
+                  <span
+                    className="text-sm px-3 py-1 rounded-full"
+                    style={{
+                      background: `${getSemanticColor("success").primary}20`,
+                      color: getSemanticColor("success").primary,
+                    }}
+                  >
                     {selectedClients.length} client
                     {selectedClients.length !== 1 ? "s" : ""} selected
                   </span>
@@ -555,16 +824,23 @@ export default function WorkoutTemplatesPage() {
               )}
 
               {/* Scrollable client list */}
-              <div className="space-y-3 max-h-[240px] overflow-y-auto">
+              <div className="space-y-3 max-h-[240px] overflow-y-auto mb-4">
                 {filteredClients.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 text-sm">
+                  <div
+                    className="text-center py-8 text-sm"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.5)"
+                        : "rgba(0,0,0,0.5)",
+                    }}
+                  >
                     {clientSearchQuery.trim()
                       ? "No clients found matching your search"
                       : "No active clients available"}
                   </div>
                 ) : (
                   filteredClients.map((c) => {
-                    const id = c.client_id || c.id;
+                    const id = c.id || c.client_profile_id || c.client_id;
                     const selected = selectedClients.includes(id);
                     return (
                       <div
@@ -576,82 +852,124 @@ export default function WorkoutTemplatesPage() {
                               : [...prev, id]
                           )
                         }
-                        className={`flex items-center justify-between border rounded-xl p-3 cursor-pointer transition-all ${
-                          selected
-                            ? "border-green-500 bg-green-50 shadow-sm"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
-                      >
-                        <div className="flex-1">
-                          <div className="font-semibold text-gray-900">
-                            {c.profiles?.first_name || ""}{" "}
-                            {c.profiles?.last_name || ""}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {c.profiles?.email || ""}
-                          </div>
-                        </div>
-                        <div
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                        className="p-3 rounded-xl cursor-pointer transition-all"
+                        style={{
+                          background: selected
+                            ? `${getSemanticColor("success").primary}10`
+                            : isDark
+                            ? "rgba(255,255,255,0.05)"
+                            : "rgba(0,0,0,0.05)",
+                          border: `2px solid ${
                             selected
-                              ? "bg-green-500 border-green-500"
-                              : "border-gray-300"
-                          }`}
-                        >
-                          {selected && (
-                            <svg
-                              className="w-3 h-3 text-white"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
+                              ? getSemanticColor("success").primary
+                              : isDark
+                              ? "rgba(255,255,255,0.1)"
+                              : "rgba(0,0,0,0.1)"
+                          }`,
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div
+                              className="font-semibold"
+                              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
                             >
-                              <path
-                                fillRule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          )}
+                              {c.profiles?.first_name || ""}{" "}
+                              {c.profiles?.last_name || ""}
+                            </div>
+                            <div
+                              className="text-sm"
+                              style={{
+                                color: isDark
+                                  ? "rgba(255,255,255,0.6)"
+                                  : "rgba(0,0,0,0.6)",
+                              }}
+                            >
+                              {c.profiles?.email || ""}
+                            </div>
+                          </div>
+                          <div
+                            className="w-6 h-6 rounded flex items-center justify-center"
+                            style={{
+                              background: selected
+                                ? getSemanticColor("success").primary
+                                : isDark
+                                ? "rgba(255,255,255,0.2)"
+                                : "rgba(0,0,0,0.2)",
+                            }}
+                          >
+                            {selected && (
+                              <svg
+                                className="w-4 h-4 text-white"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
                   })
                 )}
               </div>
-              <div className="grid gap-3 mt-4">
-                <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium">Start date</label>
-                  <input
-                    type="date"
-                    value={assignStartDate}
-                    onChange={(e) => setAssignStartDate(e.target.value)}
-                    className="border rounded px-3 py-2"
-                  />
-                </div>
+
+              <div className="flex items-center gap-3 mb-4">
+                <label
+                  className="text-sm font-medium"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  Start date:
+                </label>
+                <Input
+                  type="date"
+                  value={assignStartDate}
+                  onChange={(e) => setAssignStartDate(e.target.value)}
+                />
               </div>
             </div>
+
             <div
-              style={{ padding: 16, borderTop: "1px solid #E5E7EB" }}
-              className="flex items-center justify-end gap-2"
+              className="p-4 flex items-center justify-end gap-3"
+              style={{
+                borderTop: `1px solid ${
+                  isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+                }`,
+              }}
             >
-              <button
+              <Button
+                variant="ghost"
                 onClick={() => {
                   setShowAssignModal(false);
                   setClientSearchQuery("");
                   setSelectedClients([]);
                 }}
-                className="px-4 py-2 border rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 disabled={selectedClients.length === 0}
                 onClick={submitAssign}
-                className="px-4 py-2 bg-green-600 text-white rounded-xl disabled:bg-gray-300 disabled:cursor-not-allowed"
+                style={{
+                  background:
+                    selectedClients.length === 0
+                      ? undefined
+                      : getSemanticColor("success").gradient,
+                  boxShadow:
+                    selectedClients.length === 0
+                      ? undefined
+                      : `0 4px 12px ${getSemanticColor("success").primary}30`,
+                }}
               >
                 Assign
-              </button>
+              </Button>
             </div>
-          </div>
+          </GlassCard>
         </div>
       )}
     </>

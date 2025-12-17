@@ -64,6 +64,47 @@ export class BodyMetricsService {
         .single()
 
       if (error) throw error
+      
+      // Sync body composition goals after metric is created (non-blocking)
+      if (data) {
+        try {
+          const { syncBodyCompositionGoal } = await import('./goalSyncService')
+          
+          // Find all body composition goals for this client
+          const { data: bodyGoals } = await supabase
+            .from('goals')
+            .select('id, title')
+            .eq('client_id', clientId)
+            .eq('status', 'active')
+            .or('title.ilike.%Fat Loss%,title.ilike.%Weight Loss%,title.ilike.%Muscle Gain%,title.ilike.%Body Recomp%,title.ilike.%Recomposition%')
+
+          // Sync each goal with appropriate type
+          if (bodyGoals && bodyGoals.length > 0) {
+            for (const goal of bodyGoals) {
+              const titleLower = goal.title.toLowerCase()
+              let goalType: 'fat-loss' | 'weight-loss' | 'muscle-gain' | 'body-recomp' | null = null
+              
+              if (titleLower.includes('fat loss') || titleLower.includes('lose fat')) {
+                goalType = 'fat-loss'
+              } else if (titleLower.includes('weight loss') || titleLower.includes('lose weight')) {
+                goalType = 'weight-loss'
+              } else if (titleLower.includes('muscle gain') || titleLower.includes('gain muscle')) {
+                goalType = 'muscle-gain'
+              } else if (titleLower.includes('body recomp') || titleLower.includes('recomposition')) {
+                goalType = 'body-recomp'
+              }
+
+              if (goalType) {
+                await syncBodyCompositionGoal(goal.id, clientId, goalType)
+              }
+            }
+          }
+        } catch (syncError) {
+          console.error('Failed to sync body composition goals (non-blocking):', syncError)
+          // Don't fail the request, just log error
+        }
+      }
+      
       return data
     } catch (error) {
       console.error('Error creating body metrics:', error)

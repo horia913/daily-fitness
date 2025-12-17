@@ -44,7 +44,7 @@ interface WorkoutSession {
   }
 }
 
-export function useWorkoutSummary(userId: string, sessionId?: string) {
+export function useWorkoutSummary(userId: string, sessionId?: string, workoutLogId?: string) {
   const [workoutData, setWorkoutData] = useState<WorkoutData | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [comparison, setComparison] = useState<WorkoutComparison | null>(null)
@@ -56,7 +56,7 @@ export function useWorkoutSummary(userId: string, sessionId?: string) {
     if (userId) {
       loadWorkoutSummaryData()
     }
-  }, [userId, sessionId])
+  }, [userId, sessionId, workoutLogId])
 
   const loadWorkoutSummaryData = useCallback(async () => {
     try {
@@ -67,9 +67,17 @@ export function useWorkoutSummary(userId: string, sessionId?: string) {
       const profile = await loadUserProfile(userId)
       setUserProfile(profile)
 
-      // Load workout data
+      // Load workout data - try sessionId first, then workoutLogId as fallback
       if (sessionId) {
         const workout = await loadWorkoutData(sessionId)
+        setWorkoutData(workout)
+
+        // Load comparison data
+        const comparisonData = await loadComparisonData(userId, workout)
+        setComparison(comparisonData)
+      } else if (workoutLogId) {
+        // Fallback: Load from workout_log_id
+        const workout = await loadWorkoutDataFromLogId(workoutLogId, userId)
         setWorkoutData(workout)
 
         // Load comparison data
@@ -81,7 +89,7 @@ export function useWorkoutSummary(userId: string, sessionId?: string) {
     } finally {
       setLoading(false)
     }
-  }, [userId, sessionId])
+  }, [userId, sessionId, workoutLogId])
 
   const loadUserProfile = async (userId: string): Promise<UserProfile> => {
     try {
@@ -236,6 +244,86 @@ export function useWorkoutSummary(userId: string, sessionId?: string) {
       }
     } catch (error) {
       console.error('Error loading workout data:', error)
+      throw error
+    }
+  }
+
+  const loadWorkoutDataFromLogId = async (workoutLogId: string, userId: string): Promise<WorkoutData> => {
+    try {
+      // Load workout_log
+      const { data: workoutLog, error: logError } = await supabase
+        .from('workout_logs')
+        .select(`
+          *,
+          workout_assignment:workout_assignments(
+            *,
+            template:workout_templates(*)
+          )
+        `)
+        .eq('id', workoutLogId)
+        .eq('client_id', userId)
+        .single()
+
+      if (logError) throw logError
+
+      // Load workout_set_logs for this workout_log
+      const { data: setLogs, error: setsError } = await supabase
+        .from('workout_set_logs')
+        .select(`
+          *,
+          exercise:exercises(*)
+        `)
+        .eq('workout_log_id', workoutLogId)
+        .eq('client_id', userId)
+
+      if (setsError) throw setsError
+
+      // Process set logs into exercise data
+      const exerciseMap = new Map<string, any>()
+      
+      setLogs?.forEach((setLog: any) => {
+        const exerciseId = setLog.exercise_id
+        if (!exerciseId) return
+
+        if (!exerciseMap.has(exerciseId)) {
+          exerciseMap.set(exerciseId, {
+            id: exerciseId,
+            name: setLog.exercise?.name || 'Unknown Exercise',
+            sets: 0,
+            completedSets: 0,
+            weight: 0,
+            reps: [],
+            restTime: 0
+          })
+        }
+
+        const exercise = exerciseMap.get(exerciseId)!
+        exercise.sets += 1
+        exercise.completedSets += 1
+        exercise.weight = Math.max(exercise.weight, setLog.weight || 0)
+        exercise.reps.push(setLog.reps || 0)
+      })
+
+      const exercises = Array.from(exerciseMap.values())
+      const totalSets = exercises.reduce((sum, ex) => sum + ex.sets, 0)
+      const completedSets = exercises.reduce((sum, ex) => sum + ex.completedSets, 0)
+      const totalWeight = exercises.reduce((sum, ex) => sum + (ex.weight * ex.completedSets), 0)
+
+      return {
+        id: workoutLog.id,
+        name: workoutLog.workout_assignment?.name || workoutLog.workout_assignment?.template?.name || 'Workout',
+        duration: workoutLog.total_duration_minutes || 45,
+        difficulty: workoutLog.workout_assignment?.template?.difficulty_level || 'intermediate',
+        exercises,
+        completedAt: workoutLog.completed_at || workoutLog.started_at,
+        totalSets,
+        completedSets,
+        totalWeight,
+        averageRPE: undefined,
+        restTime: 0
+      }
+    } catch (error) {
+      console.error('Error loading workout data from log ID:', error)
       throw error
     }
   }

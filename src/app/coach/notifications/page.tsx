@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -83,7 +85,7 @@ import {
 } from 'lucide-react'
 
 export default function CoachNotifications() {
-  const { getThemeStyles } = useTheme()
+  const { getThemeStyles, performanceSettings } = useTheme()
   const theme = getThemeStyles()
   
   const [notificationType, setNotificationType] = useState('')
@@ -185,7 +187,9 @@ export default function CoachNotifications() {
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className={`min-h-screen ${theme.background}`}>
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
         {/* Floating Background Elements */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl"></div>
@@ -722,7 +726,7 @@ export default function CoachNotifications() {
             </Tabs>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

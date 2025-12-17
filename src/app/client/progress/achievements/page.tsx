@@ -1,421 +1,389 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { AchievementCard } from "@/components/ui/AchievementCard";
 import { Button } from "@/components/ui/button";
-import {
-  Award,
-  Calendar,
-  Flame,
-  Target,
-  TrendingUp,
-  Trophy,
-  ArrowLeft,
-  Star,
-  Zap,
-  CheckCircle,
-  Lock,
-} from "lucide-react";
+import { ArrowLeft, Award, Filter } from "lucide-react";
 import Link from "next/link";
-import {
-  AchievementsService,
-  Achievement,
-} from "@/lib/progressTrackingService";
+import { supabase } from "@/lib/supabase";
 
-export default function AchievementsPage() {
-  const { user, loading: authLoading } = useAuth();
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  rarity: "common" | "uncommon" | "rare" | "epic" | "legendary";
+  unlocked: boolean;
+  progress?: number; // 0-100
+  requirement?: string;
+  unlockedAt?: Date;
+}
+
+function AchievementsPageContent() {
+  const { user } = useAuth();
+  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+
+  const [achievements, setAchievements] = useState<Achievement[]>([
+    {
+      id: "1",
+      name: "First Steps",
+      description: "Complete your first workout",
+      icon: "🎯",
+      rarity: "common",
+      unlocked: true,
+      unlockedAt: new Date("2024-01-15"),
+    },
+    {
+      id: "2",
+      name: "Week Warrior",
+      description: "Complete 5 workouts in one week",
+      icon: "💪",
+      rarity: "rare",
+      unlocked: true,
+      unlockedAt: new Date("2024-01-22"),
+    },
+    {
+      id: "3",
+      name: "Streak Master",
+      description: "Maintain a 30-day workout streak",
+      icon: "🔥",
+      rarity: "epic",
+      unlocked: false,
+      progress: 40, // 12/30 = 40%
+      requirement: "Complete 30 consecutive days of workouts",
+    },
+    {
+      id: "4",
+      name: "Iron Will",
+      description: "Complete 100 total workouts",
+      icon: "🏋️",
+      rarity: "epic",
+      unlocked: false,
+      progress: 87, // 87/100 = 87%
+      requirement: "Complete 100 workouts",
+    },
+    {
+      id: "5",
+      name: "Early Bird",
+      description: "Complete 10 workouts before 7am",
+      icon: "🌅",
+      rarity: "rare",
+      unlocked: false,
+      progress: 30, // 3/10 = 30%
+      requirement: "Complete 10 morning workouts",
+    },
+    {
+      id: "6",
+      name: "Legendary Athlete",
+      description: "Reach #1 on the leaderboard",
+      icon: "👑",
+      rarity: "legendary",
+      unlocked: false,
+      requirement: "Reach the top of the leaderboard",
+    },
+    {
+      id: "7",
+      name: "PR Hunter",
+      description: "Set 20 personal records",
+      icon: "🎖️",
+      rarity: "epic",
+      unlocked: false,
+      progress: 40, // 8/20 = 40%
+      requirement: "Set 20 new personal records",
+    },
+    {
+      id: "8",
+      name: "Consistency King",
+      description: "Complete your weekly goal for 4 weeks straight",
+      icon: "⭐",
+      rarity: "rare",
+      unlocked: true,
+      unlockedAt: new Date("2024-02-10"),
+    },
+  ]);
 
   const [loading, setLoading] = useState(true);
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [filterRarity, setFilterRarity] = useState<
+    "all" | "common" | "uncommon" | "rare" | "epic" | "legendary"
+  >("all");
+  const [filterStatus, setFilterStatus] = useState<
+    "all" | "unlocked" | "progress" | "locked"
+  >("all");
 
   useEffect(() => {
-    if (user && !authLoading) {
-      loadAchievements();
-    }
-  }, [user, authLoading]);
+    loadAchievementsData();
+  }, [user]);
 
-  const loadAchievements = async () => {
-    if (!user?.id) return;
+  const loadAchievementsData = async () => {
+    if (!user) return;
 
-    setLoading(true);
     try {
-      const data = await AchievementsService.getClientAchievements(user.id);
-      setAchievements(data);
+      // TODO: Replace with actual Supabase queries
+      // Simulating data fetch
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setLoading(false);
     } catch (error) {
-      console.error("Error loading achievements:", error);
-    } finally {
+      console.error("Error loading achievements data:", error);
       setLoading(false);
     }
   };
 
-  const getAchievementIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "workout":
-      case "strength":
-        return Trophy;
-      case "milestone":
-      case "goal":
-        return Target;
-      case "streak":
-        return Flame;
-      case "progress":
-        return TrendingUp;
-      default:
-        return Award;
+  const filteredAchievements = achievements.filter((achievement) => {
+    // Filter by rarity
+    if (filterRarity !== "all" && achievement.rarity !== filterRarity) {
+      return false;
     }
-  };
 
-  const getAchievementColor = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "workout":
-      case "strength":
-        return "from-purple-500 to-indigo-600";
-      case "milestone":
-      case "goal":
-        return "from-green-500 to-emerald-600";
-      case "streak":
-        return "from-orange-500 to-red-600";
-      case "progress":
-        return "from-blue-500 to-cyan-600";
-      default:
-        return "from-yellow-500 to-amber-600";
+    // Filter by status
+    if (filterStatus === "unlocked" && !achievement.unlocked) {
+      return false;
     }
-  };
+    if (
+      filterStatus === "progress" &&
+      (!achievement.progress || achievement.unlocked)
+    ) {
+      return false;
+    }
+    if (
+      filterStatus === "locked" &&
+      (achievement.unlocked || achievement.progress !== undefined)
+    ) {
+      return false;
+    }
 
-  if (authLoading || loading) {
-    return (
-      <ProtectedRoute>
-        <div className={`min-h-screen ${theme.background}`}>
-          <div className="animate-pulse p-4">
-            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-4"></div>
-            <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  const recentAchievements = achievements.filter((a) => {
-    const achievedDate = new Date(a.achieved_date);
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return achievedDate >= thirtyDaysAgo;
+    return true;
   });
 
+  const unlockedCount = achievements.filter((a) => a.unlocked).length;
+  const inProgressCount = achievements.filter(
+    (a) => !a.unlocked && a.progress !== undefined
+  ).length;
+  const lockedCount = achievements.filter(
+    (a) => !a.unlocked && a.progress === undefined
+  ).length;
+
   return (
-    <ProtectedRoute>
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="max-w-7xl mx-auto p-4 sm:p-6">
+    <AnimatedBackground>
+      {performanceSettings.floatingParticles && <FloatingParticles />}
+
+      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
           {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
+        <div className="mb-8">
+          <GlassCard elevation={1} className="p-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-4">
             <Link href="/client/progress">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                  <Button variant="ghost" size="sm">
+                    <ArrowLeft className="w-5 h-5" />
               </Button>
             </Link>
-            <div className="flex items-center gap-3 flex-1">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 shadow-lg">
-                <Award className="w-6 h-6 text-white" />
-              </div>
               <div>
-                <h1 className={`text-2xl sm:text-3xl font-bold ${theme.text}`}>
+                  <h1
+                    className="text-3xl font-bold mb-1"
+                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                  >
                   Achievements
                 </h1>
-                <p className={`text-sm ${theme.textSecondary}`}>
-                  Celebrate your milestones and accomplishments
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Summary Stats */}
-          {achievements.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-yellow-100 dark:bg-yellow-900/20">
-                      <Star className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-                    </div>
-                    <div>
-                      <p className={`text-xs ${theme.textSecondary} mb-1`}>
-                        Total Achievements
-                      </p>
-                      <p className={`text-2xl font-bold ${theme.text}`}>
-                        {achievements.length}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-orange-100 dark:bg-orange-900/20">
-                      <Flame className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                    </div>
-                    <div>
-                      <p className={`text-xs ${theme.textSecondary} mb-1`}>
-                        Recent (30 days)
-                      </p>
-                      <p className={`text-2xl font-bold ${theme.text}`}>
-                        {recentAchievements.length}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-green-100 dark:bg-green-900/20">
-                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    </div>
-                    <div>
-                      <p className={`text-xs ${theme.textSecondary} mb-1`}>
-                        Public Achievements
-                      </p>
-                      <p className={`text-2xl font-bold ${theme.text}`}>
-                        {achievements.filter((a) => a.is_public).length}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Achievements List */}
-          {achievements.length > 0 ? (
-            <div className="space-y-4">
-              {/* Recent Achievements Section */}
-              {recentAchievements.length > 0 && (
-                <div>
-                  <h2
-                    className={`text-lg font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.6)"
+                        : "rgba(0,0,0,0.6)",
+                    }}
                   >
-                    <Flame className="w-5 h-5 text-orange-500" />
-                    Recent Achievements
-                  </h2>
-                  <div className="space-y-4 mb-6">
-                    {recentAchievements.map((achievement) => {
-                      const Icon = getAchievementIcon(
-                        achievement.achievement_type
-                      );
-                      const gradient = getAchievementColor(
-                        achievement.achievement_type
-                      );
-
-                      return (
-                        <Card
-                          key={achievement.id}
-                          className={`${theme.card} border ${theme.border} rounded-2xl bg-gradient-to-br from-orange-50/50 to-amber-50/50 dark:from-orange-900/20 dark:to-amber-900/20 border-orange-200 dark:border-orange-800`}
-                        >
-                          <CardHeader className="p-6">
-                            <div className="flex items-center gap-4">
-                              <div
-                                className={`p-4 rounded-2xl bg-gradient-to-br ${gradient} shadow-lg`}
-                              >
-                                <Icon className="w-8 h-8 text-white" />
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <CardTitle
-                                    className={`text-xl font-bold ${theme.text}`}
-                                  >
-                                    {achievement.title}
-                                  </CardTitle>
-                                  <Badge className="bg-orange-500 text-white">
-                                    <Flame className="w-3 h-3 mr-1" />
-                                    New!
-                                  </Badge>
-                                </div>
-                                {achievement.description && (
-                                  <p
-                                    className={`text-sm ${theme.textSecondary}`}
-                                  >
-                                    {achievement.description}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="p-6 pt-0">
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                              {achievement.metric_value && (
-                                <div className="flex items-center gap-2">
-                                  <Zap className="w-4 h-4 text-orange-500" />
-                                  <span className={`text-sm ${theme.text}`}>
-                                    <strong>
-                                      {achievement.metric_value}
-                                      {achievement.metric_unit || ""}
-                                    </strong>
-                                  </span>
-                                </div>
-                              )}
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-slate-400" />
-                                <span
-                                  className={`text-sm ${theme.textSecondary}`}
-                                >
-                                  {new Date(
-                                    achievement.achieved_date
-                                  ).toLocaleDateString("en-US", {
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                  })}
-                                </span>
-                              </div>
-                              {achievement.is_public && (
-                                <Badge variant="outline">Public</Badge>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                    {unlockedCount} unlocked · {inProgressCount} in progress ·{" "}
+                    {lockedCount} locked
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* All Achievements Section */}
-              <div>
-                {recentAchievements.length > 0 && (
-                  <h2
-                    className={`text-lg font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-sm font-medium"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.7)"
+                        : "rgba(0,0,0,0.7)",
+                    }}
                   >
-                    <Trophy className="w-5 h-5 text-yellow-500" />
-                    All Achievements
-                  </h2>
-                )}
-                <div className="space-y-4">
-                  {achievements
-                    .filter(
-                      (a) => !recentAchievements.find((ra) => ra.id === a.id)
-                    )
-                    .map((achievement) => {
-                      const Icon = getAchievementIcon(
-                        achievement.achievement_type
-                      );
-                      const gradient = getAchievementColor(
-                        achievement.achievement_type
-                      );
+                    Status:
+                  </span>
+                  <Button
+                    variant={filterStatus === "all" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilterStatus("all")}
+                    style={
+                      filterStatus === "all"
+                        ? {
+                            background: getSemanticColor("trust").gradient,
+                            boxShadow: `0 4px 12px ${
+                              getSemanticColor("trust").primary
+                            }30`,
+                          }
+                        : {}
+                    }
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={filterStatus === "unlocked" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilterStatus("unlocked")}
+                    style={
+                      filterStatus === "unlocked"
+                        ? {
+                            background: getSemanticColor("success").gradient,
+                            boxShadow: `0 4px 12px ${
+                              getSemanticColor("success").primary
+                            }30`,
+                          }
+                        : {}
+                    }
+                  >
+                    Unlocked
+                  </Button>
+                  <Button
+                    variant={filterStatus === "progress" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilterStatus("progress")}
+                    style={
+                      filterStatus === "progress"
+                        ? {
+                            background: getSemanticColor("warning").gradient,
+                            boxShadow: `0 4px 12px ${
+                              getSemanticColor("warning").primary
+                            }30`,
+                          }
+                        : {}
+                    }
+                  >
+                    In Progress
+                  </Button>
+                              </div>
 
-                      return (
-                        <Card
-                          key={achievement.id}
-                          className={`${theme.card} border ${theme.border} rounded-2xl`}
-                        >
-                          <CardHeader className="p-6">
-                            <div className="flex items-center gap-4">
-                              <div
-                                className={`p-3 rounded-xl bg-gradient-to-br ${gradient}`}
-                              >
-                                <Icon className="w-6 h-6 text-white" />
-                              </div>
-                              <div className="flex-1">
-                                <CardTitle
-                                  className={`text-lg font-bold ${theme.text} mb-1`}
-                                >
-                                  {achievement.title}
-                                </CardTitle>
-                                {achievement.description && (
-                                  <p
-                                    className={`text-sm ${theme.textSecondary}`}
-                                  >
-                                    {achievement.description}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="p-6 pt-0">
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                              {achievement.metric_value && (
-                                <div className="flex items-center gap-2">
-                                  <Target className="w-4 h-4 text-slate-400" />
-                                  <span className={`text-sm ${theme.text}`}>
-                                    {achievement.metric_value}
-                                    {achievement.metric_unit || ""}
-                                  </span>
-                                </div>
-                              )}
                               <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-slate-400" />
                                 <span
-                                  className={`text-sm ${theme.textSecondary}`}
-                                >
-                                  {new Date(
-                                    achievement.achieved_date
-                                  ).toLocaleDateString("en-US", {
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                  })}
+                    className="text-sm font-medium"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.7)"
+                        : "rgba(0,0,0,0.7)",
+                    }}
+                  >
+                    Rarity:
                                 </span>
-                              </div>
-                              {achievement.is_public && (
-                                <Badge variant="outline">Public</Badge>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                  <Button
+                    variant={filterRarity === "all" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilterRarity("all")}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={filterRarity === "common" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilterRarity("common")}
+                  >
+                    Common
+                  </Button>
+                  <Button
+                    variant={filterRarity === "uncommon" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilterRarity("uncommon")}
+                  >
+                    Uncommon
+                  </Button>
+                  <Button
+                    variant={filterRarity === "rare" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilterRarity("rare")}
+                  >
+                    Rare
+                  </Button>
+                  <Button
+                    variant={filterRarity === "epic" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilterRarity("epic")}
+                  >
+                    Epic
+                  </Button>
+                  <Button
+                    variant={filterRarity === "legendary" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilterRarity("legendary")}
+                  >
+                    Legendary
+                  </Button>
                 </div>
               </div>
             </div>
-          ) : (
-            <Card
-              className={`${theme.card} border ${theme.border} rounded-2xl`}
+          </GlassCard>
+        </div>
+
+        {/* Achievements Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredAchievements.map((achievement) => (
+            <AchievementCard key={achievement.id} achievement={achievement} />
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {filteredAchievements.length === 0 && (
+          <GlassCard elevation={2} className="p-12 text-center">
+            <Award
+              className="w-16 h-16 mx-auto mb-4"
+              style={{
+                color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
+              }}
+            />
+            <p
+              className="text-lg font-semibold mb-2"
+              style={{
+                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
+              }}
             >
-              <CardContent className="p-12 text-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-yellow-100 to-amber-100 dark:from-yellow-900/20 dark:to-amber-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                  <Award className="w-12 h-12 text-yellow-500 dark:text-yellow-400" />
-                </div>
-                <h3 className={`text-xl font-semibold ${theme.text} mb-2`}>
-                  No Achievements Yet
-                </h3>
-                <p className={`${theme.textSecondary} mb-6`}>
-                  Keep working out and hitting your goals to unlock
-                  achievements! Your accomplishments will appear here
-                  automatically.
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <Link href="/client/workouts">
-                    <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700">
-                      <Trophy className="w-4 h-4 mr-2" />
-                      Start Workout
+              No achievements found
+            </p>
+            <p
+              className="text-sm mb-4"
+              style={{
+                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
+              }}
+            >
+              Try adjusting your filters to see more achievements
+            </p>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setFilterRarity("all");
+                setFilterStatus("all");
+              }}
+              style={{
+                background: getSemanticColor("trust").gradient,
+                boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
+              }}
+            >
+              Reset Filters
                     </Button>
-                  </Link>
-                  <Link href="/client/progress/goals">
-                    <Button variant="outline">
-                      <Target className="w-4 h-4 mr-2" />
-                      Set Goals
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+          </GlassCard>
           )}
         </div>
-      </div>
+    </AnimatedBackground>
+  );
+}
+
+export default function AchievementsPage() {
+  return (
+    <ProtectedRoute>
+      <AchievementsPageContent />
     </ProtectedRoute>
   );
 }

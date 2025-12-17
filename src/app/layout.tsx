@@ -53,9 +53,7 @@ export default function RootLayout({
             <AuthProvider>
               <PrefetchProvider>
                 <OneSignalProvider>
-                  <AppLayout>
-                    {children}
-                  </AppLayout>
+                  <AppLayout>{children}</AppLayout>
                 </OneSignalProvider>
               </PrefetchProvider>
             </AuthProvider>

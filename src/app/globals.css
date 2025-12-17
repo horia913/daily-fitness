@@ -76,6 +76,29 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  
+  /* Typography Scale System */
+  --font-hero: 3rem; /* 48px */
+  --font-hero-lg: 4rem; /* 64px */
+  --font-h1: 2rem; /* 32px */
+  --font-h2: 1.5rem; /* 24px */
+  --font-h3: 1.25rem; /* 20px */
+  --font-body: 1rem; /* 16px */
+  --font-body-lg: 1.0625rem; /* 17px */
+  --font-caption: 0.875rem; /* 14px */
+  --font-label: 0.8125rem; /* 13px */
+  --font-small: 0.75rem; /* 12px */
+  
+  /* Font weights */
+  --font-weight-heavy: 800;
+  --font-weight-bold: 700;
+  --font-weight-semibold: 600;
+  --font-weight-medium: 500;
+  --font-weight-regular: 400;
+  
+  /* Font stacks */
+  --font-number: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
 
 .dark {
@@ -181,5 +204,78 @@
     background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%) !important;
     color: #FFFFFF !important;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  /* Animation Keyframes */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  
+  @keyframes float {
+    0% {
+      transform: translateY(100vh) translateX(0);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.3;
+    }
+    90% {
+      opacity: 0.3;
+    }
+    100% {
+      transform: translateY(-10vh) translateX(10vw);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 0.3;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(1.02);
+    }
+  }
+  
+  @keyframes gradientShift {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 0% 100%;
+    }
+  }
+  
+  @keyframes celebrate {
+    0% {
+      transform: translateY(0) scale(0);
+      opacity: 0;
+    }
+    50% {
+      transform: translateY(-50px) scale(1.2);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-100px) scale(1);
+      opacity: 0;
+    }
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

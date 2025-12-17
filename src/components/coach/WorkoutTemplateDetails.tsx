@@ -9,6 +9,8 @@ import { WorkoutTemplate } from "@/lib/database";
 import { supabase } from "@/lib/supabase";
 import { useExerciseLibrary } from "@/hooks/useCoachData";
 import { useAuth } from "@/contexts/AuthContext";
+import { WorkoutBlockService } from "@/lib/workoutBlockService";
+import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
 import {
   X,
   Dumbbell,
@@ -48,8 +50,8 @@ export default function WorkoutTemplateDetails({
 
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [expandedExercises, setExpandedExercises] = useState<Set<string>>(
-    new Set()
+  const [availableExercisesList, setAvailableExercisesList] = useState<any[]>(
+    []
   );
 
   const difficultyColors = {
@@ -77,90 +79,228 @@ export default function WorkoutTemplateDetails({
 
   const CategoryIcon = getCategoryIcon(template.category || "");
 
-  const toggleExerciseExpansion = (exerciseId: string) => {
-    setExpandedExercises((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(exerciseId)) {
-        newSet.delete(exerciseId);
-      } else {
-        newSet.add(exerciseId);
-      }
-      return newSet;
-    });
-  };
-
   useEffect(() => {
     if (isOpen && template) {
-      loadTemplateExercises();
+      loadWorkoutBlocks();
+      loadAvailableExercises();
     }
   }, [isOpen, template]);
 
-  const loadTemplateExercises = async () => {
+  const loadAvailableExercises = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
-        .from("workout_template_exercises")
-        .select(
-          `
-          *,
-          exercise:exercises(id, name, description)
-        `
-        )
-        .eq("template_id", template.id)
-        .order("order_index", { ascending: true });
+        .from("exercises")
+        .select("*")
+        .order("name", { ascending: true });
 
       if (error) throw error;
-
-      // Parse complex exercise data from notes field
-      const parsedExercises = (data || []).map((exercise) => {
-        let parsedExercise = { ...exercise };
-
-        // Try to parse JSON from notes field
-        if (exercise.notes) {
-          try {
-            const complexData = JSON.parse(exercise.notes);
-            // Restore complex exercise data from JSON
-            parsedExercise = {
-              ...exercise,
-              ...complexData,
-              // Keep the original notes if it's not JSON
-              notes:
-                typeof complexData === "object"
-                  ? complexData.notes || ""
-                  : exercise.notes,
-            };
-            console.log(
-              "🔍 WorkoutTemplateDetails - Restored complex exercise data:",
-              {
-                id: exercise.id,
-                exercise_type: complexData.exercise_type,
-                tabata_sets: complexData.tabata_sets,
-                circuit_sets: complexData.circuit_sets,
-                rounds: complexData.rounds,
-                work_seconds: complexData.work_seconds,
-                rest_seconds: complexData.rest_seconds,
-                work_seconds_type: typeof complexData.work_seconds,
-                rest_after: complexData.rest_after,
-                fullComplexData: complexData,
-                originalNotes: exercise.notes,
-                notesLength: exercise.notes?.length || 0,
-              }
-            );
-          } catch (e) {
-            // If parsing fails, keep original notes (it's regular text)
-            console.log(
-              "🔍 WorkoutTemplateDetails - Notes field is regular text, not JSON:",
-              exercise.notes
-            );
-          }
-        }
-
-        return parsedExercise;
-      });
-
-      setExercises(parsedExercises);
+      setAvailableExercisesList(data || []);
     } catch (error) {
-      console.error("Error loading template exercises:", error);
+      console.error("Error loading exercises:", error);
+      setAvailableExercisesList([]);
+    }
+  };
+
+  const loadWorkoutBlocks = async () => {
+    try {
+      setLoading(true);
+      const blocks = await WorkoutBlockService.getWorkoutBlocks(template.id);
+
+      // Convert blocks to exercises format (same as edit page)
+      if (blocks && blocks.length > 0) {
+        const convertedExercises: any[] = [];
+
+        blocks.forEach((block, blockIndex) => {
+          // Create exercise object from block (same logic as edit page)
+          const exercise: any = {
+            id: block.id || `block-${blockIndex}-${Date.now()}`,
+            exercise_type: block.block_type,
+            exercise_id: block.exercises?.[0]?.exercise_id,
+            order_index: blockIndex + 1,
+            sets: block.total_sets?.toString() || "",
+            reps: block.reps_per_set || "",
+            rest_seconds: block.rest_seconds?.toString() || "",
+            notes: block.block_notes || "",
+            block_name: block.block_name,
+            // Copy block parameters
+            rounds: block.block_parameters?.rounds
+              ? String(block.block_parameters.rounds)
+              : undefined,
+            work_seconds: block.block_parameters?.work_seconds
+              ? String(block.block_parameters.work_seconds)
+              : undefined,
+            rest_after: block.block_parameters?.rest_after
+              ? String(block.block_parameters.rest_after)
+              : undefined,
+            amrap_duration: block.block_parameters?.amrap_duration
+              ? String(block.block_parameters.amrap_duration)
+              : undefined,
+            emom_duration: block.block_parameters?.emom_duration
+              ? String(block.block_parameters.emom_duration)
+              : undefined,
+            emom_reps: block.block_parameters?.emom_reps
+              ? String(block.block_parameters.emom_reps)
+              : undefined,
+            emom_mode: block.block_parameters?.emom_mode,
+            target_reps: block.block_parameters?.target_reps
+              ? String(block.block_parameters.target_reps)
+              : undefined,
+            time_cap: block.block_parameters?.time_cap
+              ? String(block.block_parameters.time_cap)
+              : undefined,
+            drop_percentage: block.block_parameters?.drop_percentage
+              ? String(block.block_parameters.drop_percentage)
+              : "",
+            drop_set_reps: block.block_parameters?.drop_set_reps || "",
+          };
+
+          // Handle complex block types with nested exercises
+          const blockType = block.block_type as string;
+          if (blockType === "circuit" || blockType === "tabata") {
+            const exercisesArray =
+              block.exercises?.map((ex, idx) => ({
+                exercise_id: ex.exercise_id,
+                sets: ex.sets?.toString() || block.total_sets?.toString() || "",
+                reps: ex.reps || block.reps_per_set || "",
+                rest_seconds:
+                  ex.rest_seconds?.toString() ||
+                  block.rest_seconds?.toString() ||
+                  "",
+                work_seconds: ex.work_seconds?.toString(),
+                rest_after: ex.rest_after?.toString(),
+                exercise: ex.exercise,
+              })) || [];
+
+            if (blockType === "tabata") {
+              const restAfter =
+                block.block_parameters?.rest_after ||
+                block.rest_seconds ||
+                "10";
+              exercise.rest_after = String(restAfter);
+              exercise.rounds =
+                block.block_parameters?.rounds ||
+                block.total_sets?.toString() ||
+                "8";
+              exercise.work_seconds = block.block_parameters?.work_seconds
+                ? String(block.block_parameters.work_seconds)
+                : "20";
+
+              if (
+                block.block_parameters?.tabata_sets &&
+                Array.isArray(block.block_parameters.tabata_sets)
+              ) {
+                exercise.tabata_sets = block.block_parameters.tabata_sets.map(
+                  (set: any) => ({
+                    exercises: Array.isArray(set.exercises)
+                      ? set.exercises.map((ex: any) => ({
+                          ...ex,
+                          exercise:
+                            ex.exercise ||
+                            availableExercisesList.find(
+                              (e: any) => e.id === ex.exercise_id
+                            ),
+                        }))
+                      : [],
+                    rest_between_sets:
+                      set.rest_between_sets || String(restAfter),
+                  })
+                );
+              } else {
+                const numSets = block.total_sets || 1;
+                exercise.tabata_sets = Array.from(
+                  { length: numSets },
+                  (_, setIdx) => ({
+                    exercises: exercisesArray.map((ex: any) => ({
+                      ...ex,
+                    })),
+                    rest_between_sets: String(restAfter),
+                  })
+                );
+              }
+              exercise.circuit_sets = exercise.tabata_sets;
+            } else {
+              if (
+                block.block_parameters?.circuit_sets &&
+                Array.isArray(block.block_parameters.circuit_sets)
+              ) {
+                exercise.circuit_sets = block.block_parameters.circuit_sets.map(
+                  (set: any) => ({
+                    exercises: Array.isArray(set.exercises)
+                      ? set.exercises.map((ex: any) => ({
+                          ...ex,
+                          exercise:
+                            ex.exercise ||
+                            availableExercisesList.find(
+                              (e: any) => e.id === ex.exercise_id
+                            ),
+                        }))
+                      : [],
+                    rest_between_sets:
+                      set.rest_between_sets ||
+                      block.rest_seconds?.toString() ||
+                      "60",
+                  })
+                );
+              } else {
+                const numSets = block.total_sets || 1;
+                exercise.circuit_sets = Array.from(
+                  { length: numSets },
+                  (_, setIdx) => ({
+                    exercises: exercisesArray.map((ex: any) => ({
+                      ...ex,
+                    })),
+                    rest_between_sets: block.rest_seconds?.toString() || "60",
+                  })
+                );
+              }
+            }
+          } else if (block.block_type === "drop_set") {
+            if (block.block_parameters?.drop_percentage !== undefined) {
+              exercise.drop_percentage = String(
+                block.block_parameters.drop_percentage
+              );
+            }
+            if (block.block_parameters?.drop_set_reps) {
+              exercise.drop_set_reps = String(
+                block.block_parameters.drop_set_reps
+              );
+            }
+          } else if (block.block_type === "giant_set") {
+            exercise.giant_set_exercises =
+              block.exercises?.map((ex) => ({
+                exercise_id: ex.exercise_id,
+                sets: ex.sets?.toString() || block.total_sets?.toString() || "",
+                reps: ex.reps || block.reps_per_set || "",
+                exercise: ex.exercise,
+              })) || [];
+          } else if (block.block_type === "superset") {
+            if (block.exercises && block.exercises.length >= 2) {
+              exercise.superset_exercise_id = block.exercises[1].exercise_id;
+              exercise.superset_reps =
+                block.exercises[1].reps || block.reps_per_set || "";
+            }
+          } else if (block.block_type === "pre_exhaustion") {
+            if (block.exercises && block.exercises.length >= 2) {
+              exercise.compound_exercise_id = block.exercises[1].exercise_id;
+              exercise.isolation_reps = block.exercises[0].reps || "";
+              exercise.compound_reps = block.exercises[1].reps || "";
+            }
+          }
+
+          // Add exercise object from block
+          if (block.exercises && block.exercises.length > 0) {
+            exercise.exercise = block.exercises[0].exercise;
+          }
+
+          convertedExercises.push(exercise);
+        });
+
+        setExercises(convertedExercises);
+      } else {
+        setExercises([]);
+      }
+    } catch (error) {
+      console.error("Error loading workout blocks:", error);
       setExercises([]);
     } finally {
       setLoading(false);
@@ -329,7 +469,7 @@ export default function WorkoutTemplateDetails({
                     <Dumbbell className={`w-5 h-5 text-white`} />
                   </div>
                   <CardTitle className={`text-xl font-bold ${theme.text}`}>
-                    Exercises ({exercises.length})
+                    Workout Flow ({exercises.length} items)
                   </CardTitle>
                 </div>
               </CardHeader>
@@ -352,1013 +492,37 @@ export default function WorkoutTemplateDetails({
                     ))}
                   </div>
                 ) : exercises.length > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3 max-h-[600px] sm:max-h-[700px] overflow-y-auto">
                     {exercises.map((exercise, index) => {
-                      const isExpanded = expandedExercises.has(exercise.id);
-
-                      // Count how many exercises of the same type have appeared before this one
-                      const sameTypeCount = exercises
-                        .slice(0, index)
-                        .filter(
-                          (ex) => ex.exercise_type === exercise.exercise_type
-                        ).length;
-                      const exerciseNumber = sameTypeCount + 1;
-
-                      // Debug logging for exercise type
-                      console.log(
-                        "🔍 WorkoutTemplateDetails - Displaying exercise:",
-                        {
-                          id: exercise.id,
-                          name: exercise.exercise?.name,
-                          exercise_type: exercise.exercise_type,
-                          exercise_type_raw: exercise.exercise_type,
-                          isTabata: exercise.exercise_type === "tabata",
-                          rounds: exercise.rounds,
-                          work_seconds: exercise.work_seconds,
-                          tabata_sets: exercise.tabata_sets,
-                          allKeys: Object.keys(exercise),
-                        }
-                      );
+                      // Create unique key combining multiple properties to avoid duplicates
+                      const order = exercise.order_index || index + 1;
+                      const uniqueKey = exercise.id
+                        ? `ex-${exercise.exercise_type || "unknown"}-${
+                            exercise.id
+                          }-${order}`
+                        : `ex-${exercise.exercise_type || "unknown"}-${
+                            exercise.exercise_id || "no-id"
+                          }-${order}-${index}`;
 
                       return (
-                        <div
-                          key={exercise.id}
-                          className={`${theme.card} border ${theme.border} rounded-xl overflow-hidden transition-all duration-200 hover:shadow-md`}
-                        >
-                          {/* Clickable Header */}
-                          <div
-                            className="p-4 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                            onClick={() => toggleExerciseExpansion(exercise.id)}
-                          >
-                            <div className="flex items-start gap-4">
-                              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center text-sm font-bold text-blue-600 dark:text-blue-400 flex-shrink-0">
-                                {index + 1}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center flex-wrap gap-2 mb-1">
-                                  <h4
-                                    className={`font-semibold ${theme.text} break-words`}
-                                  >
-                                    {exercise.exercise_type === "circuit"
-                                      ? `Circuit ${exerciseNumber}`
-                                      : exercise.exercise_type === "tabata"
-                                      ? `Tabata ${exerciseNumber}`
-                                      : exercise.exercise_type === "giant_set"
-                                      ? `Giant Set ${exerciseNumber}`
-                                      : exercise.exercise?.name || "Exercise"}
-                                  </h4>
-                                  {/* Debug: Always show exercise type */}
-                                  <Badge
-                                    className={`text-xs ${
-                                      exercise.exercise_type === "tabata"
-                                        ? "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300"
-                                        : exercise.exercise_type === "circuit"
-                                        ? "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300"
-                                        : exercise.exercise_type === "amrap"
-                                        ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300"
-                                        : exercise.exercise_type === "emom"
-                                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
-                                        : exercise.exercise_type === "superset"
-                                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300"
-                                        : exercise.exercise_type === "drop_set"
-                                        ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300"
-                                        : exercise.exercise_type === "giant_set"
-                                        ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300"
-                                        : exercise.exercise_type ===
-                                          "cluster_set"
-                                        ? "bg-pink-100 text-pink-800 dark:bg-pink-900/20 dark:text-pink-300"
-                                        : exercise.exercise_type ===
-                                          "rest_pause"
-                                        ? "bg-teal-100 text-teal-800 dark:bg-teal-900/20 dark:text-teal-300"
-                                        : exercise.exercise_type ===
-                                          "pre_exhaustion"
-                                        ? "bg-lime-100 text-lime-800 dark:bg-lime-900/20 dark:text-lime-300"
-                                        : exercise.exercise_type === "for_time"
-                                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
-                                        : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300"
-                                    }`}
-                                  >
-                                    {exercise.exercise_type === "tabata"
-                                      ? "Tabata Circuit"
-                                      : exercise.exercise_type === "circuit"
-                                      ? "Circuit"
-                                      : exercise.exercise_type === "amrap"
-                                      ? "AMRAP"
-                                      : exercise.exercise_type === "emom"
-                                      ? "EMOM"
-                                      : exercise.exercise_type === "superset"
-                                      ? "Superset"
-                                      : exercise.exercise_type === "drop_set"
-                                      ? "Drop Set"
-                                      : exercise.exercise_type === "giant_set"
-                                      ? "Giant Set"
-                                      : exercise.exercise_type === "cluster_set"
-                                      ? "Cluster Set"
-                                      : exercise.exercise_type === "rest_pause"
-                                      ? "Rest-Pause"
-                                      : exercise.exercise_type ===
-                                        "pre_exhaustion"
-                                      ? "Pre-Exhaustion"
-                                      : exercise.exercise_type === "for_time"
-                                      ? "For Time"
-                                      : exercise.exercise_type
-                                      ? `Unknown: ${exercise.exercise_type}`
-                                      : "Straight Set"}
-                                  </Badge>
-                                  <div
-                                    className={`ml-auto flex-shrink-0 transition-transform duration-200 ${
-                                      isExpanded ? "rotate-180" : ""
-                                    }`}
-                                  >
-                                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                                  </div>
-                                </div>
-                                <p
-                                  className={`text-sm ${theme.textSecondary} break-words`}
-                                >
-                                  {(() => {
-                                    console.log("🔍 Summary text check:", {
-                                      exercise_type: exercise.exercise_type,
-                                      isTabata:
-                                        exercise.exercise_type === "tabata",
-                                      rounds: exercise.rounds,
-                                      work_seconds: exercise.work_seconds,
-                                      work_seconds_type:
-                                        typeof exercise.work_seconds,
-                                      work_seconds_raw: exercise.work_seconds,
-                                      rest_after: exercise.rest_after,
-                                      tabata_sets: exercise.tabata_sets,
-                                      full_exercise: exercise,
-                                    });
-
-                                    if (exercise.exercise_type === "tabata") {
-                                      return (
-                                        <>
-                                          {exercise.rounds || 8} rounds •{" "}
-                                          {exercise.work_seconds || 20}s work
-                                          (actual: {exercise.work_seconds})
-                                          {exercise.rest_after &&
-                                            ` • ${exercise.rest_after}s rest after`}
-                                          {exercise.tabata_sets &&
-                                            ` • ${exercise.tabata_sets.length} sets`}
-                                        </>
-                                      );
-                                    } else if (
-                                      exercise.exercise_type === "circuit"
-                                    ) {
-                                      return (
-                                        <>
-                                          {exercise.sets} rounds •{" "}
-                                          {exercise.circuit_sets?.length || 0}{" "}
-                                          exercises
-                                          {exercise.rest_seconds &&
-                                            ` • ${exercise.rest_seconds}s rest`}
-                                        </>
-                                      );
-                                    } else if (
-                                      exercise.exercise_type === "amrap"
-                                    ) {
-                                      return (
-                                        <>
-                                          {exercise.amrap_duration} minutes • As
-                                          many rounds as possible
-                                        </>
-                                      );
-                                    } else if (
-                                      exercise.exercise_type === "emom"
-                                    ) {
-                                      return (
-                                        <>
-                                          {exercise.emom_duration} minutes •
-                                          Every minute on the minute
-                                          {exercise.emom_reps &&
-                                            ` • ${exercise.emom_reps} reps`}
-                                          {exercise.work_seconds &&
-                                            ` • ${exercise.work_seconds}s work`}
-                                        </>
-                                      );
-                                    } else if (
-                                      exercise.exercise_type === "cluster_set"
-                                    ) {
-                                      return (
-                                        <>
-                                          {exercise.sets} sets
-                                          {exercise.cluster_reps &&
-                                            ` • ${exercise.cluster_reps} reps per cluster`}
-                                          {exercise.clusters_per_set &&
-                                            ` • ${exercise.clusters_per_set} clusters per set`}
-                                          {exercise.rest_seconds &&
-                                            ` • ${exercise.rest_seconds}s rest`}
-                                        </>
-                                      );
-                                    } else if (
-                                      exercise.exercise_type === "for_time"
-                                    ) {
-                                      return (
-                                        <>
-                                          {exercise.target_reps &&
-                                            `Target: ${exercise.target_reps} reps`}
-                                          {exercise.time_cap &&
-                                            ` • Time cap: ${exercise.time_cap} min`}
-                                        </>
-                                      );
-                                    } else if (
-                                      exercise.exercise_type ===
-                                      "pre_exhaustion"
-                                    ) {
-                                      return (
-                                        <>
-                                          {exercise.isolation_reps &&
-                                            `Isolation: ${exercise.isolation_reps} reps`}
-                                          {exercise.compound_reps &&
-                                            ` • Compound: ${exercise.compound_reps} reps`}
-                                          {exercise.sets &&
-                                            ` • ${exercise.sets} sets`}
-                                          {exercise.rest_seconds &&
-                                            ` • Rest: ${exercise.rest_seconds}s`}
-                                        </>
-                                      );
-                                    } else if (
-                                      exercise.exercise_type === "rest_pause"
-                                    ) {
-                                      return (
-                                        <>
-                                          {exercise.sets &&
-                                            `${exercise.sets} sets`}
-                                          {exercise.rest_pause_duration &&
-                                            ` • RP: ${exercise.rest_pause_duration}s`}
-                                          {exercise.max_rest_pauses &&
-                                            ` • Max pauses: ${exercise.max_rest_pauses}`}
-                                          {exercise.rest_seconds &&
-                                            ` • Rest: ${exercise.rest_seconds}s`}
-                                        </>
-                                      );
-                                    } else if (
-                                      exercise.exercise_type === "giant_set"
-                                    ) {
-                                      return (
-                                        <>
-                                          {exercise.sets} sets •{" "}
-                                          {exercise.giant_set_exercises
-                                            ?.length || 0}{" "}
-                                          exercises
-                                          {exercise.rest_seconds &&
-                                            ` • ${exercise.rest_seconds}s rest`}
-                                        </>
-                                      );
-                                    } else {
-                                      return (
-                                        <>
-                                          {exercise.sets} sets ×{" "}
-                                          {exercise.reps || "N/A"} reps
-                                          {exercise.rest_seconds &&
-                                            ` • ${exercise.rest_seconds}s rest`}
-                                          {exercise.rir &&
-                                            ` • RIR: ${exercise.rir}`}
-                                          {exercise.tempo &&
-                                            ` • Tempo: ${exercise.tempo}`}
-                                        </>
-                                      );
-                                    }
-                                  })()}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Expanded Details */}
-                          {isExpanded && (
-                            <div className="px-4 pb-4 border-t border-slate-200 dark:border-slate-700">
-                              <div className="pt-4 space-y-4">
-                                {/* Exercise Description - Hide for complex exercise types */}
-                                {exercise.exercise?.description &&
-                                  !["tabata", "circuit", "giant_set"].includes(
-                                    exercise.exercise_type
-                                  ) && (
-                                    <div>
-                                      <h5
-                                        className={`text-sm font-medium ${theme.text} mb-2`}
-                                      >
-                                        Description
-                                      </h5>
-                                      <p
-                                        className={`text-sm ${theme.textSecondary}`}
-                                      >
-                                        {exercise.exercise.description}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                {/* Exercise Type Specific Details */}
-                                {exercise.exercise_type === "tabata" &&
-                                  exercise.tabata_sets && (
-                                    <div>
-                                      <h5
-                                        className={`text-sm font-medium ${theme.text} mb-2`}
-                                      >
-                                        Tabata Sets
-                                      </h5>
-                                      {(() => {
-                                        console.log("🔍 Tabata sets debug:", {
-                                          exercise_work_seconds:
-                                            exercise.work_seconds,
-                                          tabata_sets: exercise.tabata_sets,
-                                          first_set_exercises:
-                                            exercise.tabata_sets[0]?.exercises,
-                                        });
-                                        return null;
-                                      })()}
-                                      <div className="space-y-2">
-                                        {exercise.tabata_sets.map(
-                                          (set: any, setIndex: number) => (
-                                            <div
-                                              key={setIndex}
-                                              className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                            >
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <span
-                                                  className={`text-xs font-medium px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300`}
-                                                >
-                                                  Set {setIndex + 1}
-                                                </span>
-                                              </div>
-                                              <div className="space-y-1">
-                                                {set.exercises?.map(
-                                                  (
-                                                    tabataExercise: any,
-                                                    exIndex: number
-                                                  ) => {
-                                                    // Look up the exercise name from availableExercises
-                                                    const exerciseName =
-                                                      availableExercises.find(
-                                                        (ex) =>
-                                                          ex.id ===
-                                                          tabataExercise.exercise_id
-                                                      )?.name || "Exercise";
-                                                    return (
-                                                      <div
-                                                        key={exIndex}
-                                                        className={`text-sm ${theme.textSecondary}`}
-                                                      >
-                                                        • {exerciseName} -{" "}
-                                                        {tabataExercise.work_seconds ||
-                                                          exercise.work_seconds ||
-                                                          20}
-                                                        s work
-                                                      </div>
-                                                    );
-                                                  }
-                                                )}
-                                              </div>
-                                            </div>
-                                          )
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                {/* Circuit Sets */}
-                                {exercise.exercise_type === "circuit" &&
-                                  exercise.circuit_sets && (
-                                    <div>
-                                      <h5
-                                        className={`text-sm font-medium ${theme.text} mb-2`}
-                                      >
-                                        Circuit Exercises
-                                      </h5>
-                                      {(() => {
-                                        console.log("🔍 Circuit sets debug:", {
-                                          exercise_circuit_sets:
-                                            exercise.circuit_sets,
-                                          first_circuit_exercise:
-                                            exercise.circuit_sets[0],
-                                          exercise_work_seconds:
-                                            exercise.work_seconds,
-                                          exercise_rest_seconds:
-                                            exercise.rest_seconds,
-                                          exercise_rounds: exercise.rounds,
-                                          circuit_sets_length:
-                                            exercise.circuit_sets?.length,
-                                          first_set_exercises:
-                                            exercise.circuit_sets[0]?.exercises,
-                                          first_set_rest:
-                                            exercise.circuit_sets[0]
-                                              ?.rest_between_sets,
-                                        });
-                                        return null;
-                                      })()}
-                                      <div className="space-y-2">
-                                        {exercise.circuit_sets.map(
-                                          (set: any, setIndex: number) => (
-                                            <div
-                                              key={setIndex}
-                                              className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                            >
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <span
-                                                  className={`text-xs font-medium px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300`}
-                                                >
-                                                  Set {setIndex + 1}
-                                                </span>
-                                                {set.rest_between_sets && (
-                                                  <span
-                                                    className={`text-xs ${theme.textSecondary}`}
-                                                  >
-                                                    Rest:{" "}
-                                                    {set.rest_between_sets}s
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <div className="space-y-1">
-                                                {set.exercises?.map(
-                                                  (
-                                                    circuitExercise: any,
-                                                    exIndex: number
-                                                  ) => {
-                                                    // Look up the exercise name from availableExercises
-                                                    const exerciseName =
-                                                      availableExercises.find(
-                                                        (ex) =>
-                                                          ex.id ===
-                                                          circuitExercise.exercise_id
-                                                      )?.name || "Exercise";
-                                                    return (
-                                                      <div
-                                                        key={exIndex}
-                                                        className={`text-sm ${theme.textSecondary}`}
-                                                      >
-                                                        • {exerciseName} -{" "}
-                                                        {circuitExercise.work_seconds ||
-                                                          exercise.work_seconds ||
-                                                          "N/A"}
-                                                        s work
-                                                        {circuitExercise.rest_after &&
-                                                          ` • ${circuitExercise.rest_after}s rest after`}
-                                                        {!circuitExercise.rest_after &&
-                                                          exercise.rest_after &&
-                                                          ` • ${exercise.rest_after}s rest after`}
-                                                      </div>
-                                                    );
-                                                  }
-                                                )}
-                                              </div>
-                                            </div>
-                                          )
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                {/* Giant Set Exercises */}
-                                {exercise.exercise_type === "giant_set" &&
-                                  exercise.giant_set_exercises && (
-                                    <div>
-                                      <h5
-                                        className={`text-sm font-medium ${theme.text} mb-2`}
-                                      >
-                                        Giant Set Exercises
-                                      </h5>
-                                      <div className="space-y-2">
-                                        {exercise.giant_set_exercises.map(
-                                          (
-                                            giantExercise: any,
-                                            exIndex: number
-                                          ) => {
-                                            // Look up the exercise name from availableExercises
-                                            const exerciseName =
-                                              availableExercises.find(
-                                                (ex) =>
-                                                  ex.id ===
-                                                  giantExercise.exercise_id
-                                              )?.name || "Exercise";
-                                            return (
-                                              <div
-                                                key={exIndex}
-                                                className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                              >
-                                                <div className="flex items-center gap-2 mb-2">
-                                                  <span
-                                                    className={`text-xs font-medium px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300`}
-                                                  >
-                                                    Exercise {exIndex + 1}
-                                                  </span>
-                                                </div>
-                                                <div
-                                                  className={`text-sm ${theme.textSecondary}`}
-                                                >
-                                                  • {exerciseName}
-                                                  {giantExercise.sets &&
-                                                    ` • ${giantExercise.sets} sets`}
-                                                  {giantExercise.reps &&
-                                                    ` • ${giantExercise.reps} reps`}
-                                                  {giantExercise.rest_seconds &&
-                                                    ` • ${giantExercise.rest_seconds}s rest`}
-                                                </div>
-                                              </div>
-                                            );
-                                          }
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                {/* Superset Details */}
-                                {exercise.exercise_type === "superset" &&
-                                  exercise.superset_exercise_id && (
-                                    <div>
-                                      <h5
-                                        className={`text-sm font-medium ${theme.text} mb-2`}
-                                      >
-                                        Superset Exercises
-                                      </h5>
-                                      <div className="space-y-2">
-                                        <div
-                                          className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                        >
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <span
-                                              className={`text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300`}
-                                            >
-                                              Exercise 1
-                                            </span>
-                                          </div>
-                                          <div
-                                            className={`text-sm ${theme.textSecondary}`}
-                                          >
-                                            •{" "}
-                                            {exercise.exercise?.name ||
-                                              "Main Exercise"}
-                                            {exercise.sets &&
-                                              ` • ${exercise.sets} sets`}
-                                            {exercise.reps &&
-                                              ` • ${exercise.reps} reps`}
-                                          </div>
-                                        </div>
-                                        <div
-                                          className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                        >
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <span
-                                              className={`text-xs font-medium px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300`}
-                                            >
-                                              Exercise 2
-                                            </span>
-                                          </div>
-                                          <div
-                                            className={`text-sm ${theme.textSecondary}`}
-                                          >
-                                            •{" "}
-                                            {availableExercises.find(
-                                              (ex) =>
-                                                ex.id ===
-                                                exercise.superset_exercise_id
-                                            )?.name || "Second Exercise"}
-                                            {exercise.sets &&
-                                              ` • ${exercise.sets} sets`}
-                                            {exercise.superset_reps &&
-                                              ` • ${exercise.superset_reps} reps`}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                {/* AMRAP Details */}
-                                {exercise.exercise_type === "amrap" && (
-                                  <div>
-                                    <h5
-                                      className={`text-sm font-medium ${theme.text} mb-2`}
-                                    >
-                                      AMRAP Details
-                                    </h5>
-                                    <div
-                                      className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                    >
-                                      <div
-                                        className={`text-sm ${theme.textSecondary}`}
-                                      >
-                                        •{" "}
-                                        {exercise.exercise?.name || "Exercise"}
-                                        {exercise.amrap_duration &&
-                                          ` • ${exercise.amrap_duration} minutes`}
-                                        {exercise.sets &&
-                                          ` • ${exercise.sets} rounds`}
-                                        {exercise.reps &&
-                                          ` • ${exercise.reps} reps per round`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* EMOM Details */}
-                                {exercise.exercise_type === "emom" && (
-                                  <div>
-                                    <h5
-                                      className={`text-sm font-medium ${theme.text} mb-2`}
-                                    >
-                                      EMOM Details
-                                    </h5>
-                                    <div
-                                      className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                    >
-                                      <div
-                                        className={`text-sm ${theme.textSecondary}`}
-                                      >
-                                        •{" "}
-                                        {exercise.exercise?.name || "Exercise"}
-                                        {exercise.emom_duration &&
-                                          ` • ${exercise.emom_duration} minutes`}
-                                        {exercise.emom_reps &&
-                                          ` • ${exercise.emom_reps} reps per minute`}
-                                        {exercise.work_seconds &&
-                                          ` • ${exercise.work_seconds}s work`}
-                                        {exercise.emom_mode &&
-                                          ` • Mode: ${exercise.emom_mode}`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Drop Set Details */}
-                                {exercise.exercise_type === "drop_set" && (
-                                  <div>
-                                    <h5
-                                      className={`text-sm font-medium ${theme.text} mb-2`}
-                                    >
-                                      Drop Set Details
-                                    </h5>
-                                    <div
-                                      className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                    >
-                                      <div
-                                        className={`text-sm ${theme.textSecondary}`}
-                                      >
-                                        •{" "}
-                                        {exercise.exercise?.name || "Exercise"}
-                                        {exercise.sets &&
-                                          ` • ${exercise.sets} sets`}
-                                        {exercise.reps &&
-                                          ` • ${exercise.reps} reps`}
-                                        {exercise.initial_weight &&
-                                          ` • Start: ${exercise.initial_weight}kg`}
-                                        {exercise.drop_percentage &&
-                                          ` • Drop: ${exercise.drop_percentage}%`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Cluster Set Details */}
-                                {exercise.exercise_type === "cluster_set" && (
-                                  <div>
-                                    <h5
-                                      className={`text-sm font-medium ${theme.text} mb-2`}
-                                    >
-                                      Cluster Set Details
-                                    </h5>
-                                    <div
-                                      className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                    >
-                                      <div
-                                        className={`text-sm ${theme.textSecondary}`}
-                                      >
-                                        •{" "}
-                                        {exercise.exercise?.name || "Exercise"}
-                                        {exercise.sets &&
-                                          ` • ${exercise.sets} sets`}
-                                        {exercise.cluster_reps &&
-                                          ` • ${exercise.cluster_reps} reps per cluster`}
-                                        {exercise.clusters_per_set &&
-                                          ` • ${exercise.clusters_per_set} clusters per set`}
-                                        {exercise.intra_cluster_rest &&
-                                          ` • ${exercise.intra_cluster_rest}s rest between clusters`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Rest-Pause Details */}
-                                {exercise.exercise_type === "rest_pause" && (
-                                  <div>
-                                    <h5
-                                      className={`text-sm font-medium ${theme.text} mb-2`}
-                                    >
-                                      Rest-Pause Details
-                                    </h5>
-                                    <div
-                                      className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                    >
-                                      <div
-                                        className={`text-sm ${theme.textSecondary}`}
-                                      >
-                                        •{" "}
-                                        {exercise.exercise?.name || "Exercise"}
-                                        {exercise.sets &&
-                                          ` • ${exercise.sets} sets`}
-                                        {exercise.reps &&
-                                          ` • ${exercise.reps} reps`}
-                                        {exercise.rest_pause_duration &&
-                                          ` • ${exercise.rest_pause_duration}s rest-pause`}
-                                        {exercise.max_rest_pauses &&
-                                          ` • Max ${exercise.max_rest_pauses} rest-pauses`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Pre-Exhaustion Details */}
-                                {exercise.exercise_type === "pre_exhaustion" &&
-                                  exercise.compound_exercise_id && (
-                                    <div>
-                                      <h5
-                                        className={`text-sm font-medium ${theme.text} mb-2`}
-                                      >
-                                        Pre-Exhaustion Details
-                                      </h5>
-                                      <div className="space-y-2">
-                                        <div
-                                          className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                        >
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <span
-                                              className={`text-xs font-medium px-2 py-1 rounded-full bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300`}
-                                            >
-                                              Pre-Exhaustion
-                                            </span>
-                                          </div>
-                                          <div
-                                            className={`text-sm ${theme.textSecondary}`}
-                                          >
-                                            •{" "}
-                                            {exercise.exercise?.name ||
-                                              "Pre-Exhaustion Exercise"}
-                                            {exercise.sets &&
-                                              ` • ${exercise.sets} sets`}
-                                            {exercise.isolation_reps &&
-                                              ` • Isolation reps: ${exercise.isolation_reps}`}
-                                          </div>
-                                        </div>
-                                        <div
-                                          className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                        >
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <span
-                                              className={`text-xs font-medium px-2 py-1 rounded-full bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300`}
-                                            >
-                                              Compound
-                                            </span>
-                                          </div>
-                                          <div
-                                            className={`text-sm ${theme.textSecondary}`}
-                                          >
-                                            •{" "}
-                                            {availableExercises.find(
-                                              (ex) =>
-                                                ex.id ===
-                                                exercise.compound_exercise_id
-                                            )?.name || "Compound Exercise"}
-                                            {exercise.sets &&
-                                              ` • ${exercise.sets} sets`}
-                                            {exercise.compound_reps &&
-                                              ` • Compound reps: ${exercise.compound_reps}`}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                {/* For Time Details */}
-                                {exercise.exercise_type === "for_time" && (
-                                  <div>
-                                    <h5
-                                      className={`text-sm font-medium ${theme.text} mb-2`}
-                                    >
-                                      For Time Details
-                                    </h5>
-                                    <div
-                                      className={`p-3 rounded-lg ${theme.card} border ${theme.border}`}
-                                    >
-                                      <div
-                                        className={`text-sm ${theme.textSecondary}`}
-                                      >
-                                        •{" "}
-                                        {exercise.exercise?.name || "Exercise"}
-                                        {exercise.sets &&
-                                          ` • ${exercise.sets} sets`}
-                                        {exercise.reps &&
-                                          ` • ${exercise.reps} reps`}
-                                        {exercise.time_cap &&
-                                          ` • Time cap: ${exercise.time_cap} minutes`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Notes */}
-                                {exercise.notes && (
-                                  <div>
-                                    <h5
-                                      className={`text-sm font-medium ${theme.text} mb-2`}
-                                    >
-                                      Notes
-                                    </h5>
-                                    <p
-                                      className={`text-sm ${theme.textSecondary}`}
-                                    >
-                                      {exercise.notes}
-                                    </p>
-                                  </div>
-                                )}
-
-                                {/* Additional Parameters */}
-                                <div>
-                                  <h5
-                                    className={`text-sm font-medium ${theme.text} mb-2`}
-                                  >
-                                    Parameters
-                                  </h5>
-                                  <div className="grid grid-cols-2 gap-2 text-sm">
-                                    {exercise.exercise_type === "tabata" ? (
-                                      <>
-                                        {exercise.rounds && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Rounds: {exercise.rounds}
-                                          </div>
-                                        )}
-                                        {exercise.work_seconds && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Work: {exercise.work_seconds}s
-                                          </div>
-                                        )}
-                                        {exercise.rest_after && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Rest After: {exercise.rest_after}s
-                                          </div>
-                                        )}
-                                        {exercise.tabata_sets && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Sets: {exercise.tabata_sets.length}
-                                          </div>
-                                        )}
-                                      </>
-                                    ) : exercise.exercise_type === "circuit" ? (
-                                      <>
-                                        {exercise.sets && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Rounds: {exercise.sets}
-                                          </div>
-                                        )}
-                                        {exercise.circuit_sets && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Exercises:{" "}
-                                            {exercise.circuit_sets.length}
-                                          </div>
-                                        )}
-                                        {exercise.rest_seconds && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Rest: {exercise.rest_seconds}s
-                                          </div>
-                                        )}
-                                      </>
-                                    ) : exercise.exercise_type === "amrap" ? (
-                                      <>
-                                        {exercise.amrap_duration && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Duration: {exercise.amrap_duration}
-                                            min
-                                          </div>
-                                        )}
-                                      </>
-                                    ) : exercise.exercise_type === "emom" ? (
-                                      <>
-                                        {exercise.emom_duration && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Duration: {exercise.emom_duration}
-                                            min
-                                          </div>
-                                        )}
-                                        {exercise.emom_reps && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Reps: {exercise.emom_reps}
-                                          </div>
-                                        )}
-                                        {exercise.work_seconds && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Work Time: {exercise.work_seconds}s
-                                          </div>
-                                        )}
-                                        {exercise.emom_mode && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Mode: {exercise.emom_mode}
-                                          </div>
-                                        )}
-                                      </>
-                                    ) : exercise.exercise_type ===
-                                      "giant_set" ? (
-                                      <>
-                                        {exercise.sets && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Sets: {exercise.sets}
-                                          </div>
-                                        )}
-                                        {exercise.giant_set_exercises && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Exercises:{" "}
-                                            {
-                                              exercise.giant_set_exercises
-                                                .length
-                                            }
-                                          </div>
-                                        )}
-                                        {exercise.rest_seconds && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Rest: {exercise.rest_seconds}s
-                                          </div>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <>
-                                        {exercise.sets && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Sets: {exercise.sets}
-                                          </div>
-                                        )}
-                                        {exercise.reps && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Reps: {exercise.reps}
-                                          </div>
-                                        )}
-                                        {exercise.rest_seconds && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Rest: {exercise.rest_seconds}s
-                                          </div>
-                                        )}
-                                        {exercise.rir && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            RIR: {exercise.rir}
-                                          </div>
-                                        )}
-                                        {exercise.tempo && (
-                                          <div
-                                            className={`${theme.textSecondary}`}
-                                          >
-                                            Tempo: {exercise.tempo}
-                                          </div>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                        <ExerciseBlockCard
+                          key={uniqueKey}
+                          exercise={exercise}
+                          index={index}
+                          availableExercises={availableExercisesList}
+                          renderMode="details"
+                        />
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <Dumbbell className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                    <p className={`text-slate-500 ${theme.textSecondary}`}>
-                      No exercises added to this template
+                  <div
+                    className={`p-6 text-center rounded-xl border-2 border-dashed ${theme.border} ${theme.textSecondary}`}
+                  >
+                    <Dumbbell className="mx-auto w-12 h-12 mb-3 text-gray-400" />
+                    <h4 className="font-semibold text-lg">No Exercises</h4>
+                    <p className="text-sm">
+                      This workout template doesn't have any exercises yet.
                     </p>
                   </div>
                 )}
@@ -1367,27 +531,26 @@ export default function WorkoutTemplateDetails({
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Footer */}
         <div
-          className={`flex-shrink-0 ${theme.card} border-t ${theme.border} px-6 py-4 rounded-b-3xl sticky bottom-0`}
+          className={`sticky bottom-0 ${theme.card} border-t ${theme.border} px-3 sm:px-6 py-4 rounded-b-3xl flex items-center justify-end gap-3`}
         >
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={onClose} className="rounded-xl">
-              Close
-            </Button>
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            className={`${theme.textSecondary} hover:${theme.text}`}
+          >
+            Close
+          </Button>
+          {onEdit && (
             <Button
-              className={`${theme.primary} rounded-xl`}
-              onClick={() => {
-                onClose();
-                if (onEdit) {
-                  onEdit(template);
-                }
-              }}
+              onClick={() => onEdit(template)}
+              className={`${theme.primary} ${theme.shadow} rounded-xl px-6 hover:scale-105 transition-all duration-200`}
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit Template
             </Button>
-          </div>
+          )}
         </div>
       </div>
     </div>

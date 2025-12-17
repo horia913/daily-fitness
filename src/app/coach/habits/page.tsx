@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,7 +61,7 @@ import { supabase } from '@/lib/supabase'
 
 export default function CoachHabitsManagement() {
   const { user } = useAuth()
-  const { getThemeStyles } = useTheme()
+  const { getThemeStyles, performanceSettings } = useTheme()
   const theme = getThemeStyles()
 
   // State management
@@ -776,7 +778,9 @@ export default function CoachHabitsManagement() {
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className={`min-h-screen ${theme.background}`}>
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
         <div className="relative p-6">
           <div className="max-w-7xl mx-auto space-y-8">
             {/* Enhanced Header */}
@@ -2255,7 +2259,7 @@ export default function CoachHabitsManagement() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

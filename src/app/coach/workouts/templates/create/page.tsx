@@ -1,15 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import WorkoutTemplateForm from "@/components/WorkoutTemplateForm";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function CreateWorkoutTemplatePage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [isOpen, setIsOpen] = useState(true);
+  const { performanceSettings } = useTheme();
 
   const handleClose = () => {
     router.push("/coach/workouts/templates");
@@ -29,17 +32,20 @@ export default function CreateWorkoutTemplatePage() {
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-2 sm:p-4">
-        <div className="max-w-7xl mx-auto">
-          <WorkoutTemplateForm
-            isOpen={isOpen}
-            onClose={handleClose}
-            onSuccess={handleSuccess}
-            template={undefined}
-            renderMode="page"
-          />
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="relative z-10 min-h-screen p-2 sm:p-4">
+          <div className="max-w-7xl mx-auto">
+            <WorkoutTemplateForm
+              isOpen={true}
+              onClose={handleClose}
+              onSuccess={handleSuccess}
+              template={undefined}
+              renderMode="page"
+            />
+          </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

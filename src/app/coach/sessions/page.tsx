@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -58,7 +60,7 @@ interface Client {
 }
 
 export default function CoachSessions() {
-  const { getThemeStyles } = useTheme()
+  const { getThemeStyles, performanceSettings } = useTheme()
   const theme = getThemeStyles()
   
   const [sessions, setSessions] = useState<Session[]>([])
@@ -320,7 +322,9 @@ export default function CoachSessions() {
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div style={{ backgroundColor: '#E8E9F3', minHeight: '100vh', paddingBottom: '100px' }}>
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div style={{ minHeight: '100vh', paddingBottom: '100px' }}>
         <div style={{ padding: '24px 20px' }}>
           <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
             {/* Header */}
@@ -731,7 +735,7 @@ export default function CoachSessions() {
             </Dialog>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

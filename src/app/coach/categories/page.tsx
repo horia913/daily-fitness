@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Input } from '@/components/ui/input'
 import { 
@@ -52,7 +54,7 @@ const categoryColors = [
 ]
 
 export default function WorkoutCategories() {
-  const { isDark } = useTheme()
+  const { isDark, performanceSettings } = useTheme()
   
   const [categories, setCategories] = useState<WorkoutCategory[]>([])
   const [loading, setLoading] = useState(true)
@@ -205,14 +207,16 @@ export default function WorkoutCategories() {
               </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     )
   }
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div style={{ 
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div style={{ 
         backgroundColor: isDark ? '#0A0A0A' : '#E8E9F3',
         backgroundImage: isDark 
           ? 'linear-gradient(to bottom right, #0A0A0A, #1A1A1A)' 
@@ -591,7 +595,7 @@ export default function WorkoutCategories() {
             />
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

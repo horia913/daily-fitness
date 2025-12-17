@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +33,7 @@ import MobilityFormFields from "@/components/progress/MobilityFormFields";
 
 export default function MobilityMetricsPage() {
   const { user, loading: authLoading } = useAuth();
-  const { getThemeStyles } = useTheme();
+  const { getThemeStyles, performanceSettings } = useTheme();
   const theme = getThemeStyles();
 
   const [loading, setLoading] = useState(true);
@@ -144,7 +146,9 @@ export default function MobilityMetricsPage() {
 
   return (
     <ProtectedRoute>
-      <div className={`min-h-screen ${theme.background}`}>
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
         <div className="max-w-7xl mx-auto p-4 sm:p-6">
           {/* Header */}
           <div className="flex items-center gap-4 mb-6">
@@ -483,7 +487,7 @@ export default function MobilityMetricsPage() {
             </form>
           </ResponsiveModal>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

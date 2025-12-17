@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Card,
   CardContent,
@@ -18,6 +21,7 @@ import {
   ArrowLeft,
   Play,
   Check,
+  CheckCircle,
   Target,
   Youtube,
   X,
@@ -40,31 +44,25 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast-provider";
-import { useTheme } from "@/contexts/ThemeContext";
 import LiveWorkoutBlockExecutor from "@/components/client/LiveWorkoutBlockExecutor";
 import {
   WorkoutBlock,
   LiveWorkoutBlock,
   LoggedSet,
 } from "@/types/workoutBlocks";
-import { WorkoutBlockService } from "@/lib/workoutBlockService";
-
+import {
+  fetchE1RMs,
+  calculateSuggestedWeight,
+  formatSuggestedWeight,
+} from "@/lib/e1rmUtils";
 interface WorkoutAssignment {
   id: string;
-  workout_template_id: string;
+  workout_template_id: string | null;
   status: string;
-  notes?: string;
-  template?: {
-    id: string;
-    name: string;
-    description: string;
-    estimated_duration: number;
-    difficulty_level: string;
-    category?: {
-      name: string;
-      color: string;
-    };
-  };
+  notes?: string | null;
+  name?: string | null;
+  description?: string | null;
+  scheduled_date?: string | null;
 }
 
 interface TemplateExercise {
@@ -88,14 +86,50 @@ interface TemplateExercise {
   };
   completed_sets?: number;
   current_set?: number;
+  [key: string]: any;
 }
+
+type ClientBlockExerciseRecord = {
+  id: string;
+  exercise_id: string | null;
+  exercise_order: number | null;
+  exercise_letter: string | null;
+  sets: number | null;
+  reps: string | null;
+  weight_kg: number | null;
+  rir: number | null;
+  tempo: string | null;
+  rest_seconds: number | null;
+  notes: string | null;
+};
+
+type ClientBlockRecord = {
+  id: string;
+  block_order: number | null;
+  block_type: string | null;
+  block_name: string | null;
+  block_notes: string | null;
+  total_sets: number | null;
+  reps_per_set: string | null;
+  rest_seconds: number | null;
+  duration_seconds?: number | null;
+  block_parameters?: unknown;
+  exercises?: ClientBlockExerciseRecord[] | null;
+};
 
 export default function LiveWorkout() {
   const params = useParams();
   const router = useRouter();
   const assignmentId = params.id as string;
+  console.log("📍 Page: assignmentId from params:", assignmentId);
   const { addToast } = useToast();
-  const { isDark, getThemeStyles } = useTheme();
+  
+  // Debug: Log assignmentId from URL
+  useEffect(() => {
+    console.log("🔍 [Page] assignmentId from URL params:", params.id);
+    console.log("🔍 [Page] assignmentId variable:", assignmentId);
+  }, [assignmentId, params.id]);
+  const { isDark, getThemeStyles, performanceSettings } = useTheme();
 
   const [assignment, setAssignment] = useState<WorkoutAssignment | null>(null);
   const [exercises, setExercises] = useState<TemplateExercise[]>([]);
@@ -137,6 +171,7 @@ export default function LiveWorkout() {
 
   // Workout Completion State
   const [showWorkoutCompletion, setShowWorkoutCompletion] = useState(false);
+  const [isLastBlockComplete, setIsLastBlockComplete] = useState(false);
   const [workoutStats, setWorkoutStats] = useState({
     totalTime: 0,
     exercisesCompleted: 0,
@@ -145,12 +180,51 @@ export default function LiveWorkout() {
     totalWeightLifted: 0,
     weightComparison: "",
   });
-  const [workoutStartTime, setWorkoutStartTime] = useState(Date.now());
+  const [workoutStartTime, setWorkoutStartTime] = useState(() => {
+    const time = Date.now();
+    console.log("🕐 [Duration Debug] workoutStartTime initialized:", {
+      timestamp: time,
+      date: new Date(time).toISOString(),
+      isMilliseconds: true,
+    });
+    return time;
+  });
   const [totalWeightLifted, setTotalWeightLifted] = useState(0);
+  // Ref to prevent multiple timeout calls for block advancement
+  const blockAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Exercise details lookup for nested items (giant set, etc.)
   const [exerciseLookup, setExerciseLookup] = useState<
     Record<string, { name: string; video_url?: string }>
   >({});
+
+  // e1RM state for suggested weight calculations
+  const [e1rmMap, setE1rmMap] = useState<Record<string, number>>({});
+
+  // Helper function to get suggested weight display text
+  const getSuggestedWeightText = (
+    exerciseId: string,
+    loadPercentage: number | null | undefined
+  ): string | null => {
+    if (!loadPercentage || loadPercentage <= 0) {
+      return null;
+    }
+
+    const e1rm = e1rmMap[exerciseId];
+    if (!e1rm || e1rm <= 0) {
+      return `${loadPercentage}% Load - Suggested: Log first set to calculate`;
+    }
+
+    const suggested = calculateSuggestedWeight(
+      exerciseId,
+      loadPercentage,
+      e1rmMap
+    );
+    if (suggested !== null && suggested > 0) {
+      return `${loadPercentage}% Load - Suggested: ${suggested}kg`;
+    }
+
+    return `${loadPercentage}% Load - Suggested: Log first set to calculate`;
+  };
 
   // Barbell options
   const barbellOptions = [
@@ -256,11 +330,68 @@ export default function LiveWorkout() {
 
   // Workout Block Handlers
   const handleBlockComplete = (blockId: string, loggedSets: LoggedSet[]) => {
-    setWorkoutBlocks((prev) =>
-      prev.map((block) =>
+    console.log("🎯 handleBlockComplete called:", {
+      blockId,
+      currentBlockIndex,
+      totalBlocks: workoutBlocks.length,
+      isLastBlock: currentBlockIndex >= workoutBlocks.length - 1,
+    });
+
+    // Update block completion status
+    setWorkoutBlocks((prev) => {
+      const updated = prev.map((block) =>
         block.block.id === blockId ? { ...block, isCompleted: true } : block
-      )
-    );
+      );
+      
+      // Check if all blocks are now completed
+      const allCompleted = updated.every((block) => block.isCompleted);
+      const completedCount = updated.filter((block) => block.isCompleted).length;
+      
+      // Check if this is the last block
+      const isLastBlock = currentBlockIndex >= workoutBlocks.length - 1;
+      if (isLastBlock) {
+        console.log("🏁 Last block completed - setting isLastBlockComplete flag");
+        setIsLastBlockComplete(true);
+      }
+      
+      console.log("📊 Block completion status:", {
+        totalBlocks: updated.length,
+        completedCount,
+        allCompleted,
+        currentBlockIndex,
+        isLastBlock,
+      });
+
+      return updated;
+    });
+
+    // AUTO-ADVANCE: Move to next block or show completion
+    // Clear any existing timeout to prevent multiple calls
+    if (blockAdvanceTimeoutRef.current) {
+      clearTimeout(blockAdvanceTimeoutRef.current);
+    }
+    
+    // Move setTimeout OUTSIDE of setWorkoutBlocks to prevent multiple timeouts
+    // Capture current values to avoid stale closures
+    const currentIdx = currentBlockIndex;
+    const totalBlocks = workoutBlocks.length;
+    
+    blockAdvanceTimeoutRef.current = setTimeout(() => {
+      // Use functional update to get latest state
+      setCurrentBlockIndex((latestIdx) => {
+        const isLastBlock = latestIdx >= totalBlocks - 1;
+        if (!isLastBlock) {
+          console.log("➡️ Moving to next block:", latestIdx + 1, "of", totalBlocks);
+          return latestIdx + 1;
+        } else {
+          // All blocks complete - don't auto-show completion modal
+          // User will click "Complete Workout" button instead
+          console.log("🏁 All blocks complete! Waiting for user to click 'Complete Workout' button");
+          return latestIdx;
+        }
+      });
+      blockAdvanceTimeoutRef.current = null;
+    }, 1500); // Small delay for UX
   };
 
   const handleNextBlock = () => {
@@ -272,6 +403,52 @@ export default function LiveWorkout() {
     }
   };
 
+  // Handle block change
+  const handleBlockChange = (blockIndex: number) => {
+    setCurrentBlockIndex(blockIndex);
+    // Reset exercise index to 0 when changing blocks
+    setWorkoutBlocks((prev) =>
+      prev.map((block, idx) =>
+        idx === blockIndex ? { ...block, currentExerciseIndex: 0 } : block
+      )
+    );
+  };
+
+  // Handle set logged - update completedSets in workout blocks state
+  const handleSetLogged = (blockId: string, newCompletedSets: number) => {
+    setWorkoutBlocks((prev) =>
+      prev.map((block) =>
+        block.block.id === blockId
+          ? { ...block, completedSets: newCompletedSets }
+          : block
+      )
+    );
+  };
+
+  // Handle exercise complete - advance to next exercise within a block
+  const handleExerciseComplete = (blockId: string) => {
+    setWorkoutBlocks((prev) =>
+      prev.map((block) => {
+        if (block.block.id !== blockId) return block;
+
+        const currentExIndex = block.currentExerciseIndex || 0;
+        const exercises = block.block.exercises || [];
+
+        if (currentExIndex < exercises.length - 1) {
+          // Advance to next exercise, reset sets
+          return {
+            ...block,
+            currentExerciseIndex: currentExIndex + 1,
+            completedSets: 0,
+          };
+        } else {
+          // All exercises done, mark block complete
+          return { ...block, isCompleted: true };
+        }
+      })
+    );
+  };
+
   useEffect(() => {
     if (assignmentId) {
       loadAssignment().catch((error) => {
@@ -279,6 +456,141 @@ export default function LiveWorkout() {
       });
     }
   }, [assignmentId]);
+
+  // Log when completion modal state changes and calculate stats from database
+  useEffect(() => {
+    if (showWorkoutCompletion) {
+      console.log("🎉 Workout completion modal is now showing");
+      console.log("📊 Workout stats (before calculation):", workoutStats);
+      
+      // Calculate stats from logged sets in database
+      calculateWorkoutStatsFromDatabase();
+    }
+  }, [showWorkoutCompletion]);
+
+  // Calculate workout stats from workout_set_logs in database
+  const calculateWorkoutStatsFromDatabase = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || !assignmentId) return;
+
+      console.log("📊 Calculating workout stats from database for assignment:", assignmentId);
+
+      // ✅ CRITICAL: Get only the ACTIVE workout_log (matches log-set API logic)
+      // Since API reuses the same log, all sets should be in the active log
+      const { data: activeWorkoutLog, error: logsError } = await supabase
+        .from("workout_logs")
+        .select("id, started_at, completed_at")
+        .eq("workout_assignment_id", assignmentId)
+        .eq("client_id", user.id)
+        .is("completed_at", null) // CRITICAL: Only active logs (matches log-set API)
+        .order("started_at", { ascending: false }) // Most recent first
+        .limit(1)
+        .maybeSingle();
+
+      if (logsError) {
+        console.error("❌ Error finding workout log:", logsError);
+        return;
+      }
+
+      if (!activeWorkoutLog) {
+        console.warn("⚠️ No active workout log found for assignment");
+        // Fallback to workoutStartTime if available
+        const totalTime = workoutStartTime
+          ? Math.floor((Date.now() - workoutStartTime) / 1000 / 60)
+          : 0;
+        setWorkoutStats({
+          totalTime,
+          exercisesCompleted: 0,
+          totalSets: 0,
+          personalBests: 0,
+          totalWeightLifted: 0,
+          weightComparison: "0 kg",
+        });
+        return;
+      }
+
+      const workoutLogId = activeWorkoutLog.id;
+      const startTime = activeWorkoutLog.started_at;
+      
+      console.log("📊 Found active workout_log:", {
+        id: workoutLogId,
+        started_at: startTime,
+        completed_at: activeWorkoutLog.completed_at,
+      });
+
+      // Get ALL workout_set_logs for the active workout_log
+      const { data: setLogs, error: setsError } = await supabase
+        .from("workout_set_logs")
+        .select("weight, reps, exercise_id")
+        .eq("workout_log_id", workoutLogId)
+        .eq("client_id", user.id);
+
+      if (setsError) {
+        console.error("❌ Error fetching set logs:", setsError);
+        return;
+      }
+
+      console.log("📊 Found set logs:", {
+        count: setLogs?.length || 0,
+        workout_log_id: workoutLogId,
+      });
+
+      // Calculate totals from ALL sets
+      const totalSets = setLogs?.length || 0;
+      const totalReps = setLogs?.reduce((sum, set) => sum + (set.reps || 0), 0) || 0;
+      const totalWeightLifted = setLogs?.reduce(
+        (sum, set) => sum + ((set.weight || 0) * (set.reps || 0)),
+        0
+      ) || 0;
+      const uniqueExercises = new Set(setLogs?.map((set) => set.exercise_id).filter(Boolean) || []).size;
+      
+      // Calculate duration from start time to now
+      const now = Date.now();
+      const startTimeMs = startTime ? new Date(startTime).getTime() : null;
+      const workoutStartTimeMs = workoutStartTime || null;
+      
+      let totalTime = 0;
+      if (startTimeMs) {
+        const durationMs = now - startTimeMs;
+        totalTime = Math.floor(durationMs / 1000 / 60);
+        console.log("🕐 [Duration Debug] Calculated from database started_at:", {
+          started_at: startTime,
+          started_at_ms: startTimeMs,
+          now_ms: now,
+          duration_ms: durationMs,
+          duration_seconds: Math.floor(durationMs / 1000),
+          duration_minutes: totalTime,
+        });
+      } else if (workoutStartTimeMs) {
+        const durationMs = now - workoutStartTimeMs;
+        totalTime = Math.floor(durationMs / 1000 / 60);
+        console.log("🕐 [Duration Debug] Calculated from workoutStartTime:", {
+          workoutStartTime_ms: workoutStartTimeMs,
+          now_ms: now,
+          duration_ms: durationMs,
+          duration_seconds: Math.floor(durationMs / 1000),
+          duration_minutes: totalTime,
+        });
+      }
+
+      const calculatedStats = {
+        totalTime,
+        exercisesCompleted: uniqueExercises,
+        totalSets,
+        personalBests: 0, // TODO: Calculate from e1RM changes
+        totalWeightLifted,
+        weightComparison: `${totalWeightLifted.toLocaleString()} kg`,
+      };
+
+      console.log("✅ Calculated workout stats:", calculatedStats);
+      setWorkoutStats(calculatedStats);
+    } catch (error) {
+      console.error("❌ Error calculating workout stats:", error);
+    }
+  };
 
   // Auto-start workout when assignment and exercises are loaded
   useEffect(() => {
@@ -300,260 +612,392 @@ export default function LiveWorkout() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      console.log("🔍 Workout Execution - User ID:", user.id);
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from("workout_assignments")
+        .select("*")
+        .eq("id", assignmentId)
+        .eq("client_id", user.id)
+        .maybeSingle();
 
-      try {
-        // Load assignment using simpler approach to avoid RLS issues
-        const { data: assignmentData, error: assignmentError } = await supabase
-          .from("workout_assignments")
-          .select("*")
-          .eq("id", assignmentId)
-          .eq("client_id", user.id)
-          .maybeSingle();
+      console.log("🔍 Workout Execution - Assignment query result:", {
+        assignmentData,
+        assignmentError,
+      });
 
-        console.log("🔍 Workout Execution - Assignment query result:", {
-          assignmentData,
-          assignmentError,
-        });
+      let resolvedAssignment = assignmentData;
 
-        if (assignmentError) throw assignmentError;
-        if (!assignmentData) throw new Error("Workout assignment not found");
+      if (assignmentError) throw assignmentError;
 
-        // Load template details separately
-        const { data: templateData, error: templateError } = await supabase
-          .from("workout_templates")
-          .select(
-            `
-            id, name, description, estimated_duration, difficulty_level,
-            category:workout_categories(name, color)
-          `
-          )
-          .eq("id", assignmentData.workout_template_id)
-          .maybeSingle();
+      if (!resolvedAssignment) {
+        console.warn(
+          "Workout Execution - assignment not found by ID, trying template fallback"
+        );
+        const { data: fallbackAssignment, error: fallbackError } =
+          await supabase
+            .from("workout_assignments")
+            .select("*")
+            .eq("workout_template_id", assignmentId)
+            .eq("client_id", user.id)
+            .order("created_at", { ascending: false })
+            .maybeSingle();
 
-        if (templateError) throw templateError;
-        if (!templateData) throw new Error("Workout template not found");
+        if (fallbackError) throw fallbackError;
+        if (!fallbackAssignment)
+          throw new Error("Workout assignment not found");
 
-        // Combine the data
-        const combinedData = {
-          ...assignmentData,
-          template: templateData,
-        };
+        resolvedAssignment = fallbackAssignment;
+      }
 
-        // Load exercises using the new block system
-        // Note: Legacy workout_template_exercises table no longer exists
-        // We'll use WorkoutBlockService to load blocks instead
-        let exercisesData: any[] = [];
-        try {
-          // Try to load using block system
-          const blocks = await WorkoutBlockService.getWorkoutBlocks(
-            assignmentData.workout_template_id
-          );
-          if (blocks.length > 0) {
-            // Convert blocks to exercises format for backward compatibility
-            exercisesData = blocks.flatMap((block) =>
-              (block.exercises || []).map((ex: any, idx: number) => ({
-                id: ex.id || `${block.id}-${idx}`,
-                exercise_id: ex.exercise_id,
-                order_index: block.block_order || 0,
-                sets: block.total_sets || 1,
-                reps: block.reps_per_set || "",
-                rest_seconds: block.rest_seconds || 60,
-                notes: block.block_notes || "",
-                exercise_type: block.block_type,
-                exercise: ex.exercise,
-              }))
-            );
-          }
-        } catch (blockError) {
-          console.warn(
-            "Could not load workout blocks, using empty exercises array:",
-            blockError
-          );
+      // Combine the data
+      const combinedAssignment: WorkoutAssignment = {
+        id: resolvedAssignment.id,
+        workout_template_id: resolvedAssignment.workout_template_id ?? null,
+        status: resolvedAssignment.status,
+        notes: resolvedAssignment.notes ?? null,
+        name: resolvedAssignment.name ?? null,
+        description: resolvedAssignment.description ?? null,
+        scheduled_date: resolvedAssignment.scheduled_date ?? null,
+      };
+
+      // Fetch original blocks using workout_template_id from assignment
+      if (!combinedAssignment.workout_template_id) {
+        throw new Error("Workout template ID not found in assignment");
+      }
+
+      // Use WorkoutBlockService to fetch blocks (handles RLS properly)
+      const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
+      const workoutBlocks = await WorkoutBlockService.getWorkoutBlocks(
+        combinedAssignment.workout_template_id
+      );
+
+      if (!workoutBlocks || workoutBlocks.length === 0) {
+        throw new Error("No workout blocks found for this template");
+      }
+
+      // Convert WorkoutBlock[] to ClientBlockRecord[] format
+      const clientBlocks: ClientBlockRecord[] = workoutBlocks.map((block) => ({
+        id: block.id,
+        block_order: block.block_order,
+        block_type: block.block_type,
+        block_name: block.block_name ?? null,
+        block_notes: block.block_notes ?? null,
+        total_sets: block.total_sets ?? null,
+        reps_per_set: block.reps_per_set ?? null,
+        rest_seconds: block.rest_seconds ?? null,
+        duration_seconds: block.duration_seconds ?? null,
+        block_parameters: block.block_parameters ?? null,
+        exercises: (block.exercises ?? []).map((ex) => ({
+          id: ex.id,
+          exercise_id: ex.exercise_id,
+          exercise_order: ex.exercise_order,
+          exercise_letter: ex.exercise_letter ?? null,
+          sets: ex.sets ?? null,
+          reps: ex.reps ?? null,
+          weight_kg: ex.weight_kg ?? null,
+          rir: ex.rir ?? null,
+          tempo: ex.tempo ?? null,
+          rest_seconds: ex.rest_seconds ?? null,
+          load_percentage: (ex as any).load_percentage ?? null,
+          notes: ex.notes ?? null,
+        })) as any[],
+      }));
+      const allClientExercises = clientBlocks.flatMap(
+        (block) => (block.exercises ?? []) as any[]
+      );
+
+      const exerciseIds = Array.from(
+        new Set(
+          allClientExercises
+            .map((exercise) => exercise.exercise_id)
+            .filter((id): id is string => Boolean(id))
+        )
+      );
+
+      const exerciseMeta = new Map<
+        string,
+        {
+          name: string;
+          description: string;
+          image_url?: string | null;
+          video_url?: string | null;
         }
+      >();
 
-        // Load exercise details separately
-        const exercisesWithDetails = await Promise.all(
-          (exercisesData || []).map(async (exercise) => {
-            // Parse complex meta from notes JSON if present
-            let meta: any = {};
-            let exercise_type: string | undefined = undefined;
-            if (exercise.notes) {
-              try {
-                const parsed = JSON.parse(exercise.notes);
-                if (parsed && typeof parsed === "object") {
-                  meta = parsed;
-                  exercise_type = parsed.exercise_type || undefined;
-                }
-              } catch {}
+      if (exerciseIds.length > 0) {
+        const { data: exerciseDetails, error: exerciseDetailsError } =
+          await supabase
+            .from("exercises")
+            .select("id, name, description, image_url, video_url")
+            .in("id", exerciseIds);
+
+        if (exerciseDetailsError) {
+          console.error(
+            "Error loading exercise metadata:",
+            exerciseDetailsError
+          );
+        } else if (exerciseDetails) {
+          exerciseDetails.forEach((detail) => {
+            exerciseMeta.set(detail.id, {
+              name: detail.name,
+              description: detail.description ?? "",
+              image_url: (detail as any).image_url ?? null,
+              video_url: (detail as any).video_url ?? null,
+            });
+          });
+        }
+      }
+
+      const now = new Date().toISOString();
+
+      const safeParse = (value: unknown) => {
+        if (!value) return {};
+        if (typeof value === "string") {
+          // Skip parsing if it's clearly not JSON (like "teest")
+          const trimmed = value.trim();
+          if (trimmed.length === 0) return {};
+          // Only try to parse if it looks like JSON (starts with { or [)
+          if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            try {
+              return JSON.parse(value);
+            } catch (error) {
+              console.warn("Failed to parse JSON", value, error);
+              return {};
             }
-            const { data: exerciseDetails } = await supabase
-              .from("exercises")
-              .select("id, name, description, category, image_url, video_url")
-              .eq("id", exercise.exercise_id)
-              .single();
+          }
+          // If it's not JSON-like, return empty object
+          return {};
+        }
+        if (typeof value === "object") return value || {};
+        return {};
+      };
+
+      const workoutBlocksConverted: WorkoutBlock[] = clientBlocks.map(
+        (block: ClientBlockRecord) => {
+          const blockType = (block.block_type as any) || "straight_set";
+          const blockParameters = safeParse(block.block_parameters);
+
+          const blockExercises = (
+            (block.exercises ?? []) as any[]
+          ).map((exercise: ClientBlockExerciseRecord, idx: number) => {
+            const parsedNotes = safeParse(exercise.notes);
+            const meta = parsedNotes || {};
+            const exerciseType = meta.exercise_type || blockType;
+            const metaDetails = exercise.exercise_id
+              ? exerciseMeta.get(exercise.exercise_id)
+              : undefined;
 
             return {
-              ...exercise,
-              exercise_type,
-              meta,
-              exercise: exerciseDetails,
+              id: exercise.id,
+              block_id: block.id,
+              exercise_id: exercise.exercise_id ?? "",
+              exercise_order:
+                typeof exercise.exercise_order === "number" &&
+                Number.isFinite(exercise.exercise_order)
+                  ? exercise.exercise_order
+                  : idx + 1,
+              exercise_letter: exercise.exercise_letter ?? undefined,
+              sets: exercise.sets ?? block.total_sets ?? undefined,
+              reps: exercise.reps ?? block.reps_per_set ?? undefined,
+              weight_kg: exercise.weight_kg ?? undefined,
+              rir: exercise.rir ?? undefined,
+              tempo: exercise.tempo ?? undefined,
+              rest_seconds:
+                exercise.rest_seconds ?? block.rest_seconds ?? undefined,
+              load_percentage: (exercise as any).load_percentage ?? undefined,
+              notes: exercise.notes ?? undefined,
+              exercise: exercise.exercise_id
+                ? {
+                    id: exercise.exercise_id,
+                    name: metaDetails?.name || "Exercise",
+                    description: metaDetails?.description || "",
+                    category: "",
+                    image_url: metaDetails?.image_url ?? undefined,
+                    video_url: metaDetails?.video_url ?? undefined,
+                    created_at: now,
+                    updated_at: now,
+                  }
+                : undefined,
+              drop_sets: [],
+              cluster_sets: [],
+              pyramid_sets: [],
+              rest_pause_sets: [],
+              ladder_sets: [],
+              created_at: now,
+              updated_at: now,
             };
+          });
+
+          return {
+            id: block.id,
+            template_id:
+              combinedAssignment.workout_template_id || combinedAssignment.id,
+            block_type: blockType,
+            block_order:
+              typeof block.block_order === "number" &&
+              Number.isFinite(block.block_order)
+                ? block.block_order
+                : 0,
+            block_name: block.block_name ?? undefined,
+            block_notes: block.block_notes ?? undefined,
+            duration_seconds: (block as any).duration_seconds ?? undefined,
+            rest_seconds: block.rest_seconds ?? undefined,
+            total_sets: block.total_sets ?? undefined,
+            reps_per_set: block.reps_per_set ?? undefined,
+            block_parameters: blockParameters,
+            exercises: blockExercises as any,
+            drop_sets: [],
+            cluster_sets: [],
+            pyramid_sets: [],
+            rest_pause_sets: [],
+            time_protocol: undefined,
+            ladder_sets: [],
+            created_at: now,
+            updated_at: now,
+          } as WorkoutBlock;
+        }
+      );
+
+      const exercisesWithDetails: TemplateExercise[] = workoutBlocksConverted
+        .flatMap((block) => {
+          return (block.exercises || []).map((exercise: any, idx: number) => {
+            const meta = safeParse(exercise.notes);
+            const exerciseType = meta.exercise_type || block.block_type;
+            return {
+              id: exercise.id,
+              exercise_id: exercise.exercise_id,
+              order_index: exercise.exercise_order ?? idx,
+              sets: exercise.sets ?? block.total_sets ?? 1,
+              reps: exercise.reps ?? block.reps_per_set ?? "",
+              rest_seconds: exercise.rest_seconds ?? block.rest_seconds ?? 60,
+              load_percentage: (exercise as any).load_percentage ?? undefined,
+              notes: exercise.notes ?? "",
+              exercise_type: exerciseType,
+              meta,
+              exercise: exercise.exercise,
+              completed_sets: 0,
+              current_set: 0,
+            } as TemplateExercise;
+          });
+        })
+        .sort((a, b) => a.order_index - b.order_index);
+
+      setAssignment(combinedAssignment);
+      console.log("📍 Page: Assignment loaded:", combinedAssignment);
+      console.log("📍 Page: assignment.id:", combinedAssignment?.id);
+      setExercises(exercisesWithDetails);
+
+      try {
+        const idSet = new Set<string>();
+        for (const ex of exercisesWithDetails as any[]) {
+          const m = ex.meta || {};
+          if (m.superset_exercise_id) idSet.add(m.superset_exercise_id);
+          if (m.compound_exercise_id) idSet.add(m.compound_exercise_id);
+          if (Array.isArray(m.giant_set_exercises)) {
+            for (const gi of m.giant_set_exercises) {
+              if (gi?.exercise_id) idSet.add(gi.exercise_id);
+            }
+          }
+          if (Array.isArray(m.circuit_sets)) {
+            for (const cs of m.circuit_sets) {
+              if (Array.isArray(cs.exercises)) {
+                for (const cse of cs.exercises) {
+                  if (cse?.exercise_id) idSet.add(cse.exercise_id);
+                }
+              }
+            }
+          }
+          if (Array.isArray(m.tabata_sets)) {
+            for (const ts of m.tabata_sets) {
+              if (Array.isArray(ts.exercises)) {
+                for (const tse of ts.exercises) {
+                  if (tse?.exercise_id) idSet.add(tse.exercise_id);
+                }
+              }
+            }
+          }
+        }
+        if (idSet.size > 0) {
+          const ids = Array.from(idSet);
+          const { data: extras } = await supabase
+            .from("exercises")
+            .select("id, name, video_url")
+            .in("id", ids);
+          const map: Record<string, { name: string; video_url?: string }> = {};
+          for (const e of extras || []) {
+            map[e.id] = { name: e.name, video_url: (e as any).video_url };
+          }
+          setExerciseLookup(map);
+        }
+      } catch (lookupError) {
+        console.warn("Unable to build exercise lookup map", lookupError);
+      }
+
+      if (workoutBlocksConverted.length > 0) {
+        setUseBlockSystem(true);
+        const liveBlocks: LiveWorkoutBlock[] = workoutBlocksConverted.map(
+          (block) => ({
+            block,
+            currentExerciseIndex: 0,
+            currentSetIndex: 0,
+            isCompleted: false,
+            completedSets: 0,
+            totalSets:
+              block.total_sets ||
+              (block.exercises && block.exercises[0]?.sets) ||
+              1,
           })
         );
+        setWorkoutBlocks(liveBlocks);
 
-        setAssignment(combinedData);
-        setExercises(exercisesWithDetails);
+        // Fetch e1RMs for all exercises in blocks
+        const allExerciseIds = workoutBlocksConverted
+          .flatMap((block) => block.exercises || [])
+          .map((ex) => ex.exercise_id)
+          .filter((id): id is string => !!id);
 
-        // Build lookup of extra exercise IDs referenced in complex metas
-        try {
-          const idSet = new Set<string>();
-          for (const ex of exercisesWithDetails as any[]) {
-            const m = ex.meta || {};
-            if (m.superset_exercise_id) idSet.add(m.superset_exercise_id);
-            if (m.compound_exercise_id) idSet.add(m.compound_exercise_id);
-            if (Array.isArray(m.giant_set_exercises)) {
-              for (const gi of m.giant_set_exercises) {
-                if (gi?.exercise_id) idSet.add(gi.exercise_id);
-              }
-            }
-            if (Array.isArray(m.circuit_sets)) {
-              for (const cs of m.circuit_sets) {
-                if (Array.isArray(cs.exercises)) {
-                  for (const cse of cs.exercises) {
-                    if (cse?.exercise_id) idSet.add(cse.exercise_id);
-                  }
-                }
-              }
-            }
-            if (Array.isArray(m.tabata_sets)) {
-              for (const ts of m.tabata_sets) {
-                if (Array.isArray(ts.exercises)) {
-                  for (const tse of ts.exercises) {
-                    if (tse?.exercise_id) idSet.add(tse.exercise_id);
-                  }
-                }
-              }
-            }
-            // Also check for tabata_sets at the root level (not in meta)
-            if (Array.isArray(ex.tabata_sets)) {
-              for (const ts of ex.tabata_sets) {
-                if (Array.isArray(ts.exercises)) {
-                  for (const tse of ts.exercises) {
-                    if (tse?.exercise_id) idSet.add(tse.exercise_id);
-                  }
-                }
-              }
-            }
-          }
-          if (idSet.size > 0) {
-            const ids = Array.from(idSet);
-            const { data: extras } = await supabase
-              .from("exercises")
-              .select("id, name, video_url")
-              .in("id", ids);
-            const map: Record<string, { name: string; video_url?: string }> =
-              {};
-            for (const e of extras || []) {
-              map[e.id] = { name: e.name, video_url: (e as any).video_url };
-            }
-            setExerciseLookup(map);
-          }
-        } catch {}
-
-        // Load workout blocks (with error handling for missing schema)
-        try {
-          const blocks = await WorkoutBlockService.getWorkoutBlocks(
-            assignmentData.workout_template_id
-          );
-
-          if (blocks.length > 0) {
-            // Use block system
-            setUseBlockSystem(true);
-            const liveBlocks: LiveWorkoutBlock[] = blocks.map((block) => ({
-              block,
-              currentExerciseIndex: 0,
-              currentSetIndex: 0,
-              isCompleted: false,
-              completedSets: 0,
-              totalSets: block.total_sets || 1,
-            }));
-            setWorkoutBlocks(liveBlocks);
-          } else {
-            // Use traditional system
-            setUseBlockSystem(false);
-          }
-        } catch (error) {
-          console.log(
-            "Workout blocks not available, using traditional system:",
-            error
-          );
-          // Use traditional system if blocks table doesn't exist
-          setUseBlockSystem(false);
+        if (allExerciseIds.length > 0) {
+          fetchE1RMs(allExerciseIds, supabase).then((e1rmData) => {
+            setE1rmMap(e1rmData);
+          });
         }
-      } catch (dbError) {
-        console.log("Database not ready, using localStorage fallback");
-
-        // Sample data for testing
-        const sampleAssignment = {
-          id: assignmentId,
-          template_id: "template-1",
-          status: "assigned",
-          notes: "Focus on form and controlled movements",
-          template: {
-            id: "template-1",
-            name: "Upper Body Strength",
-            description: "Build strength in chest, shoulders, and arms",
-            estimated_duration: 45,
-            difficulty_level: "Intermediate",
-            category: { name: "Upper Body", color: "#EF4444" },
-          },
-        };
-
-        const sampleExercises = [
-          {
-            id: "1",
-            exercise_id: "ex-1",
-            order_index: 1,
-            sets: 3,
-            reps: "10",
-            rest_seconds: 60,
-            notes: "Keep core tight",
-            exercise: {
-              id: "ex-1",
-              name: "Push-ups",
-              description: "Classic bodyweight exercise",
-              category: "Upper Body",
-            },
-            completed_sets: 0,
-            current_set: 1,
-          },
-          {
-            id: "2",
-            exercise_id: "ex-2",
-            order_index: 2,
-            sets: 3,
-            reps: "8-12",
-            rest_seconds: 90,
-            notes: "Focus on controlled movement",
-            exercise: {
-              id: "ex-2",
-              name: "Pull-ups",
-              description: "Upper body pulling exercise",
-              category: "Upper Body",
-            },
-            completed_sets: 0,
-            current_set: 1,
-          },
-        ];
-
-        setAssignment(sampleAssignment);
-        setExercises(sampleExercises);
+      } else {
+        setUseBlockSystem(false);
       }
-    } catch (error) {
-      console.error("Error loading assignment:", error);
-    } finally {
-      setLoading(false);
+    } catch (dbError) {
+      console.log("Database not ready, using localStorage fallback");
+
+      // Sample data for testing
+      const sampleAssignment = {
+        id: assignmentId,
+        workout_template_id: "template-1",
+        status: "assigned",
+        notes: "Focus on form and controlled movements",
+        name: "Upper Body Strength",
+        description: "Build strength in chest, shoulders, and arms",
+      } as WorkoutAssignment;
+
+      const sampleExercises = [
+        {
+          id: "1",
+          exercise_id: "ex-1",
+          order_index: 0,
+          sets: 4,
+          reps: "8-10",
+          rest_seconds: 90,
+          notes: JSON.stringify({ exercise_type: "straight_set" }),
+          exercise_type: "straight_set",
+          exercise: {
+            id: "ex-1",
+            name: "Flat Bench Press",
+            description: "Classic compound move for chest strength",
+            category: "Chest",
+          },
+        },
+      ] as TemplateExercise[];
+
+      setAssignment(sampleAssignment);
+      setExercises(sampleExercises);
+      setUseBlockSystem(false);
     }
   };
 
@@ -626,16 +1070,79 @@ export default function LiveWorkout() {
 
     // BACKGROUND DATABASE SAVE
     try {
-      await supabase.from("workout_logs").insert({
-        session_id: sessionId,
-        template_exercise_id: currentExercise.id,
-        set_number: currentSet,
-        weight_used: workingWeightNum,
-        reps_completed: setReps,
-        rest_taken: currentExercise.rest_seconds || 60,
-        rpe: 5,
-        notes: `dropset_weight=${dropWeightNum},dropset_reps=${dropReps}`,
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      // Log the working set
+      const response1 = await fetch("/api/log-set", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workout_log_id: undefined, // API will create if needed
+          block_id: currentExercise.block_id,
+          exercise_id: currentExercise.exercise_id || currentExercise.exercise?.id,
+          weight: workingWeightNum,
+          reps: setReps,
+          client_id: user.id,
+          session_id: sessionId,
+          template_exercise_id: currentExercise.id,
+        }),
       });
+
+      if (!response1.ok) {
+        const error = await response1.json();
+        throw new Error(error.error || "Failed to log working set");
+      }
+
+      const result1 = await response1.json();
+      
+      // Show PR notification if needed for working set
+      if (result1.e1rm?.is_new_pr) {
+        addToast({
+          title: "New Personal Record! 🎉",
+          description: `e1RM: ${result1.e1rm.stored.toFixed(2)}kg`,
+          variant: "success",
+          duration: 3000,
+        });
+      }
+
+      // Log the drop set
+      if (dropWeightNum > 0 && dropReps > 0) {
+        const response2 = await fetch("/api/log-set", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workout_log_id: undefined, // API will create if needed
+            block_id: currentExercise.block_id,
+            exercise_id: currentExercise.exercise_id || currentExercise.exercise?.id,
+            weight: dropWeightNum,
+            reps: dropReps,
+            client_id: user.id,
+            session_id: sessionId,
+            template_exercise_id: currentExercise.id,
+          }),
+        });
+
+        if (!response2.ok) {
+          const error = await response2.json();
+          throw new Error(error.error || "Failed to log drop set");
+        }
+
+        const result2 = await response2.json();
+        
+        // Show PR notification if needed for drop set
+        if (result2.e1rm?.is_new_pr) {
+          addToast({
+            title: "New Personal Record! 🎉",
+            description: `e1RM: ${result2.e1rm.stored.toFixed(2)}kg`,
+            variant: "success",
+            duration: 3000,
+          });
+        }
+      }
 
       addToast({
         title: "Drop Set Logged!",
@@ -738,29 +1245,90 @@ export default function LiveWorkout() {
 
     // BACKGROUND DATABASE SAVE - Log both exercises
     try {
-      // Log first exercise
-      await supabase.from("workout_logs").insert({
-        session_id: sessionId,
-        template_exercise_id: currentExercise.id,
-        set_number: currentSet,
-        weight_used: weightA,
-        reps_completed: repsA,
-        rest_taken: currentExercise.rest_seconds || 60,
-        rpe: 5,
-        notes: "superset_exercise_a",
-      });
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
 
-      // Log second exercise
-      await supabase.from("workout_logs").insert({
-        session_id: sessionId,
-        template_exercise_id: currentExercise.id,
-        set_number: currentSet,
-        weight_used: weightB,
-        reps_completed: repsB,
-        rest_taken: currentExercise.rest_seconds || 60,
-        rpe: 5,
-        notes: "superset_exercise_b",
-      });
+      // Log first exercise (Exercise A)
+      if (currentExercise.exercise_id && weightA > 0 && repsA > 0) {
+        const responseA = await fetch("/api/log-set", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workout_log_id: undefined, // API will create if needed
+            block_id: currentExercise.block_id,
+            exercise_id: currentExercise.exercise_id,
+            weight: weightA,
+            reps: repsA,
+            client_id: user.id,
+            session_id: sessionId,
+            template_exercise_id: currentExercise.id,
+          }),
+        });
+
+        if (responseA.ok) {
+          const resultA = await responseA.json();
+          if (resultA.success && resultA.e1rm) {
+            setE1rmMap((prev) => ({
+              ...prev,
+              [currentExercise.exercise_id]: resultA.e1rm.calculated,
+            }));
+            
+            // Show PR notification if needed
+            if (resultA.e1rm.is_new_pr) {
+              addToast({
+                title: "New Personal Record! 🎉",
+                description: `e1RM: ${resultA.e1rm.stored.toFixed(2)}kg`,
+                variant: "success",
+                duration: 3000,
+              });
+            }
+          }
+        }
+      }
+
+      // Log second exercise (Exercise B)
+      const exerciseBId =
+        currentExercise.meta?.superset_exercise_id ||
+        currentExercise.superset_exercise_id;
+      if (exerciseBId && weightB > 0 && repsB > 0) {
+        const responseB = await fetch("/api/log-set", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workout_log_id: undefined, // API will create if needed
+            block_id: currentExercise.block_id,
+            exercise_id: exerciseBId,
+            weight: weightB,
+            reps: repsB,
+            client_id: user.id,
+            session_id: sessionId,
+            template_exercise_id: currentExercise.id,
+          }),
+        });
+
+        if (responseB.ok) {
+          const resultB = await responseB.json();
+          if (resultB.success && resultB.e1rm) {
+            setE1rmMap((prev) => ({
+              ...prev,
+              [exerciseBId]: resultB.e1rm.calculated,
+            }));
+            
+            // Show PR notification if needed
+            if (resultB.e1rm.is_new_pr) {
+              addToast({
+                title: "New Personal Record! 🎉",
+                description: `e1RM: ${resultB.e1rm.stored.toFixed(2)}kg`,
+                variant: "success",
+                duration: 3000,
+              });
+            }
+          }
+        }
+      }
 
       addToast({
         title: "Superset Logged!",
@@ -856,18 +1424,52 @@ export default function LiveWorkout() {
 
     // BACKGROUND DATABASE SAVE
     try {
-      const { error } = await supabase.from("workout_logs").insert({
-        session_id: sessionId,
-        template_exercise_id: currentExercise.id,
-        set_number: currentSet,
-        weight_used: weightNum,
-        reps_completed: repsNum,
-        rest_taken: currentExercise.rest_seconds || 60,
-        rpe: 5,
-        notes: "",
-      });
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
 
-      if (error) throw error;
+      // Call /api/log-set endpoint (handles both logging and e1RM calculation)
+      if (currentExercise.exercise_id && weightNum > 0 && repsNum > 0) {
+        const response = await fetch("/api/log-set", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workout_log_id: undefined, // API will create if needed
+            block_id: currentExercise.block_id,
+            exercise_id: currentExercise.exercise_id,
+            weight: weightNum,
+            reps: repsNum,
+            client_id: user.id,
+            session_id: sessionId,
+            template_exercise_id: currentExercise.id,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Failed to log set");
+        }
+
+        const result = await response.json();
+        if (result.success && result.e1rm) {
+          setE1rmMap((prev) => ({
+            ...prev,
+            [currentExercise.exercise_id]: result.e1rm.calculated,
+          }));
+          
+          // Show PR notification if needed
+          if (result.e1rm.is_new_pr) {
+            addToast({
+              title: "New Personal Record! 🎉",
+              description: `e1RM: ${result.e1rm.stored.toFixed(2)}kg`,
+              variant: "success",
+              duration: 3000,
+            });
+          }
+        }
+      }
 
       addToast({
         title: "AMRAP Logged!",
@@ -1009,6 +1611,10 @@ export default function LiveWorkout() {
       return;
     }
 
+    // Save weight and reps before resetting
+    const loggedWeight = currentSetData.weight;
+    const loggedReps = currentSetData.reps;
+
     // Start rest timer
     setRestTime(currentExercise.rest_seconds || 60);
     setShowRestTimer(true);
@@ -1018,25 +1624,72 @@ export default function LiveWorkout() {
 
     // BACKGROUND DATABASE SAVE
     try {
-      const { error } = await supabase.from("workout_logs").insert({
-        session_id: sessionId,
-        template_exercise_id: currentExercise.id,
-        set_number: currentSet,
-        weight_used: currentSetData.weight,
-        reps_completed: currentSetData.reps,
-        rest_taken: currentExercise.rest_seconds || 60,
-        rpe: 5,
-        notes:
-          currentType === "for_time" && forTimeCompletionSecs != null
-            ? `for_time_completion_secs=${forTimeCompletionSecs}`
-            : "",
-      });
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
 
-      if (error) throw error;
+      // Call /api/log-set endpoint (handles both logging and e1RM calculation)
+      if (currentExercise.exercise_id && loggedWeight > 0 && loggedReps > 0) {
+        // Build notes for for_time completion
+        let notes = "";
+        if (currentType === "for_time" && forTimeCompletionSecs != null) {
+          notes = `for_time_completion_secs=${forTimeCompletionSecs}`;
+        }
+
+        const response = await fetch("/api/log-set", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            workout_log_id: undefined, // API will create if needed
+            block_id: currentExercise.block_id,
+            exercise_id: currentExercise.exercise_id,
+            weight: loggedWeight,
+            reps: loggedReps,
+            client_id: user.id,
+            session_id: sessionId,
+            template_exercise_id: currentExercise.id,
+            notes: notes || undefined,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Failed to log set");
+        }
+
+        const result = await response.json();
+        if (result.success && result.e1rm) {
+          // Update e1RM map with new value
+          setE1rmMap((prev) => ({
+            ...prev,
+            [currentExercise.exercise_id]: result.e1rm.calculated,
+          }));
+          
+          // Show PR notification if needed
+          if (result.e1rm.is_new_pr) {
+            addToast({
+              title: "New Personal Record! 🎉",
+              description: `e1RM: ${result.e1rm.stored.toFixed(2)}kg`,
+              variant: "success",
+              duration: 3000,
+            });
+          }
+        }
+      }
+
+      // Reset for_time state after logging
+      if (currentType === "for_time") {
+        setForTimeStopped(false);
+        setForTimeCompletionSecs(null);
+      }
 
       addToast({
         title: "Set Logged!",
-        description: `${currentSetData.weight}kg × ${currentSetData.reps} reps saved`,
+        description: `${loggedWeight}kg × ${loggedReps} reps saved`,
         variant: "success",
         duration: 2000,
       });
@@ -1111,21 +1764,62 @@ export default function LiveWorkout() {
     setRestTime(current.rest_seconds || 60);
     setShowRestTimer(true);
 
-    // Background save
+    // Background save - Log each exercise in the giant set individually
     try {
-      const { error } = await supabase.from("workout_logs").insert({
-        session_id: sessionId,
-        template_exercise_id: current.id,
-        set_number: currentSet,
-        weight_used: null,
-        reps_completed: null,
-        rest_taken: current.rest_seconds || 60,
-        rpe: 5,
-        notes: JSON.stringify({
-          giant_set: { weights: giantWeights, reps: giantReps },
-        }),
-      });
-      if (error) throw error;
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      // Get giant set exercises
+      const giantSetExercises: any[] = (current?.meta?.giant_set_exercises ||
+        current?.giant_set_exercises ||
+        []) as any[];
+
+      // Log each exercise individually
+      for (let i = 0; i < Math.max(giantWeights.length, giantReps.length); i++) {
+        const weight = parseFloat(giantWeights[i] || "0") || 0;
+        const reps = parseInt(giantReps[i] || "0") || 0;
+        const exerciseItem = giantSetExercises[i];
+        const exerciseId = exerciseItem?.exercise_id;
+
+        // Only log if we have valid data
+        if (exerciseId && weight > 0 && reps > 0) {
+          const response = await fetch("/api/log-set", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              workout_log_id: undefined, // API will create if needed
+              block_id: current.block_id,
+              exercise_id: exerciseId,
+              weight: weight,
+              reps: reps,
+              client_id: user.id,
+              session_id: sessionId,
+              template_exercise_id: current.id,
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            console.error(`Error logging giant set exercise ${i + 1}:`, error);
+            // Continue with other exercises even if one fails
+          } else {
+            const result = await response.json();
+            // Show PR notification if needed
+            if (result.e1rm?.is_new_pr) {
+              addToast({
+                title: "New Personal Record! 🎉",
+                description: `e1RM: ${result.e1rm.stored.toFixed(2)}kg`,
+                variant: "success",
+                duration: 3000,
+              });
+            }
+          }
+        }
+      }
+
       addToast({
         title: "Giant Set Logged!",
         description: "All entries saved",
@@ -1194,14 +1888,39 @@ export default function LiveWorkout() {
 
   const completeWorkout = async () => {
     try {
+      console.log("🚀 completeWorkout called - navigating to complete page");
+      console.log("📍 assignmentId:", assignmentId);
+      console.log("📍 sessionId:", sessionId);
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.error("❌ User not authenticated");
+        return;
+      }
+
+      // Calculate simple duration: from when workout screen opened to now
+      const endTime = Date.now();
+      const durationMs = endTime - workoutStartTime;
+      const durationMinutes = Math.round(durationMs / 1000 / 60);
+      
+      console.log("🕐 [Simple Duration] Calculated:", {
+        workoutStartTime,
+        endTime,
+        durationMs,
+        durationSeconds: Math.floor(durationMs / 1000),
+        durationMinutes,
+      });
+
+      // Store duration in localStorage to pass to complete page
+      localStorage.setItem("workoutDurationMinutes", durationMinutes.toString());
+      localStorage.setItem("workoutStartTime", workoutStartTime.toString());
 
       try {
-        // Update workout session
+        // Update workout session (if exists)
         if (sessionId) {
+          console.log("💾 Updating workout session:", sessionId);
           await supabase
             .from("workout_sessions")
             .update({
@@ -1211,19 +1930,19 @@ export default function LiveWorkout() {
             .eq("id", sessionId);
         }
 
-        // Update assignment status
-        await supabase
-          .from("workout_assignments")
-          .update({ status: "completed" })
-          .eq("id", assignmentId);
+        // Don't update assignment status here - let the complete page handle it
+        // This ensures markWorkoutComplete() is called, which updates totals
       } catch (dbError) {
-        console.log("Database not ready, using localStorage fallback");
+        console.error("❌ Database error in completeWorkout:", dbError);
+        // Continue anyway - navigation is more important
       }
 
       // Navigate to completion page
+      // The complete page will handle updating assignment status and totals
+      console.log("🧭 Navigating to complete page:", `/client/workouts/${assignmentId}/complete`);
       router.push(`/client/workouts/${assignmentId}/complete`);
     } catch (error) {
-      console.error("Error completing workout:", error);
+      console.error("❌ Error in completeWorkout:", error);
     }
   };
 
@@ -1276,7 +1995,9 @@ export default function LiveWorkout() {
   const [emomRepTimeLeft, setEmomRepTimeLeft] = useState(0);
   // Tabata/Circuit state
   const [intervalActive, setIntervalActive] = useState(false);
-  const [intervalPhase, setIntervalPhase] = useState<"work" | "rest">("work");
+  const [intervalPhase, setIntervalPhase] = useState<
+    "work" | "rest" | "rest_after_set"
+  >("work");
   const [intervalPhaseLeft, setIntervalPhaseLeft] = useState(0);
   const [intervalRound, setIntervalRound] = useState(0);
   const [intervalTotalRounds, setIntervalTotalRounds] = useState(0);
@@ -1313,6 +2034,7 @@ export default function LiveWorkout() {
   const [forTimeCompletionSecs, setForTimeCompletionSecs] = useState<
     number | null
   >(null);
+  const [forTimeStopped, setForTimeStopped] = useState(false);
   // Superset/Pre-exhaustion dual inputs
   const [supersetAWeight, setSupersetAWeight] = useState<string>("");
   const [supersetAReps, setSupersetAReps] = useState<string>("");
@@ -1626,89 +2348,17 @@ export default function LiveWorkout() {
         return;
       }
 
-      // Get last workout performance for this exercise
-      // Join with workout_assignments to filter by current user
-      const { data: lastWorkout, error: lastError } = await supabase
-        .from("workout_logs")
-        .select(
-          `
-          id, 
-          set_number, 
-          reps_completed, 
-          reps,
-          weight_used, 
-          weight_kg,
-          logged_at,
-          assignment_id
-        `
-        )
-        .eq("exercise_id", exerciseId)
-        .not("assignment_id", "is", null)
-        .order("logged_at", { ascending: false })
-        .limit(10);
-
-      if (lastError) {
-        console.log("Unable to fetch previous performance:", lastError.message);
-        setPreviousPerformance({
-          lastWorkout: null,
-          personalBest: null,
-          loading: false,
-        });
-        return;
-      }
-
-      // Filter by user's assignments (since we can't join directly)
-      const { data: userAssignments } = await supabase
-        .from("workout_assignments")
-        .select("id")
-        .eq("client_id", user.id);
-
-      const assignmentIds = userAssignments?.map((a) => a.id) || [];
-      const userLastWorkout = lastWorkout?.find((log) =>
-        assignmentIds.includes(log.assignment_id)
+      // TODO: Fix previous performance query once workout_logs schema is confirmed
+      // For now, disable this query to prevent errors
+      // The workout_logs table schema may be different than expected
+      console.log(
+        "Previous performance query disabled - workout_logs schema needs verification"
       );
 
-      // Get personal best (highest weight used) for this exercise
-      const { data: bestWorkout, error: bestError } = await supabase
-        .from("workout_logs")
-        .select(
-          `
-          id, 
-          set_number,
-          reps_completed,
-          reps,
-          weight_used,
-          weight_kg,
-          logged_at,
-          assignment_id
-        `
-        )
-        .eq("exercise_id", exerciseId)
-        .not("assignment_id", "is", null)
-        .order("weight_used", { ascending: false })
-        .order("weight_kg", { ascending: false })
-        .limit(10);
-
-      if (bestError) {
-        console.log("Unable to fetch personal best:", bestError.message);
-        setPreviousPerformance({
-          lastWorkout: userLastWorkout || null,
-          personalBest: null,
-          loading: false,
-        });
-        return;
-      }
-
-      // Filter by user's assignments
-      const userBestWorkout = bestWorkout?.find(
-        (log) =>
-          assignmentIds.includes(log.assignment_id) &&
-          (log.weight_used || log.weight_kg)
-      );
-
+      // Set empty previous performance for now
       setPreviousPerformance({
-        lastWorkout: userLastWorkout || null,
-        personalBest: userBestWorkout || null,
+        lastWorkout: null,
+        personalBest: null,
         loading: false,
       });
     } catch (error) {
@@ -1769,12 +2419,6 @@ export default function LiveWorkout() {
                       previousPerformance.lastWorkout.reps}
                   </div>
                 )}
-                {previousPerformance.lastWorkout.set_number && (
-                  <div className={`text-sm ${theme.text}`}>
-                    <span className="font-medium">Set:</span>{" "}
-                    {previousPerformance.lastWorkout.set_number}
-                  </div>
-                )}
                 <div className={`text-xs ${theme.textSecondary}`}>
                   {new Date(
                     previousPerformance.lastWorkout.logged_at
@@ -1815,12 +2459,6 @@ export default function LiveWorkout() {
                       previousPerformance.personalBest.reps}
                   </div>
                 )}
-                {previousPerformance.personalBest.set_number && (
-                  <div className={`text-sm ${theme.text}`}>
-                    <span className="font-medium">Set:</span>{" "}
-                    {previousPerformance.personalBest.set_number}
-                  </div>
-                )}
                 <div className={`text-xs ${theme.textSecondary}`}>
                   {new Date(
                     previousPerformance.personalBest.logged_at
@@ -1840,457 +2478,282 @@ export default function LiveWorkout() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <div
-        style={{
-          minHeight: "100vh",
-          backgroundColor: "#E8E9F3",
-          paddingBottom: "100px",
-        }}
-      >
-        {/* Rest Timer Overlay */}
-        <RestTimerOverlay
-          isActive={showRestTimer}
-          initialTime={restTime}
-          onComplete={handleRestTimerComplete}
-          onSkip={handleRestTimerSkip}
-          exerciseName={currentExercise?.exercise?.name}
-          nextSet={currentSet}
-          totalSets={currentExercise?.sets}
-        />
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div
+          style={{
+            minHeight: "100vh",
+            paddingBottom: "100px",
+          }}
+        >
+          {/* Rest Timer Overlay */}
+          <RestTimerOverlay
+            isActive={showRestTimer}
+            initialTime={restTime}
+            onComplete={handleRestTimerComplete}
+            onSkip={handleRestTimerSkip}
+            exerciseName={currentExercise?.exercise?.name}
+            nextSet={currentSet}
+            totalSets={currentExercise?.sets}
+          />
 
-        <div style={{ padding: "24px 20px" }}>
-          <div
-            className="max-w-4xl mx-auto"
-            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-          >
-            {/* Enhanced Header */}
-            <Card
-              style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "24px",
-                padding: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                marginBottom: "20px",
-                border: "none",
-                overflow: "hidden",
-              }}
+          <div style={{ padding: "24px 20px" }}>
+            <div
+              className="max-w-4xl mx-auto"
+              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
             >
-              <CardContent style={{ padding: "0" }}>
-                <div className="flex items-center" style={{ gap: "16px" }}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push("/client/workouts")}
-                    style={{
-                      padding: "12px",
-                      borderRadius: "16px",
-                      color: "#6B7280",
-                    }}
-                  >
-                    <ArrowLeft style={{ width: "20px", height: "20px" }} />
-                  </Button>
-                  <div className="flex-1">
-                    <div className="flex items-center" style={{ gap: "12px" }}>
-                      <div
-                        style={{
-                          width: "56px",
-                          height: "56px",
-                          borderRadius: "18px",
-                          background:
-                            "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Dumbbell
-                          style={{
-                            width: "32px",
-                            height: "32px",
-                            color: "#FFFFFF",
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <h1
-                          style={{
-                            fontSize: "20px",
-                            fontWeight: "700",
-                            color: "#1A1A1A",
-                            lineHeight: "1.2",
-                            marginBottom: "4px",
-                          }}
-                        >
-                          {assignment?.template?.name || "Workout"}
-                        </h1>
-                        <p
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: "400",
-                            color: "#6B7280",
-                          }}
-                        >
-                          Live Workout Session
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center" style={{ gap: "8px" }}>
-                    <div
+              {/* Enhanced Header */}
+              <Card
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: "24px",
+                  padding: "24px",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                  marginBottom: "20px",
+                  border: "none",
+                  overflow: "hidden",
+                }}
+              >
+                <CardContent style={{ padding: "0" }}>
+                  <div className="flex items-center" style={{ gap: "16px" }}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => router.push("/client/workouts")}
                       style={{
-                        width: "12px",
-                        height: "12px",
-                        backgroundColor: "#4CAF50",
-                        borderRadius: "50%",
-                        animation:
-                          "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-                      }}
-                    ></div>
-                    <span
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: "400",
+                        padding: "12px",
+                        borderRadius: "16px",
                         color: "#6B7280",
                       }}
                     >
-                      Live
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            {/* Workout Block System */}
-            {useBlockSystem && workoutBlocks.length > 0 ? (
-              <LiveWorkoutBlockExecutor
-                block={workoutBlocks[currentBlockIndex]}
-                onBlockComplete={handleBlockComplete}
-                onNextBlock={handleNextBlock}
-              />
-            ) : /* Traditional Workout System */
-            loading ? (
-              <Card
-                className={`${theme.card} border ${theme.border} rounded-3xl overflow-hidden`}
-              >
-                <CardContent className="p-12 text-center">
-                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                    <Dumbbell className="w-10 h-10 text-white animate-pulse" />
-                  </div>
-                  <h3 className={`text-2xl font-bold ${theme.text} mb-3`}>
-                    Loading workout...
-                  </h3>
-                  <p className={`${theme.textSecondary} mb-6`}>
-                    Please wait while we prepare your exercises.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : currentExercise ? (
-              <div className="space-y-4 sm:space-y-6">
-                {/* Instruction Card - Only show for types that don't have their own detail cards */}
-                {currentType !== "giant_set" &&
-                  currentType !== "circuit" &&
-                  currentType !== "tabata" &&
-                  currentType !== "amrap" &&
-                  currentType !== "emom" &&
-                  currentType !== "for_time" &&
-                  currentType !== "superset" &&
-                  currentType !== "pre_exhaustion" && (
-                    <div className="rounded-2xl sm:rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl relative z-30">
-                      <Card
-                        className={`border-0 ${theme.card} bg-white/90 dark:bg-slate-800/90 backdrop-blur-md overflow-hidden`}
+                      <ArrowLeft style={{ width: "20px", height: "20px" }} />
+                    </Button>
+                    <div className="flex-1">
+                      <div
+                        className="flex items-center"
+                        style={{ gap: "12px" }}
                       >
-                        <CardContent className="p-4 sm:p-5">
-                          <div className="flex items-start gap-3">
-                            <div className="shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md">
-                              <Lightbulb className="w-4 h-4" />
-                            </div>
-                            <div className="flex-1">
-                              <div
-                                className={`text-base font-semibold ${theme.text} mb-1`}
-                              >
-                                How to perform
-                              </div>
-                              <div
-                                className={`text-base leading-relaxed ${theme.textSecondary} rounded-xl border ${theme.border} bg-white/70 dark:bg-slate-800/50 p-3`}
-                              >
-                                {typeHelp}
-                              </div>
-                            </div>
-                            {/* Optional tiny illustration placeholder (hidden if not needed) */}
-                            <div className="hidden sm:block shrink-0">
-                              <div className="w-16 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border border-white/40 dark:border-white/10"></div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                {/* AMRAP Flow */}
-                {currentType === "amrap" && (
-                  <div
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      borderRadius: "24px",
-                      padding: "24px",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                      border: "2px solid #2196F3",
-                    }}
-                  >
-                    <div>
-                      {!amrapActive ? (
                         <div
                           style={{
+                            width: "56px",
+                            height: "56px",
+                            borderRadius: "18px",
+                            background:
+                              "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)",
                             display: "flex",
-                            flexDirection: "column",
-                            gap: "16px",
+                            alignItems: "center",
+                            justifyContent: "center",
                           }}
                         >
-                          {/* Exercise Details Header */}
-                          <div
-                            className="flex items-center"
-                            style={{ gap: "12px" }}
-                          >
-                            <div
-                              style={{
-                                width: "56px",
-                                height: "56px",
-                                borderRadius: "18px",
-                                background:
-                                  "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Target
-                                style={{
-                                  width: "32px",
-                                  height: "32px",
-                                  color: "#FFFFFF",
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <div
-                                style={{
-                                  fontSize: "20px",
-                                  fontWeight: "700",
-                                  color: "#1A1A1A",
-                                }}
-                              >
-                                AMRAP Details
-                              </div>
-                              <div
-                                style={{ fontSize: "14px", color: "#6B7280" }}
-                              >
-                                Complete as many reps as possible
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Summary Info */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="rounded-xl p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-200 dark:border-blue-700">
-                              <div
-                                className={`text-sm ${theme.textSecondary} mb-1`}
-                              >
-                                Duration
-                              </div>
-                              <div
-                                className={`text-2xl font-bold ${theme.text}`}
-                              >
-                                {currentExercise?.meta?.amrap_duration ||
-                                  currentExercise?.amrap_duration ||
-                                  10}{" "}
-                                min
-                              </div>
-                            </div>
-                            <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                              <div
-                                className={`text-sm ${theme.textSecondary} mb-1`}
-                              >
-                                Sets
-                              </div>
-                              <div
-                                className={`text-2xl font-bold ${theme.text}`}
-                              >
-                                {currentExercise?.sets || 1}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Exercise Details */}
-                          <div className="rounded-xl p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700">
-                            <div className="flex items-start gap-3 mb-3">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-400 to-cyan-500">
-                                <Dumbbell className="w-4 h-4 text-white" />
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <div
-                                    className={`font-bold ${theme.text} text-base`}
-                                  >
-                                    {currentExercise.exercise?.name ||
-                                      "Exercise"}
-                                  </div>
-                                  {/* Utility Icon Buttons */}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setShowPlateCalculator(true)}
-                                    className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                                  >
-                                    <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      setShowExerciseAlternatives(true)
-                                    }
-                                    className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                                  >
-                                    <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                                  </Button>
-                                </div>
-                                <div className="flex flex-wrap gap-2 text-sm">
-                                  {currentExercise?.reps && (
-                                    <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
-                                      <span
-                                        className={`text-sm font-bold ${theme.text}`}
-                                      >
-                                        {currentExercise.reps} reps
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              {currentExercise.exercise?.video_url && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    openVideoModal(
-                                      currentExercise.exercise?.video_url || ""
-                                    )
-                                  }
-                                  className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                >
-                                  <Youtube className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-
-                            {/* Logging Fields */}
-                            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 dark:border-slate-600">
-                              <div>
-                                <label
-                                  className={`block text-sm font-medium ${theme.text} mb-1`}
-                                >
-                                  Weight (kg)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={amrapWeight}
-                                  onChange={(e) =>
-                                    setAmrapWeight(e.target.value)
-                                  }
-                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
-                                  step="0.5"
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div>
-                                <label
-                                  className={`block text-sm font-medium ${theme.text} mb-1`}
-                                >
-                                  Reps Achieved
-                                </label>
-                                <input
-                                  type="number"
-                                  value={amrapReps}
-                                  onChange={(e) => setAmrapReps(e.target.value)}
-                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
-                                  placeholder="0"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Previous Performance Card */}
-                          <PreviousPerformanceCard />
-
-                          {/* Action Buttons */}
-                          <div className="space-y-2">
-                            {/* Primary: Log and Continue */}
-                            <Button
-                              onClick={completeAmrapSet}
-                              className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
-                              disabled={isLoggingSet}
-                            >
-                              <Check className="w-5 h-5 mr-2" /> Log AMRAP
-                            </Button>
-
-                            {/* Secondary: Start Timer */}
-                            <Button
-                              onClick={() => {
-                                const minutes =
-                                  Number(
-                                    currentExercise?.meta?.amrap_duration
-                                  ) ||
-                                  Number(currentExercise?.amrap_duration) ||
-                                  10;
-                                setAmrapTimeLeft(minutes * 60);
-                                setAmrapActive(true);
-                              }}
-                              variant="outline"
-                              className="w-full border-2 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl py-4 text-base font-semibold"
-                            >
-                              <Clock className="w-4 h-4 mr-2" /> Start Timer
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-8">
-                          <div className="text-5xl font-bold text-blue-700 dark:text-blue-300">
-                            {Math.floor(amrapTimeLeft / 60)
-                              .toString()
-                              .padStart(2, "0")}
-                            :{(amrapTimeLeft % 60).toString().padStart(2, "0")}
-                          </div>
-                          <div className="mt-2 text-slate-600 dark:text-slate-300">
-                            Time Remaining
-                          </div>
-                          <Button
-                            onClick={() => {
-                              setAmrapActive(false);
-                              setAmrapTimeLeft(0);
+                          <Dumbbell
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              color: "#FFFFFF",
                             }}
-                            variant="outline"
-                            className="mt-4"
-                          >
-                            Stop
-                          </Button>
+                          />
                         </div>
-                      )}
+                        <div>
+                          <h1
+                            style={{
+                              fontSize: "20px",
+                              fontWeight: "700",
+                              color: "#1A1A1A",
+                              lineHeight: "1.2",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            {assignment?.name || "Workout"}
+                          </h1>
+                          <p
+                            style={{
+                              fontSize: "14px",
+                              fontWeight: "400",
+                              color: "#6B7280",
+                            }}
+                          >
+                            Live Workout Session
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center" style={{ gap: "8px" }}>
+                      <div
+                        style={{
+                          width: "12px",
+                          height: "12px",
+                          backgroundColor: "#4CAF50",
+                          borderRadius: "50%",
+                          animation:
+                            "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                        }}
+                      ></div>
+                      <span
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: "400",
+                          color: "#6B7280",
+                        }}
+                      >
+                        Live
+                      </span>
                     </div>
                   </div>
-                )}
-
-                {/* EMOM Flow */}
-                {currentType === "emom" && (
-                  <div
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      borderRadius: "24px",
-                      padding: "24px",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                      border: "2px solid #4CAF50",
+                </CardContent>
+              </Card>
+              {/* Workout Block System */}
+              {useBlockSystem && workoutBlocks.length > 0 ? (
+                <>
+                  {/* Block Progress Indicator */}
+                  {workoutBlocks.length > 1 && (
+                    <Card className={`${theme.card} border ${theme.border} rounded-2xl overflow-hidden mb-4`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                          {workoutBlocks.map((block, index) => {
+                            const isCompleted = block.isCompleted || index < currentBlockIndex;
+                            const isCurrent = index === currentBlockIndex;
+                            const blockClass = isCompleted
+                              ? "opacity-50 pointer-events-none bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
+                              : isCurrent
+                              ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                              : "bg-slate-50 dark:bg-slate-800";
+                            
+                            return (
+                              <div
+                                key={block.block.id}
+                                className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg border-2 ${
+                                  isCompleted
+                                    ? "border-gray-300 dark:border-gray-600"
+                                    : isCurrent
+                                    ? "border-blue-500"
+                                    : "border-slate-300 dark:border-slate-600"
+                                } ${blockClass}`}
+                                title={block.block.block_name || `Block ${index + 1}`}
+                              >
+                                {isCompleted ? (
+                                  <Check className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                                ) : (
+                                  <span className="text-sm font-semibold">{index + 1}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-2 text-center">
+                          Block {currentBlockIndex + 1} of {workoutBlocks.length}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  <LiveWorkoutBlockExecutor
+                    block={workoutBlocks[currentBlockIndex]}
+                    onBlockComplete={handleBlockComplete}
+                    onNextBlock={handleNextBlock}
+                    e1rmMap={e1rmMap}
+                    onE1rmUpdate={(exerciseId, e1rm) => {
+                      setE1rmMap((prev) => ({
+                        ...prev,
+                        [exerciseId]: e1rm,
+                      }));
                     }}
-                  >
-                    <div>
-                      {/* Rep-based behaves like AMRAP */}
-                      {currentExercise?.meta?.emom_mode === "rep_based" ? (
-                        !emomRepActive && emomRepTimeLeft === 0 ? (
+                    sessionId={sessionId}
+                    assignmentId={assignmentId}
+                    allBlocks={workoutBlocks}
+                    currentBlockIndex={currentBlockIndex}
+                    onBlockChange={handleBlockChange}
+                    onSetLogged={handleSetLogged}
+                    onExerciseComplete={handleExerciseComplete}
+                  />
+                  {/* Complete Workout Button - Only show on last block when complete */}
+                  {isLastBlockComplete && currentBlockIndex === workoutBlocks.length - 1 && (
+                    <div className="mt-6">
+                      <Button
+                        onClick={async () => {
+                          console.log("🔘 Complete Workout button clicked");
+                          setShowWorkoutCompletion(false);
+                          await completeWorkout();
+                        }}
+                        className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl h-14 text-lg font-semibold shadow-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CheckCircle className="w-6 h-6" />
+                          Complete Workout
+                        </div>
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : /* Traditional Workout System */
+              loading ? (
+                <Card
+                  className={`${theme.card} border ${theme.border} rounded-3xl overflow-hidden`}
+                >
+                  <CardContent className="p-12 text-center">
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                      <Dumbbell className="w-10 h-10 text-white animate-pulse" />
+                    </div>
+                    <h3 className={`text-2xl font-bold ${theme.text} mb-3`}>
+                      Loading workout...
+                    </h3>
+                    <p className={`${theme.textSecondary} mb-6`}>
+                      Please wait while we prepare your exercises.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : currentExercise ? (
+                <div className="space-y-4 sm:space-y-6">
+                  {/* Instruction Card - Only show for types that don't have their own detail cards */}
+                  {currentType !== "giant_set" &&
+                    currentType !== "circuit" &&
+                    currentType !== "tabata" &&
+                    currentType !== "amrap" &&
+                    currentType !== "emom" &&
+                    currentType !== "for_time" &&
+                    currentType !== "superset" &&
+                    currentType !== "pre_exhaustion" && (
+                      <div className="rounded-2xl sm:rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl relative z-30">
+                        <Card
+                          className={`border-0 ${theme.card} bg-white/90 dark:bg-slate-800/90 backdrop-blur-md overflow-hidden`}
+                        >
+                          <CardContent className="p-4 sm:p-5">
+                            <div className="flex items-start gap-3">
+                              <div className="shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md">
+                                <Lightbulb className="w-4 h-4" />
+                              </div>
+                              <div className="flex-1">
+                                <div
+                                  className={`text-base font-semibold ${theme.text} mb-1`}
+                                >
+                                  How to perform
+                                </div>
+                                <div
+                                  className={`text-base leading-relaxed ${theme.textSecondary} rounded-xl border ${theme.border} bg-white/70 dark:bg-slate-800/50 p-3`}
+                                >
+                                  {typeHelp}
+                                </div>
+                              </div>
+                              {/* Optional tiny illustration placeholder (hidden if not needed) */}
+                              <div className="hidden sm:block shrink-0">
+                                <div className="w-16 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border border-white/40 dark:border-white/10"></div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )}
+                  {/* AMRAP Flow */}
+                  {currentType === "amrap" && (
+                    <div
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: "24px",
+                        padding: "24px",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                        border: "2px solid #2196F3",
+                      }}
+                    >
+                      <div>
+                        {!amrapActive ? (
                           <div
                             style={{
                               display: "flex",
@@ -2309,13 +2772,13 @@ export default function LiveWorkout() {
                                   height: "56px",
                                   borderRadius: "18px",
                                   background:
-                                    "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
+                                    "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
                                 }}
                               >
-                                <Clock
+                                <Target
                                   style={{
                                     width: "32px",
                                     height: "32px",
@@ -2331,12 +2794,368 @@ export default function LiveWorkout() {
                                     color: "#1A1A1A",
                                   }}
                                 >
-                                  EMOM Details (Rep-Based)
+                                  AMRAP Details
                                 </div>
                                 <div
                                   style={{ fontSize: "14px", color: "#6B7280" }}
                                 >
-                                  Complete target reps every minute
+                                  Complete as many reps as possible
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Summary Info */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="rounded-xl p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-200 dark:border-blue-700">
+                                <div
+                                  className={`text-sm ${theme.textSecondary} mb-1`}
+                                >
+                                  Duration
+                                </div>
+                                <div
+                                  className={`text-2xl font-bold ${theme.text}`}
+                                >
+                                  {currentExercise?.meta?.amrap_duration ||
+                                    currentExercise?.amrap_duration ||
+                                    10}{" "}
+                                  min
+                                </div>
+                              </div>
+                              <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
+                                <div
+                                  className={`text-sm ${theme.textSecondary} mb-1`}
+                                >
+                                  Sets
+                                </div>
+                                <div
+                                  className={`text-2xl font-bold ${theme.text}`}
+                                >
+                                  {currentExercise?.sets || 1}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Exercise Details */}
+                            <div className="rounded-xl p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700">
+                              <div className="flex items-start gap-3 mb-3">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-400 to-cyan-500">
+                                  <Dumbbell className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <div
+                                      className={`font-bold ${theme.text} text-base`}
+                                    >
+                                      {currentExercise.exercise?.name ||
+                                        "Exercise"}
+                                    </div>
+                                    {/* Utility Icon Buttons */}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        setShowPlateCalculator(true)
+                                      }
+                                      className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                    >
+                                      <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        setShowExerciseAlternatives(true)
+                                      }
+                                      className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                    >
+                                      <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                    </Button>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 text-sm">
+                                    {currentExercise?.reps && (
+                                      <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
+                                        <span
+                                          className={`text-sm font-bold ${theme.text}`}
+                                        >
+                                          {currentExercise.reps} reps
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {currentExercise.exercise?.video_url && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      openVideoModal(
+                                        currentExercise.exercise?.video_url ||
+                                          ""
+                                      )
+                                    }
+                                    className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  >
+                                    <Youtube className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+
+                              {/* Logging Fields */}
+                              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 dark:border-slate-600">
+                                <div>
+                                  <label
+                                    className={`block text-sm font-medium ${theme.text} mb-1`}
+                                  >
+                                    Weight (kg)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={amrapWeight}
+                                    onChange={(e) =>
+                                      setAmrapWeight(e.target.value)
+                                    }
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    step="0.5"
+                                    placeholder="0"
+                                  />
+                                </div>
+                                <div>
+                                  <label
+                                    className={`block text-sm font-medium ${theme.text} mb-1`}
+                                  >
+                                    Reps Achieved
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={amrapReps}
+                                    onChange={(e) =>
+                                      setAmrapReps(e.target.value)
+                                    }
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    placeholder="0"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Previous Performance Card */}
+                            <PreviousPerformanceCard />
+
+                            {/* Action Buttons */}
+                            <div className="space-y-2">
+                              {/* Primary: Log and Continue */}
+                              <Button
+                                onClick={completeAmrapSet}
+                                className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                                disabled={isLoggingSet}
+                              >
+                                <Check className="w-5 h-5 mr-2" /> Log AMRAP
+                              </Button>
+
+                              {/* Secondary: Start Timer */}
+                              <Button
+                                onClick={() => {
+                                  const minutes =
+                                    Number(
+                                      currentExercise?.meta?.amrap_duration
+                                    ) ||
+                                    Number(currentExercise?.amrap_duration) ||
+                                    10;
+                                  setAmrapTimeLeft(minutes * 60);
+                                  setAmrapActive(true);
+                                }}
+                                variant="outline"
+                                className="w-full border-2 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl py-4 text-base font-semibold"
+                              >
+                                <Clock className="w-4 h-4 mr-2" /> Start Timer
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-8">
+                            <div className="text-5xl font-bold text-blue-700 dark:text-blue-300">
+                              {Math.floor(amrapTimeLeft / 60)
+                                .toString()
+                                .padStart(2, "0")}
+                              :
+                              {(amrapTimeLeft % 60).toString().padStart(2, "0")}
+                            </div>
+                            <div className="mt-2 text-slate-600 dark:text-slate-300">
+                              Time Remaining
+                            </div>
+                            <Button
+                              onClick={() => {
+                                setAmrapActive(false);
+                                setAmrapTimeLeft(0);
+                              }}
+                              variant="outline"
+                              className="mt-4"
+                            >
+                              Stop
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* EMOM Flow */}
+                  {currentType === "emom" && (
+                    <div
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: "24px",
+                        padding: "24px",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                        border: "2px solid #4CAF50",
+                      }}
+                    >
+                      <div>
+                        {/* Rep-based behaves like AMRAP */}
+                        {currentExercise?.meta?.emom_mode === "rep_based" ? (
+                          !emomRepActive && emomRepTimeLeft === 0 ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "16px",
+                              }}
+                            >
+                              {/* Exercise Details Header */}
+                              <div
+                                className="flex items-center"
+                                style={{ gap: "12px" }}
+                              >
+                                <div
+                                  style={{
+                                    width: "56px",
+                                    height: "56px",
+                                    borderRadius: "18px",
+                                    background:
+                                      "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Clock
+                                    style={{
+                                      width: "32px",
+                                      height: "32px",
+                                      color: "#FFFFFF",
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <div
+                                    style={{
+                                      fontSize: "20px",
+                                      fontWeight: "700",
+                                      color: "#1A1A1A",
+                                    }}
+                                  >
+                                    EMOM Details (Rep-Based)
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "14px",
+                                      color: "#6B7280",
+                                    }}
+                                  >
+                                    Complete target reps every minute
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Summary Info */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-xl p-4 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-2 border-emerald-200 dark:border-emerald-700">
+                                  <div
+                                    className={`text-sm ${theme.textSecondary} mb-1`}
+                                  >
+                                    Duration
+                                  </div>
+                                  <div
+                                    className={`text-2xl font-bold ${theme.text}`}
+                                  >
+                                    {currentExercise?.meta?.emom_duration ||
+                                      currentExercise?.emom_duration ||
+                                      10}{" "}
+                                    min
+                                  </div>
+                                </div>
+                                <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
+                                  <div
+                                    className={`text-sm ${theme.textSecondary} mb-1`}
+                                  >
+                                    Sets
+                                  </div>
+                                  <div
+                                    className={`text-2xl font-bold ${theme.text}`}
+                                  >
+                                    {currentExercise?.sets || 1}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Start Button */}
+                              <Button
+                                onClick={() => {
+                                  const minutes =
+                                    Number(
+                                      currentExercise?.meta?.emom_duration
+                                    ) ||
+                                    Number(currentExercise?.emom_duration) ||
+                                    10;
+                                  setEmomRepTimeLeft(minutes * 60);
+                                  setEmomRepActive(true);
+                                }}
+                                className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                              >
+                                <Clock className="w-5 h-5 mr-2" /> Start EMOM
+                              </Button>
+                            </div>
+                          ) : emomRepActive ? (
+                            <div className="flex flex-col items-center justify-center py-8">
+                              <div className="text-5xl font-bold text-emerald-700 dark:text-emerald-300">
+                                {Math.floor(emomRepTimeLeft / 60)
+                                  .toString()
+                                  .padStart(2, "0")}
+                                :
+                                {(emomRepTimeLeft % 60)
+                                  .toString()
+                                  .padStart(2, "0")}
+                              </div>
+                              <div className="mt-2 text-slate-600 dark:text-slate-300">
+                                Time Remaining
+                              </div>
+                              <Button
+                                onClick={() => setEmomRepActive(false)}
+                                variant="outline"
+                                className="mt-4"
+                              >
+                                Stop
+                              </Button>
+                            </div>
+                          ) : null
+                        ) : // Time-based with alternating phases
+                        !emomActive && emomTotalLeft === 0 ? (
+                          <div className="space-y-4">
+                            {/* Exercise Details Header */}
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600">
+                                <Clock className="w-5 h-5 text-white" />
+                              </div>
+                              <div>
+                                <div
+                                  className={`text-xl font-bold ${theme.text}`}
+                                >
+                                  EMOM Details (Time-Based)
+                                </div>
+                                <div
+                                  className={`text-sm ${theme.textSecondary}`}
+                                >
+                                  Work every minute on the minute
                                 </div>
                               </div>
                             </div>
@@ -2362,12 +3181,15 @@ export default function LiveWorkout() {
                                 <div
                                   className={`text-sm ${theme.textSecondary} mb-1`}
                                 >
-                                  Sets
+                                  Work Time
                                 </div>
                                 <div
                                   className={`text-2xl font-bold ${theme.text}`}
                                 >
-                                  {currentExercise?.sets || 1}
+                                  {currentExercise?.meta?.work_seconds ||
+                                    currentExercise?.work_seconds ||
+                                    40}
+                                  s
                                 </div>
                               </div>
                             </div>
@@ -2381,188 +3203,85 @@ export default function LiveWorkout() {
                                   ) ||
                                   Number(currentExercise?.emom_duration) ||
                                   10;
-                                setEmomRepTimeLeft(minutes * 60);
-                                setEmomRepActive(true);
+                                const workSeconds =
+                                  Number(currentExercise?.meta?.work_seconds) ||
+                                  Number(currentExercise?.work_seconds) ||
+                                  40;
+                                const restSeconds = Math.max(
+                                  0,
+                                  60 - workSeconds
+                                );
+                                setEmomTotalLeft(minutes * 60);
+                                setEmomPhase("work");
+                                setEmomPhaseLeft(workSeconds);
+                                setEmomActive(true);
                               }}
                               className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
                             >
                               <Clock className="w-5 h-5 mr-2" /> Start EMOM
                             </Button>
                           </div>
-                        ) : emomRepActive ? (
+                        ) : emomActive ? (
                           <div className="flex flex-col items-center justify-center py-8">
-                            <div className="text-5xl font-bold text-emerald-700 dark:text-emerald-300">
-                              {Math.floor(emomRepTimeLeft / 60)
+                            <div className="text-sm uppercase tracking-wide text-slate-600 dark:text-slate-300 mb-1">
+                              Total Remaining
+                            </div>
+                            <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-300 mb-4">
+                              {Math.floor(emomTotalLeft / 60)
                                 .toString()
                                 .padStart(2, "0")}
                               :
-                              {(emomRepTimeLeft % 60)
+                              {(emomTotalLeft % 60).toString().padStart(2, "0")}
+                            </div>
+                            <div
+                              className={`text-5xl font-extrabold ${
+                                emomPhase === "work"
+                                  ? "text-red-600"
+                                  : "text-blue-600"
+                              } dark:${
+                                emomPhase === "work"
+                                  ? "text-red-400"
+                                  : "text-blue-400"
+                              }`}
+                            >
+                              {Math.floor(emomPhaseLeft / 60)
                                 .toString()
                                 .padStart(2, "0")}
+                              :
+                              {(emomPhaseLeft % 60).toString().padStart(2, "0")}
                             </div>
                             <div className="mt-2 text-slate-600 dark:text-slate-300">
-                              Time Remaining
+                              {emomPhase === "work" ? "Work" : "Rest"} phase
                             </div>
                             <Button
-                              onClick={() => setEmomRepActive(false)}
+                              onClick={() => setEmomActive(false)}
                               variant="outline"
                               className="mt-4"
                             >
                               Stop
                             </Button>
                           </div>
-                        ) : null
-                      ) : // Time-based with alternating phases
-                      !emomActive && emomTotalLeft === 0 ? (
-                        <div className="space-y-4">
-                          {/* Exercise Details Header */}
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600">
-                              <Clock className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                              <div
-                                className={`text-xl font-bold ${theme.text}`}
-                              >
-                                EMOM Details (Time-Based)
-                              </div>
-                              <div className={`text-sm ${theme.textSecondary}`}>
-                                Work every minute on the minute
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Summary Info */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="rounded-xl p-4 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-2 border-emerald-200 dark:border-emerald-700">
-                              <div
-                                className={`text-sm ${theme.textSecondary} mb-1`}
-                              >
-                                Duration
-                              </div>
-                              <div
-                                className={`text-2xl font-bold ${theme.text}`}
-                              >
-                                {currentExercise?.meta?.emom_duration ||
-                                  currentExercise?.emom_duration ||
-                                  10}{" "}
-                                min
-                              </div>
-                            </div>
-                            <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                              <div
-                                className={`text-sm ${theme.textSecondary} mb-1`}
-                              >
-                                Work Time
-                              </div>
-                              <div
-                                className={`text-2xl font-bold ${theme.text}`}
-                              >
-                                {currentExercise?.meta?.work_seconds ||
-                                  currentExercise?.work_seconds ||
-                                  40}
-                                s
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Start Button */}
-                          <Button
-                            onClick={() => {
-                              const minutes =
-                                Number(currentExercise?.meta?.emom_duration) ||
-                                Number(currentExercise?.emom_duration) ||
-                                10;
-                              const workSeconds =
-                                Number(currentExercise?.meta?.work_seconds) ||
-                                Number(currentExercise?.work_seconds) ||
-                                40;
-                              const restSeconds = Math.max(0, 60 - workSeconds);
-                              setEmomTotalLeft(minutes * 60);
-                              setEmomPhase("work");
-                              setEmomPhaseLeft(workSeconds);
-                              setEmomActive(true);
-                            }}
-                            className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
-                          >
-                            <Clock className="w-5 h-5 mr-2" /> Start EMOM
-                          </Button>
-                        </div>
-                      ) : emomActive ? (
-                        <div className="flex flex-col items-center justify-center py-8">
-                          <div className="text-sm uppercase tracking-wide text-slate-600 dark:text-slate-300 mb-1">
-                            Total Remaining
-                          </div>
-                          <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-300 mb-4">
-                            {Math.floor(emomTotalLeft / 60)
-                              .toString()
-                              .padStart(2, "0")}
-                            :{(emomTotalLeft % 60).toString().padStart(2, "0")}
-                          </div>
-                          <div
-                            className={`text-5xl font-extrabold ${
-                              emomPhase === "work"
-                                ? "text-red-600"
-                                : "text-blue-600"
-                            } dark:${
-                              emomPhase === "work"
-                                ? "text-red-400"
-                                : "text-blue-400"
-                            }`}
-                          >
-                            {Math.floor(emomPhaseLeft / 60)
-                              .toString()
-                              .padStart(2, "0")}
-                            :{(emomPhaseLeft % 60).toString().padStart(2, "0")}
-                          </div>
-                          <div className="mt-2 text-slate-600 dark:text-slate-300">
-                            {emomPhase === "work" ? "Work" : "Rest"} phase
-                          </div>
-                          <Button
-                            onClick={() => setEmomActive(false)}
-                            variant="outline"
-                            className="mt-4"
-                          >
-                            Stop
-                          </Button>
-                        </div>
-                      ) : null}
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Tabata / Circuit Flow */}
-                {(currentType === "tabata" || currentType === "circuit") && (
-                  <div
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      borderRadius: "24px",
-                      padding: "24px",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                      border:
-                        currentType === "tabata"
-                          ? "2px solid #F5576C"
-                          : "2px solid #6C5CE7",
-                    }}
-                  >
-                    <div>
-                      {!intervalActive ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "16px",
-                          }}
-                        >
-                          {/* Debug log */}
-                          {currentType === "tabata" &&
-                            console.log("🔍 Tabata currentExercise data:", {
-                              work_seconds: currentExercise?.work_seconds,
-                              rest_seconds: currentExercise?.rest_seconds,
-                              meta: currentExercise?.meta,
-                              full: currentExercise,
-                            })}
-                          {/* Exercise Details Card */}
+                  {/* Tabata / Circuit Flow */}
+                  {(currentType === "tabata" || currentType === "circuit") && (
+                    <div
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: "24px",
+                        padding: "24px",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                        border:
+                          currentType === "tabata"
+                            ? "2px solid #F5576C"
+                            : "2px solid #6C5CE7",
+                      }}
+                    >
+                      <div>
+                        {!intervalActive ? (
                           <div
                             style={{
                               display: "flex",
@@ -2570,1295 +3289,549 @@ export default function LiveWorkout() {
                               gap: "16px",
                             }}
                           >
-                            {/* Header */}
+                            {/* Exercise Details Card */}
                             <div
-                              className="flex items-center"
-                              style={{ gap: "12px" }}
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "16px",
+                              }}
                             >
+                              {/* Header */}
                               <div
-                                style={{
-                                  width: "56px",
-                                  height: "56px",
-                                  borderRadius: "18px",
-                                  background:
-                                    currentType === "tabata"
-                                      ? "linear-gradient(135deg, #F5576C 0%, #FF8A80 100%)"
-                                      : "linear-gradient(135deg, #6C5CE7 0%, #A29BFE 100%)",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
+                                className="flex items-center"
+                                style={{ gap: "12px" }}
                               >
-                                <Activity
-                                  style={{
-                                    width: "32px",
-                                    height: "32px",
-                                    color: "#FFFFFF",
-                                  }}
-                                />
-                              </div>
-                              <div>
                                 <div
                                   style={{
-                                    fontSize: "20px",
-                                    fontWeight: "700",
-                                    color: "#1A1A1A",
-                                  }}
-                                >
-                                  {currentType === "tabata"
-                                    ? "Tabata"
-                                    : "Circuit"}{" "}
-                                  Details
-                                </div>
-                                <div
-                                  style={{ fontSize: "14px", color: "#6B7280" }}
-                                >
-                                  Autoplay countdowns for work and rest
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Summary Info */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="rounded-xl p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
-                                <div
-                                  className={`text-sm ${theme.textSecondary} mb-1`}
-                                >
-                                  {currentType === "tabata"
-                                    ? "Rounds per Set"
-                                    : "Total Rounds"}
-                                </div>
-                                <div
-                                  className={`text-2xl font-bold ${theme.text}`}
-                                >
-                                  {currentType === "tabata"
-                                    ? currentExercise?.rounds ||
-                                      currentExercise?.meta?.rounds ||
-                                      8
-                                    : currentExercise?.sets || 1}
-                                </div>
-                              </div>
-                              <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                                <div
-                                  className={`text-sm ${theme.textSecondary} mb-1`}
-                                >
-                                  {currentType === "tabata"
-                                    ? "Total Sets"
-                                    : "Sets per Round"}
-                                </div>
-                                <div
-                                  className={`text-2xl font-bold ${theme.text}`}
-                                >
-                                  {(() => {
-                                    const sets =
+                                    width: "56px",
+                                    height: "56px",
+                                    borderRadius: "18px",
+                                    background:
                                       currentType === "tabata"
-                                        ? currentExercise?.meta?.tabata_sets ||
-                                          currentExercise?.tabata_sets
-                                        : currentExercise?.meta?.circuit_sets;
-                                    return Array.isArray(sets)
-                                      ? sets.length
-                                      : 0;
-                                  })()}
+                                        ? "linear-gradient(135deg, #F5576C 0%, #FF8A80 100%)"
+                                        : "linear-gradient(135deg, #6C5CE7 0%, #A29BFE 100%)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Activity
+                                    style={{
+                                      width: "32px",
+                                      height: "32px",
+                                      color: "#FFFFFF",
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <div
+                                    style={{
+                                      fontSize: "20px",
+                                      fontWeight: "700",
+                                      color: "#1A1A1A",
+                                    }}
+                                  >
+                                    {currentType === "tabata"
+                                      ? "Tabata"
+                                      : "Circuit"}{" "}
+                                    Details
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "14px",
+                                      color: "#6B7280",
+                                    }}
+                                  >
+                                    Autoplay countdowns for work and rest
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            {/* Sets Details */}
-                            {(() => {
-                              const sets =
-                                currentType === "tabata"
-                                  ? currentExercise?.meta?.tabata_sets ||
-                                    currentExercise?.tabata_sets
-                                  : currentExercise?.meta?.circuit_sets;
-                              return (
-                                Array.isArray(sets) &&
-                                sets.length > 0 && (
-                                  <div className="space-y-3">
-                                    {sets.map((set: any, setIndex: number) => (
-                                      <div
-                                        key={setIndex}
-                                        className="rounded-xl p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
-                                      >
-                                        {/* Set Header */}
-                                        <div className="flex items-center justify-between mb-3">
+                              {/* Summary Info */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-xl p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
+                                  <div
+                                    className={`text-sm ${theme.textSecondary} mb-1`}
+                                  >
+                                    {currentType === "tabata"
+                                      ? "Rounds per Set"
+                                      : "Total Rounds"}
+                                  </div>
+                                  <div
+                                    className={`text-2xl font-bold ${theme.text}`}
+                                  >
+                                    {currentType === "tabata"
+                                      ? currentExercise?.rounds ||
+                                        currentExercise?.meta?.rounds ||
+                                        8
+                                      : currentExercise?.sets || 1}
+                                  </div>
+                                </div>
+                                <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
+                                  <div
+                                    className={`text-sm ${theme.textSecondary} mb-1`}
+                                  >
+                                    {currentType === "tabata"
+                                      ? "Total Sets"
+                                      : "Sets per Round"}
+                                  </div>
+                                  <div
+                                    className={`text-2xl font-bold ${theme.text}`}
+                                  >
+                                    {(() => {
+                                      const sets =
+                                        currentType === "tabata"
+                                          ? currentExercise?.meta
+                                              ?.tabata_sets ||
+                                            currentExercise?.tabata_sets
+                                          : currentExercise?.meta?.circuit_sets;
+                                      return Array.isArray(sets)
+                                        ? sets.length
+                                        : 0;
+                                    })()}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Sets Details */}
+                              {(() => {
+                                const sets =
+                                  currentType === "tabata"
+                                    ? currentExercise?.meta?.tabata_sets ||
+                                      currentExercise?.tabata_sets
+                                    : currentExercise?.meta?.circuit_sets;
+                                return (
+                                  Array.isArray(sets) &&
+                                  sets.length > 0 && (
+                                    <div className="space-y-3">
+                                      {sets.map(
+                                        (set: any, setIndex: number) => (
                                           <div
-                                            className={`text-lg font-bold ${theme.text}`}
+                                            key={setIndex}
+                                            className="rounded-xl p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
                                           >
-                                            Set {setIndex + 1}
-                                          </div>
-                                          {set.rest_between_sets && (
-                                            <div className="px-3 py-1 rounded-lg bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
+                                            {/* Set Header */}
+                                            <div className="flex items-center justify-between mb-3">
                                               <div
-                                                className={`text-xs font-semibold ${theme.text}`}
+                                                className={`text-lg font-bold ${theme.text}`}
                                               >
-                                                Rest After Set:{" "}
-                                                {set.rest_between_sets}s
+                                                Set {setIndex + 1}
                                               </div>
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        {/* Exercises */}
-                                        <div className="space-y-2">
-                                          {Array.isArray(set.exercises) &&
-                                            set.exercises.map(
-                                              (
-                                                exercise: any,
-                                                exerciseIndex: number
-                                              ) => {
-                                                const exerciseInfo =
-                                                  exerciseLookup[
-                                                    exercise.exercise_id
-                                                  ];
-                                                return (
+                                              {set.rest_between_sets && (
+                                                <div className="px-3 py-1 rounded-lg bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
                                                   <div
-                                                    key={exerciseIndex}
-                                                    className="rounded-lg p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600"
+                                                    className={`text-xs font-semibold ${theme.text}`}
                                                   >
-                                                    <div className="flex items-start gap-3">
+                                                    Rest After Set:{" "}
+                                                    {set.rest_between_sets}s
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+
+                                            {/* Exercises */}
+                                            <div className="space-y-2">
+                                              {Array.isArray(set.exercises) &&
+                                                set.exercises.map(
+                                                  (
+                                                    exercise: any,
+                                                    exerciseIndex: number
+                                                  ) => {
+                                                    const exerciseInfo =
+                                                      exerciseLookup[
+                                                        exercise.exercise_id
+                                                      ];
+                                                    return (
                                                       <div
-                                                        className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                                          currentType ===
-                                                          "tabata"
-                                                            ? "bg-gradient-to-br from-red-400 to-orange-500"
-                                                            : "bg-gradient-to-br from-purple-400 to-indigo-500"
-                                                        }`}
+                                                        key={exerciseIndex}
+                                                        className="rounded-lg p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600"
                                                       >
-                                                        <span className="text-white font-bold text-sm">
-                                                          {exerciseIndex + 1}
-                                                        </span>
-                                                      </div>
-                                                      <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 mb-1">
+                                                        <div className="flex items-start gap-3">
                                                           <div
-                                                            className={`font-bold ${theme.text} text-base`}
+                                                            className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                                              currentType ===
+                                                              "tabata"
+                                                                ? "bg-gradient-to-br from-red-400 to-orange-500"
+                                                                : "bg-gradient-to-br from-purple-400 to-indigo-500"
+                                                            }`}
                                                           >
-                                                            {exerciseInfo?.name ||
-                                                              "Unknown Exercise"}
+                                                            <span className="text-white font-bold text-sm">
+                                                              {exerciseIndex +
+                                                                1}
+                                                            </span>
                                                           </div>
-                                                          {/* Utility Icon Buttons */}
-                                                          <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                              setShowPlateCalculator(
-                                                                true
-                                                              )
-                                                            }
-                                                            className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                                                          >
-                                                            <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                                                          </Button>
-                                                          <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                              setShowExerciseAlternatives(
-                                                                true
-                                                              )
-                                                            }
-                                                            className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                                                          >
-                                                            <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                                                          </Button>
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-2 text-sm">
-                                                          {currentType ===
-                                                          "tabata" ? (
-                                                            <>
-                                                              {/* For Tabata, use global work_seconds and rest_seconds */}
-                                                              {(currentExercise?.work_seconds ||
-                                                                currentExercise
-                                                                  ?.meta
-                                                                  ?.work_seconds) && (
-                                                                <div className="px-2 py-1 rounded bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700">
-                                                                  <span
-                                                                    className={`font-semibold ${theme.text}`}
-                                                                  >
-                                                                    Work:{" "}
-                                                                    {currentExercise?.work_seconds ||
-                                                                      currentExercise
-                                                                        ?.meta
-                                                                        ?.work_seconds}
-                                                                    s
-                                                                  </span>
-                                                                </div>
+                                                          <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                              <div
+                                                                className={`font-bold ${theme.text} text-base`}
+                                                              >
+                                                                {exerciseInfo?.name ||
+                                                                  "Unknown Exercise"}
+                                                              </div>
+                                                              {/* Utility Icon Buttons */}
+                                                              <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                  setShowPlateCalculator(
+                                                                    true
+                                                                  )
+                                                                }
+                                                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                                              >
+                                                                <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                                              </Button>
+                                                              <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                  setShowExerciseAlternatives(
+                                                                    true
+                                                                  )
+                                                                }
+                                                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                                              >
+                                                                <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                                              </Button>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-2 text-sm">
+                                                              {currentType ===
+                                                              "tabata" ? (
+                                                                <>
+                                                                  {/* For Tabata, use global work_seconds and rest_seconds */}
+                                                                  {(currentExercise?.work_seconds ||
+                                                                    currentExercise
+                                                                      ?.meta
+                                                                      ?.work_seconds) && (
+                                                                    <div className="px-2 py-1 rounded bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700">
+                                                                      <span
+                                                                        className={`font-semibold ${theme.text}`}
+                                                                      >
+                                                                        Work:{" "}
+                                                                        {currentExercise?.work_seconds ||
+                                                                          currentExercise
+                                                                            ?.meta
+                                                                            ?.work_seconds}
+                                                                        s
+                                                                      </span>
+                                                                    </div>
+                                                                  )}
+                                                                  {(currentExercise?.rest_seconds ||
+                                                                    currentExercise
+                                                                      ?.meta
+                                                                      ?.rest_seconds) && (
+                                                                    <div className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700">
+                                                                      <span
+                                                                        className={`font-semibold ${theme.text}`}
+                                                                      >
+                                                                        Rest:{" "}
+                                                                        {currentExercise?.rest_seconds ||
+                                                                          currentExercise
+                                                                            ?.meta
+                                                                            ?.rest_seconds}
+                                                                        s
+                                                                      </span>
+                                                                    </div>
+                                                                  )}
+                                                                </>
+                                                              ) : (
+                                                                <>
+                                                                  {/* For Circuit, use individual exercise settings */}
+                                                                  {exercise.work_seconds && (
+                                                                    <div className="px-2 py-1 rounded bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700">
+                                                                      <span
+                                                                        className={`font-semibold ${theme.text}`}
+                                                                      >
+                                                                        Work:{" "}
+                                                                        {
+                                                                          exercise.work_seconds
+                                                                        }
+                                                                        s
+                                                                      </span>
+                                                                    </div>
+                                                                  )}
+                                                                  {exercise.target_reps && (
+                                                                    <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
+                                                                      <span
+                                                                        className={`font-semibold ${theme.text}`}
+                                                                      >
+                                                                        Target:{" "}
+                                                                        {
+                                                                          exercise.target_reps
+                                                                        }{" "}
+                                                                        reps
+                                                                      </span>
+                                                                    </div>
+                                                                  )}
+                                                                  {exercise.rest_after && (
+                                                                    <div className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700">
+                                                                      <span
+                                                                        className={`font-semibold ${theme.text}`}
+                                                                      >
+                                                                        Rest:{" "}
+                                                                        {
+                                                                          exercise.rest_after
+                                                                        }
+                                                                        s
+                                                                      </span>
+                                                                    </div>
+                                                                  )}
+                                                                </>
                                                               )}
-                                                              {(currentExercise?.rest_seconds ||
-                                                                currentExercise
-                                                                  ?.meta
-                                                                  ?.rest_seconds) && (
-                                                                <div className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700">
-                                                                  <span
-                                                                    className={`font-semibold ${theme.text}`}
-                                                                  >
-                                                                    Rest:{" "}
-                                                                    {currentExercise?.rest_seconds ||
-                                                                      currentExercise
-                                                                        ?.meta
-                                                                        ?.rest_seconds}
-                                                                    s
-                                                                  </span>
-                                                                </div>
-                                                              )}
-                                                            </>
-                                                          ) : (
-                                                            <>
-                                                              {/* For Circuit, use individual exercise settings */}
-                                                              {exercise.work_seconds && (
-                                                                <div className="px-2 py-1 rounded bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700">
-                                                                  <span
-                                                                    className={`font-semibold ${theme.text}`}
-                                                                  >
-                                                                    Work:{" "}
-                                                                    {
-                                                                      exercise.work_seconds
-                                                                    }
-                                                                    s
-                                                                  </span>
-                                                                </div>
-                                                              )}
-                                                              {exercise.target_reps && (
-                                                                <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
-                                                                  <span
-                                                                    className={`font-semibold ${theme.text}`}
-                                                                  >
-                                                                    Target:{" "}
-                                                                    {
-                                                                      exercise.target_reps
-                                                                    }{" "}
-                                                                    reps
-                                                                  </span>
-                                                                </div>
-                                                              )}
-                                                              {exercise.rest_after && (
-                                                                <div className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700">
-                                                                  <span
-                                                                    className={`font-semibold ${theme.text}`}
-                                                                  >
-                                                                    Rest:{" "}
-                                                                    {
-                                                                      exercise.rest_after
-                                                                    }
-                                                                    s
-                                                                  </span>
-                                                                </div>
-                                                              )}
-                                                            </>
+                                                            </div>
+                                                          </div>
+                                                          {/* Video Button */}
+                                                          {exerciseInfo?.video_url && (
+                                                            <Button
+                                                              variant="outline"
+                                                              size="sm"
+                                                              onClick={() => {
+                                                                setCurrentVideoUrl(
+                                                                  exerciseInfo.video_url ||
+                                                                    ""
+                                                                );
+                                                                setShowVideoModal(
+                                                                  true
+                                                                );
+                                                              }}
+                                                              className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                            >
+                                                              <Youtube className="w-4 h-4" />
+                                                            </Button>
                                                           )}
                                                         </div>
                                                       </div>
-                                                      {/* Video Button */}
-                                                      {exerciseInfo?.video_url && (
-                                                        <Button
-                                                          variant="outline"
-                                                          size="sm"
-                                                          onClick={() => {
-                                                            setCurrentVideoUrl(
-                                                              exerciseInfo.video_url ||
-                                                                ""
-                                                            );
-                                                            setShowVideoModal(
-                                                              true
-                                                            );
-                                                          }}
-                                                          className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                        >
-                                                          <Youtube className="w-4 h-4" />
-                                                        </Button>
-                                                      )}
-                                                    </div>
-                                                  </div>
-                                                );
-                                              }
-                                            )}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )
-                              );
-                            })()}
-                          </div>
-
-                          {/* Start Button */}
-                          <Button
-                            onClick={() => {
-                              setShowTimerModal(true);
-                              setTimerExerciseIndex(0);
-                              setTimerSetIndex(0);
-                              setIntervalMode(currentType as any);
-                              setIntervalRound(0);
-                              setIntervalPhase("work");
-                              setIntervalActive(true);
-
-                              // Initialize timer with first exercise
-                              const sets =
-                                currentType === "tabata"
-                                  ? currentExercise?.meta?.tabata_sets ||
-                                    currentExercise?.tabata_sets
-                                  : currentExercise?.meta?.circuit_sets;
-                              const firstSet = sets?.[0];
-                              const firstExercise = firstSet?.exercises?.[0];
-                              const workTime =
-                                firstExercise?.work_seconds || 20;
-                              setIntervalPhaseLeft(workTime);
-
-                              // Set total rounds
-                              const rounds = currentExercise?.sets || 1;
-                              setIntervalTotalRounds(rounds);
-                            }}
-                            className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
-                          >
-                            <Clock className="w-5 h-5 mr-2" /> Start{" "}
-                            {currentType === "tabata" ? "Tabata" : "Circuit"}
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-8">
-                          <div className="text-sm text-slate-600 dark:text-slate-300 mb-1">
-                            Round{" "}
-                            {Math.min(
-                              intervalRound +
-                                (intervalPhase === "rest" ? 1 : 1),
-                              intervalTotalRounds
-                            )}{" "}
-                            / {intervalTotalRounds}
-                          </div>
-                          <div
-                            className={`text-5xl font-extrabold ${
-                              intervalPhase === "work"
-                                ? "text-purple-700"
-                                : "text-indigo-700"
-                            } dark:${
-                              intervalPhase === "work"
-                                ? "text-purple-300"
-                                : "text-indigo-300"
-                            }`}
-                          >
-                            {Math.floor(intervalPhaseLeft / 60)
-                              .toString()
-                              .padStart(2, "0")}
-                            :
-                            {(intervalPhaseLeft % 60)
-                              .toString()
-                              .padStart(2, "0")}
-                          </div>
-                          <div className="mt-2 text-slate-600 dark:text-slate-300">
-                            {intervalPhase === "work" ? "Work" : "Rest"} phase
-                          </div>
-                          <Button
-                            onClick={() => setIntervalActive(false)}
-                            variant="outline"
-                            className="mt-4"
-                          >
-                            Stop
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Cluster Set Flow */}
-                {currentType === "cluster_set" && (
-                  <div
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      borderRadius: "24px",
-                      padding: "24px",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                      border: "2px solid #6C5CE7",
-                    }}
-                  >
-                    <div>
-                      {/* Header */}
-                      <div
-                        className="flex items-center"
-                        style={{ gap: "12px", marginBottom: "16px" }}
-                      >
-                        <div
-                          style={{
-                            width: "56px",
-                            height: "56px",
-                            borderRadius: "18px",
-                            background:
-                              "linear-gradient(135deg, #6C5CE7 0%, #A29BFE 100%)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Dumbbell
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              color: "#FFFFFF",
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <div
-                            style={{
-                              fontSize: "20px",
-                              fontWeight: "700",
-                              color: "#1A1A1A",
-                            }}
-                          >
-                            Cluster Set
-                          </div>
-                          <div style={{ fontSize: "14px", color: "#6B7280" }}>
-                            Multiple mini-sets with short rest
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Summary Info */}
-                      <div className="grid grid-cols-3 gap-3 mb-4">
-                        <div className="rounded-xl p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                          <div
-                            className={`text-xs ${theme.textSecondary} mb-1`}
-                          >
-                            Clusters
-                          </div>
-                          <div className={`text-lg font-bold ${theme.text}`}>
-                            {Number(currentExercise?.meta?.clusters_per_set) ||
-                              Number(currentExercise?.clusters_per_set) ||
-                              1}
-                          </div>
-                        </div>
-                        <div className="rounded-xl p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
-                          <div
-                            className={`text-xs ${theme.textSecondary} mb-1`}
-                          >
-                            Reps per Cluster
-                          </div>
-                          <div className={`text-lg font-bold ${theme.text}`}>
-                            {Number(currentExercise?.meta?.cluster_reps) ||
-                              Number(currentExercise?.cluster_reps) ||
-                              1}
-                          </div>
-                        </div>
-                        <div className="rounded-xl p-3 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 border-2 border-green-200 dark:border-green-700 relative">
-                          <div
-                            className={`text-xs ${theme.textSecondary} mb-1`}
-                          >
-                            Rest (s)
-                          </div>
-                          <div className={`text-lg font-bold ${theme.text}`}>
-                            {Number(
-                              currentExercise?.meta?.intra_cluster_rest
-                            ) ||
-                              Number(currentExercise?.intra_cluster_rest) ||
-                              0}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Exercise Info */}
-                      <div className="flex items-start gap-3 mb-4">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-pink-500">
-                          <Dumbbell className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className={`font-bold ${theme.text} text-lg`}>
-                              {currentExercise.exercise?.name || "Exercise"}
-                            </div>
-                            {/* Utility Icon Buttons */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowPlateCalculator(true)}
-                              className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                            >
-                              <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowExerciseAlternatives(true)}
-                              className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                            >
-                              <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                            </Button>
-                          </div>
-                          <div className="flex flex-wrap gap-2.5">
-                            {(currentExercise?.reps ||
-                              currentExercise?.meta?.cluster_reps) && (
-                              <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
-                                <span
-                                  className={`text-sm font-bold ${theme.text}`}
-                                >
-                                  {currentExercise?.reps ||
-                                    currentExercise?.meta?.cluster_reps}{" "}
-                                  reps
-                                </span>
-                              </div>
-                            )}
-                            {(currentExercise?.rir ||
-                              currentExercise?.rir === 0) && (
-                              <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
-                                <span
-                                  className={`text-xs font-semibold ${theme.text}`}
-                                >
-                                  RIR: {currentExercise.rir}
-                                </span>
-                              </div>
-                            )}
-                            {currentExercise?.tempo && (
-                              <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
-                                <span
-                                  className={`text-xs font-semibold ${theme.text}`}
-                                >
-                                  Tempo: {currentExercise.tempo}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {currentExercise.exercise?.video_url && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              openVideoModal(
-                                currentExercise.exercise?.video_url || ""
-                              )
-                            }
-                            className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          >
-                            <Youtube className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-
-                      {/* Cluster Logging Fields */}
-                      <div className="space-y-3">
-                        <div
-                          className={`text-sm font-semibold ${theme.text} mb-2`}
-                        >
-                          Log Performance
-                        </div>
-                        {clusterWeights.map((w, idx) => (
-                          <div
-                            key={idx}
-                            className="rounded-xl p-3 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <div
-                                className={`text-sm font-bold ${theme.text}`}
-                              >
-                                Cluster {idx + 1}
-                              </div>
-                              <div className={`text-xs ${theme.textSecondary}`}>
-                                Reps:{" "}
-                                {Number(currentExercise?.meta?.cluster_reps) ||
-                                  Number(currentExercise?.cluster_reps) ||
-                                  1}
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label
-                                  className={`block text-xs font-medium ${theme.text} mb-1`}
-                                >
-                                  Weight (kg)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={w}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setClusterWeights((prev) => {
-                                      const copy = [...prev];
-                                      copy[idx] = val;
-                                      // autofill subsequent clusters if editing first cluster
-                                      if (idx === 0 && val) {
-                                        for (let i = 1; i < copy.length; i++) {
-                                          copy[i] = val;
-                                        }
-                                      }
-                                      // clear subsequent clusters if first cluster is cleared
-                                      else if (idx === 0 && !val) {
-                                        for (let i = 1; i < copy.length; i++) {
-                                          copy[i] = "";
-                                        }
-                                      }
-                                      return copy;
-                                    });
-                                  }}
-                                  className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
-                                  step="0.5"
-                                  placeholder={
-                                    idx === 0 ? "Enter weight" : "Auto-filled"
-                                  }
-                                  readOnly={idx > 0}
-                                />
-                              </div>
-                              <div>
-                                <label
-                                  className={`block text-xs font-medium ${theme.text} mb-1`}
-                                >
-                                  Reps
-                                </label>
-                                <input
-                                  type="number"
-                                  value={
-                                    Number(
-                                      currentExercise?.meta?.cluster_reps
-                                    ) ||
-                                    Number(currentExercise?.cluster_reps) ||
-                                    1
-                                  }
-                                  readOnly
-                                  className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-slate-100 dark:bg-slate-700 ${theme.text} font-semibold`}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Timer Button */}
-                      <div className="flex justify-center mt-6 mb-4">
-                        <Button
-                          onClick={() => setShowClusterTimer(true)}
-                          className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg"
-                        >
-                          <Clock className="w-4 h-4 mr-2" />
-                          Start Rest Timer
-                        </Button>
-                      </div>
-
-                      {/* Previous Performance Card */}
-                      <div className="mt-4">
-                        <PreviousPerformanceCard />
-                      </div>
-
-                      {/* Log Button */}
-                      <div className="mt-4">
-                        <Button
-                          onClick={() => {
-                            // TODO: Implement cluster set completion logic
-                            console.log("Logging cluster set:", clusterWeights);
-                          }}
-                          className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
-                          disabled={clusterWeights.some((w) => !w || w === "0")}
-                        >
-                          <Check className="w-5 h-5 mr-2" /> Log Cluster Set
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Rest-Pause Flow */}
-                {currentType === "rest_pause" && (
-                  <div
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      borderRadius: "24px",
-                      padding: "24px",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                      border: "2px solid #4CAF50",
-                    }}
-                  >
-                    <div>
-                      {/* Header */}
-                      <div
-                        className="flex items-center"
-                        style={{ gap: "12px", marginBottom: "16px" }}
-                      >
-                        <div
-                          style={{
-                            width: "56px",
-                            height: "56px",
-                            borderRadius: "18px",
-                            background:
-                              "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Dumbbell
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              color: "#FFFFFF",
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <div
-                            style={{
-                              fontSize: "20px",
-                              fontWeight: "700",
-                              color: "#1A1A1A",
-                            }}
-                          >
-                            Rest Pause Set
-                          </div>
-                          <div style={{ fontSize: "14px", color: "#6B7280" }}>
-                            Main set + mini-sets with rest periods
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Summary Info */}
-                      <div className="grid grid-cols-3 gap-3 mb-4">
-                        <div className="rounded-xl p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
-                          <div
-                            className={`text-xs ${theme.textSecondary} mb-1`}
-                          >
-                            Main Set
-                          </div>
-                          <div className={`text-lg font-bold ${theme.text}`}>
-                            1
-                          </div>
-                        </div>
-                        <div className="rounded-xl p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                          <div
-                            className={`text-xs ${theme.textSecondary} mb-1`}
-                          >
-                            Mini-sets
-                          </div>
-                          <div className={`text-lg font-bold ${theme.text}`}>
-                            {restPauseExtraReps.length}
-                          </div>
-                        </div>
-                        <div className="rounded-xl p-3 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 border-2 border-green-200 dark:border-green-700">
-                          <div
-                            className={`text-xs ${theme.textSecondary} mb-1`}
-                          >
-                            Rest (s)
-                          </div>
-                          <div className={`text-lg font-bold ${theme.text}`}>
-                            {Number(
-                              currentExercise?.meta?.rest_pause_duration
-                            ) ||
-                              Number(currentExercise?.rest_pause_duration) ||
-                              0}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Exercise Info */}
-                      <div className="flex items-start gap-3 mb-4">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-teal-400 to-cyan-500">
-                          <Dumbbell className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className={`font-bold ${theme.text} text-lg`}>
-                              {currentExercise.exercise?.name || "Exercise"}
-                            </div>
-                            {/* Utility Icon Buttons */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowPlateCalculator(true)}
-                              className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                            >
-                              <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowExerciseAlternatives(true)}
-                              className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                            >
-                              <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                            </Button>
-                          </div>
-                          <div className="flex flex-wrap gap-2.5">
-                            {(currentExercise?.reps ||
-                              currentExercise?.meta?.rest_pause_reps) && (
-                              <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
-                                <span
-                                  className={`text-sm font-bold ${theme.text}`}
-                                >
-                                  {currentExercise?.reps ||
-                                    currentExercise?.meta?.rest_pause_reps}{" "}
-                                  reps
-                                </span>
-                              </div>
-                            )}
-                            {(currentExercise?.rir ||
-                              currentExercise?.rir === 0) && (
-                              <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
-                                <span
-                                  className={`text-xs font-semibold ${theme.text}`}
-                                >
-                                  RIR: {currentExercise.rir}
-                                </span>
-                              </div>
-                            )}
-                            {currentExercise?.tempo && (
-                              <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
-                                <span
-                                  className={`text-xs font-semibold ${theme.text}`}
-                                >
-                                  Tempo: {currentExercise.tempo}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {currentExercise.exercise?.video_url && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              openVideoModal(
-                                currentExercise.exercise?.video_url || ""
-                              )
-                            }
-                            className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          >
-                            <Youtube className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-
-                      {/* Main Set Logging */}
-                      <div className="space-y-3 mb-4">
-                        <div
-                          className={`text-sm font-semibold ${theme.text} mb-2`}
-                        >
-                          Main Set
-                        </div>
-                        <div className="rounded-xl p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label
-                                className={`block text-sm font-medium ${theme.text} mb-1`}
-                              >
-                                Weight (kg)
-                              </label>
-                              <input
-                                type="number"
-                                value={
-                                  currentSetData.weight === 0
-                                    ? ""
-                                    : currentSetData.weight
-                                }
-                                onChange={(e) =>
-                                  setCurrentSetData((prev) => ({
-                                    ...prev,
-                                    weight: parseFloat(e.target.value) || 0,
-                                  }))
-                                }
-                                className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
-                                step="0.5"
-                                placeholder="0"
-                              />
-                            </div>
-                            <div>
-                              <label
-                                className={`block text-sm font-medium ${theme.text} mb-1`}
-                              >
-                                Reps
-                              </label>
-                              <input
-                                type="number"
-                                value={
-                                  currentSetData.reps === 0
-                                    ? ""
-                                    : currentSetData.reps
-                                }
-                                onChange={(e) =>
-                                  setCurrentSetData((prev) => ({
-                                    ...prev,
-                                    reps: parseInt(e.target.value) || 0,
-                                  }))
-                                }
-                                className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
-                                placeholder="0"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Mini-sets Logging */}
-                      {restPauseExtraReps.length > 0 && (
-                        <div className="space-y-3 mb-4">
-                          <div
-                            className={`text-sm font-semibold ${theme.text} mb-2`}
-                          >
-                            Mini-sets
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {restPauseExtraReps.map((r, idx) => (
-                              <div
-                                key={idx}
-                                className="rounded-xl p-3 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
-                              >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div
-                                    className={`text-sm font-bold ${theme.text}`}
-                                  >
-                                    Mini-set {idx + 1}
-                                  </div>
-                                  <div
-                                    className={`text-sm font-bold ${theme.text}`}
-                                  >
-                                    {currentSetData.weight || 0}kg
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <label
-                                      className={`block text-xs font-medium ${theme.text} mb-1`}
-                                    >
-                                      Reps
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={r}
-                                      onChange={(e) =>
-                                        setRestPauseExtraReps((prev) =>
-                                          prev.map((x, i) =>
-                                            i === idx ? e.target.value : x
-                                          )
+                                                    );
+                                                  }
+                                                )}
+                                            </div>
+                                          </div>
                                         )
-                                      }
-                                      className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
-                                      placeholder="0"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label
-                                      className={`block text-xs font-medium ${theme.text} mb-1`}
-                                    >
-                                      Rest (s)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={
-                                        Number(
-                                          currentExercise?.meta
-                                            ?.rest_pause_duration
-                                        ) ||
-                                        Number(
-                                          currentExercise?.rest_pause_duration
-                                        ) ||
-                                        0
-                                      }
-                                      readOnly
-                                      className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-slate-100 dark:bg-slate-700 ${theme.text} font-semibold`}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                                      )}
+                                    </div>
+                                  )
+                                );
+                              })()}
+                            </div>
 
-                      {/* Previous Performance Card */}
-                      <div className="mt-4">
-                        <PreviousPerformanceCard />
-                      </div>
+                            {/* Start Button */}
+                            <Button
+                              onClick={() => {
+                                setShowTimerModal(true);
+                                setTimerExerciseIndex(0);
+                                setTimerSetIndex(0);
+                                setIntervalMode(currentType as any);
+                                setIntervalRound(0);
+                                setIntervalPhase("work");
+                                setIntervalActive(true);
 
-                      {/* Log Button */}
-                      <div className="mt-4">
-                        <Button
-                          onClick={() => {
-                            // TODO: Implement rest pause completion logic
-                            console.log("Logging rest pause set:", {
-                              mainSet: currentSetData,
-                              miniSets: restPauseExtraReps,
-                            });
-                          }}
-                          className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
-                          disabled={
-                            currentSetData.weight <= 0 ||
-                            currentSetData.reps <= 0
-                          }
-                        >
-                          <Check className="w-5 h-5 mr-2" /> Log Rest Pause Set
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                                // Initialize timer with first exercise
+                                const sets =
+                                  currentType === "tabata"
+                                    ? currentExercise?.meta?.tabata_sets ||
+                                      currentExercise?.tabata_sets
+                                    : currentExercise?.meta?.circuit_sets;
+                                const firstSet = sets?.[0];
+                                const firstExercise = firstSet?.exercises?.[0];
+                                const workTime =
+                                  firstExercise?.work_seconds || 20;
+                                setIntervalPhaseLeft(workTime);
 
-                {/* For Time Flow */}
-                {currentType === "for_time" && (
-                  <div
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      borderRadius: "24px",
-                      padding: "24px",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                      border: "2px solid #FFD54F",
-                    }}
-                  >
-                    <div>
-                      {!forTimeActive && forTimeCompletionSecs == null ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "16px",
-                          }}
-                        >
-                          {/* Exercise Details Header */}
-                          <div
-                            className="flex items-center"
-                            style={{ gap: "12px" }}
-                          >
-                            <div
-                              style={{
-                                width: "56px",
-                                height: "56px",
-                                borderRadius: "18px",
-                                background:
-                                  "linear-gradient(135deg, #FFD54F 0%, #FFE082 100%)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
+                                // Set total rounds
+                                const rounds = currentExercise?.sets || 1;
+                                setIntervalTotalRounds(rounds);
                               }}
+                              className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
                             >
-                              <Trophy
-                                style={{
-                                  width: "32px",
-                                  height: "32px",
-                                  color: "#FFFFFF",
-                                }}
-                              />
+                              <Clock className="w-5 h-5 mr-2" /> Start{" "}
+                              {currentType === "tabata" ? "Tabata" : "Circuit"}
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-8">
+                            <div className="text-sm text-slate-600 dark:text-slate-300 mb-1">
+                              Round{" "}
+                              {Math.min(
+                                intervalRound +
+                                  (intervalPhase === "rest" ? 1 : 1),
+                                intervalTotalRounds
+                              )}{" "}
+                              / {intervalTotalRounds}
                             </div>
-                            <div>
-                              <div
-                                style={{
-                                  fontSize: "20px",
-                                  fontWeight: "700",
-                                  color: "#1A1A1A",
-                                }}
-                              >
-                                For Time Details
-                              </div>
-                              <div
-                                style={{ fontSize: "14px", color: "#6B7280" }}
-                              >
-                                Complete target reps as fast as possible
-                              </div>
+                            <div
+                              className={`text-5xl font-extrabold ${
+                                intervalPhase === "work"
+                                  ? "text-purple-700"
+                                  : "text-indigo-700"
+                              } dark:${
+                                intervalPhase === "work"
+                                  ? "text-purple-300"
+                                  : "text-indigo-300"
+                              }`}
+                            >
+                              {Math.floor(intervalPhaseLeft / 60)
+                                .toString()
+                                .padStart(2, "0")}
+                              :
+                              {(intervalPhaseLeft % 60)
+                                .toString()
+                                .padStart(2, "0")}
                             </div>
-                          </div>
-
-                          {/* Summary Info */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="rounded-xl p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-2 border-amber-200 dark:border-amber-700">
-                              <div
-                                className={`text-sm ${theme.textSecondary} mb-1`}
-                              >
-                                Time Cap
-                              </div>
-                              <div
-                                className={`text-2xl font-bold ${theme.text}`}
-                              >
-                                {currentExercise?.meta?.time_cap ||
-                                  currentExercise?.time_cap ||
-                                  10}{" "}
-                                min
-                              </div>
+                            <div className="mt-2 text-slate-600 dark:text-slate-300">
+                              {intervalPhase === "work" ? "Work" : "Rest"} phase
                             </div>
-                            <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
-                              <div
-                                className={`text-sm ${theme.textSecondary} mb-1`}
-                              >
-                                Target Reps
-                              </div>
-                              <div
-                                className={`text-2xl font-bold ${theme.text}`}
-                              >
-                                {currentExercise?.meta?.target_reps ||
-                                  currentExercise?.target_reps ||
-                                  currentExercise?.reps ||
-                                  "-"}
-                              </div>
-                            </div>
+                            <Button
+                              onClick={() => setIntervalActive(false)}
+                              variant="outline"
+                              className="mt-4"
+                            >
+                              Stop
+                            </Button>
                           </div>
-
-                          {/* Start Button */}
-                          <Button
-                            onClick={() => {
-                              const capMin =
-                                Number(currentExercise?.meta?.time_cap) ||
-                                Number(currentExercise?.time_cap) ||
-                                10;
-                              setForTimeTimeLeft(capMin * 60);
-                              setForTimeCompletionSecs(null);
-                              setForTimeActive(true);
-                            }}
-                            className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
-                          >
-                            <Clock className="w-5 h-5 mr-2" /> Start For Time
-                          </Button>
-                        </div>
-                      ) : forTimeActive ? (
-                        <div className="flex flex-col items-center justify-center py-8">
-                          <div className="text-5xl font-bold text-amber-700 dark:text-amber-300">
-                            {Math.floor(forTimeTimeLeft / 60)
-                              .toString()
-                              .padStart(2, "0")}
-                            :
-                            {(forTimeTimeLeft % 60).toString().padStart(2, "0")}
-                          </div>
-                          <div className="mt-2 text-slate-600 dark:text-slate-300">
-                            Time Remaining
-                          </div>
-                          <Button
-                            onClick={() => {
-                              const capMin =
-                                Number(currentExercise?.meta?.time_cap) ||
-                                Number(currentExercise?.time_cap) ||
-                                10;
-                              const elapsed = capMin * 60 - forTimeTimeLeft;
-                              setForTimeCompletionSecs(elapsed);
-                              setForTimeActive(false);
-                            }}
-                            variant="outline"
-                            className="mt-4"
-                          >
-                            I hit target reps
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
-                          <div className="text-sm text-slate-700 dark:text-slate-200">
-                            Completion time recorded: {forTimeCompletionSecs}s
-                          </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Superset / Pre-Exhaustion Flow */}
-                {(currentType === "superset" ||
-                  currentType === "pre_exhaustion") && (
-                  <div
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      borderRadius: "24px",
-                      padding: "24px",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                      border: "2px solid #F5576C",
-                    }}
-                  >
-                    <div>
-                      {/* Header */}
-                      <div
-                        className="flex items-center justify-between"
-                        style={{ marginBottom: "16px" }}
-                      >
+                  {/* Cluster Set Flow */}
+                  {currentType === "cluster_set" && (
+                    <div
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: "24px",
+                        padding: "24px",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                        border: "2px solid #6C5CE7",
+                      }}
+                    >
+                      <div>
+                        {/* Header */}
                         <div
                           className="flex items-center"
-                          style={{ gap: "12px" }}
+                          style={{ gap: "12px", marginBottom: "16px" }}
                         >
                           <div
                             style={{
-                              fontSize: "20px",
-                              fontWeight: "700",
-                              color: "#1A1A1A",
+                              width: "56px",
+                              height: "56px",
+                              borderRadius: "18px",
+                              background:
+                                "linear-gradient(135deg, #6C5CE7 0%, #A29BFE 100%)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
                             }}
                           >
-                            {currentType === "superset"
-                              ? "Superset"
-                              : "Pre-Exhaustion"}
+                            <Dumbbell
+                              style={{
+                                width: "32px",
+                                height: "32px",
+                                color: "#FFFFFF",
+                              }}
+                            />
                           </div>
-                          {(currentExercise?.rest_seconds ||
-                            currentExercise?.meta?.rest_seconds) && (
-                            <div className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700">
-                              <span
-                                className={`text-xs font-semibold ${theme.text}`}
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "20px",
+                                fontWeight: "700",
+                                color: "#1A1A1A",
+                              }}
+                            >
+                              Cluster Set
+                            </div>
+                            <div style={{ fontSize: "14px", color: "#6B7280" }}>
+                              Multiple mini-sets with short rest
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Summary Info */}
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                          <div className="rounded-xl p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
+                            <div
+                              className={`text-xs ${theme.textSecondary} mb-1`}
+                            >
+                              Clusters
+                            </div>
+                            <div className={`text-lg font-bold ${theme.text}`}>
+                              {Number(
+                                currentExercise?.meta?.clusters_per_set
+                              ) ||
+                                Number(currentExercise?.clusters_per_set) ||
+                                1}
+                            </div>
+                          </div>
+                          <div className="rounded-xl p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
+                            <div
+                              className={`text-xs ${theme.textSecondary} mb-1`}
+                            >
+                              Reps per Cluster
+                            </div>
+                            <div className={`text-lg font-bold ${theme.text}`}>
+                              {Number(currentExercise?.meta?.cluster_reps) ||
+                                Number(currentExercise?.cluster_reps) ||
+                                1}
+                            </div>
+                          </div>
+                          <div className="rounded-xl p-3 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 border-2 border-green-200 dark:border-green-700 relative">
+                            <div
+                              className={`text-xs ${theme.textSecondary} mb-1`}
+                            >
+                              Rest (s)
+                            </div>
+                            <div className={`text-lg font-bold ${theme.text}`}>
+                              {Number(
+                                currentExercise?.meta?.intra_cluster_rest
+                              ) ||
+                                Number(currentExercise?.intra_cluster_rest) ||
+                                0}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Exercise Info */}
+                        <div className="flex items-start gap-3 mb-4">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-pink-500">
+                            <Dumbbell className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div
+                                className={`font-bold ${theme.text} text-lg`}
                               >
-                                Rest:{" "}
-                                {currentExercise?.rest_seconds ||
-                                  currentExercise?.meta?.rest_seconds}
-                                s
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className={`text-xs ${theme.textSecondary}`}>
-                          Set {currentSet} of {currentExercise?.sets || 1}
-                        </div>
-                      </div>
-
-                      {/* Exercise Cards */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Exercise A */}
-                        <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
-                          <div
-                            className={`p-4 ${theme.card} bg-white/95 dark:bg-slate-800/95 rounded-2xl space-y-3`}
-                          >
-                            {/* Exercise Header */}
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-indigo-500">
-                                <span className="text-white font-bold text-sm">
-                                  1
-                                </span>
+                                {currentExercise.exercise?.name || "Exercise"}
                               </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className={`font-bold ${theme.text} text-base`}
-                                  >
-                                    {currentExercise?.exercise?.name ||
-                                      "First Exercise"}
-                                  </div>
-                                  {/* Utility Icon Buttons */}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setShowPlateCalculator(true)}
-                                    className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                                  >
-                                    <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      setShowExerciseAlternatives(true)
-                                    }
-                                    className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                                  >
-                                    <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                                  </Button>
-                                </div>
-                              </div>
-                              {currentExercise?.exercise?.video_url && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    openVideoModal(
-                                      currentExercise.exercise?.video_url || ""
-                                    )
-                                  }
-                                  className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                >
-                                  <Youtube className="w-4 h-4" />
-                                </Button>
-                              )}
+                              {/* Utility Icon Buttons */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowPlateCalculator(true)}
+                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                              >
+                                <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setShowExerciseAlternatives(true)
+                                }
+                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                              </Button>
                             </div>
-
-                            {/* Exercise Details */}
-                            <div className="flex flex-wrap gap-2">
-                              {(currentExercise?.meta?.superset_reps_a ||
-                                currentExercise?.reps) && (
+                            <div className="flex flex-wrap gap-2.5">
+                              {(currentExercise?.reps ||
+                                currentExercise?.meta?.cluster_reps) && (
                                 <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
                                   <span
                                     className={`text-sm font-bold ${theme.text}`}
                                   >
-                                    {currentExercise?.meta?.superset_reps_a ||
-                                      currentExercise?.reps}{" "}
+                                    {currentExercise?.reps ||
+                                      currentExercise?.meta?.cluster_reps}{" "}
                                     reps
                                   </span>
                                 </div>
@@ -3883,142 +3856,343 @@ export default function LiveWorkout() {
                                 </div>
                               )}
                             </div>
+                          </div>
+                          {currentExercise.exercise?.video_url && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                openVideoModal(
+                                  currentExercise.exercise?.video_url || ""
+                                )
+                              }
+                              className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            >
+                              <Youtube className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
 
-                            {/* Logging Fields */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label
-                                  className={`block text-sm font-medium ${theme.text} mb-1`}
+                        {/* Cluster Logging Fields */}
+                        <div className="space-y-3">
+                          <div
+                            className={`text-sm font-semibold ${theme.text} mb-2`}
+                          >
+                            Log Performance
+                          </div>
+                          {clusterWeights.map((w, idx) => (
+                            <div
+                              key={idx}
+                              className="rounded-xl p-3 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div
+                                  className={`text-sm font-bold ${theme.text}`}
                                 >
-                                  Weight (kg)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={supersetAWeight}
-                                  onChange={(e) =>
-                                    setSupersetAWeight(e.target.value)
-                                  }
-                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
-                                  step="0.5"
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div>
-                                <label
-                                  className={`block text-sm font-medium ${theme.text} mb-1`}
+                                  Cluster {idx + 1}
+                                </div>
+                                <div
+                                  className={`text-xs ${theme.textSecondary}`}
                                 >
-                                  Reps
-                                </label>
-                                <input
-                                  type="number"
-                                  value={supersetAReps}
-                                  onChange={(e) =>
-                                    setSupersetAReps(e.target.value)
-                                  }
-                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
-                                  placeholder="0"
-                                />
+                                  Reps:{" "}
+                                  {Number(
+                                    currentExercise?.meta?.cluster_reps
+                                  ) ||
+                                    Number(currentExercise?.cluster_reps) ||
+                                    1}
+                                </div>
                               </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label
+                                    className={`block text-xs font-medium ${theme.text} mb-1`}
+                                  >
+                                    Weight (kg)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={w}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setClusterWeights((prev) => {
+                                        const copy = [...prev];
+                                        copy[idx] = val;
+                                        // autofill subsequent clusters if editing first cluster
+                                        if (idx === 0 && val) {
+                                          for (
+                                            let i = 1;
+                                            i < copy.length;
+                                            i++
+                                          ) {
+                                            copy[i] = val;
+                                          }
+                                        }
+                                        // clear subsequent clusters if first cluster is cleared
+                                        else if (idx === 0 && !val) {
+                                          for (
+                                            let i = 1;
+                                            i < copy.length;
+                                            i++
+                                          ) {
+                                            copy[i] = "";
+                                          }
+                                        }
+                                        return copy;
+                                      });
+                                    }}
+                                    className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    step="0.5"
+                                    placeholder={
+                                      idx === 0 ? "Enter weight" : "Auto-filled"
+                                    }
+                                    readOnly={idx > 0}
+                                  />
+                                </div>
+                                <div>
+                                  <label
+                                    className={`block text-xs font-medium ${theme.text} mb-1`}
+                                  >
+                                    Reps
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={
+                                      Number(
+                                        currentExercise?.meta?.cluster_reps
+                                      ) ||
+                                      Number(currentExercise?.cluster_reps) ||
+                                      1
+                                    }
+                                    readOnly
+                                    className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-slate-100 dark:bg-slate-700 ${theme.text} font-semibold`}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Timer Button */}
+                        <div className="flex justify-center mt-6 mb-4">
+                          <Button
+                            onClick={() => setShowClusterTimer(true)}
+                            className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg"
+                          >
+                            <Clock className="w-4 h-4 mr-2" />
+                            Start Rest Timer
+                          </Button>
+                        </div>
+
+                        {/* Previous Performance Card */}
+                        <div className="mt-4">
+                          <PreviousPerformanceCard />
+                        </div>
+
+                        {/* Log Button */}
+                        <div className="mt-4">
+                          <Button
+                            onClick={() => {
+                              // TODO: Implement cluster set completion logic
+                              console.log(
+                                "Logging cluster set:",
+                                clusterWeights
+                              );
+                            }}
+                            className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                            disabled={clusterWeights.some(
+                              (w) => !w || w === "0"
+                            )}
+                          >
+                            <Check className="w-5 h-5 mr-2" /> Log Cluster Set
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rest-Pause Flow */}
+                  {currentType === "rest_pause" && (
+                    <div
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: "24px",
+                        padding: "24px",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                        border: "2px solid #4CAF50",
+                      }}
+                    >
+                      <div>
+                        {/* Header */}
+                        <div
+                          className="flex items-center"
+                          style={{ gap: "12px", marginBottom: "16px" }}
+                        >
+                          <div
+                            style={{
+                              width: "56px",
+                              height: "56px",
+                              borderRadius: "18px",
+                              background:
+                                "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Dumbbell
+                              style={{
+                                width: "32px",
+                                height: "32px",
+                                color: "#FFFFFF",
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "20px",
+                                fontWeight: "700",
+                                color: "#1A1A1A",
+                              }}
+                            >
+                              Rest Pause Set
+                            </div>
+                            <div style={{ fontSize: "14px", color: "#6B7280" }}>
+                              Main set + mini-sets with rest periods
                             </div>
                           </div>
                         </div>
 
-                        {/* Exercise B */}
-                        <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
-                          <div
-                            className={`p-4 ${theme.card} bg-white/95 dark:bg-slate-800/95 rounded-2xl space-y-3`}
-                          >
-                            {/* Exercise Header */}
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-indigo-500">
-                                <span className="text-white font-bold text-sm">
-                                  2
-                                </span>
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className={`font-bold ${theme.text} text-base`}
-                                  >
-                                    {(() => {
-                                      const exerciseId =
-                                        currentExercise?.meta
-                                          ?.superset_exercise_id ||
-                                        currentExercise?.superset_exercise_id;
-                                      const exerciseInfo = exerciseId
-                                        ? exerciseLookup[exerciseId]
-                                        : undefined;
-                                      return (
-                                        exerciseInfo?.name || "Second Exercise"
-                                      );
-                                    })()}
-                                  </div>
-                                  {/* Utility Icon Buttons */}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setShowPlateCalculator(true)}
-                                    className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                                  >
-                                    <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      setShowExerciseAlternatives(true)
-                                    }
-                                    className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                                  >
-                                    <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                                  </Button>
-                                </div>
-                              </div>
-                              {(() => {
-                                const exerciseId =
-                                  currentExercise?.meta?.superset_exercise_id ||
-                                  currentExercise?.superset_exercise_id;
-                                const exerciseInfo = exerciseId
-                                  ? exerciseLookup[exerciseId]
-                                  : undefined;
-                                const video = exerciseInfo?.video_url;
-                                return (
-                                  video && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openVideoModal(video)}
-                                      className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                    >
-                                      <Youtube className="w-4 h-4" />
-                                    </Button>
-                                  )
-                                );
-                              })()}
+                        {/* Summary Info */}
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                          <div className="rounded-xl p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
+                            <div
+                              className={`text-xs ${theme.textSecondary} mb-1`}
+                            >
+                              Main Set
                             </div>
+                            <div className={`text-lg font-bold ${theme.text}`}>
+                              1
+                            </div>
+                          </div>
+                          <div className="rounded-xl p-3 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
+                            <div
+                              className={`text-xs ${theme.textSecondary} mb-1`}
+                            >
+                              Mini-sets
+                            </div>
+                            <div className={`text-lg font-bold ${theme.text}`}>
+                              {restPauseExtraReps.length}
+                            </div>
+                          </div>
+                          <div className="rounded-xl p-3 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 border-2 border-green-200 dark:border-green-700">
+                            <div
+                              className={`text-xs ${theme.textSecondary} mb-1`}
+                            >
+                              Rest (s)
+                            </div>
+                            <div className={`text-lg font-bold ${theme.text}`}>
+                              {Number(
+                                currentExercise?.meta?.rest_pause_duration
+                              ) ||
+                                Number(currentExercise?.rest_pause_duration) ||
+                                0}
+                            </div>
+                          </div>
+                        </div>
 
-                            {/* Exercise Details */}
-                            <div className="flex flex-wrap gap-2">
-                              {(currentExercise?.meta?.superset_reps_b ||
-                                currentExercise?.meta?.superset_reps ||
-                                currentExercise?.superset_reps ||
-                                currentExercise?.reps) && (
+                        {/* Exercise Info */}
+                        <div className="flex items-start gap-3 mb-4">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-teal-400 to-cyan-500">
+                            <Dumbbell className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div
+                                className={`font-bold ${theme.text} text-lg`}
+                              >
+                                {currentExercise.exercise?.name || "Exercise"}
+                              </div>
+                              {/* Utility Icon Buttons */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowPlateCalculator(true)}
+                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                              >
+                                <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setShowExerciseAlternatives(true)
+                                }
+                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap gap-2.5">
+                              {(currentExercise?.reps ||
+                                currentExercise?.meta?.rest_pause_reps) && (
                                 <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
                                   <span
                                     className={`text-sm font-bold ${theme.text}`}
                                   >
-                                    {currentExercise?.meta?.superset_reps_b ||
-                                      currentExercise?.meta?.superset_reps ||
-                                      currentExercise?.superset_reps ||
-                                      currentExercise?.reps}{" "}
+                                    {currentExercise?.reps ||
+                                      currentExercise?.meta
+                                        ?.rest_pause_reps}{" "}
                                     reps
                                   </span>
                                 </div>
                               )}
+                              {(currentExercise?.rir ||
+                                currentExercise?.rir === 0) && (
+                                <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
+                                  <span
+                                    className={`text-xs font-semibold ${theme.text}`}
+                                  >
+                                    RIR: {currentExercise.rir}
+                                  </span>
+                                </div>
+                              )}
+                              {currentExercise?.tempo && (
+                                <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
+                                  <span
+                                    className={`text-xs font-semibold ${theme.text}`}
+                                  >
+                                    Tempo: {currentExercise.tempo}
+                                  </span>
+                                </div>
+                              )}
                             </div>
+                          </div>
+                          {currentExercise.exercise?.video_url && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                openVideoModal(
+                                  currentExercise.exercise?.video_url || ""
+                                )
+                              }
+                              className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            >
+                              <Youtube className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
 
-                            {/* Logging Fields */}
-                            <div className="grid grid-cols-2 gap-3">
+                        {/* Main Set Logging */}
+                        <div className="space-y-3 mb-4">
+                          <div
+                            className={`text-sm font-semibold ${theme.text} mb-2`}
+                          >
+                            Main Set
+                          </div>
+                          <div className="rounded-xl p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700">
+                            <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <label
                                   className={`block text-sm font-medium ${theme.text} mb-1`}
@@ -4027,9 +4201,16 @@ export default function LiveWorkout() {
                                 </label>
                                 <input
                                   type="number"
-                                  value={supersetBWeight}
+                                  value={
+                                    currentSetData.weight === 0
+                                      ? ""
+                                      : currentSetData.weight
+                                  }
                                   onChange={(e) =>
-                                    setSupersetBWeight(e.target.value)
+                                    setCurrentSetData((prev) => ({
+                                      ...prev,
+                                      weight: parseFloat(e.target.value) || 0,
+                                    }))
                                   }
                                   className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
                                   step="0.5"
@@ -4044,9 +4225,16 @@ export default function LiveWorkout() {
                                 </label>
                                 <input
                                   type="number"
-                                  value={supersetBReps}
+                                  value={
+                                    currentSetData.reps === 0
+                                      ? ""
+                                      : currentSetData.reps
+                                  }
                                   onChange={(e) =>
-                                    setSupersetBReps(e.target.value)
+                                    setCurrentSetData((prev) => ({
+                                      ...prev,
+                                      reps: parseInt(e.target.value) || 0,
+                                    }))
                                   }
                                   className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
                                   placeholder="0"
@@ -4055,99 +4243,423 @@ export default function LiveWorkout() {
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Previous Performance Card */}
-                      <div style={{ marginTop: "24px" }}>
-                        <PreviousPerformanceCard />
-                      </div>
+                        {/* Mini-sets Logging */}
+                        {restPauseExtraReps.length > 0 && (
+                          <div className="space-y-3 mb-4">
+                            <div
+                              className={`text-sm font-semibold ${theme.text} mb-2`}
+                            >
+                              Mini-sets
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {restPauseExtraReps.map((r, idx) => (
+                                <div
+                                  key={idx}
+                                  className="rounded-xl p-3 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700"
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div
+                                      className={`text-sm font-bold ${theme.text}`}
+                                    >
+                                      Mini-set {idx + 1}
+                                    </div>
+                                    <div
+                                      className={`text-sm font-bold ${theme.text}`}
+                                    >
+                                      {currentSetData.weight || 0}kg
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                      <label
+                                        className={`block text-xs font-medium ${theme.text} mb-1`}
+                                      >
+                                        Reps
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={r}
+                                        onChange={(e) =>
+                                          setRestPauseExtraReps((prev) =>
+                                            prev.map((x, i) =>
+                                              i === idx ? e.target.value : x
+                                            )
+                                          )
+                                        }
+                                        className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label
+                                        className={`block text-xs font-medium ${theme.text} mb-1`}
+                                      >
+                                        Rest (s)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={
+                                          Number(
+                                            currentExercise?.meta
+                                              ?.rest_pause_duration
+                                          ) ||
+                                          Number(
+                                            currentExercise?.rest_pause_duration
+                                          ) ||
+                                          0
+                                        }
+                                        readOnly
+                                        className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-slate-100 dark:bg-slate-700 ${theme.text} font-semibold`}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
-                      {/* Log Button */}
-                      <Button
-                        onClick={completeSuperset}
-                        style={{
-                          width: "100%",
-                          background:
-                            "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                          color: "#FFFFFF",
-                          borderRadius: "20px",
-                          padding: "16px 32px",
-                          fontSize: "16px",
-                          fontWeight: "600",
-                          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                          border: "none",
-                          cursor: isLoggingSet ? "not-allowed" : "pointer",
-                          opacity: isLoggingSet ? 0.5 : 1,
-                          marginTop: "24px",
-                        }}
-                        disabled={isLoggingSet}
-                      >
-                        <Check className="w-5 h-5 mr-2" /> Log{" "}
-                        {currentType === "superset"
-                          ? "Superset"
-                          : "Pre-Exhaustion"}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Giant Set Flow */}
-                {currentType === "giant_set" && (
-                  <div
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      borderRadius: "24px",
-                      padding: "24px",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                      border: "2px solid #6C5CE7",
-                      position: "relative",
-                      zIndex: 20,
-                    }}
-                  >
-                    <div>
-                      <div
-                        className="flex items-center justify-between"
-                        style={{ marginBottom: "16px" }}
-                      >
-                        <div
-                          className={`text-base sm:text-xl font-bold ${theme.text}`}
-                        >
-                          Giant Set
+                        {/* Previous Performance Card */}
+                        <div className="mt-4">
+                          <PreviousPerformanceCard />
                         </div>
-                        <div className={`text-xs ${theme.textSecondary}`}>
-                          Set {currentSet} of {currentExercise?.sets || 1}
-                        </div>
-                      </div>
-                      {(
-                        (currentExercise?.meta?.giant_set_exercises ||
-                          currentExercise?.giant_set_exercises ||
-                          []) as any[]
-                      ).map((item: any, idx: number) => {
-                        const resolved = item.exercise_id
-                          ? exerciseLookup[item.exercise_id]
-                          : undefined;
-                        const displayName =
-                          resolved?.name || item.name || `Exercise ${idx + 1}`;
-                        const video = resolved?.video_url || item.video_url;
-                        return (
-                          <div
-                            key={idx}
-                            className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl"
+
+                        {/* Log Button */}
+                        <div className="mt-4">
+                          <Button
+                            onClick={() => {
+                              // TODO: Implement rest pause completion logic
+                              console.log("Logging rest pause set:", {
+                                mainSet: currentSetData,
+                                miniSets: restPauseExtraReps,
+                              });
+                            }}
+                            className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                            disabled={
+                              currentSetData.weight <= 0 ||
+                              currentSetData.reps <= 0
+                            }
                           >
+                            <Check className="w-5 h-5 mr-2" /> Log Rest Pause
+                            Set
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* For Time Flow */}
+                  {currentType === "for_time" && (
+                    <div
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: "24px",
+                        padding: "24px",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                        border: "2px solid #FFD54F",
+                      }}
+                    >
+                      <div>
+                        {!forTimeActive && forTimeCompletionSecs == null ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "16px",
+                            }}
+                          >
+                            {/* Exercise Details Header */}
+                            <div
+                              className="flex items-center"
+                              style={{ gap: "12px" }}
+                            >
+                              <div
+                                style={{
+                                  width: "56px",
+                                  height: "56px",
+                                  borderRadius: "18px",
+                                  background:
+                                    "linear-gradient(135deg, #FFD54F 0%, #FFE082 100%)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <Trophy
+                                  style={{
+                                    width: "32px",
+                                    height: "32px",
+                                    color: "#FFFFFF",
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: "20px",
+                                    fontWeight: "700",
+                                    color: "#1A1A1A",
+                                  }}
+                                >
+                                  For Time Details
+                                </div>
+                                <div
+                                  style={{ fontSize: "14px", color: "#6B7280" }}
+                                >
+                                  Complete target reps as fast as possible
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Summary Info */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="rounded-xl p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-2 border-amber-200 dark:border-amber-700">
+                                <div
+                                  className={`text-sm ${theme.textSecondary} mb-1`}
+                                >
+                                  Time Cap
+                                </div>
+                                <div
+                                  className={`text-2xl font-bold ${theme.text}`}
+                                >
+                                  {currentExercise?.meta?.time_cap ||
+                                    currentExercise?.time_cap ||
+                                    10}{" "}
+                                  min
+                                </div>
+                              </div>
+                              <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
+                                <div
+                                  className={`text-sm ${theme.textSecondary} mb-1`}
+                                >
+                                  Target Reps
+                                </div>
+                                <div
+                                  className={`text-2xl font-bold ${theme.text}`}
+                                >
+                                  {currentExercise?.meta?.target_reps ||
+                                    currentExercise?.target_reps ||
+                                    currentExercise?.reps ||
+                                    "-"}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Start Button */}
+                            <Button
+                              onClick={() => {
+                                const capMin =
+                                  Number(currentExercise?.meta?.time_cap) ||
+                                  Number(currentExercise?.time_cap) ||
+                                  10;
+                                setForTimeTimeLeft(capMin * 60);
+                                setForTimeCompletionSecs(null);
+                                setForTimeActive(true);
+                                setForTimeStopped(false);
+                              }}
+                              className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                            >
+                              <Clock className="w-5 h-5 mr-2" /> Start For Time
+                            </Button>
+                          </div>
+                        ) : forTimeActive ? (
+                          <div className="flex flex-col items-center justify-center py-8">
+                            <div className="text-5xl font-bold text-amber-700 dark:text-amber-300">
+                              {Math.floor(forTimeTimeLeft / 60)
+                                .toString()
+                                .padStart(2, "0")}
+                              :
+                              {(forTimeTimeLeft % 60)
+                                .toString()
+                                .padStart(2, "0")}
+                            </div>
+                            <div className="mt-2 text-slate-600 dark:text-slate-300">
+                              Time Remaining
+                            </div>
+                            <Button
+                              onClick={() => {
+                                const capMin =
+                                  Number(currentExercise?.meta?.time_cap) ||
+                                  Number(currentExercise?.time_cap) ||
+                                  10;
+                                const elapsed = capMin * 60 - forTimeTimeLeft;
+                                setForTimeCompletionSecs(elapsed);
+                                setForTimeActive(false);
+                                setForTimeStopped(true);
+                              }}
+                              variant="outline"
+                              className="mt-4"
+                            >
+                              Stop
+                            </Button>
+                          </div>
+                        ) : forTimeStopped && forTimeCompletionSecs != null ? (
+                          <div className="space-y-6">
+                            {/* Completion Time Display */}
+                            <div className="flex flex-col items-center justify-center py-4">
+                              <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-300 mb-2">
+                                {Math.floor(forTimeCompletionSecs / 60)
+                                  .toString()
+                                  .padStart(2, "0")}
+                                :
+                                {(forTimeCompletionSecs % 60)
+                                  .toString()
+                                  .padStart(2, "0")}
+                              </div>
+                              <div className="text-sm text-slate-600 dark:text-slate-300">
+                                Completion Time
+                              </div>
+                            </div>
+
+                            {/* Weight and Reps Inputs */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label
+                                  className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2"
+                                >
+                                  Weight (kg)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={
+                                    currentSetData.weight === 0
+                                      ? ""
+                                      : currentSetData.weight
+                                  }
+                                  onChange={(e) =>
+                                    setCurrentSetData((prev) => ({
+                                      ...prev,
+                                      weight: parseFloat(e.target.value) || 0,
+                                    }))
+                                  }
+                                  className="w-full h-12 text-center text-lg font-bold rounded-xl border-2 border-blue-300 dark:border-indigo-700 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 dark:focus:border-indigo-500"
+                                  step="0.5"
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div>
+                                <label
+                                  className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2"
+                                >
+                                  Reps
+                                </label>
+                                <input
+                                  type="number"
+                                  value={
+                                    currentSetData.reps === 0
+                                      ? ""
+                                      : currentSetData.reps
+                                  }
+                                  onChange={(e) =>
+                                    setCurrentSetData((prev) => ({
+                                      ...prev,
+                                      reps: parseInt(e.target.value) || 0,
+                                    }))
+                                  }
+                                  className="w-full h-12 text-center text-lg font-bold rounded-xl border-2 border-blue-300 dark:border-indigo-700 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 dark:focus:border-indigo-500"
+                                  placeholder="0"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Complete Set Button */}
+                            <Button
+                              onClick={completeSet}
+                              disabled={
+                                currentSetData.weight <= 0 ||
+                                currentSetData.reps <= 0 ||
+                                isLoggingSet
+                              }
+                              className="w-full bg-[linear-gradient(135deg,#4CAF50_0%,#81C784_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Check className="w-5 h-5 mr-2" /> Complete Set
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <div className="text-sm text-slate-700 dark:text-slate-200">
+                              Completion time recorded: {forTimeCompletionSecs}s
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Superset / Pre-Exhaustion Flow */}
+                  {(currentType === "superset" ||
+                    currentType === "pre_exhaustion") && (
+                    <div
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: "24px",
+                        padding: "24px",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                        border: "2px solid #F5576C",
+                      }}
+                    >
+                      <div>
+                        {/* Header */}
+                        <div
+                          className="flex items-center justify-between"
+                          style={{ marginBottom: "16px" }}
+                        >
+                          <div
+                            className="flex items-center"
+                            style={{ gap: "12px" }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "20px",
+                                fontWeight: "700",
+                                color: "#1A1A1A",
+                              }}
+                            >
+                              {currentType === "superset"
+                                ? "Superset"
+                                : "Pre-Exhaustion"}
+                            </div>
+                            {(currentExercise?.rest_seconds ||
+                              currentExercise?.meta?.rest_seconds) && (
+                              <div className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700">
+                                <span
+                                  className={`text-xs font-semibold ${theme.text}`}
+                                >
+                                  Rest:{" "}
+                                  {currentExercise?.rest_seconds ||
+                                    currentExercise?.meta?.rest_seconds}
+                                  s
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className={`text-xs ${theme.textSecondary}`}>
+                            Set {currentSet} of {currentExercise?.sets || 1}
+                          </div>
+                        </div>
+
+                        {/* Exercise Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Exercise A */}
+                          <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
                             <div
                               className={`p-4 ${theme.card} bg-white/95 dark:bg-slate-800/95 rounded-2xl space-y-3`}
                             >
-                              {/* Header: name + video + number badge */}
+                              {/* Exercise Header */}
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-orange-400 to-red-500">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-indigo-500">
                                   <span className="text-white font-bold text-sm">
-                                    {idx + 1}
+                                    1
                                   </span>
                                 </div>
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
-                                    <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                                      {displayName}
+                                    <div
+                                      className={`font-bold ${theme.text} text-base`}
+                                    >
+                                      {currentExercise?.exercise?.name ||
+                                        "First Exercise"}
                                     </div>
                                     {/* Utility Icon Buttons */}
                                     <Button
@@ -4172,11 +4684,16 @@ export default function LiveWorkout() {
                                     </Button>
                                   </div>
                                 </div>
-                                {video && (
+                                {currentExercise?.exercise?.video_url && (
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => openVideoModal(video)}
+                                    onClick={() =>
+                                      openVideoModal(
+                                        currentExercise.exercise?.video_url ||
+                                          ""
+                                      )
+                                    }
                                     className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                                   >
                                     <Youtube className="w-4 h-4" />
@@ -4184,436 +4701,217 @@ export default function LiveWorkout() {
                                 )}
                               </div>
 
-                              {/* Exercise Details - Reps */}
-                              {item.reps && (
-                                <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
-                                  <span
-                                    className={`text-sm font-bold ${theme.text}`}
-                                  >
-                                    {item.reps} reps
-                                  </span>
-                                </div>
-                              )}
+                              {/* Exercise Details */}
+                              <div className="flex flex-wrap gap-2">
+                                {(currentExercise?.meta?.superset_reps_a ||
+                                  currentExercise?.reps) && (
+                                  <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
+                                    <span
+                                      className={`text-sm font-bold ${theme.text}`}
+                                    >
+                                      {currentExercise?.meta?.superset_reps_a ||
+                                        currentExercise?.reps}{" "}
+                                      reps
+                                    </span>
+                                  </div>
+                                )}
+                                {(currentExercise?.rir ||
+                                  currentExercise?.rir === 0) && (
+                                  <div className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700">
+                                    <span
+                                      className={`text-xs font-semibold ${theme.text}`}
+                                    >
+                                      RIR: {currentExercise.rir}
+                                    </span>
+                                  </div>
+                                )}
+                                {currentExercise?.tempo && (
+                                  <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
+                                    <span
+                                      className={`text-xs font-semibold ${theme.text}`}
+                                    >
+                                      Tempo: {currentExercise.tempo}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
 
-                              {/* Input Fields */}
-                              <div className="grid grid-cols-2 gap-4">
+                              {/* Logging Fields */}
+                              <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <label
-                                    className={`block text-sm font-medium text-slate-800 dark:text-slate-200 mb-1`}
+                                    className={`block text-sm font-medium ${theme.text} mb-1`}
                                   >
                                     Weight (kg)
                                   </label>
                                   <input
                                     type="number"
-                                    value={giantWeights[idx] || ""}
+                                    value={supersetAWeight}
                                     onChange={(e) =>
-                                      setGiantWeights((prev) =>
-                                        prev.map((w, i) =>
-                                          i === idx ? e.target.value : w
-                                        )
-                                      )
+                                      setSupersetAWeight(e.target.value)
                                     }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 bg-white/90 dark:bg-slate-700 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500 dark:focus:border-indigo-500`}
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
                                     step="0.5"
+                                    placeholder="0"
                                   />
                                 </div>
                                 <div>
                                   <label
-                                    className={`block text-sm font-medium text-slate-800 dark:text-slate-200 mb-1`}
+                                    className={`block text-sm font-medium ${theme.text} mb-1`}
                                   >
                                     Reps
                                   </label>
                                   <input
                                     type="number"
-                                    value={giantReps[idx] || ""}
-                                    readOnly
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 bg-white/80 dark:bg-slate-700 text-slate-900 dark:text-white font-semibold`}
+                                    value={supersetAReps}
+                                    onChange={(e) =>
+                                      setSupersetAReps(e.target.value)
+                                    }
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    placeholder="0"
                                   />
                                 </div>
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
 
-                      {/* Previous Performance Card */}
-                      <div style={{ marginTop: "24px" }}>
-                        <PreviousPerformanceCard />
-                      </div>
-
-                      <Button
-                        onClick={completeGiantSet}
-                        style={{
-                          width: "100%",
-                          background:
-                            "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                          color: "#FFFFFF",
-                          borderRadius: "20px",
-                          padding: "16px 32px",
-                          fontSize: "16px",
-                          fontWeight: "600",
-                          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                          border: "none",
-                          cursor: isLoggingSet ? "not-allowed" : "pointer",
-                          opacity: isLoggingSet ? 0.5 : 1,
-                          marginTop: "24px",
-                        }}
-                        disabled={isLoggingSet}
-                      >
-                        Log Giant Set
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {/* Standard Exercise Types - Modern Style */}
-                {currentType !== "giant_set" &&
-                  currentType !== "circuit" &&
-                  currentType !== "tabata" &&
-                  currentType !== "amrap" &&
-                  currentType !== "emom" &&
-                  currentType !== "for_time" &&
-                  currentType !== "superset" &&
-                  currentType !== "pre_exhaustion" &&
-                  currentType !== "cluster_set" &&
-                  currentType !== "rest_pause" && (
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "24px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #2196F3",
-                      }}
-                    >
-                      <div>
-                        {/* Header */}
-                        <div
-                          className="flex items-center justify-between"
-                          style={{ marginBottom: "16px" }}
-                        >
-                          <div className="flex items-center gap-3">
+                          {/* Exercise B */}
+                          <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
                             <div
-                              className={`text-base sm:text-xl font-bold ${theme.text}`}
+                              className={`p-4 ${theme.card} bg-white/95 dark:bg-slate-800/95 rounded-2xl space-y-3`}
                             >
-                              {currentType === "straight_set"
-                                ? "Straight Set"
-                                : currentType === "drop_set"
-                                ? "Drop Set"
-                                : currentType === "cluster_set"
-                                ? "Cluster Set"
-                                : currentType === "rest_pause"
-                                ? "Rest Pause"
-                                : "Exercise"}
-                            </div>
-                            {currentExercise?.rest_seconds && (
-                              <div className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700">
-                                <span
-                                  className={`text-xs font-semibold ${theme.text}`}
-                                >
-                                  Rest: {currentExercise.rest_seconds}s
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700">
-                            <span className={`text-sm font-bold ${theme.text}`}>
-                              Set {currentSet} of {currentExercise?.sets || 1}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Exercise Name and Actions */}
-                        <div
-                          className="flex items-start"
-                          style={{ gap: "12px", marginBottom: "16px" }}
-                        >
-                          <div
-                            style={{
-                              width: "56px",
-                              height: "56px",
-                              borderRadius: "18px",
-                              background:
-                                "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Dumbbell
-                              style={{
-                                width: "32px",
-                                height: "32px",
-                                color: "#FFFFFF",
-                              }}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div
-                                style={{
-                                  fontSize: "20px",
-                                  fontWeight: "700",
-                                  color: "#1A1A1A",
-                                }}
-                              >
-                                {currentExercise.exercise?.name || "Exercise"}
-                              </div>
-                              {/* Utility Icon Buttons */}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setShowPlateCalculator(true)}
-                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                              >
-                                <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  setShowExerciseAlternatives(true)
-                                }
-                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
-                              >
-                                <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                              </Button>
-                            </div>
-                            <div
-                              className="flex flex-wrap"
-                              style={{ gap: "8px" }}
-                            >
-                              {targetReps && (
-                                <div
-                                  style={{
-                                    backgroundColor: "#EDE7F6",
-                                    borderRadius: "12px",
-                                    padding: "6px 12px",
-                                    display: "inline-block",
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      fontSize: "14px",
-                                      fontWeight: "600",
-                                      color: "#6C5CE7",
-                                    }}
-                                  >
-                                    {targetReps} reps
+                              {/* Exercise Header */}
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-400 to-indigo-500">
+                                  <span className="text-white font-bold text-sm">
+                                    2
                                   </span>
                                 </div>
-                              )}
-                              {(currentExercise?.rir ||
-                                currentExercise?.rir === 0) && (
-                                <div
-                                  style={{
-                                    backgroundColor: "#FFE0B2",
-                                    borderRadius: "12px",
-                                    padding: "6px 12px",
-                                    display: "inline-block",
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      fontSize: "14px",
-                                      fontWeight: "600",
-                                      color: "#F5576C",
-                                    }}
-                                  >
-                                    RIR: {currentExercise.rir}
-                                  </span>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className={`font-bold ${theme.text} text-base`}
+                                    >
+                                      {(() => {
+                                        const exerciseId =
+                                          currentExercise?.meta
+                                            ?.superset_exercise_id ||
+                                          currentExercise?.superset_exercise_id;
+                                        const exerciseInfo = exerciseId
+                                          ? exerciseLookup[exerciseId]
+                                          : undefined;
+                                        return (
+                                          exerciseInfo?.name ||
+                                          "Second Exercise"
+                                        );
+                                      })()}
+                                    </div>
+                                    {/* Utility Icon Buttons */}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        setShowPlateCalculator(true)
+                                      }
+                                      className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                    >
+                                      <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        setShowExerciseAlternatives(true)
+                                      }
+                                      className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                    >
+                                      <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                    </Button>
+                                  </div>
                                 </div>
-                              )}
-                              {currentExercise?.tempo && (
-                                <div
-                                  style={{
-                                    backgroundColor: "#E3F2FD",
-                                    borderRadius: "12px",
-                                    padding: "6px 12px",
-                                    display: "inline-block",
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      fontSize: "14px",
-                                      fontWeight: "600",
-                                      color: "#2196F3",
-                                    }}
-                                  >
-                                    Tempo: {currentExercise.tempo}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          {currentExercise.exercise?.video_url && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                openVideoModal(
-                                  currentExercise.exercise?.video_url || ""
-                                )
-                              }
-                              className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                              <Youtube className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-
-                        {/* Logging Fields */}
-                        <div
-                          className="grid grid-cols-2"
-                          style={{
-                            gap: "16px",
-                            paddingTop: "16px",
-                            borderTop: "1px solid #E5E7EB",
-                          }}
-                        >
-                          <div>
-                            <label
-                              style={{
-                                display: "block",
-                                fontSize: "14px",
-                                fontWeight: "600",
-                                color: "#6B7280",
-                                marginBottom: "8px",
-                              }}
-                            >
-                              {currentType === "drop_set"
-                                ? "Working Weight (kg)"
-                                : "Weight (kg)"}
-                            </label>
-                            <input
-                              type="number"
-                              value={
-                                currentSetData.weight === 0
-                                  ? ""
-                                  : currentSetData.weight
-                              }
-                              onChange={(e) =>
-                                setCurrentSetData((prev) => ({
-                                  ...prev,
-                                  weight: parseFloat(e.target.value) || 0,
-                                }))
-                              }
-                              style={{
-                                width: "100%",
-                                height: "56px",
-                                textAlign: "center",
-                                fontSize: "18px",
-                                fontWeight: "700",
-                                color: "#1A1A1A",
-                                backgroundColor: "#FFFFFF",
-                                border: "2px solid #2196F3",
-                                borderRadius: "16px",
-                                outline: "none",
-                              }}
-                              step="0.5"
-                              placeholder="0"
-                            />
-                          </div>
-                          <div>
-                            <label
-                              style={{
-                                display: "block",
-                                fontSize: "14px",
-                                fontWeight: "600",
-                                color: "#6B7280",
-                                marginBottom: "8px",
-                              }}
-                            >
-                              Reps
-                            </label>
-                            <input
-                              type="number"
-                              value={
-                                currentSetData.reps === 0
-                                  ? ""
-                                  : currentSetData.reps
-                              }
-                              onChange={(e) =>
-                                setCurrentSetData((prev) => ({
-                                  ...prev,
-                                  reps: parseInt(e.target.value) || 0,
-                                }))
-                              }
-                              style={{
-                                width: "100%",
-                                height: "56px",
-                                textAlign: "center",
-                                fontSize: "18px",
-                                fontWeight: "700",
-                                color: "#1A1A1A",
-                                backgroundColor: "#FFFFFF",
-                                border: "2px solid #2196F3",
-                                borderRadius: "16px",
-                                outline: "none",
-                              }}
-                              placeholder="0"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Drop Set - Second Set Fields */}
-                        {currentType === "drop_set" && (
-                          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Calculator className="w-3 h-3 text-orange-500" />
-                              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                                Drop Set (Second Set)
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1">
-                                  Drop Weight (kg)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={dropWeight === "" ? "" : dropWeight}
-                                  onChange={(e) =>
-                                    setDropWeight(e.target.value)
-                                  }
-                                  className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-slate-700 dark:text-slate-300"
-                                  step="0.5"
-                                  placeholder={
-                                    currentSetData.weight > 0
-                                      ? (
-                                          currentSetData.weight *
-                                          (1 -
-                                            (Number(
-                                              currentExercise?.meta
-                                                ?.drop_percentage
-                                            ) ||
-                                              Number(
-                                                currentExercise?.drop_percentage
-                                              ) ||
-                                              0) /
-                                              100)
-                                        ).toFixed(1)
-                                      : "Auto"
-                                  }
-                                />
+                                {(() => {
+                                  const exerciseId =
+                                    currentExercise?.meta
+                                      ?.superset_exercise_id ||
+                                    currentExercise?.superset_exercise_id;
+                                  const exerciseInfo = exerciseId
+                                    ? exerciseLookup[exerciseId]
+                                    : undefined;
+                                  const video = exerciseInfo?.video_url;
+                                  return (
+                                    video && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => openVideoModal(video)}
+                                        className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                      >
+                                        <Youtube className="w-4 h-4" />
+                                      </Button>
+                                    )
+                                  );
+                                })()}
                               </div>
-                              <div>
-                                <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1">
-                                  Reps
-                                </label>
-                                <input
-                                  type="number"
-                                  value={dropReps === 0 ? "" : dropReps}
-                                  onChange={(e) =>
-                                    setDropReps(parseInt(e.target.value) || 0)
-                                  }
-                                  className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-slate-700 dark:text-slate-300"
-                                  placeholder="0"
-                                />
+
+                              {/* Exercise Details */}
+                              <div className="flex flex-wrap gap-2">
+                                {(currentExercise?.meta?.superset_reps_b ||
+                                  currentExercise?.meta?.superset_reps ||
+                                  currentExercise?.superset_reps ||
+                                  currentExercise?.reps) && (
+                                  <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
+                                    <span
+                                      className={`text-sm font-bold ${theme.text}`}
+                                    >
+                                      {currentExercise?.meta?.superset_reps_b ||
+                                        currentExercise?.meta?.superset_reps ||
+                                        currentExercise?.superset_reps ||
+                                        currentExercise?.reps}{" "}
+                                      reps
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Logging Fields */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label
+                                    className={`block text-sm font-medium ${theme.text} mb-1`}
+                                  >
+                                    Weight (kg)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={supersetBWeight}
+                                    onChange={(e) =>
+                                      setSupersetBWeight(e.target.value)
+                                    }
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    step="0.5"
+                                    placeholder="0"
+                                  />
+                                </div>
+                                <div>
+                                  <label
+                                    className={`block text-sm font-medium ${theme.text} mb-1`}
+                                  >
+                                    Reps
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={supersetBReps}
+                                    onChange={(e) =>
+                                      setSupersetBReps(e.target.value)
+                                    }
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    placeholder="0"
+                                  />
+                                </div>
                               </div>
                             </div>
                           </div>
-                        )}
+                        </div>
 
                         {/* Previous Performance Card */}
                         <div style={{ marginTop: "24px" }}>
@@ -4622,7 +4920,7 @@ export default function LiveWorkout() {
 
                         {/* Log Button */}
                         <Button
-                          onClick={completeSet}
+                          onClick={completeSuperset}
                           style={{
                             width: "100%",
                             background:
@@ -4634,102 +4932,692 @@ export default function LiveWorkout() {
                             fontWeight: "600",
                             boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
                             border: "none",
-                            cursor:
-                              currentSetData.weight <= 0 ||
-                              currentSetData.reps <= 0 ||
-                              isLoggingSet
-                                ? "not-allowed"
-                                : "pointer",
-                            opacity:
-                              currentSetData.weight <= 0 ||
-                              currentSetData.reps <= 0 ||
-                              isLoggingSet
-                                ? 0.5
-                                : 1,
+                            cursor: isLoggingSet ? "not-allowed" : "pointer",
+                            opacity: isLoggingSet ? 0.5 : 1,
                             marginTop: "24px",
                           }}
-                          disabled={
-                            currentSetData.weight <= 0 ||
-                            currentSetData.reps <= 0 ||
-                            isLoggingSet
-                          }
+                          disabled={isLoggingSet}
                         >
-                          <Check className="w-5 h-5 mr-2" /> Log Set
+                          <Check className="w-5 h-5 mr-2" /> Log{" "}
+                          {currentType === "superset"
+                            ? "Superset"
+                            : "Pre-Exhaustion"}
                         </Button>
                       </div>
                     </div>
                   )}
 
-                {/* Simple Navigation */}
-                {exercises.length > 1 && (
-                  <div className="flex items-center justify-between">
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        setCurrentExerciseIndex(
-                          Math.max(0, currentExerciseIndex - 1)
-                        )
-                      }
-                      disabled={currentExerciseIndex === 0}
-                      className="flex-1 mr-2"
+                  {/* Giant Set Flow */}
+                  {currentType === "giant_set" && (
+                    <div
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: "24px",
+                        padding: "24px",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                        border: "2px solid #6C5CE7",
+                        position: "relative",
+                        zIndex: 20,
+                      }}
                     >
-                      <ChevronLeft className="w-4 h-4 mr-1" />
-                      Previous
-                    </Button>
+                      <div>
+                        <div
+                          className="flex items-center justify-between"
+                          style={{ marginBottom: "16px" }}
+                        >
+                          <div
+                            className={`text-base sm:text-xl font-bold ${theme.text}`}
+                          >
+                            Giant Set
+                          </div>
+                          <div className={`text-xs ${theme.textSecondary}`}>
+                            Set {currentSet} of {currentExercise?.sets || 1}
+                          </div>
+                        </div>
+                        {(
+                          (currentExercise?.meta?.giant_set_exercises ||
+                            currentExercise?.giant_set_exercises ||
+                            []) as any[]
+                        ).map((item: any, idx: number) => {
+                          const resolved = item.exercise_id
+                            ? exerciseLookup[item.exercise_id]
+                            : undefined;
+                          const displayName =
+                            resolved?.name ||
+                            item.name ||
+                            `Exercise ${idx + 1}`;
+                          const video = resolved?.video_url || item.video_url;
+                          return (
+                            <div
+                              key={idx}
+                              className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl"
+                            >
+                              <div
+                                className={`p-4 ${theme.card} bg-white/95 dark:bg-slate-800/95 rounded-2xl space-y-3`}
+                              >
+                                {/* Header: name + video + number badge */}
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-orange-400 to-red-500">
+                                    <span className="text-white font-bold text-sm">
+                                      {idx + 1}
+                                    </span>
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                                        {displayName}
+                                      </div>
+                                      {/* Utility Icon Buttons */}
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          setShowPlateCalculator(true)
+                                        }
+                                        className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                      >
+                                        <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          setShowExerciseAlternatives(true)
+                                        }
+                                        className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                      >
+                                        <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  {video && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openVideoModal(video)}
+                                      className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                    >
+                                      <Youtube className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
 
-                    <div className="text-center px-4">
-                      <div className="text-sm text-slate-600 dark:text-slate-300">
-                        Exercise
-                      </div>
-                      <div className="text-lg font-bold">
-                        {currentExerciseIndex + 1} / {exercises.length}
+                                {/* Exercise Details - Reps */}
+                                {item.reps && (
+                                  <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
+                                    <span
+                                      className={`text-sm font-bold ${theme.text}`}
+                                    >
+                                      {item.reps} reps
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Input Fields */}
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label
+                                      className={`block text-sm font-medium text-slate-800 dark:text-slate-200 mb-1`}
+                                    >
+                                      Weight (kg)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={giantWeights[idx] || ""}
+                                      onChange={(e) =>
+                                        setGiantWeights((prev) =>
+                                          prev.map((w, i) =>
+                                            i === idx ? e.target.value : w
+                                          )
+                                        )
+                                      }
+                                      className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 bg-white/90 dark:bg-slate-700 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500 dark:focus:border-indigo-500`}
+                                      step="0.5"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label
+                                      className={`block text-sm font-medium text-slate-800 dark:text-slate-200 mb-1`}
+                                    >
+                                      Reps
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={giantReps[idx] || ""}
+                                      readOnly
+                                      className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 bg-white/80 dark:bg-slate-700 text-slate-900 dark:text-white font-semibold`}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Previous Performance Card */}
+                        <div style={{ marginTop: "24px" }}>
+                          <PreviousPerformanceCard />
+                        </div>
+
+                        <Button
+                          onClick={completeGiantSet}
+                          style={{
+                            width: "100%",
+                            background:
+                              "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
+                            color: "#FFFFFF",
+                            borderRadius: "20px",
+                            padding: "16px 32px",
+                            fontSize: "16px",
+                            fontWeight: "600",
+                            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                            border: "none",
+                            cursor: isLoggingSet ? "not-allowed" : "pointer",
+                            opacity: isLoggingSet ? 0.5 : 1,
+                            marginTop: "24px",
+                          }}
+                          disabled={isLoggingSet}
+                        >
+                          Log Giant Set
+                        </Button>
                       </div>
                     </div>
+                  )}
+                  {/* Standard Exercise Types - Modern Style */}
+                  {currentType !== "giant_set" &&
+                    currentType !== "circuit" &&
+                    currentType !== "tabata" &&
+                    currentType !== "amrap" &&
+                    currentType !== "emom" &&
+                    currentType !== "for_time" &&
+                    currentType !== "superset" &&
+                    currentType !== "pre_exhaustion" &&
+                    currentType !== "cluster_set" &&
+                    currentType !== "rest_pause" && (
+                      <div
+                        style={{
+                          backgroundColor: "#FFFFFF",
+                          borderRadius: "24px",
+                          padding: "24px",
+                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                          border: "2px solid #2196F3",
+                        }}
+                      >
+                        <div>
+                          {/* Header */}
+                          <div
+                            className="flex items-center justify-between"
+                            style={{ marginBottom: "16px" }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`text-base sm:text-xl font-bold ${theme.text}`}
+                              >
+                                {currentType === "straight_set"
+                                  ? "Straight Set"
+                                  : currentType === "drop_set"
+                                  ? "Drop Set"
+                                  : currentType === "cluster_set"
+                                  ? "Cluster Set"
+                                  : currentType === "rest_pause"
+                                  ? "Rest Pause"
+                                  : "Exercise"}
+                              </div>
+                              {currentExercise?.rest_seconds && (
+                                <div className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700">
+                                  <span
+                                    className={`text-xs font-semibold ${theme.text}`}
+                                  >
+                                    Rest: {currentExercise.rest_seconds}s
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700">
+                              <span
+                                className={`text-sm font-bold ${theme.text}`}
+                              >
+                                Set {currentSet} of {currentExercise?.sets || 1}
+                              </span>
+                            </div>
+                          </div>
 
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        setCurrentExerciseIndex(
-                          Math.min(
-                            exercises.length - 1,
-                            currentExerciseIndex + 1
+                          {/* Exercise Name and Actions */}
+                          <div
+                            className="flex items-start"
+                            style={{ gap: "12px", marginBottom: "16px" }}
+                          >
+                            <div
+                              style={{
+                                width: "56px",
+                                height: "56px",
+                                borderRadius: "18px",
+                                background:
+                                  "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Dumbbell
+                                style={{
+                                  width: "32px",
+                                  height: "32px",
+                                  color: "#FFFFFF",
+                                }}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div
+                                  style={{
+                                    fontSize: "20px",
+                                    fontWeight: "700",
+                                    color: "#1A1A1A",
+                                  }}
+                                >
+                                  {currentExercise.exercise?.name || "Exercise"}
+                                </div>
+                                {/* Utility Icon Buttons */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowPlateCalculator(true)}
+                                  className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                >
+                                  <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    setShowExerciseAlternatives(true)
+                                  }
+                                  className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                </Button>
+                              </div>
+                              <div
+                                className="flex flex-wrap"
+                                style={{ gap: "8px" }}
+                              >
+                                {targetReps && (
+                                  <div
+                                    style={{
+                                      backgroundColor: "#EDE7F6",
+                                      borderRadius: "12px",
+                                      padding: "6px 12px",
+                                      display: "inline-block",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontSize: "14px",
+                                        fontWeight: "600",
+                                        color: "#6C5CE7",
+                                      }}
+                                    >
+                                      {targetReps} reps
+                                    </span>
+                                  </div>
+                                )}
+                                {(currentExercise?.rir ||
+                                  currentExercise?.rir === 0) && (
+                                  <div
+                                    style={{
+                                      backgroundColor: "#FFE0B2",
+                                      borderRadius: "12px",
+                                      padding: "6px 12px",
+                                      display: "inline-block",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontSize: "14px",
+                                        fontWeight: "600",
+                                        color: "#F5576C",
+                                      }}
+                                    >
+                                      RIR: {currentExercise.rir}
+                                    </span>
+                                  </div>
+                                )}
+                                {currentExercise?.exercise_id &&
+                                  currentExercise?.load_percentage &&
+                                  getSuggestedWeightText(
+                                    currentExercise.exercise_id,
+                                    currentExercise.load_percentage
+                                  ) && (
+                                    <div
+                                      style={{
+                                        backgroundColor: "#E8F5E9",
+                                        borderRadius: "12px",
+                                        padding: "6px 12px",
+                                        display: "inline-block",
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          fontSize: "14px",
+                                          fontWeight: "600",
+                                          color: "#2E7D32",
+                                        }}
+                                      >
+                                        {getSuggestedWeightText(
+                                          currentExercise.exercise_id,
+                                          currentExercise.load_percentage
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                {currentExercise?.tempo && (
+                                  <div
+                                    style={{
+                                      backgroundColor: "#E3F2FD",
+                                      borderRadius: "12px",
+                                      padding: "6px 12px",
+                                      display: "inline-block",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontSize: "14px",
+                                        fontWeight: "600",
+                                        color: "#2196F3",
+                                      }}
+                                    >
+                                      Tempo: {currentExercise.tempo}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {currentExercise.exercise?.video_url && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  openVideoModal(
+                                    currentExercise.exercise?.video_url || ""
+                                  )
+                                }
+                                className="flex-shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              >
+                                <Youtube className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+
+                          {/* Logging Fields */}
+                          <div
+                            className="grid grid-cols-2"
+                            style={{
+                              gap: "16px",
+                              paddingTop: "16px",
+                              borderTop: "1px solid #E5E7EB",
+                            }}
+                          >
+                            <div>
+                              <label
+                                style={{
+                                  display: "block",
+                                  fontSize: "14px",
+                                  fontWeight: "600",
+                                  color: "#6B7280",
+                                  marginBottom: "8px",
+                                }}
+                              >
+                                {currentType === "drop_set"
+                                  ? "Working Weight (kg)"
+                                  : "Weight (kg)"}
+                              </label>
+                              <input
+                                type="number"
+                                value={
+                                  currentSetData.weight === 0
+                                    ? ""
+                                    : currentSetData.weight
+                                }
+                                onChange={(e) =>
+                                  setCurrentSetData((prev) => ({
+                                    ...prev,
+                                    weight: parseFloat(e.target.value) || 0,
+                                  }))
+                                }
+                                style={{
+                                  width: "100%",
+                                  height: "56px",
+                                  textAlign: "center",
+                                  fontSize: "18px",
+                                  fontWeight: "700",
+                                  color: "#1A1A1A",
+                                  backgroundColor: "#FFFFFF",
+                                  border: "2px solid #2196F3",
+                                  borderRadius: "16px",
+                                  outline: "none",
+                                }}
+                                step="0.5"
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <label
+                                style={{
+                                  display: "block",
+                                  fontSize: "14px",
+                                  fontWeight: "600",
+                                  color: "#6B7280",
+                                  marginBottom: "8px",
+                                }}
+                              >
+                                Reps
+                              </label>
+                              <input
+                                type="number"
+                                value={
+                                  currentSetData.reps === 0
+                                    ? ""
+                                    : currentSetData.reps
+                                }
+                                onChange={(e) =>
+                                  setCurrentSetData((prev) => ({
+                                    ...prev,
+                                    reps: parseInt(e.target.value) || 0,
+                                  }))
+                                }
+                                style={{
+                                  width: "100%",
+                                  height: "56px",
+                                  textAlign: "center",
+                                  fontSize: "18px",
+                                  fontWeight: "700",
+                                  color: "#1A1A1A",
+                                  backgroundColor: "#FFFFFF",
+                                  border: "2px solid #2196F3",
+                                  borderRadius: "16px",
+                                  outline: "none",
+                                }}
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Drop Set - Second Set Fields */}
+                          {currentType === "drop_set" && (
+                            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Calculator className="w-3 h-3 text-orange-500" />
+                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                                  Drop Set (Second Set)
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1">
+                                    Drop Weight (kg)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={dropWeight === "" ? "" : dropWeight}
+                                    onChange={(e) =>
+                                      setDropWeight(e.target.value)
+                                    }
+                                    className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-slate-700 dark:text-slate-300"
+                                    step="0.5"
+                                    placeholder={
+                                      currentSetData.weight > 0
+                                        ? (
+                                            currentSetData.weight *
+                                            (1 -
+                                              (Number(
+                                                currentExercise?.meta
+                                                  ?.drop_percentage
+                                              ) ||
+                                                Number(
+                                                  currentExercise?.drop_percentage
+                                                ) ||
+                                                0) /
+                                                100)
+                                          ).toFixed(1)
+                                        : "Auto"
+                                    }
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1">
+                                    Reps
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={dropReps === 0 ? "" : dropReps}
+                                    onChange={(e) =>
+                                      setDropReps(parseInt(e.target.value) || 0)
+                                    }
+                                    className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-slate-700 dark:text-slate-300"
+                                    placeholder="0"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Previous Performance Card */}
+                          <div style={{ marginTop: "24px" }}>
+                            <PreviousPerformanceCard />
+                          </div>
+
+                          {/* Log Button */}
+                          <Button
+                            onClick={completeSet}
+                            style={{
+                              width: "100%",
+                              background:
+                                "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
+                              color: "#FFFFFF",
+                              borderRadius: "20px",
+                              padding: "16px 32px",
+                              fontSize: "16px",
+                              fontWeight: "600",
+                              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                              border: "none",
+                              cursor:
+                                currentSetData.weight <= 0 ||
+                                currentSetData.reps <= 0 ||
+                                isLoggingSet
+                                  ? "not-allowed"
+                                  : "pointer",
+                              opacity:
+                                currentSetData.weight <= 0 ||
+                                currentSetData.reps <= 0 ||
+                                isLoggingSet
+                                  ? 0.5
+                                  : 1,
+                              marginTop: "24px",
+                            }}
+                            disabled={
+                              currentSetData.weight <= 0 ||
+                              currentSetData.reps <= 0 ||
+                              isLoggingSet
+                            }
+                          >
+                            <Check className="w-5 h-5 mr-2" /> Log Set
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Simple Navigation */}
+                  {exercises.length > 1 && (
+                    <div className="flex items-center justify-between">
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          setCurrentExerciseIndex(
+                            Math.max(0, currentExerciseIndex - 1)
                           )
-                        )
-                      }
-                      disabled={currentExerciseIndex === exercises.length - 1}
-                      className="flex-1 ml-2"
+                        }
+                        disabled={currentExerciseIndex === 0}
+                        className="flex-1 mr-2"
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" />
+                        Previous
+                      </Button>
+
+                      <div className="text-center px-4">
+                        <div className="text-sm text-slate-600 dark:text-slate-300">
+                          Exercise
+                        </div>
+                        <div className="text-lg font-bold">
+                          {currentExerciseIndex + 1} / {exercises.length}
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          setCurrentExerciseIndex(
+                            Math.min(
+                              exercises.length - 1,
+                              currentExerciseIndex + 1
+                            )
+                          )
+                        }
+                        disabled={currentExerciseIndex === exercises.length - 1}
+                        className="flex-1 ml-2"
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Card
+                  className={`${theme.card} border ${theme.border} rounded-3xl overflow-hidden`}
+                >
+                  <CardContent className="p-12 text-center">
+                    <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-pink-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                      <AlertTriangle className="w-10 h-10 text-white" />
+                    </div>
+                    <h3 className={`text-2xl font-bold ${theme.text} mb-3`}>
+                      No exercises found
+                    </h3>
+                    <p className={`${theme.textSecondary} mb-6`}>
+                      This workout doesn&apos;t have any exercises assigned.
+                    </p>
+                    <Button
+                      onClick={() => router.push("/client/workouts")}
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-2xl"
                     >
-                      Next
-                      <ChevronRight className="w-4 h-4 ml-1" />
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Back to Workouts
                     </Button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Card
-                className={`${theme.card} border ${theme.border} rounded-3xl overflow-hidden`}
-              >
-                <CardContent className="p-12 text-center">
-                  <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-pink-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                    <AlertTriangle className="w-10 h-10 text-white" />
-                  </div>
-                  <h3 className={`text-2xl font-bold ${theme.text} mb-3`}>
-                    No exercises found
-                  </h3>
-                  <p className={`${theme.textSecondary} mb-6`}>
-                    This workout doesn&apos;t have any exercises assigned.
-                  </p>
-                  <Button
-                    onClick={() => router.push("/client/workouts")}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-2xl"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Workouts
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-            )
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         </div>
 
@@ -4756,7 +5644,7 @@ export default function LiveWorkout() {
 
                         // Calculate segments per round
                         let segmentsPerRound = 0;
-                        circuitSets.forEach((set) => {
+                        circuitSets.forEach((set: any) => {
                           const exercisesInSet = set?.exercises?.length || 0;
                           // Each exercise has: work + rest
                           segmentsPerRound += exercisesInSet * 2;
@@ -5840,7 +6728,13 @@ export default function LiveWorkout() {
                           lineHeight: "1.1",
                         }}
                       >
-                        {workoutStats.totalTime}
+                        {(() => {
+                          console.log("🕐 [Duration Debug] Modal displaying totalTime:", {
+                            totalTime: workoutStats.totalTime,
+                            unit: "minutes",
+                          });
+                          return workoutStats.totalTime;
+                        })()}
                       </div>
                       <div
                         style={{
@@ -5925,9 +6819,10 @@ export default function LiveWorkout() {
                 >
                   <Button
                     onClick={async () => {
-                      await completeWorkout();
+                      console.log("🔘 Completion modal button clicked - View Progress");
                       setShowWorkoutCompletion(false);
-                      router.push("/client/workouts");
+                      await completeWorkout();
+                      // completeWorkout() already navigates to complete page
                     }}
                     style={{
                       width: "100%",
@@ -6175,7 +7070,7 @@ export default function LiveWorkout() {
             </div>
           </div>
         )}
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

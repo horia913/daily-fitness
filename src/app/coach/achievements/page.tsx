@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -165,7 +167,7 @@ const defaultTiers: AchievementTier[] = [
 ]
 
 export default function CoachAchievements() {
-  const { getThemeStyles } = useTheme()
+  const { getThemeStyles, performanceSettings } = useTheme()
   const theme = getThemeStyles()
   
   const [achievementTemplates, setAchievementTemplates] = useState<AchievementTemplate[]>([])
@@ -595,7 +597,9 @@ export default function CoachAchievements() {
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className={`min-h-screen ${theme.background}`}>
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
         <div className="relative p-6">
           <div className="max-w-7xl mx-auto space-y-8">
             {/* Header */}
@@ -1065,7 +1069,7 @@ export default function CoachAchievements() {
             </Dialog>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

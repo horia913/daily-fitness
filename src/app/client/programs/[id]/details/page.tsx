@@ -1,71 +1,81 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Clock, Calendar, BookOpen, Play } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { useTheme } from '@/contexts/ThemeContext'
-import { supabase } from '@/lib/supabase'
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Clock,
+  Calendar,
+  BookOpen,
+  Play,
+  Dumbbell,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { useTheme } from "@/contexts/ThemeContext";
+import { supabase } from "@/lib/supabase";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface Program {
-  id: string
-  name: string
-  description: string
-  duration_weeks: number
+  id: string;
+  name: string;
+  description: string;
+  duration_weeks: number;
 }
 
 interface ProgramWeek {
-  week_number: number
+  week_number: number;
   workouts: Array<{
-    id: string
-    name: string
-    description: string
-    estimated_duration: number
-  }>
+    id: string;
+    name: string;
+    description: string;
+    estimated_duration: number;
+  }>;
 }
 
-export default function ProgramDetailsPage() {
-  const { id } = useParams()
-  const router = useRouter()
-  // supabase is imported from @/lib/supabase
-  const { theme } = useTheme()
-  const [program, setProgram] = useState<Program | null>(null)
-  const [weeks, setWeeks] = useState<ProgramWeek[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+function ProgramDetailsContent() {
+  const { id } = useParams();
+  const router = useRouter();
+  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const [program, setProgram] = useState<Program | null>(null);
+  const [weeks, setWeeks] = useState<ProgramWeek[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
-      loadProgramDetails(id as string)
+      loadProgramDetails(id as string);
     }
-  }, [id])
+  }, [id]);
 
   const loadProgramDetails = async (programId: string) => {
     try {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      setError(null);
 
       // Get program details
       const { data: programData, error: programError } = await supabase
-        .from('workout_programs')
-        .select('id, name, description, duration_weeks')
-        .eq('id', programId)
-        .single()
+        .from("workout_programs")
+        .select("id, name, description, duration_weeks")
+        .eq("id", programId)
+        .single();
 
       if (programError) {
-        console.error('Error fetching program:', programError)
-        setError('Failed to load program details')
-        return
+        console.error("Error fetching program:", programError);
+        setError("Failed to load program details");
+        return;
       }
 
-      setProgram(programData)
+      setProgram(programData);
 
       // Get program weeks and workouts
       const { data: programWeeks, error: weeksError } = await supabase
-        .from('program_weeks')
-        .select(`
+        .from("program_weeks")
+        .select(
+          `
           week_number,
           workout_templates!inner (
             id,
@@ -73,168 +83,370 @@ export default function ProgramDetailsPage() {
             description,
             estimated_duration
           )
-        `)
-        .eq('program_id', programId)
-        .order('week_number', { ascending: true })
+        `
+        )
+        .eq("program_id", programId)
+        .order("week_number", { ascending: true });
 
       if (weeksError) {
-        console.error('Error fetching program weeks:', weeksError)
-        // Don't set error here, just show empty weeks
-        setWeeks([])
+        console.error("Error fetching program weeks:", weeksError);
+        setWeeks([]);
       } else {
         // Transform the data to match our interface
-        const weeksData: ProgramWeek[] = programWeeks?.map((week: any) => ({
-          week_number: week.week_number,
-          workouts: week.workout_templates ? [week.workout_templates] : []
-        })) || []
-        
-        setWeeks(weeksData)
+        const weeksData: ProgramWeek[] =
+          programWeeks?.map((week: any) => ({
+            week_number: week.week_number,
+            workouts: week.workout_templates ? [week.workout_templates] : [],
+          })) || [];
+
+        setWeeks(weeksData);
       }
     } catch (error) {
-      console.error('Error loading program details:', error)
-      setError('Failed to load program details')
+      console.error("Error loading program details:", error);
+      setError("Failed to load program details");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
-
-  const getThemeStyles = () => {
-    return {
-      background: theme === 'dark' 
-        ? 'bg-gradient-to-br from-gray-900 to-gray-800' 
-        : 'bg-gradient-to-br from-gray-50 to-gray-100',
-      card: theme === 'dark' 
-        ? 'bg-gray-800 border-gray-700' 
-        : 'bg-white border-gray-200',
-      text: theme === 'dark' ? 'text-white' : 'text-gray-900',
-      textSecondary: theme === 'dark' ? 'text-gray-300' : 'text-gray-600',
-      badge: theme === 'dark' 
-        ? 'bg-orange-600 text-white' 
-        : 'bg-orange-100 text-orange-800'
-    }
-  }
-
-  const styles = getThemeStyles()
+  };
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${styles.background}`}>
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-[50vh]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-              <p className={styles.textSecondary}>Loading program details...</p>
-            </div>
-          </div>
+      <AnimatedBackground>
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <GlassCard elevation={2} className="p-8 text-center">
+            <div
+              className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
+              style={{
+                borderColor: `${getSemanticColor("trust").primary}40`,
+                borderTopColor: "transparent",
+              }}
+            />
+            <p
+              style={{
+                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+              }}
+            >
+              Loading program details...
+            </p>
+          </GlassCard>
         </div>
-      </div>
-    )
+      </AnimatedBackground>
+    );
   }
 
   if (error || !program) {
     return (
-      <div className={`min-h-screen ${styles.background}`}>
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-[50vh]">
-            <div className="text-center">
-              <p className={`text-red-500 mb-4`}>{error || 'Program not found'}</p>
-              <Button onClick={() => router.back()} variant="outline">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Go Back
-              </Button>
-            </div>
-          </div>
+      <AnimatedBackground>
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <GlassCard elevation={2} className="p-8 text-center">
+            <p className="text-red-500 mb-4">{error || "Program not found"}</p>
+            <Button onClick={() => router.back()} variant="ghost">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Go Back
+            </Button>
+          </GlassCard>
         </div>
-      </div>
-    )
+      </AnimatedBackground>
+    );
   }
 
+  const totalWorkouts = weeks.reduce(
+    (sum, week) => sum + week.workouts.length,
+    0
+  );
+
   return (
-    <div className={`min-h-screen ${styles.background}`}>
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <Button 
-            onClick={() => router.back()} 
-            variant="ghost" 
-            className="text-orange-500 hover:text-orange-600"
+    <AnimatedBackground>
+      {performanceSettings.floatingParticles && <FloatingParticles />}
+      <div className="min-h-screen p-4 sm:p-6">
+        <div className="max-w-6xl mx-auto space-y-6 relative z-10">
+          {/* Back Button */}
+          <Button
+            onClick={() => router.back()}
+            variant="ghost"
+            className="mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
-        </div>
 
-        {/* Program Header */}
-        <Card className={`${styles.card} mb-6`}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className={`${styles.text} text-2xl`}>
-                {program.name}
-              </CardTitle>
-              <Badge className={styles.badge}>
-                <Calendar className="w-3 h-3 mr-1" />
-                {program.duration_weeks} weeks
-              </Badge>
+          {/* Program Header */}
+          <GlassCard elevation={3} className="p-6">
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-6">
+              <div className="flex items-start gap-4 flex-1">
+                <div
+                  className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{
+                    background: getSemanticColor("success").gradient,
+                    boxShadow: `0 4px 12px ${
+                      getSemanticColor("success").primary
+                    }30`,
+                  }}
+                >
+                  <BookOpen className="w-7 h-7 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h1
+                    className="text-3xl font-bold mb-3 break-words"
+                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                  >
+                    {program.name}
+                  </h1>
+                  {program.description && (
+                    <p
+                      className="leading-relaxed"
+                      style={{
+                        color: isDark
+                          ? "rgba(255,255,255,0.7)"
+                          : "rgba(0,0,0,0.7)",
+                      }}
+                    >
+                      {program.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div
+                className="px-4 py-2 rounded-xl flex items-center gap-2 flex-shrink-0"
+                style={{
+                  background: `${getSemanticColor("warning").primary}20`,
+                }}
+              >
+                <Calendar
+                  className="w-5 h-5"
+                  style={{ color: getSemanticColor("warning").primary }}
+                />
+                <span
+                  className="font-semibold"
+                  style={{ color: getSemanticColor("warning").primary }}
+                >
+                  {program.duration_weeks} weeks
+                </span>
+              </div>
             </div>
-            {program.description && (
-              <p className={`${styles.textSecondary} mt-2`}>
-                {program.description}
-              </p>
-            )}
-          </CardHeader>
-        </Card>
+          </GlassCard>
 
-        {/* Program Weeks */}
-        <Card className={styles.card}>
-          <CardHeader>
-            <CardTitle className={`${styles.text} flex items-center`}>
-              <BookOpen className="w-5 h-5 mr-2" />
+          {/* Stats Summary */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <GlassCard elevation={2} className="p-5 text-center">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
+                style={{
+                  background: `${getSemanticColor("trust").primary}20`,
+                }}
+              >
+                <Calendar
+                  className="w-6 h-6"
+                  style={{ color: getSemanticColor("trust").primary }}
+                />
+              </div>
+              <AnimatedNumber
+                value={program.duration_weeks}
+                className="text-3xl font-bold"
+                color={isDark ? "#fff" : "#1A1A1A"}
+              />
+              <p
+                className="text-xs mt-1"
+                style={{
+                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                }}
+              >
+                Weeks
+              </p>
+            </GlassCard>
+
+            <GlassCard elevation={2} className="p-5 text-center">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
+                style={{
+                  background: `${getSemanticColor("success").primary}20`,
+                }}
+              >
+                <Dumbbell
+                  className="w-6 h-6"
+                  style={{ color: getSemanticColor("success").primary }}
+                />
+              </div>
+              <AnimatedNumber
+                value={totalWorkouts}
+                className="text-3xl font-bold"
+                color={isDark ? "#fff" : "#1A1A1A"}
+              />
+              <p
+                className="text-xs mt-1"
+                style={{
+                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                }}
+              >
+                Workouts
+              </p>
+            </GlassCard>
+
+            <GlassCard elevation={2} className="p-5 text-center">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
+                style={{
+                  background: `${getSemanticColor("warning").primary}20`,
+                }}
+              >
+                <Clock
+                  className="w-6 h-6"
+                  style={{ color: getSemanticColor("warning").primary }}
+                />
+              </div>
+              <AnimatedNumber
+                value={weeks.reduce(
+                  (sum, week) =>
+                    sum +
+                    week.workouts.reduce((s, w) => s + w.estimated_duration, 0),
+                  0
+                )}
+                className="text-3xl font-bold"
+                color={isDark ? "#fff" : "#1A1A1A"}
+              />
+              <p
+                className="text-xs mt-1"
+                style={{
+                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                }}
+              >
+                Total Minutes
+              </p>
+            </GlassCard>
+          </div>
+
+          {/* Program Weeks */}
+          <GlassCard elevation={2} className="p-6">
+            <h3
+              className="text-lg font-bold mb-6 flex items-center gap-2"
+              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+            >
+              <BookOpen className="w-5 h-5" />
               Program Structure
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </h3>
+
             {weeks.length === 0 ? (
-              <p className={`${styles.textSecondary} text-center py-8`}>
+              <p
+                className="text-center py-8"
+                style={{
+                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                }}
+              >
                 No workout schedule found for this program.
               </p>
             ) : (
               <div className="space-y-6">
                 {weeks.map((week) => (
-                  <div key={week.week_number} className="border-b border-gray-200 dark:border-gray-700 pb-4 last:border-b-0">
-                    <h3 className={`${styles.text} font-semibold text-lg mb-3`}>
+                  <div
+                    key={week.week_number}
+                    className="pb-6 last:pb-0"
+                    style={{
+                      borderBottom:
+                        weeks.indexOf(week) !== weeks.length - 1
+                          ? `1px solid ${
+                              isDark
+                                ? "rgba(255,255,255,0.1)"
+                                : "rgba(0,0,0,0.1)"
+                            }`
+                          : "none",
+                    }}
+                  >
+                    <h4
+                      className="font-bold text-lg mb-4"
+                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                    >
                       Week {week.week_number}
-                    </h3>
-                    
+                    </h4>
+
                     {week.workouts.length === 0 ? (
-                      <p className={`${styles.textSecondary} text-sm`}>
+                      <p
+                        className="text-sm"
+                        style={{
+                          color: isDark
+                            ? "rgba(255,255,255,0.5)"
+                            : "rgba(0,0,0,0.5)",
+                        }}
+                      >
                         No workouts scheduled for this week.
                       </p>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {week.workouts.map((workout) => (
-                          <div 
+                          <div
                             key={workout.id}
-                            className={`${styles.card} border rounded-lg p-3 flex items-center justify-between`}
+                            className="p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                            style={{
+                              background: isDark
+                                ? "rgba(255,255,255,0.05)"
+                                : "rgba(0,0,0,0.03)",
+                              border: `1px solid ${
+                                isDark
+                                  ? "rgba(255,255,255,0.1)"
+                                  : "rgba(0,0,0,0.1)"
+                              }`,
+                            }}
                           >
-                            <div>
-                              <h4 className={`${styles.text} font-medium`}>
+                            <div className="flex-1 min-w-0">
+                              <h5
+                                className="font-semibold mb-1 break-words"
+                                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                              >
                                 {workout.name}
-                              </h4>
+                              </h5>
                               {workout.description && (
-                                <p className={`${styles.textSecondary} text-sm`}>
+                                <p
+                                  className="text-sm break-words"
+                                  style={{
+                                    color: isDark
+                                      ? "rgba(255,255,255,0.6)"
+                                      : "rgba(0,0,0,0.6)",
+                                  }}
+                                >
                                   {workout.description}
                                 </p>
                               )}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                <Clock className="w-3 h-3 mr-1" />
-                                {workout.estimated_duration} min
-                              </Badge>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <div
+                                className="px-3 py-1 rounded-lg flex items-center gap-2"
+                                style={{
+                                  background: isDark
+                                    ? "rgba(255,255,255,0.1)"
+                                    : "rgba(0,0,0,0.05)",
+                                }}
+                              >
+                                <Clock
+                                  className="w-3.5 h-3.5"
+                                  style={{
+                                    color: getSemanticColor("warning").primary,
+                                  }}
+                                />
+                                <span
+                                  className="text-xs font-semibold"
+                                  style={{
+                                    color: isDark
+                                      ? "rgba(255,255,255,0.9)"
+                                      : "rgba(0,0,0,0.9)",
+                                  }}
+                                >
+                                  {workout.estimated_duration} min
+                                </span>
+                              </div>
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => router.push(`/client/workouts/${workout.id}/details`)}
+                                onClick={() =>
+                                  router.push(
+                                    `/client/workouts/${workout.id}/details`
+                                  )
+                                }
+                                style={{
+                                  background:
+                                    getSemanticColor("trust").gradient,
+                                  boxShadow: `0 4px 12px ${
+                                    getSemanticColor("trust").primary
+                                  }30`,
+                                }}
                               >
                                 View Details
                               </Button>
@@ -247,20 +459,33 @@ export default function ProgramDetailsPage() {
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </GlassCard>
 
-        {/* Action Button */}
-        <div className="mt-6 text-center">
-          <Button 
-            onClick={() => router.push('/client/workouts')}
-            className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 text-lg"
-          >
-            <Play className="w-5 h-5 mr-2" />
-            View All Workouts
-          </Button>
+          {/* Action Button */}
+          <div className="text-center">
+            <Button
+              onClick={() => router.push("/client/workouts")}
+              size="lg"
+              className="rounded-xl px-8"
+              style={{
+                background: getSemanticColor("energy").gradient,
+                boxShadow: `0 4px 12px ${getSemanticColor("energy").primary}30`,
+              }}
+            >
+              <Play className="w-5 h-5 mr-2" />
+              View All Workouts
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
-  )
+    </AnimatedBackground>
+  );
+}
+
+export default function ProgramDetailsPage() {
+  return (
+    <ProtectedRoute requiredRole="client">
+      <ProgramDetailsContent />
+    </ProtectedRoute>
+  );
 }

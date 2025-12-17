@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Card,
   CardContent,
@@ -59,7 +62,6 @@ import {
   Sun,
   Moon,
   Rainbow,
-  Lightning,
   Wind,
   Share2,
   ExternalLink,
@@ -91,6 +93,7 @@ interface AchievementCategory {
 
 export default function ClientAchievements() {
   const { user } = useAuth();
+  const { performanceSettings } = useTheme();
   const [loading, setLoading] = useState(true);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [categories, setCategories] = useState<AchievementCategory[]>([]);
@@ -637,7 +640,9 @@ export default function ClientAchievements() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 dark:from-slate-900 dark:to-slate-800">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
         <div className="p-4">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Header */}
@@ -1035,7 +1040,7 @@ export default function ClientAchievements() {
             </div>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

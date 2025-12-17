@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { useTheme } from "@/contexts/ThemeContext";
 import WorkoutTemplateForm from "@/components/WorkoutTemplateForm";
 import WorkoutTemplateService, {
   WorkoutTemplate,
@@ -13,6 +16,7 @@ export default function EditWorkoutTemplatePage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { performanceSettings } = useTheme();
   const templateId = useMemo(() => String(params?.id || ""), [params]);
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +60,10 @@ export default function EditWorkoutTemplatePage() {
   if (!user) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div></div>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div></div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -64,13 +71,16 @@ export default function EditWorkoutTemplatePage() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-4">
-          <div className="max-w-7xl mx-auto">
-            <div className="animate-pulse bg-white dark:bg-slate-800 rounded-2xl p-6">
-              <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="min-h-screen p-4">
+            <div className="max-w-7xl mx-auto">
+              <div className="animate-pulse bg-white dark:bg-slate-800 rounded-2xl p-6">
+                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+              </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -78,32 +88,38 @@ export default function EditWorkoutTemplatePage() {
   if (!template) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-4">
-          <div className="max-w-7xl mx-auto">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6">
-              <p>Template not found.</p>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="min-h-screen p-4">
+            <div className="max-w-7xl mx-auto">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-6">
+                <p>Template not found.</p>
+              </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-2 sm:p-4">
-        <div className="max-w-7xl mx-auto">
-          {isOpen && (
-            <WorkoutTemplateForm
-              isOpen={isOpen}
-              onClose={handleClose}
-              onSuccess={handleSuccess}
-              template={template}
-              renderMode="page"
-            />
-          )}
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen p-2 sm:p-4">
+          <div className="max-w-7xl mx-auto">
+            {isOpen && (
+              <WorkoutTemplateForm
+                isOpen={isOpen}
+                onClose={handleClose}
+                onSuccess={handleSuccess}
+                template={template}
+                renderMode="page"
+              />
+            )}
+          </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

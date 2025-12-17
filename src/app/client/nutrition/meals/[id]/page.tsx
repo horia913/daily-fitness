@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
@@ -68,7 +70,7 @@ export default function MealDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { getThemeStyles } = useTheme();
+  const { getThemeStyles, performanceSettings } = useTheme();
   const theme = getThemeStyles();
 
   const mealId = params.id as string;
@@ -210,7 +212,9 @@ export default function MealDetailPage() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="min-h-screen">
           <div className="p-4 sm:p-6">
             <div className="max-w-4xl mx-auto">
               <div className="animate-pulse space-y-4">
@@ -219,7 +223,7 @@ export default function MealDetailPage() {
               </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -227,7 +231,9 @@ export default function MealDetailPage() {
   if (!meal) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="min-h-screen">
           <div className="p-4 sm:p-6">
             <div className="max-w-4xl mx-auto text-center py-12">
               <h2 className={`text-2xl font-bold ${theme.text} mb-4`}>
@@ -238,7 +244,7 @@ export default function MealDetailPage() {
               </Link>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -248,7 +254,9 @@ export default function MealDetailPage() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
         <div className="p-4 sm:p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Header */}
@@ -670,7 +678,7 @@ export default function MealDetailPage() {
             )}
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

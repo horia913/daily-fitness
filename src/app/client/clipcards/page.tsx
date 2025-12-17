@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useTheme } from '@/contexts/ThemeContext'
 import { 
   CreditCard,
   Calendar,
@@ -53,6 +56,7 @@ interface ClipCard {
 }
 
 export default function ClientClipCards() {
+  const { performanceSettings } = useTheme()
   const [clipcards, setClipcards] = useState<ClipCard[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'active' | 'low_sessions' | 'used_up' | 'expired'>('all')
@@ -226,8 +230,10 @@ export default function ClientClipCards() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-          <div className="p-4">
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="min-h-screen">
+            <div className="p-4">
             <div className="max-w-4xl mx-auto space-y-6">
               {/* Header Skeleton */}
               <div className="text-center space-y-4 py-8">
@@ -282,15 +288,17 @@ export default function ClientClipCards() {
               </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     )
   }
 
   return (
     <ProtectedRoute requiredRole="client">
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-        <div className="p-4">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
+          <div className="p-4">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Header */}
             <div className="text-center space-y-4 py-8">
@@ -531,7 +539,7 @@ export default function ClientClipCards() {
             </div>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

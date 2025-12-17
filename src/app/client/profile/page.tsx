@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { DatabaseService } from '@/lib/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -60,7 +62,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 export default function ClientProfilePage() {
   const { user, signOut } = useAuth()
   const router = useRouter()
-  const { isDark } = useTheme()
+  const { isDark, performanceSettings } = useTheme()
   // Check if we're viewing as another user (for coach view)
   const [viewAsUserId, setViewAsUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -309,7 +311,9 @@ export default function ClientProfilePage() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <div className={`min-h-screen ${isDark ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900' : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50'}`}>
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
         <div className="p-4">
           <div className="max-w-5xl mx-auto space-y-6">
             {/* Enhanced Header */}
@@ -967,7 +971,8 @@ export default function ClientProfilePage() {
 
           </div>
         </div>
-      </div>
+        </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

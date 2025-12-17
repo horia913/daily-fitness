@@ -1,6 +1,8 @@
 'use client'
 
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -31,7 +33,7 @@ const daysOfWeek = [
 ]
 
 export default function AvailabilitySettings() {
-  const { isDark } = useTheme()
+  const { isDark, performanceSettings } = useTheme()
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -228,7 +230,9 @@ export default function AvailabilitySettings() {
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div style={{ 
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div style={{ 
         backgroundColor: isDark ? '#0A0A0A' : '#E8E9F3',
         backgroundImage: isDark 
           ? 'linear-gradient(to bottom right, #0A0A0A, #1A1A1A)' 
@@ -698,7 +702,7 @@ export default function AvailabilitySettings() {
             </div>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

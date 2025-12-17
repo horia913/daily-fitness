@@ -100,22 +100,40 @@ export default function SetLoggingForm({
     setLoading(true)
 
     try {
-      // Save workout log to database
-      const { error } = await supabase
-        .from('workout_logs')
-        .insert({
-          session_id: sessionId,
-          template_exercise_id: templateExercise?.id,
-          set_number: setNumber,
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+      // Call /api/log-set endpoint
+      const response = await fetch('/api/log-set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workout_log_id: undefined, // API will create if needed
+          block_id: templateExercise?.block_id,
+          exercise_id: templateExercise?.exercise_id || templateExercise?.exercise?.id,
           weight: parseFloat(formData.weight_used) || 0,
           reps: parseInt(formData.reps_completed) || 0,
-          rest_seconds: formData.rest_time,
-          rpe: formData.rpe,
-          notes: formData.notes,
-          status: setStatus
+          client_id: user.id,
+          session_id: sessionId,
+          template_exercise_id: templateExercise?.id
         })
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to log set')
+      }
+
+      const result = await response.json()
+      
+      // Show PR notification if needed
+      if (result.e1rm?.is_new_pr) {
+        // PR notification can be added here if toast context is available
+        console.log('New PR!', result.e1rm)
+      }
 
       // Show success animation
       setShowSuccessAnimation(true)

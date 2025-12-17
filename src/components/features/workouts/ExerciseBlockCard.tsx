@@ -35,6 +35,7 @@ interface ExerciseBlockCardProps {
   onDragStart?: (e: React.DragEvent, exerciseId: string) => void;
   onDragEnd?: (e: React.DragEvent) => void;
   renderMode?: "form" | "view"; // 'form' for edit mode, 'view' for display only
+  children?: React.ReactNode;
 }
 
 // Block type styles with colors and icons
@@ -156,6 +157,11 @@ const COMPLEX_BLOCK_TYPES = [
   "giant_set",
   "superset",
   "pre_exhaustion",
+  "amrap",
+  "emom",
+  "emom_reps",
+  "for_time",
+  "ladder",
 ];
 
 export default function ExerciseBlockCard({
@@ -169,6 +175,7 @@ export default function ExerciseBlockCard({
   onDragStart,
   onDragEnd,
   renderMode = "form",
+  children,
 }: ExerciseBlockCardProps) {
   const { getThemeStyles } = useTheme();
   const theme = getThemeStyles();
@@ -196,19 +203,47 @@ export default function ExerciseBlockCard({
   const renderExerciseSummary = () => {
     switch (exerciseType) {
       case "tabata":
+        // Count rounds, sets, and exercises
+        const tabataRounds =
+          exercise.rounds || exercise.tabata_sets?.length || 8;
+        const tabataSets = exercise.tabata_sets?.length || 0;
+        const totalTabataExercises =
+          exercise.tabata_sets && Array.isArray(exercise.tabata_sets)
+            ? exercise.tabata_sets.reduce((total: number, set: any) => {
+                return (
+                  total +
+                  (Array.isArray(set.exercises) ? set.exercises.length : 0)
+                );
+              }, 0)
+            : 0;
         return (
           <>
-            {exercise.rounds || 8} rounds • {exercise.work_seconds || 20}s work
-            {exercise.rest_after && ` • ${exercise.rest_after}s rest after`}
-            {exercise.tabata_sets && ` • ${exercise.tabata_sets.length} sets`}
+            {tabataRounds} rounds • {tabataSets} sets • {totalTabataExercises}{" "}
+            exercises
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       case "circuit":
+        // Count rounds, sets, and exercises
+        const circuitRounds =
+          exercise.sets || exercise.circuit_sets?.length || 1;
+        const circuitSets = exercise.circuit_sets?.length || 0;
+        const totalCircuitExercises =
+          exercise.circuit_sets && Array.isArray(exercise.circuit_sets)
+            ? exercise.circuit_sets.reduce((total: number, set: any) => {
+                return (
+                  total +
+                  (Array.isArray(set.exercises) ? set.exercises.length : 0)
+                );
+              }, 0)
+            : 0;
         return (
           <>
-            {exercise.sets || 1} rounds • {exercise.circuit_sets?.length || 0}{" "}
-            exercises
-            {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
+            {circuitRounds} rounds • {circuitSets} sets •{" "}
+            {totalCircuitExercises} exercises
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       case "amrap":
@@ -216,15 +251,31 @@ export default function ExerciseBlockCard({
           <>
             {exercise.amrap_duration} minutes • As many rounds as possible
             {exercise.reps && ` • ${exercise.reps} reps per round`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       case "emom":
       case "emom_reps":
+        // For rep-based EMOM, show reps prominently
+        if (exercise.emom_mode === "rep_based" && exercise.emom_reps) {
+          return (
+            <>
+              {exercise.emom_reps} reps/min • {exercise.emom_duration || 0}{" "}
+              minutes
+              {exercise.load_percentage &&
+                ` • Load: ${exercise.load_percentage}%`}
+            </>
+          );
+        }
+        // For time-based EMOM, show work time
         return (
           <>
-            {exercise.emom_duration} minutes • Every minute on the minute
-            {exercise.emom_reps && ` • ${exercise.emom_reps} reps`}
+            {exercise.emom_duration || 0} minutes • Every minute on the minute
             {exercise.work_seconds && ` • ${exercise.work_seconds}s work`}
+            {exercise.emom_reps && ` • ${exercise.emom_reps} reps/min`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       case "for_time":
@@ -232,6 +283,8 @@ export default function ExerciseBlockCard({
           <>
             {exercise.target_reps && `Target: ${exercise.target_reps} reps`}
             {exercise.time_cap && ` • Time cap: ${exercise.time_cap} min`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       case "cluster_set":
@@ -243,6 +296,8 @@ export default function ExerciseBlockCard({
             {exercise.clusters_per_set &&
               ` • ${exercise.clusters_per_set} clusters per set`}
             {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       case "rest_pause":
@@ -254,6 +309,8 @@ export default function ExerciseBlockCard({
             {exercise.max_rest_pauses &&
               ` • Max pauses: ${exercise.max_rest_pauses}`}
             {exercise.rest_seconds && ` • Rest: ${exercise.rest_seconds}s`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       case "superset":
@@ -261,6 +318,8 @@ export default function ExerciseBlockCard({
           <>
             {exercise.sets} sets × {exercise.reps || "N/A"} reps
             {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       case "giant_set":
@@ -270,6 +329,8 @@ export default function ExerciseBlockCard({
             {exercise.giant_set_exercises?.length &&
               ` • ${exercise.giant_set_exercises.length} exercises`}
             {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       case "pre_exhaustion":
@@ -281,26 +342,63 @@ export default function ExerciseBlockCard({
             {exercise.compound_reps &&
               ` • Compound: ${exercise.compound_reps} reps`}
             {exercise.rest_seconds && ` • Rest: ${exercise.rest_seconds}s`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       case "drop_set":
         return (
           <>
             {exercise.sets} sets × {exercise.reps} reps
+            {exercise.weight && ` • ${exercise.weight} kg`}
             {exercise.drop_percentage &&
               ` • Drop: ${exercise.drop_percentage}%`}
+            {exercise.drop_set_reps &&
+              ` • Drop reps: ${exercise.drop_set_reps}`}
             {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
+          </>
+        );
+      case "pyramid_set":
+        return (
+          <>
+            {exercise.sets} sets • Pyramid structure
+            {exercise.start_reps && ` • Start: ${exercise.start_reps} reps`}
+            {exercise.end_reps && ` • End: ${exercise.end_reps} reps`}
+            {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
+          </>
+        );
+      case "ladder":
+        return (
+          <>
+            {exercise.rounds} rounds • Ladder style
+            {exercise.start_reps && ` • Start: ${exercise.start_reps} reps`}
+            {exercise.increment && ` • +${exercise.increment} per round`}
+            {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
+            {exercise.load_percentage &&
+              ` • Load: ${exercise.load_percentage}%`}
           </>
         );
       default:
-        return (
-          <>
-            {exercise.sets} sets × {exercise.reps || "N/A"} reps
-            {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
-            {exercise.rir && ` • RIR: ${exercise.rir}`}
-            {exercise.tempo && ` • Tempo: ${exercise.tempo}`}
-          </>
-        );
+        // Straight sets and any other type - show ALL available data
+        const details: string[] = [];
+        if (exercise.sets) details.push(`${exercise.sets} sets`);
+        if (exercise.reps) details.push(`${exercise.reps} reps`);
+        if (exercise.weight) details.push(`${exercise.weight} kg`);
+        if (exercise.load_percentage)
+          details.push(`${exercise.load_percentage}% load`);
+        if (exercise.rest_seconds)
+          details.push(`${exercise.rest_seconds}s rest`);
+        if (exercise.rir) details.push(`RIR: ${exercise.rir}`);
+        if (exercise.rpe) details.push(`RPE: ${exercise.rpe}`);
+        if (exercise.tempo) details.push(`Tempo: ${exercise.tempo}`);
+        if (exercise.duration_seconds)
+          details.push(`${exercise.duration_seconds}s`);
+
+        return <>{details.length > 0 ? details.join(" • ") : "No details"}</>;
     }
   };
 
@@ -319,15 +417,75 @@ export default function ExerciseBlockCard({
         reps: ex.reps,
         rest_seconds: ex.rest_seconds,
         exercise: ex.exercise,
+        exercise_letter: ex.exercise_letter,
+        weight_kg: ex.weight_kg,
+        tempo: ex.tempo,
+        rir: ex.rir,
+        rpe: ex.rpe,
+        notes: ex.notes,
       }));
     }
 
     // Fallback to legacy format
     switch (exerciseType) {
       case "circuit":
-        return exercise.circuit_sets || [];
+        // Circuit: circuit_sets is an array of sets, each set has exercises array
+        if (exercise.circuit_sets && Array.isArray(exercise.circuit_sets)) {
+          const allExercises: any[] = [];
+          exercise.circuit_sets.forEach((set: any, setIndex: number) => {
+            if (set.exercises && Array.isArray(set.exercises)) {
+              set.exercises.forEach((ex: any, exIndex: number) => {
+                allExercises.push({
+                  exercise_id: ex.exercise_id,
+                  name: ex.exercise?.name || getExerciseName(ex.exercise_id),
+                  sets: ex.sets || exercise.sets,
+                  reps: ex.reps || exercise.reps,
+                  rest_seconds:
+                    ex.rest_seconds ||
+                    set.rest_between_sets ||
+                    exercise.rest_seconds,
+                  exercise: ex.exercise,
+                  work_seconds: ex.work_seconds,
+                  rest_after: ex.rest_after || set.rest_between_sets,
+                  exercise_letter: String.fromCharCode(65 + exIndex), // A, B, C, etc.
+                });
+              });
+            }
+          });
+          return allExercises;
+        }
+        return [];
       case "tabata":
-        return exercise.tabata_sets || [];
+        // Tabata: tabata_sets is an array of sets, each set has exercises array
+        if (exercise.tabata_sets && Array.isArray(exercise.tabata_sets)) {
+          const allExercises: any[] = [];
+          exercise.tabata_sets.forEach((set: any, setIndex: number) => {
+            if (set.exercises && Array.isArray(set.exercises)) {
+              set.exercises.forEach((ex: any, exIndex: number) => {
+                allExercises.push({
+                  exercise_id: ex.exercise_id,
+                  name: ex.exercise?.name || getExerciseName(ex.exercise_id),
+                  sets: ex.sets || exercise.sets,
+                  reps: ex.reps || exercise.reps,
+                  rest_seconds:
+                    ex.rest_seconds ||
+                    set.rest_between_sets ||
+                    exercise.rest_after ||
+                    exercise.rest_seconds,
+                  exercise: ex.exercise,
+                  work_seconds: exercise.work_seconds,
+                  rest_after:
+                    ex.rest_after ||
+                    set.rest_between_sets ||
+                    exercise.rest_after,
+                  exercise_letter: String.fromCharCode(65 + exIndex), // A, B, C, etc.
+                });
+              });
+            }
+          });
+          return allExercises;
+        }
+        return [];
       case "giant_set":
         return exercise.giant_set_exercises || [];
       case "superset":
@@ -339,6 +497,10 @@ export default function ExerciseBlockCard({
             sets: exercise.sets,
             reps: exercise.reps,
             rest_seconds: exercise.rest_seconds,
+            weight: exercise.weight,
+            tempo: exercise.tempo,
+            rir: exercise.rir,
+            rpe: exercise.rpe,
           },
           {
             exercise_id: exercise.superset_exercise_id,
@@ -346,6 +508,10 @@ export default function ExerciseBlockCard({
             sets: exercise.sets,
             reps: exercise.superset_reps || exercise.reps,
             rest_seconds: exercise.rest_seconds,
+            weight: exercise.superset_weight,
+            tempo: exercise.superset_tempo,
+            rir: exercise.superset_rir,
+            rpe: exercise.superset_rpe,
           },
         ].filter((e) => e.exercise_id);
       case "pre_exhaustion":
@@ -356,6 +522,11 @@ export default function ExerciseBlockCard({
             sets: exercise.sets,
             reps: exercise.isolation_reps,
             type: "isolation",
+            rest_seconds: exercise.rest_seconds,
+            weight: exercise.weight,
+            tempo: exercise.tempo,
+            rir: exercise.rir,
+            rpe: exercise.rpe,
           },
           {
             exercise_id: exercise.compound_exercise_id,
@@ -363,8 +534,41 @@ export default function ExerciseBlockCard({
             sets: exercise.sets,
             reps: exercise.compound_reps,
             type: "compound",
+            rest_seconds: exercise.rest_seconds,
+            weight: exercise.compound_weight,
+            tempo: exercise.compound_tempo,
+            rir: exercise.compound_rir,
+            rpe: exercise.compound_rpe,
           },
         ].filter((e) => e.exercise_id);
+      case "amrap":
+      case "emom":
+      case "emom_reps":
+      case "for_time":
+      case "ladder":
+        // These types might have nested exercises in block.exercises
+        // If main exercise exists, show it as a nested item
+        if (exercise.exercise_id) {
+          return [
+            {
+              exercise_id: exercise.exercise_id,
+              name: mainExerciseName,
+              sets: exercise.sets,
+              reps: exercise.reps,
+              rest_seconds: exercise.rest_seconds,
+              weight: exercise.weight,
+              tempo: exercise.tempo,
+              rir: exercise.rir,
+              rpe: exercise.rpe,
+              duration_seconds: exercise.duration_seconds,
+              work_seconds: exercise.work_seconds,
+              emom_duration: exercise.emom_duration,
+              emom_reps: exercise.emom_reps,
+              emom_mode: exercise.emom_mode,
+            },
+          ];
+        }
+        return [];
       default:
         return [];
     }
@@ -381,7 +585,7 @@ export default function ExerciseBlockCard({
       onDragEnd={draggable ? onDragEnd : undefined}
       className={`${theme.card} border ${
         theme.border
-      } rounded-xl p-3 sm:p-4 transition-all duration-200 hover:shadow-md ${
+      } rounded-xl p-3 sm:p-4 transition-all duration-200 hover:shadow-md w-full ${
         draggable ? "cursor-move" : ""
       }`}
     >
@@ -391,7 +595,7 @@ export default function ExerciseBlockCard({
           {/* Number and drag handle */}
           <div className="flex items-center gap-2 flex-shrink-0">
             {draggable && (
-              <div className="cursor-grab active:cursor-grabbing">
+              <div className="hidden sm:block cursor-grab active:cursor-grabbing">
                 <GripVertical className="w-4 h-4 text-gray-400" />
               </div>
             )}
@@ -461,18 +665,115 @@ export default function ExerciseBlockCard({
 
       {/* Nested exercises for complex blocks */}
       {showNestedExercises && (
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-          {nestedExercises.map((nestedExercise: any, nestedIndex: number) => (
-            <ExerciseItem
-              key={nestedIndex}
-              exercise={nestedExercise}
-              index={nestedIndex}
-              availableExercises={availableExercises}
-              blockType={exerciseType}
-            />
-          ))}
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+          {/* Group exercises by sets for tabata/circuit */}
+          {(exerciseType === "tabata" || exerciseType === "circuit") &&
+          (exercise.tabata_sets || exercise.circuit_sets)
+            ? // Display sets with their exercises
+              (exerciseType === "tabata"
+                ? exercise.tabata_sets
+                : exercise.circuit_sets
+              ).map((set: any, setIndex: number) => (
+                <div key={setIndex} className="space-y-2">
+                  {/* Set header with rest after set time */}
+                  {set.rest_between_sets && (
+                    <div
+                      className={`text-xs font-medium ${theme.textSecondary} mb-1`}
+                    >
+                      Set {setIndex + 1} • {set.rest_between_sets}s rest after
+                      set
+                    </div>
+                  )}
+                  {/* Exercises in this set */}
+                  {Array.isArray(set.exercises) && set.exercises.length > 0 ? (
+                    <div className="space-y-2 pl-2 w-full">
+                      {set.exercises.map((ex: any, exIndex: number) => {
+                        // Get exercise name
+                        const exName =
+                          ex.exercise?.name ||
+                          (ex.exercise_id
+                            ? availableExercises.find(
+                                (e: any) => e.id === ex.exercise_id
+                              )?.name
+                            : null) ||
+                          "Exercise";
+
+                        // For Tabata: work_seconds and rest_seconds are uniform (block-level)
+                        // For Circuit: can differ per exercise
+                        let workTime: number | undefined;
+                        let restTime: number | undefined;
+
+                        if (exerciseType === "tabata") {
+                          // Tabata: uniform work/rest times from block level
+                          // Work time comes from block level (exercise.work_seconds)
+                          workTime = exercise.work_seconds
+                            ? parseInt(String(exercise.work_seconds))
+                            : 20; // Default 20s for tabata if not set
+                          // Rest time is the SHORT rest between exercises (typically 10s)
+                          // This is NOT rest_after (which is shown in set header)
+                          // In tabata, rest between exercises is usually 10s or stored in block_parameters
+                          restTime = ex.rest_seconds
+                            ? parseInt(String(ex.rest_seconds))
+                            : 10; // Default 10s rest between exercises in tabata
+                        } else {
+                          // Circuit: can differ per exercise
+                          workTime = ex.work_seconds
+                            ? parseInt(String(ex.work_seconds))
+                            : undefined;
+                          restTime = ex.rest_seconds
+                            ? parseInt(String(ex.rest_seconds))
+                            : ex.rest_after
+                            ? parseInt(String(ex.rest_after))
+                            : undefined;
+                        }
+
+                        return (
+                          <ExerciseItem
+                            key={exIndex}
+                            exercise={{
+                              ...ex,
+                              exercise_id: ex.exercise_id,
+                              name: exName,
+                              exercise:
+                                ex.exercise ||
+                                availableExercises.find(
+                                  (e: any) => e.id === ex.exercise_id
+                                ),
+                              work_seconds: workTime,
+                              rest_seconds: restTime,
+                            }}
+                            index={exIndex}
+                            availableExercises={availableExercises}
+                            blockType={exerciseType}
+                          />
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div
+                      className={`text-xs ${theme.textSecondary} pl-2 italic`}
+                    >
+                      No exercises in this set
+                    </div>
+                  )}
+                </div>
+              ))
+            : // Fallback for other complex block types or if sets structure is not available
+              nestedExercises.map(
+                (nestedExercise: any, nestedIndex: number) => (
+                  <ExerciseItem
+                    key={nestedIndex}
+                    exercise={nestedExercise}
+                    index={nestedIndex}
+                    availableExercises={availableExercises}
+                    blockType={exerciseType}
+                  />
+                )
+              )}
         </div>
       )}
+
+      {children && <div className="mt-4">{children}</div>}
     </div>
   );
 }

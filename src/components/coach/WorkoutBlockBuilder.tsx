@@ -1,61 +1,68 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Plus, 
-  Trash2, 
-  Edit, 
-  Save, 
-  X, 
-  Clock, 
-  Dumbbell, 
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
+  Plus,
+  Trash2,
+  Edit,
+  Save,
+  X,
+  Clock,
+  Dumbbell,
   Target,
   AlertCircle,
   CheckCircle,
   Info,
   ArrowUp,
   ArrowDown,
-  GripVertical
-} from 'lucide-react'
-import { useTheme } from '@/contexts/ThemeContext'
-import { 
-  WorkoutBlock, 
-  WorkoutBlockExercise, 
+  GripVertical,
+} from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
+import {
+  WorkoutBlock,
+  WorkoutBlockExercise,
   WorkoutBlockType,
-  WORKOUT_BLOCK_CONFIGS
-} from '@/types/workoutBlocks'
-import { WorkoutBlockService } from '@/lib/workoutBlockService'
+  WORKOUT_BLOCK_CONFIGS,
+} from "@/types/workoutBlocks";
+import { WorkoutBlockService } from "@/lib/workoutBlockService";
 
 interface WorkoutBlockBuilderProps {
-  templateId: string
-  blocks: WorkoutBlock[]
-  onBlocksChange: (blocks: WorkoutBlock[]) => void
-  availableExercises: any[]
+  templateId: string;
+  blocks: WorkoutBlock[];
+  onBlocksChange: (blocks: WorkoutBlock[]) => void;
+  availableExercises: any[];
 }
 
 export default function WorkoutBlockBuilder({
   templateId,
   blocks,
   onBlocksChange,
-  availableExercises
+  availableExercises,
 }: WorkoutBlockBuilderProps) {
-  const { getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
-  
-  const [selectedBlockType, setSelectedBlockType] = useState<WorkoutBlockType>('straight_set')
-  const [showAddBlock, setShowAddBlock] = useState(false)
-  const [editingBlock, setEditingBlock] = useState<WorkoutBlock | null>(null)
-  const [loading, setLoading] = useState(false)
+  const { getThemeStyles } = useTheme();
+  const theme = getThemeStyles();
+
+  const [selectedBlockType, setSelectedBlockType] =
+    useState<WorkoutBlockType>("straight_set");
+  const [showAddBlock, setShowAddBlock] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<WorkoutBlock | null>(null);
+  const [loading, setLoading] = useState(false);
 
   // Add new block
   const handleAddBlock = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
       const newBlock = await WorkoutBlockService.createWorkoutBlock(
         templateId,
@@ -63,95 +70,109 @@ export default function WorkoutBlockBuilder({
         blocks.length + 1,
         {
           block_name: WORKOUT_BLOCK_CONFIGS[selectedBlockType].name,
-          block_notes: '',
+          block_notes: "",
           rest_seconds: 60,
           total_sets: 3,
-          reps_per_set: '10-12'
+          reps_per_set: "10-12",
         }
-      )
+      );
 
       if (newBlock) {
-        onBlocksChange([...blocks, newBlock])
-        setShowAddBlock(false)
+        onBlocksChange([...blocks, newBlock]);
+        setShowAddBlock(false);
       }
     } catch (error) {
-      console.error('Error adding block:', error)
+      console.error("Error adding block:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Delete block
   const handleDeleteBlock = async (blockId: string) => {
-    if (confirm('Are you sure you want to delete this block?')) {
-      setLoading(true)
+    if (confirm("Are you sure you want to delete this block?")) {
+      setLoading(true);
       try {
-        const success = await WorkoutBlockService.deleteWorkoutBlock(blockId)
+        const success = await WorkoutBlockService.deleteWorkoutBlock(blockId);
         if (success) {
-          onBlocksChange(blocks.filter(block => block.id !== blockId))
+          onBlocksChange(blocks.filter((block) => block.id !== blockId));
         }
       } catch (error) {
-        console.error('Error deleting block:', error)
+        console.error("Error deleting block:", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
-  }
+  };
 
   // Update block
-  const handleUpdateBlock = async (blockId: string, updates: Partial<WorkoutBlock>) => {
-    setLoading(true)
+  const handleUpdateBlock = async (
+    blockId: string,
+    updates: Partial<WorkoutBlock>
+  ) => {
+    setLoading(true);
     try {
-      const updatedBlock = await WorkoutBlockService.updateWorkoutBlock(blockId, updates)
+      const updatedBlock = await WorkoutBlockService.updateWorkoutBlock(
+        blockId,
+        updates
+      );
       if (updatedBlock) {
-        onBlocksChange(blocks.map(block => 
-          block.id === blockId ? updatedBlock : block
-        ))
-        setEditingBlock(null)
+        onBlocksChange(
+          blocks.map((block) => (block.id === blockId ? updatedBlock : block))
+        );
+        setEditingBlock(null);
       }
     } catch (error) {
-      console.error('Error updating block:', error)
+      console.error("Error updating block:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Reorder blocks
-  const handleReorderBlocks = async (blockId: string, direction: 'up' | 'down') => {
-    const currentIndex = blocks.findIndex(block => block.id === blockId)
+  const handleReorderBlocks = async (
+    blockId: string,
+    direction: "up" | "down"
+  ) => {
+    const currentIndex = blocks.findIndex((block) => block.id === blockId);
     if (
-      (direction === 'up' && currentIndex === 0) ||
-      (direction === 'down' && currentIndex === blocks.length - 1)
+      (direction === "up" && currentIndex === 0) ||
+      (direction === "down" && currentIndex === blocks.length - 1)
     ) {
-      return
+      return;
     }
 
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
-    const reorderedBlocks = [...blocks]
-    const [movedBlock] = reorderedBlocks.splice(currentIndex, 1)
-    reorderedBlocks.splice(newIndex, 0, movedBlock)
+    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    const reorderedBlocks = [...blocks];
+    const [movedBlock] = reorderedBlocks.splice(currentIndex, 1);
+    reorderedBlocks.splice(newIndex, 0, movedBlock);
 
     // Update block orders
     const blockOrders = reorderedBlocks.map((block, index) => ({
       blockId: block.id,
-      newOrder: index + 1
-    }))
+      newOrder: index + 1,
+    }));
 
-    setLoading(true)
+    setLoading(true);
     try {
-      const success = await WorkoutBlockService.reorderWorkoutBlocks(templateId, blockOrders)
+      const success = await WorkoutBlockService.reorderWorkoutBlocks(
+        templateId,
+        blockOrders
+      );
       if (success) {
-        onBlocksChange(reorderedBlocks.map((block, index) => ({
-          ...block,
-          block_order: index + 1
-        })))
+        onBlocksChange(
+          reorderedBlocks.map((block, index) => ({
+            ...block,
+            block_order: index + 1,
+          }))
+        );
       }
     } catch (error) {
-      console.error('Error reordering blocks:', error)
+      console.error("Error reordering blocks:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -198,8 +219,8 @@ export default function WorkoutBlockBuilder({
                   onClick={() => setSelectedBlockType(type as WorkoutBlockType)}
                   className={`p-4 rounded-xl border-2 transition-all text-left ${
                     selectedBlockType === type
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500"
                   }`}
                 >
                   <div className="text-2xl mb-2">{config.icon}</div>
@@ -220,12 +241,9 @@ export default function WorkoutBlockBuilder({
                 disabled={loading}
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
               >
-                {loading ? 'Adding...' : 'Add Block'}
+                {loading ? "Adding..." : "Add Block"}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowAddBlock(false)}
-              >
+              <Button variant="outline" onClick={() => setShowAddBlock(false)}>
                 Cancel
               </Button>
             </div>
@@ -236,10 +254,13 @@ export default function WorkoutBlockBuilder({
       {/* Blocks List */}
       <div className="space-y-4">
         {blocks.map((block, index) => {
-          const config = WORKOUT_BLOCK_CONFIGS[block.block_type]
-          
+          const config = WORKOUT_BLOCK_CONFIGS[block.block_type];
+
           return (
-            <Card key={block.id} className={`${theme.card} border ${theme.border}`}>
+            <Card
+              key={block.id}
+              className={`${theme.card} border ${theme.border}`}
+            >
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -256,13 +277,13 @@ export default function WorkoutBlockBuilder({
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     {/* Reorder Buttons */}
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleReorderBlocks(block.id, 'up')}
+                      onClick={() => handleReorderBlocks(block.id, "up")}
                       disabled={index === 0 || loading}
                     >
                       <ArrowUp className="w-4 h-4" />
@@ -270,12 +291,12 @@ export default function WorkoutBlockBuilder({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleReorderBlocks(block.id, 'down')}
+                      onClick={() => handleReorderBlocks(block.id, "down")}
                       disabled={index === blocks.length - 1 || loading}
                     >
                       <ArrowDown className="w-4 h-4" />
                     </Button>
-                    
+
                     {/* Edit Button */}
                     <Button
                       variant="ghost"
@@ -284,7 +305,7 @@ export default function WorkoutBlockBuilder({
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
-                    
+
                     {/* Delete Button */}
                     <Button
                       variant="ghost"
@@ -297,29 +318,35 @@ export default function WorkoutBlockBuilder({
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent>
                 {/* Block Info */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-slate-500" />
-                    <span className="text-sm text-slate-600 dark:text-slate-400">
-                      Rest: {block.rest_seconds || 60}s
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-slate-500" />
-                    <span className="text-sm text-slate-600 dark:text-slate-400">
-                      Sets: {block.total_sets || 3}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Dumbbell className="w-4 h-4 text-slate-500" />
-                    <span className="text-sm text-slate-600 dark:text-slate-400">
-                      Reps: {block.reps_per_set || '10-12'}
-                    </span>
-                  </div>
-                  {block.duration_seconds && (
+                  {block.rest_seconds != null && (
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-slate-500" />
+                      <span className="text-sm text-slate-600 dark:text-slate-400">
+                        Rest: {block.rest_seconds}s
+                      </span>
+                    </div>
+                  )}
+                  {block.total_sets != null && (
+                    <div className="flex items-center gap-2">
+                      <Target className="w-4 h-4 text-slate-500" />
+                      <span className="text-sm text-slate-600 dark:text-slate-400">
+                        Sets: {block.total_sets}
+                      </span>
+                    </div>
+                  )}
+                  {block.reps_per_set && (
+                    <div className="flex items-center gap-2">
+                      <Dumbbell className="w-4 h-4 text-slate-500" />
+                      <span className="text-sm text-slate-600 dark:text-slate-400">
+                        Reps: {block.reps_per_set}
+                      </span>
+                    </div>
+                  )}
+                  {block.duration_seconds != null && (
                     <div className="flex items-center gap-2">
                       <Timer className="w-4 h-4 text-slate-500" />
                       <span className="text-sm text-slate-600 dark:text-slate-400">
@@ -343,7 +370,7 @@ export default function WorkoutBlockBuilder({
                   <h4 className="font-medium text-slate-800 dark:text-white">
                     Exercises ({block.exercises?.length || 0})
                   </h4>
-                  
+
                   {block.exercises && block.exercises.length > 0 ? (
                     <div className="space-y-2">
                       {block.exercises
@@ -355,17 +382,31 @@ export default function WorkoutBlockBuilder({
                           >
                             <div className="flex items-center gap-3">
                               <Badge variant="outline" className="text-xs">
-                                {exercise.exercise_letter || exercise.exercise_order}
+                                {exercise.exercise_letter ||
+                                  exercise.exercise_order}
                               </Badge>
                               <span className="font-medium text-slate-800 dark:text-white">
-                                {exercise.exercise?.name || 'Unknown Exercise'}
+                                {exercise.exercise?.name || "Unknown Exercise"}
                               </span>
                             </div>
                             <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
-                              <span>{exercise.sets || 0} sets</span>
-                              <span>{exercise.reps || 'N/A'} reps</span>
-                              {exercise.weight_kg && (
+                              {exercise.sets != null && (
+                                <span>{exercise.sets} sets</span>
+                              )}
+                              {exercise.reps && (
+                                <span>{exercise.reps} reps</span>
+                              )}
+                              {exercise.weight_kg != null && (
                                 <span>{exercise.weight_kg}kg</span>
+                              )}
+                              {exercise.tempo && (
+                                <span>Tempo: {exercise.tempo}</span>
+                              )}
+                              {exercise.rir != null && (
+                                <span>RIR: {exercise.rir}</span>
+                              )}
+                              {exercise.rest_seconds != null && (
+                                <span>Rest: {exercise.rest_seconds}s</span>
                               )}
                             </div>
                           </div>
@@ -391,7 +432,7 @@ export default function WorkoutBlockBuilder({
                 </div>
               </CardContent>
             </Card>
-          )
+          );
         })}
       </div>
 
@@ -419,5 +460,5 @@ export default function WorkoutBlockBuilder({
         </Card>
       )}
     </div>
-  )
+  );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -54,6 +54,7 @@ import WorkoutBlockBuilder from "@/components/coach/WorkoutBlockBuilder";
 import { WorkoutBlock } from "@/types/workoutBlocks";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
 import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
+import ExerciseDetailForm from "@/components/features/workouts/ExerciseDetailForm";
 import {
   DragDropContext,
   Droppable,
@@ -173,6 +174,8 @@ export default function WorkoutTemplateForm({
 
   // Workout Block System (integrated with exercises)
   const [workoutBlocks, setWorkoutBlocks] = useState<WorkoutBlock[]>([]);
+  const hasLoadedBlocks = useRef(false);
+  const previousTemplateId = useRef<string | null>(null);
 
   // Combined workout items (exercises and blocks in chronological order)
   // When blocks are loaded, they're converted to exercises, so we only use exercises to avoid duplicates
@@ -203,11 +206,21 @@ export default function WorkoutTemplateForm({
             : "Beginner",
         });
 
-        loadWorkoutBlocks(template.id);
+        if (previousTemplateId.current !== template.id) {
+          hasLoadedBlocks.current = false;
+          previousTemplateId.current = template.id || null;
+        }
+
+        if (!hasLoadedBlocks.current) {
+          loadWorkoutBlocks(template.id);
+          hasLoadedBlocks.current = true;
+        }
       } else {
         resetForm();
         setExercises([]);
         setWorkoutBlocks([]);
+        hasLoadedBlocks.current = false;
+        previousTemplateId.current = null;
       }
     }
   }, [isOpen, template]);
@@ -363,11 +376,18 @@ export default function WorkoutTemplateForm({
             time_cap: block.block_parameters?.time_cap
               ? String(block.block_parameters.time_cap)
               : undefined,
+            // Drop set specific
+            drop_percentage: block.block_parameters?.drop_percentage
+              ? String(block.block_parameters.drop_percentage)
+              : "",
+            drop_set_reps: block.block_parameters?.drop_set_reps || "",
           };
 
           // Handle complex block types with nested exercises
           const blockType = block.block_type as string;
           if (blockType === "circuit" || blockType === "tabata") {
+            // Convert exercises to proper set structure
+            // Each exercise in the block becomes an exercise in the sets
             const exercisesArray =
               block.exercises?.map((ex, idx) => ({
                 exercise_id: ex.exercise_id,
@@ -377,29 +397,97 @@ export default function WorkoutTemplateForm({
                   ex.rest_seconds?.toString() ||
                   block.rest_seconds?.toString() ||
                   "",
-                rest_between_sets:
-                  ex.rest_seconds?.toString() ||
-                  block.rest_seconds?.toString() ||
-                  "",
               })) || [];
 
             if (blockType === "tabata") {
-              // Tabata uses tabata_sets
+              // Tabata uses tabata_sets - structure: [{ exercises: [...], rest_between_sets: "..." }]
               const restAfter =
                 block.block_parameters?.rest_after ||
                 block.rest_seconds ||
                 "10";
               exercise.rest_after = String(restAfter);
-              exercise.tabata_sets = exercisesArray.map((ex: any) => ({
-                ...ex,
-                rest_between_sets: String(restAfter), // Ensure all sets use same rest
-                rest_seconds: String(restAfter),
-              }));
+              exercise.rounds =
+                block.block_parameters?.rounds ||
+                block.total_sets?.toString() ||
+                "8";
+              exercise.work_seconds = block.block_parameters?.work_seconds
+                ? String(block.block_parameters.work_seconds)
+                : "20";
+
+              // Check if tabata_sets already exists in block_parameters (from saved data)
+              if (
+                block.block_parameters?.tabata_sets &&
+                Array.isArray(block.block_parameters.tabata_sets)
+              ) {
+                // Use existing structure
+                exercise.tabata_sets = block.block_parameters.tabata_sets.map(
+                  (set: any) => ({
+                    exercises: Array.isArray(set.exercises)
+                      ? set.exercises
+                      : [],
+                    rest_between_sets:
+                      set.rest_between_sets || String(restAfter),
+                  })
+                );
+              } else {
+                // Group exercises into sets - for tabata, typically one set contains all exercises
+                const numSets = block.total_sets || 1;
+                exercise.tabata_sets = Array.from(
+                  { length: numSets },
+                  (_, setIdx) => ({
+                    exercises: exercisesArray.map((ex: any) => ({
+                      ...ex,
+                    })),
+                    rest_between_sets: String(restAfter),
+                  })
+                );
+              }
               // Also set circuit_sets for compatibility
               exercise.circuit_sets = exercise.tabata_sets;
             } else {
-              // Circuit uses circuit_sets
-              exercise.circuit_sets = exercisesArray;
+              // Circuit uses circuit_sets - structure: [{ exercises: [...], rest_between_sets: "..." }]
+              // Check if circuit_sets already exists in block_parameters (from saved data)
+              if (
+                block.block_parameters?.circuit_sets &&
+                Array.isArray(block.block_parameters.circuit_sets)
+              ) {
+                // Use existing structure
+                exercise.circuit_sets = block.block_parameters.circuit_sets.map(
+                  (set: any) => ({
+                    exercises: Array.isArray(set.exercises)
+                      ? set.exercises
+                      : [],
+                    rest_between_sets:
+                      set.rest_between_sets ||
+                      block.rest_seconds?.toString() ||
+                      "60",
+                  })
+                );
+              } else {
+                // Group exercises into sets
+                const numSets = block.total_sets || 1;
+                exercise.circuit_sets = Array.from(
+                  { length: numSets },
+                  (_, setIdx) => ({
+                    exercises: exercisesArray.map((ex: any) => ({
+                      ...ex,
+                    })),
+                    rest_between_sets: block.rest_seconds?.toString() || "60",
+                  })
+                );
+              }
+            }
+          } else if (block.block_type === "drop_set") {
+            // Ensure drop_percentage and drop_set_reps are loaded
+            if (block.block_parameters?.drop_percentage !== undefined) {
+              exercise.drop_percentage = String(
+                block.block_parameters.drop_percentage
+              );
+            }
+            if (block.block_parameters?.drop_set_reps) {
+              exercise.drop_set_reps = String(
+                block.block_parameters.drop_set_reps
+              );
             }
           } else if (block.block_type === "giant_set") {
             exercise.giant_set_exercises =
@@ -554,6 +642,15 @@ export default function WorkoutTemplateForm({
                 blockParameters.target_reps = exercise.target_reps;
               if (exercise.time_cap)
                 blockParameters.time_cap = exercise.time_cap;
+              // Drop set specific
+              if (exercise.drop_percentage && exercise.drop_percentage !== "") {
+                const dropPct = parseInt(exercise.drop_percentage);
+                if (!isNaN(dropPct)) {
+                  blockParameters.drop_percentage = dropPct;
+                }
+              }
+              if (exercise.drop_set_reps && exercise.drop_set_reps !== "")
+                blockParameters.drop_set_reps = exercise.drop_set_reps;
 
               // Create the block
               const block = await WorkoutBlockService.createWorkoutBlock(
@@ -685,12 +782,17 @@ export default function WorkoutTemplateForm({
 
                 if (exerciseType === "circuit" || exerciseType === "tabata") {
                   // Tabata uses tabata_sets, circuit uses circuit_sets
+                  // Structure: [{ exercises: [{ exercise_id, sets, reps, ... }], rest_between_sets: "..." }]
                   const setsArray =
                     exerciseType === "tabata"
-                      ? exercise.tabata_sets || exercise.circuit_sets
-                      : exercise.circuit_sets;
+                      ? Array.isArray(exercise.tabata_sets)
+                        ? exercise.tabata_sets
+                        : []
+                      : Array.isArray(exercise.circuit_sets)
+                      ? exercise.circuit_sets
+                      : [];
 
-                  if (setsArray && Array.isArray(setsArray)) {
+                  if (setsArray && setsArray.length > 0) {
                     // For tabata, ensure rest_after is consistent - use the first set's rest or exercise.rest_after
                     let tabataRestAfter = exercise.rest_after;
                     if (exerciseType === "tabata" && setsArray.length > 0) {
@@ -705,43 +807,71 @@ export default function WorkoutTemplateForm({
                         "10";
                     }
 
-                    for (let j = 0; j < setsArray.length; j++) {
-                      const setEx = setsArray[j];
-                      if (setEx.exercise_id) {
-                        await WorkoutBlockService.addExerciseToBlock(
-                          block.id,
-                          setEx.exercise_id,
-                          j + 1,
-                          {
-                            sets:
-                              setEx.sets || exercise.sets
-                                ? parseInt(setEx.sets || exercise.sets)
-                                : undefined,
-                            reps: setEx.reps || exercise.reps || undefined,
-                            // For tabata, use consistent rest_after for all exercises
-                            rest_seconds:
-                              exerciseType === "tabata"
-                                ? tabataRestAfter
-                                  ? parseInt(String(tabataRestAfter))
-                                  : undefined
-                                : exercise.rest_seconds
-                                ? parseInt(exercise.rest_seconds)
-                                : undefined,
-                          }
-                        );
+                    // Collect all exercises from all sets
+                    let exerciseOrder = 1;
+                    for (let setIdx = 0; setIdx < setsArray.length; setIdx++) {
+                      const set = setsArray[setIdx];
+                      const exercisesInSet = Array.isArray(set.exercises)
+                        ? set.exercises
+                        : [];
+
+                      for (
+                        let exIdx = 0;
+                        exIdx < exercisesInSet.length;
+                        exIdx++
+                      ) {
+                        const setEx = exercisesInSet[exIdx];
+                        if (setEx.exercise_id) {
+                          await WorkoutBlockService.addExerciseToBlock(
+                            block.id,
+                            setEx.exercise_id,
+                            exerciseOrder++,
+                            {
+                              sets:
+                                setEx.sets || exercise.sets
+                                  ? parseInt(setEx.sets || exercise.sets)
+                                  : undefined,
+                              reps: setEx.reps || exercise.reps || undefined,
+                              // For tabata, use consistent rest_after for all exercises
+                              rest_seconds:
+                                exerciseType === "tabata"
+                                  ? tabataRestAfter
+                                    ? parseInt(String(tabataRestAfter))
+                                    : undefined
+                                  : set.rest_between_sets ||
+                                    exercise.rest_seconds
+                                  ? parseInt(
+                                      String(
+                                        set.rest_between_sets ||
+                                          exercise.rest_seconds
+                                      )
+                                    )
+                                  : undefined,
+                            }
+                          );
+                        }
                       }
                     }
 
-                    // Update block parameters with consistent rest_after for tabata
-                    if (exerciseType === "tabata" && tabataRestAfter) {
-                      const updatedParams = {
-                        ...blockParameters,
-                        rest_after: tabataRestAfter,
-                      };
-                      await WorkoutBlockService.updateWorkoutBlock(block.id, {
-                        block_parameters: updatedParams,
-                      });
+                    // Save tabata_sets/circuit_sets to block_parameters for proper loading
+                    const updatedParams = {
+                      ...blockParameters,
+                    };
+                    if (exerciseType === "tabata") {
+                      updatedParams.tabata_sets = setsArray;
+                      updatedParams.rest_after = tabataRestAfter;
+                      updatedParams.work_seconds = exercise.work_seconds
+                        ? parseInt(exercise.work_seconds)
+                        : 20;
+                      updatedParams.rounds = exercise.rounds
+                        ? parseInt(exercise.rounds)
+                        : 8;
+                    } else {
+                      updatedParams.circuit_sets = setsArray;
                     }
+                    await WorkoutBlockService.updateWorkoutBlock(block.id, {
+                      block_parameters: updatedParams,
+                    });
                   }
                 }
 
@@ -1091,6 +1221,19 @@ export default function WorkoutTemplateForm({
     setExercises((prev) => prev.filter((ex) => ex.id !== exerciseId));
   };
 
+  const updateExerciseAtIndex = (index: number, updatedExercise: any) => {
+    setExercises((prev) =>
+      prev.map((ex, idx) =>
+        idx === index
+          ? {
+              ...ex,
+              ...updatedExercise,
+            }
+          : ex
+      )
+    );
+  };
+
   // Drag and drop handler for reordering exercises
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
@@ -1222,7 +1365,13 @@ export default function WorkoutTemplateForm({
       emom_reps: exercise.emom_reps,
       // Tabata specific
       rounds: exercise.rounds,
-      tabata_sets: exercise.tabata_sets,
+      tabata_sets: Array.isArray(exercise.tabata_sets)
+        ? exercise.tabata_sets.map((set: any) => ({
+            exercises: Array.isArray(set.exercises) ? set.exercises : [],
+            rest_between_sets:
+              set.rest_between_sets || exercise.rest_after || "",
+          }))
+        : [],
       rest_after: exercise.rest_after,
       // Drop set specific
       drop_percentage: exercise.drop_percentage,
@@ -1250,7 +1399,12 @@ export default function WorkoutTemplateForm({
 
       rest_between_rungs: exercise.rest_between_rungs,
       // Circuit specific
-      circuit_sets: exercise.circuit_sets,
+      circuit_sets: Array.isArray(exercise.circuit_sets)
+        ? exercise.circuit_sets.map((set: any) => ({
+            exercises: Array.isArray(set.exercises) ? set.exercises : [],
+            rest_between_sets: set.rest_between_sets || "",
+          }))
+        : [],
     });
     setShowAddExercise(true);
   };
@@ -1275,9 +1429,15 @@ export default function WorkoutTemplateForm({
       data-theme={isDark ? "dark" : "light"}
     >
       <div
-        className={`relative ${theme.card} ${theme.shadow} rounded-2xl sm:rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
+        className={`relative ${
+          isPage
+            ? ""
+            : `${theme.card} ${theme.shadow} rounded-2xl sm:rounded-3xl border ${theme.border}`
+        } w-full flex flex-col transform transition-all duration-300 ease-out ${
+          isPage ? "" : "overflow-hidden"
+        }`}
         style={{
-          animation: "modalSlideIn 0.3s ease-out",
+          animation: !isPage ? "modalSlideIn 0.3s ease-out" : undefined,
           maxWidth: isPage ? "100%" : "min(95vw, 80rem)",
           height: isPage ? "auto" : "min(88vh, calc(100vh - 4rem))",
           maxHeight: isPage ? "none" : "min(88vh, calc(100vh - 4rem))",
@@ -1285,9 +1445,11 @@ export default function WorkoutTemplateForm({
       >
         {/* Header */}
         <div
-          className={`sticky top-0 ${theme.card} border-b ${theme.border} px-3 py-3 sm:px-6 sm:py-5 rounded-t-3xl`}
+          className={`${isPage ? "mb-6" : "sticky top-0"} ${
+            isPage ? "" : `${theme.card} border-b ${theme.border}`
+          } px-3 py-3 sm:px-6 sm:py-5 ${isPage ? "" : "rounded-t-3xl"}`}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-4">
               <div
                 className={`p-3 rounded-2xl bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-lg`}
@@ -1326,9 +1488,14 @@ export default function WorkoutTemplateForm({
         <div
           className={`flex-1 ${
             isPage ? "overflow-y-visible" : "overflow-y-auto"
-          } px-3 pb-4 sm:px-6 sm:pb-6`}
+          } ${isPage ? "px-0" : "px-3"} pb-4 ${
+            isPage ? "sm:px-0" : "sm:px-6"
+          } sm:pb-6`}
         >
-          <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-3 pt-3">
+          <form
+            onSubmit={handleSubmit}
+            className={`space-y-2 sm:space-y-3 ${isPage ? "" : "pt-3"}`}
+          >
             {/* Enhanced Schema Status Banner */}
             <div
               className={`${theme.card} border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 rounded-xl p-4 mb-6`}
@@ -1410,19 +1577,21 @@ export default function WorkoutTemplateForm({
             </Card>
 
             {/* Template Configuration */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Category Selection */}
               <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
+                className={`${theme.card} border ${theme.border} rounded-xl`}
               >
                 <CardHeader className="p-2">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
                     <div
-                      className={`p-2 rounded-xl bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 shadow-lg`}
+                      className={`p-1 rounded-md bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 shadow-md`}
                     >
-                      <Target className={`w-5 h-5 text-white`} />
+                      <Target className={`w-3 h-3 text-white`} />
                     </div>
-                    <CardTitle className={`text-lg font-bold ${theme.text}`}>
+                    <CardTitle
+                      className={`text-sm font-semibold ${theme.text}`}
+                    >
                       Category
                     </CardTitle>
                   </div>
@@ -1469,16 +1638,18 @@ export default function WorkoutTemplateForm({
 
               {/* Duration Selection */}
               <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
+                className={`${theme.card} border ${theme.border} rounded-xl`}
               >
-                <CardHeader className="p-6">
-                  <div className="flex items-center gap-3">
+                <CardHeader className="p-2">
+                  <div className="flex items-center gap-1.5">
                     <div
-                      className={`p-2 rounded-xl bg-gradient-to-br from-green-400 via-green-500 to-green-600 shadow-lg`}
+                      className={`p-1 rounded-md bg-gradient-to-br from-green-400 via-green-500 to-green-600 shadow-md`}
                     >
-                      <Clock className={`w-5 h-5 text-white`} />
+                      <Clock className={`w-3 h-3 text-white`} />
                     </div>
-                    <CardTitle className={`text-lg font-bold ${theme.text}`}>
+                    <CardTitle
+                      className={`text-sm font-semibold ${theme.text}`}
+                    >
                       Duration
                     </CardTitle>
                   </div>
@@ -1515,16 +1686,18 @@ export default function WorkoutTemplateForm({
 
               {/* Difficulty Level */}
               <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
+                className={`${theme.card} border ${theme.border} rounded-xl`}
               >
-                <CardHeader className="p-6">
-                  <div className="flex items-center gap-3">
+                <CardHeader className="p-2">
+                  <div className="flex items-center gap-1.5">
                     <div
-                      className={`p-2 rounded-xl bg-gradient-to-br from-red-400 via-red-500 to-red-600 shadow-lg`}
+                      className={`p-1 rounded-md bg-gradient-to-br from-red-400 via-red-500 to-red-600 shadow-md`}
                     >
-                      <Zap className={`w-5 h-5 text-white`} />
+                      <Zap className={`w-3 h-3 text-white`} />
                     </div>
-                    <CardTitle className={`text-lg font-bold ${theme.text}`}>
+                    <CardTitle
+                      className={`text-sm font-semibold ${theme.text}`}
+                    >
                       Difficulty
                     </CardTitle>
                   </div>
@@ -1563,7 +1736,7 @@ export default function WorkoutTemplateForm({
                 className={`${theme.card} border ${theme.border} rounded-2xl`}
               >
                 <CardHeader className="p-6">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-3">
                       <div
                         className={`p-2 rounded-xl bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 shadow-lg`}
@@ -1761,21 +1934,88 @@ export default function WorkoutTemplateForm({
                                             </div>
                                             {exercise.exercise_type ===
                                               "tabata" &&
-                                              exercise.tabata_sets && (
+                                              exercise.tabata_sets &&
+                                              Array.isArray(
+                                                exercise.tabata_sets
+                                              ) && (
                                                 <div
                                                   className={`text-xs ${theme.textSecondary} mt-1`}
                                                 >
                                                   {exercise.tabata_sets
+                                                    .filter((set: any) =>
+                                                      Array.isArray(
+                                                        set.exercises
+                                                      )
+                                                    )
                                                     .map(
-                                                      (set) =>
+                                                      (set: any) =>
                                                         set.exercises?.length ||
                                                         0
                                                     )
                                                     .reduce(
-                                                      (a, b) => a + b,
+                                                      (a: number, b: number) =>
+                                                        a + b,
                                                       0
                                                     )}{" "}
                                                   exercises total
+                                                </div>
+                                              )}
+                                            {exercise.exercise_type ===
+                                              "circuit" &&
+                                              exercise.circuit_sets &&
+                                              Array.isArray(
+                                                exercise.circuit_sets
+                                              ) && (
+                                                <div
+                                                  className={`text-xs ${theme.textSecondary} mt-1`}
+                                                >
+                                                  {exercise.circuit_sets.length}{" "}
+                                                  sets •{" "}
+                                                  {exercise.circuit_sets
+                                                    .filter((set: any) =>
+                                                      Array.isArray(
+                                                        set.exercises
+                                                      )
+                                                    )
+                                                    .map(
+                                                      (set: any) =>
+                                                        set.exercises?.length ||
+                                                        0
+                                                    )
+                                                    .reduce(
+                                                      (a: number, b: number) =>
+                                                        a + b,
+                                                      0
+                                                    )}{" "}
+                                                  exercises total
+                                                </div>
+                                              )}
+                                            {exercise.exercise_type ===
+                                              "emom" &&
+                                              exercise.emom_mode ===
+                                                "rep_based" &&
+                                              exercise.emom_reps && (
+                                                <div
+                                                  className={`text-xs ${theme.textSecondary} mt-1`}
+                                                >
+                                                  {exercise.emom_reps} reps/min
+                                                  •{" "}
+                                                  {exercise.emom_duration || 0}{" "}
+                                                  min
+                                                </div>
+                                              )}
+                                            {exercise.exercise_type ===
+                                              "emom" &&
+                                              exercise.emom_mode ===
+                                                "time_based" &&
+                                              exercise.work_seconds && (
+                                                <div
+                                                  className={`text-xs ${theme.textSecondary} mt-1`}
+                                                >
+                                                  {exercise.work_seconds}s work
+                                                  •{" "}
+                                                  {exercise.emom_duration || 0}{" "}
+                                                  min
                                                 </div>
                                               )}
                                           </div>
@@ -1824,132 +2064,120 @@ export default function WorkoutTemplateForm({
             )}
 
             {/* Unified Workout Structure */}
-            <Card
-              className={`${theme.card} border ${theme.border} rounded-2xl`}
-            >
-              <CardHeader className="p-2">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`p-2 rounded-xl bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 shadow-lg`}
-                  >
-                    <Dumbbell className={`w-5 h-5 text-white`} />
-                  </div>
-                  <CardTitle className={`text-lg font-bold ${theme.text}`}>
-                    Workout Structure
-                  </CardTitle>
-                </div>
-                <CardDescription className={`${theme.textSecondary} mt-2`}>
-                  Build your workout by adding exercises and blocks in any order
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-2 pt-0">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className={`text-lg font-bold ${theme.text}`}>
-                      Workout Flow ({workoutItems.length} items)
-                    </h3>
-                    <Button
-                      type="button"
-                      onClick={() => setShowAddExercise(true)}
-                      className={`${theme.primary} ${theme.shadow} rounded-xl px-4 py-2 hover:scale-105 transition-all duration-200`}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Exercise
-                    </Button>
-                  </div>
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row w-full items-start sm:items-center gap-3 sm:gap-2 sm:justify-between">
+                <h3 className={`text-xl font-bold ${theme.text}`}>
+                  Workout Flow ({workoutItems.length} items)
+                </h3>
+                <Button
+                  type="button"
+                  onClick={() => setShowAddExercise(true)}
+                  className={`${theme.primary} ${theme.shadow} rounded-xl px-6 py-3 hover:scale-105 transition-all duration-200 w-full sm:w-auto justify-center`}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Exercise
+                </Button>
+              </div>
 
-                  {exercises.length > 0 ? (
-                    <DragDropContext onDragEnd={handleDragEnd}>
-                      <Droppable droppableId="exercises-list">
-                        {(provided) => (
-                          <div
-                            {...provided.droppableProps}
-                            ref={provided.innerRef}
-                            className="space-y-3 max-h-80 overflow-y-auto"
-                          >
-                            {exercises.map((exercise, index) => {
-                              // Create unique key combining multiple properties to avoid duplicates
-                              // Use order_index if available, otherwise use index
-                              const order = exercise.order_index || index + 1;
-                              const uniqueKey = exercise.id
-                                ? `ex-${exercise.exercise_type || "unknown"}-${
-                                    exercise.id
-                                  }-${order}`
-                                : `ex-${exercise.exercise_type || "unknown"}-${
-                                    exercise.exercise_id || "no-id"
-                                  }-${order}-${index}`;
-
-                              return (
-                                <Draggable
-                                  key={uniqueKey}
-                                  draggableId={uniqueKey}
-                                  index={index}
-                                >
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      className={
-                                        snapshot.isDragging ? "opacity-50" : ""
-                                      }
-                                    >
-                                      <div className="flex items-start gap-2">
-                                        <div
-                                          {...provided.dragHandleProps}
-                                          className="mt-4 cursor-grab active:cursor-grabbing flex-shrink-0"
-                                        >
-                                          <GripVertical className="w-5 h-5 text-slate-400" />
-                                        </div>
-                                        <div className="flex-1">
-                                          <ExerciseBlockCard
-                                            exercise={exercise}
-                                            index={index}
-                                            availableExercises={
-                                              availableExercises
-                                            }
-                                            onEdit={editExercise}
-                                            onDelete={removeExercise}
-                                            renderMode="form"
-                                          />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </Draggable>
-                              );
-                            })}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
-                    </DragDropContext>
-                  ) : (
-                    <div
-                      className={`p-6 border-2 border-dashed ${theme.border} rounded-2xl text-center`}
-                    >
-                      <Dumbbell
-                        className={`w-12 h-12 mx-auto mb-4 ${theme.textSecondary}`}
-                      />
-                      <h3 className={`text-lg font-bold ${theme.text} mb-2`}>
-                        Empty Workout
-                      </h3>
-                      <p className={`text-sm ${theme.textSecondary} mb-4`}>
-                        Start building your workout by adding exercises and
-                        blocks in any order you want!
-                      </p>
-                      <Button
-                        type="button"
-                        onClick={() => setShowAddExercise(true)}
-                        className={`${theme.primary} ${theme.shadow} rounded-xl px-6 py-3 hover:scale-105 transition-all duration-200`}
+              {exercises.length > 0 ? (
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <Droppable droppableId="exercises-list">
+                    {(provided) => (
+                      <div
+                        {...provided.droppableProps}
+                        ref={provided.innerRef}
+                        className="w-full space-y-3"
                       >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Exercise
-                      </Button>
-                    </div>
-                  )}
+                        {exercises.map((exercise, index) => {
+                          // Create unique key combining multiple properties to avoid duplicates
+                          // Use order_index if available, otherwise use index
+                          const order = exercise.order_index || index + 1;
+                          const uniqueKey = exercise.id
+                            ? `ex-${exercise.exercise_type || "unknown"}-${
+                                exercise.id
+                              }-${order}`
+                            : `ex-${exercise.exercise_type || "unknown"}-${
+                                exercise.exercise_id || "no-id"
+                              }-${order}-${index}`;
+
+                          return (
+                            <Draggable
+                              key={uniqueKey}
+                              draggableId={uniqueKey}
+                              index={index}
+                            >
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={
+                                    snapshot.isDragging ? "opacity-50" : ""
+                                  }
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <div className="hidden sm:flex mt-4 cursor-grab active:cursor-grabbing flex-shrink-0">
+                                      <GripVertical className="w-5 h-5 text-slate-400" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <ExerciseBlockCard
+                                        exercise={exercise}
+                                        index={index}
+                                        availableExercises={availableExercises}
+                                        onDelete={removeExercise}
+                                        renderMode="form"
+                                      >
+                                        <ExerciseDetailForm
+                                          exercise={exercise}
+                                          onChange={(updated) =>
+                                            updateExerciseAtIndex(
+                                              index,
+                                              updated
+                                            )
+                                          }
+                                          availableExercises={
+                                            availableExercises
+                                          }
+                                          mode="inline"
+                                        />
+                                      </ExerciseBlockCard>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </Draggable>
+                          );
+                        })}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+              ) : (
+                <div
+                  className={`p-6 border-2 border-dashed ${theme.border} rounded-2xl text-center`}
+                >
+                  <Dumbbell
+                    className={`w-12 h-12 mx-auto mb-4 ${theme.textSecondary}`}
+                  />
+                  <h3 className={`text-lg font-bold ${theme.text} mb-2`}>
+                    Empty Workout
+                  </h3>
+                  <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                    Start building your workout by adding exercises and blocks
+                    in any order you want!
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={() => setShowAddExercise(true)}
+                    className={`${theme.primary} ${theme.shadow} rounded-xl px-6 py-3 hover:scale-105 transition-all duration-200 w-full sm:w-auto justify-center`}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Exercise
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+            </div>
 
             {/* Add Exercise Modal */}
             {showAddExercise && (
@@ -1957,7 +2185,7 @@ export default function WorkoutTemplateForm({
                 className={`${theme.card} border ${theme.border} rounded-2xl`}
               >
                 <CardHeader className="p-6">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-3">
                       <div
                         className={`p-2 rounded-xl ${
@@ -2230,7 +2458,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <Zap className="w-4 h-4 text-purple-600" />
                             Superset Configuration
@@ -2262,7 +2490,7 @@ export default function WorkoutTemplateForm({
                               className="mt-2"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -2314,7 +2542,7 @@ export default function WorkoutTemplateForm({
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -2362,7 +2590,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <Rocket className="w-4 h-4 text-purple-600" />
                             AMRAP Configuration
@@ -2406,7 +2634,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <Timer className="w-4 h-4 text-purple-600" />
                             EMOM Configuration
@@ -2449,7 +2677,7 @@ export default function WorkoutTemplateForm({
                           </div>
 
                           {newExercise.emom_mode === "time_based" && (
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                 <Label
                                   className={`text-sm font-medium ${theme.text}`}
@@ -2502,7 +2730,7 @@ export default function WorkoutTemplateForm({
                           )}
 
                           {newExercise.emom_mode === "rep_based" && (
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                 <Label
                                   className={`text-sm font-medium ${theme.text}`}
@@ -2565,7 +2793,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <CloudLightning className="w-4 h-4 text-purple-600" />
                             Tabata Circuit Configuration
@@ -2576,7 +2804,7 @@ export default function WorkoutTemplateForm({
                           </p>
 
                           {/* Tabata Timing */}
-                          <div className="grid grid-cols-3 gap-4 mb-6">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -2659,7 +2887,7 @@ export default function WorkoutTemplateForm({
 
                           {/* Sets */}
                           <div className="space-y-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
                               >
@@ -2695,7 +2923,7 @@ export default function WorkoutTemplateForm({
                                   key={setIndex}
                                   className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
                                 >
-                                  <div className="flex items-center justify-between mb-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
                                     <h5 className={`font-medium ${theme.text}`}>
                                       Set {setIndex + 1}
                                     </h5>
@@ -2721,72 +2949,71 @@ export default function WorkoutTemplateForm({
 
                                   {/* Exercises in this set */}
                                   <div className="space-y-2 mb-3">
-                                    {set.exercises.map(
-                                      (exercise, exerciseIndex) => (
-                                        <div
-                                          key={exerciseIndex}
-                                          className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600"
-                                        >
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <span className="text-xs text-slate-500 w-6">
-                                              {exerciseIndex + 1}.
-                                            </span>
-                                            <div className="flex-1">
-                                              <SearchableSelect
-                                                value={
-                                                  exercise.exercise_id || ""
-                                                }
-                                                onValueChange={(value) => {
-                                                  const updated = [
-                                                    ...(newExercise.tabata_sets ||
-                                                      []),
-                                                  ];
-                                                  updated[setIndex].exercises[
-                                                    exerciseIndex
-                                                  ].exercise_id = value;
-                                                  setNewExercise({
-                                                    ...newExercise,
-                                                    tabata_sets: updated,
-                                                  });
-                                                }}
-                                                placeholder="Search exercise..."
-                                                items={availableExercises.map(
-                                                  (ex) => ({
-                                                    id: ex.id,
-                                                    name: ex.name,
-                                                    description: ex.description,
-                                                  })
-                                                )}
-                                              />
-                                            </div>
-                                            <Button
-                                              type="button"
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => {
+                                    {(Array.isArray(set.exercises)
+                                      ? set.exercises
+                                      : []
+                                    ).map((exercise, exerciseIndex) => (
+                                      <div
+                                        key={exerciseIndex}
+                                        className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600"
+                                      >
+                                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                                          <span className="text-xs text-slate-500 w-6">
+                                            {exerciseIndex + 1}.
+                                          </span>
+                                          <div className="flex-1">
+                                            <SearchableSelect
+                                              value={exercise.exercise_id || ""}
+                                              onValueChange={(value) => {
                                                 const updated = [
                                                   ...(newExercise.tabata_sets ||
                                                     []),
                                                 ];
-                                                updated[
-                                                  setIndex
-                                                ].exercises.splice(
-                                                  exerciseIndex,
-                                                  1
-                                                );
+                                                updated[setIndex].exercises[
+                                                  exerciseIndex
+                                                ].exercise_id = value;
                                                 setNewExercise({
                                                   ...newExercise,
                                                   tabata_sets: updated,
                                                 });
                                               }}
-                                              className="text-red-500 hover:text-red-700 p-1"
-                                            >
-                                              <X className="w-3 h-3" />
-                                            </Button>
+                                              placeholder="Search exercise..."
+                                              items={availableExercises.map(
+                                                (ex) => ({
+                                                  id: ex.id,
+                                                  name: ex.name,
+                                                  description: ex.description,
+                                                })
+                                              )}
+                                            />
                                           </div>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              const updated = [
+                                                ...(newExercise.tabata_sets ||
+                                                  []),
+                                              ];
+                                              updated[
+                                                setIndex
+                                              ].exercises.splice(
+                                                exerciseIndex,
+                                                1
+                                              );
+                                              setNewExercise({
+                                                ...newExercise,
+                                                tabata_sets: updated,
+                                              });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 p-1"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </Button>
                                         </div>
-                                      )
-                                    )}
+                                      </div>
+                                    ))}
 
                                     <Button
                                       type="button"
@@ -2857,7 +3084,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <TrendingDown className="w-4 h-4 text-purple-600" />
                             Drop Set Configuration
@@ -2865,7 +3092,7 @@ export default function WorkoutTemplateForm({
                           <p className={`text-sm ${theme.textSecondary} mb-4`}>
                             Perform to failure, then immediately reduce weight
                           </p>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -2898,9 +3125,11 @@ export default function WorkoutTemplateForm({
                               <Input
                                 type="number"
                                 value={
-                                  newExercise.drop_percentage === ""
+                                  newExercise.drop_percentage === "" ||
+                                  newExercise.drop_percentage === undefined ||
+                                  newExercise.drop_percentage === null
                                     ? ""
-                                    : newExercise.drop_percentage
+                                    : String(newExercise.drop_percentage)
                                 }
                                 onChange={(e) =>
                                   setNewExercise({
@@ -2917,7 +3146,7 @@ export default function WorkoutTemplateForm({
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -2965,7 +3194,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <Flame className="w-4 h-4 text-purple-600" />
                             Giant Set Configuration
@@ -2988,7 +3217,7 @@ export default function WorkoutTemplateForm({
                                   key={index}
                                   className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
                                 >
-                                  <div className="flex items-center gap-2 mb-2">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
                                     <span className="text-sm font-medium text-slate-600 dark:text-slate-300 w-8">
                                       {index + 1}.
                                     </span>
@@ -3087,7 +3316,7 @@ export default function WorkoutTemplateForm({
                           </div>
 
                           {/* Sets and Rest */}
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -3146,7 +3375,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <Link className="w-4 h-4 text-purple-600" />
                             Cluster Set Configuration
@@ -3154,7 +3383,7 @@ export default function WorkoutTemplateForm({
                           <p className={`text-sm ${theme.textSecondary} mb-4`}>
                             Short intra-set rests between small sets of reps
                           </p>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -3206,7 +3435,7 @@ export default function WorkoutTemplateForm({
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -3294,7 +3523,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <PauseCircle className="w-4 h-4 text-purple-600" />
                             Rest-Pause Set Configuration
@@ -3303,7 +3532,7 @@ export default function WorkoutTemplateForm({
                             Perform to near failure, rest briefly, then perform
                             more reps
                           </p>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -3355,7 +3584,7 @@ export default function WorkoutTemplateForm({
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -3417,7 +3646,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <Dumbbell className="w-4 h-4 text-purple-600" />
                             Pre-Exhaustion Configuration
@@ -3450,7 +3679,7 @@ export default function WorkoutTemplateForm({
                                 className="mt-2"
                               />
                             </div>
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                 <Label
                                   className={`text-sm font-medium ${theme.text}`}
@@ -3565,7 +3794,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <Activity className="w-4 h-4 text-purple-600" />
                             For Time Configuration
@@ -3573,7 +3802,7 @@ export default function WorkoutTemplateForm({
                           <p className={`text-sm ${theme.textSecondary} mb-4`}>
                             Complete a set amount of work as fast as possible
                           </p>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -3635,7 +3864,7 @@ export default function WorkoutTemplateForm({
                       <div className="space-y-4">
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
-                            className={`font-semibold ${theme.text} mb-3 flex items-center gap-2`}
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
                             <Activity className="w-4 h-4 text-purple-600" />
                             Circuit Configuration
@@ -3678,7 +3907,7 @@ export default function WorkoutTemplateForm({
 
                           {/* Sets */}
                           <div className="space-y-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
                               >
@@ -3714,7 +3943,7 @@ export default function WorkoutTemplateForm({
                                   key={setIndex}
                                   className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
                                 >
-                                  <div className="flex items-center justify-between mb-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
                                     <h5 className={`font-medium ${theme.text}`}>
                                       Set {setIndex + 1}
                                     </h5>
@@ -3740,142 +3969,141 @@ export default function WorkoutTemplateForm({
 
                                   {/* Exercises in this set */}
                                   <div className="space-y-2 mb-3">
-                                    {set.exercises.map(
-                                      (exercise, exerciseIndex) => (
-                                        <div
-                                          key={exerciseIndex}
-                                          className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg"
-                                        >
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <span className="text-xs text-slate-500 w-6">
-                                              {exerciseIndex + 1}.
-                                            </span>
-                                            <div className="flex-1">
-                                              <SearchableSelect
-                                                value={
-                                                  exercise.exercise_id || ""
-                                                }
-                                                onValueChange={(value) => {
-                                                  const updated = [
-                                                    ...(newExercise.circuit_sets ||
-                                                      []),
-                                                  ];
-                                                  updated[setIndex].exercises[
-                                                    exerciseIndex
-                                                  ].exercise_id = value;
-                                                  setNewExercise({
-                                                    ...newExercise,
-                                                    circuit_sets: updated,
-                                                  });
-                                                }}
-                                                placeholder="Search exercise..."
-                                                items={availableExercises.map(
-                                                  (ex) => ({
-                                                    id: ex.id,
-                                                    name: ex.name,
-                                                    description: ex.description,
-                                                  })
-                                                )}
-                                              />
-                                            </div>
-                                            <Button
-                                              type="button"
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => {
+                                    {(Array.isArray(set.exercises)
+                                      ? set.exercises
+                                      : []
+                                    ).map((exercise, exerciseIndex) => (
+                                      <div
+                                        key={exerciseIndex}
+                                        className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg"
+                                      >
+                                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                                          <span className="text-xs text-slate-500 w-6">
+                                            {exerciseIndex + 1}.
+                                          </span>
+                                          <div className="flex-1">
+                                            <SearchableSelect
+                                              value={exercise.exercise_id || ""}
+                                              onValueChange={(value) => {
                                                 const updated = [
                                                   ...(newExercise.circuit_sets ||
                                                     []),
                                                 ];
-                                                updated[
-                                                  setIndex
-                                                ].exercises.splice(
-                                                  exerciseIndex,
-                                                  1
-                                                );
+                                                updated[setIndex].exercises[
+                                                  exerciseIndex
+                                                ].exercise_id = value;
                                                 setNewExercise({
                                                   ...newExercise,
                                                   circuit_sets: updated,
                                                 });
                                               }}
-                                              className="text-red-500 hover:text-red-700 p-1"
-                                            >
-                                              <X className="w-3 h-3" />
-                                            </Button>
+                                              placeholder="Search exercise..."
+                                              items={availableExercises.map(
+                                                (ex) => ({
+                                                  id: ex.id,
+                                                  name: ex.name,
+                                                  description: ex.description,
+                                                })
+                                              )}
+                                            />
                                           </div>
-                                          <div className="grid grid-cols-2 gap-2">
-                                            <div>
-                                              <Label
-                                                className={`text-xs font-medium ${theme.text}`}
-                                              >
-                                                Work (seconds)
-                                              </Label>
-                                              <Input
-                                                type="number"
-                                                value={
-                                                  exercise.work_seconds === ""
-                                                    ? ""
-                                                    : exercise.work_seconds
-                                                }
-                                                onChange={(e) => {
-                                                  const updated = [
-                                                    ...(newExercise.circuit_sets ||
-                                                      []),
-                                                  ];
-                                                  updated[setIndex].exercises[
-                                                    exerciseIndex
-                                                  ].work_seconds =
-                                                    handleNumberChange(
-                                                      e.target.value,
-                                                      0
-                                                    );
-                                                  setNewExercise({
-                                                    ...newExercise,
-                                                    circuit_sets: updated,
-                                                  });
-                                                }}
-                                                min="10"
-                                                className="mt-1 rounded-lg text-sm"
-                                              />
-                                            </div>
-                                            <div>
-                                              <Label
-                                                className={`text-xs font-medium ${theme.text}`}
-                                              >
-                                                Rest After (seconds)
-                                              </Label>
-                                              <Input
-                                                type="number"
-                                                value={
-                                                  exercise.rest_after === ""
-                                                    ? ""
-                                                    : exercise.rest_after
-                                                }
-                                                onChange={(e) => {
-                                                  const updated = [
-                                                    ...(newExercise.circuit_sets ||
-                                                      []),
-                                                  ];
-                                                  updated[setIndex].exercises[
-                                                    exerciseIndex
-                                                  ].rest_after =
-                                                    handleNumberChange(
-                                                      e.target.value,
-                                                      0
-                                                    );
-                                                  setNewExercise({
-                                                    ...newExercise,
-                                                    circuit_sets: updated,
-                                                  });
-                                                }}
-                                                min="0"
-                                                className="mt-1 rounded-lg text-sm"
-                                              />
-                                            </div>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              const updated = [
+                                                ...(newExercise.circuit_sets ||
+                                                  []),
+                                              ];
+                                              updated[
+                                                setIndex
+                                              ].exercises.splice(
+                                                exerciseIndex,
+                                                1
+                                              );
+                                              setNewExercise({
+                                                ...newExercise,
+                                                circuit_sets: updated,
+                                              });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 p-1"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                          <div>
+                                            <Label
+                                              className={`text-xs font-medium ${theme.text}`}
+                                            >
+                                              Work (seconds)
+                                            </Label>
+                                            <Input
+                                              type="number"
+                                              value={
+                                                exercise.work_seconds === ""
+                                                  ? ""
+                                                  : exercise.work_seconds
+                                              }
+                                              onChange={(e) => {
+                                                const updated = [
+                                                  ...(newExercise.circuit_sets ||
+                                                    []),
+                                                ];
+                                                updated[setIndex].exercises[
+                                                  exerciseIndex
+                                                ].work_seconds =
+                                                  handleNumberChange(
+                                                    e.target.value,
+                                                    0
+                                                  );
+                                                setNewExercise({
+                                                  ...newExercise,
+                                                  circuit_sets: updated,
+                                                });
+                                              }}
+                                              min="10"
+                                              className="mt-1 rounded-lg text-sm"
+                                            />
+                                          </div>
+                                          <div>
+                                            <Label
+                                              className={`text-xs font-medium ${theme.text}`}
+                                            >
+                                              Rest After (seconds)
+                                            </Label>
+                                            <Input
+                                              type="number"
+                                              value={
+                                                exercise.rest_after === ""
+                                                  ? ""
+                                                  : exercise.rest_after
+                                              }
+                                              onChange={(e) => {
+                                                const updated = [
+                                                  ...(newExercise.circuit_sets ||
+                                                    []),
+                                                ];
+                                                updated[setIndex].exercises[
+                                                  exerciseIndex
+                                                ].rest_after =
+                                                  handleNumberChange(
+                                                    e.target.value,
+                                                    0
+                                                  );
+                                                setNewExercise({
+                                                  ...newExercise,
+                                                  circuit_sets: updated,
+                                                });
+                                              }}
+                                              min="0"
+                                              className="mt-1 rounded-lg text-sm"
+                                            />
                                           </div>
                                         </div>
-                                      )
-                                    )}
+                                      </div>
+                                    ))}
 
                                     <Button
                                       type="button"
@@ -4006,12 +4234,12 @@ export default function WorkoutTemplateForm({
         <div
           className={`flex-shrink-0 ${theme.card} border-t ${theme.border} px-6 py-4 rounded-b-3xl`}
         >
-          <div className="flex justify-end gap-3">
+          <div className="w-full flex flex-col sm:flex-row justify-end gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              className="rounded-xl"
+              className="rounded-xl w-full sm:w-auto"
             >
               Cancel
             </Button>
@@ -4019,7 +4247,7 @@ export default function WorkoutTemplateForm({
               type="submit"
               disabled={loading}
               onClick={handleSubmit}
-              className={`${theme.primary} flex items-center gap-2 rounded-xl`}
+              className={`${theme.primary} flex items-center gap-2 rounded-xl w-full sm:w-auto justify-center`}
             >
               <Save className="w-4 h-4" />
               {loading

@@ -21,75 +21,119 @@ export default function ExerciseItem({
   const theme = getThemeStyles();
 
   const getExerciseName = (exerciseId?: string) => {
-    if (!exerciseId && exercise.name) return exercise.name;
-    if (!exerciseId) return "Exercise";
-    const found = availableExercises.find((e) => e.id === exerciseId);
-    return found?.name || exercise.name || "Exercise";
+    // First check if exercise object is directly available
+    if (exercise.exercise?.name) return exercise.exercise.name;
+    // Then check if name is in the exercise object itself
+    if (exercise.name) return exercise.name;
+    // Then try to look up by exercise_id
+    if (exerciseId) {
+      const found = availableExercises.find((e) => e.id === exerciseId);
+      if (found?.name) return found.name;
+    }
+    return "Exercise";
   };
 
   const exerciseName = getExerciseName(exercise.exercise_id);
 
-  // Render details based on parent block type
+  // Render ALL details based on parent block type
   const renderDetails = () => {
-    if (blockType === "circuit" && exercise.work_seconds) {
-      return (
-        <>
-          {exercise.work_seconds}s work
-          {exercise.rest_after && ` • ${exercise.rest_after}s rest after`}
-        </>
-      );
+    const details: string[] = [];
+
+    // Block-type specific details first
+    // Tabata and Circuit display the same: exercise name, work time, rest time
+    if (blockType === "circuit" || blockType === "tabata") {
+      // Work time - required for both
+      if (
+        exercise.work_seconds !== undefined &&
+        exercise.work_seconds !== null
+      ) {
+        details.push(`${exercise.work_seconds}s work`);
+      }
+      // Rest time - the short rest between exercises (required for both)
+      if (
+        exercise.rest_seconds !== undefined &&
+        exercise.rest_seconds !== null
+      ) {
+        details.push(`${exercise.rest_seconds}s rest`);
+      }
+    } else if (blockType === "giant_set") {
+      if (exercise.sets) details.push(`${exercise.sets} sets`);
+      if (exercise.reps) details.push(`${exercise.reps} reps`);
+      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
+    } else if (blockType === "superset") {
+      if (exercise.sets) details.push(`${exercise.sets} sets`);
+      if (exercise.reps) details.push(`${exercise.reps} reps`);
+      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
+    } else if (blockType === "pre_exhaustion") {
+      if (exercise.reps) details.push(`${exercise.reps} reps`);
+      if (exercise.type) details.push(`(${exercise.type})`);
+      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
+    } else if (blockType === "amrap") {
+      if (exercise.reps) details.push(`${exercise.reps} reps`);
+      if (exercise.duration_seconds)
+        details.push(`${exercise.duration_seconds}s`);
+      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
+    } else if (blockType === "emom" || blockType === "emom_reps") {
+      // For rep-based EMOM, show reps prominently
+      if (exercise.emom_reps) {
+        details.push(`${exercise.emom_reps} reps/min`);
+      } else if (exercise.reps) {
+        details.push(`${exercise.reps} reps`);
+      }
+      // For time-based EMOM, show work time
+      if (exercise.work_seconds) details.push(`${exercise.work_seconds}s work`);
+      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
+      // Always show duration if available
+      if (exercise.emom_duration) details.push(`${exercise.emom_duration} min`);
+    } else if (blockType === "for_time") {
+      if (exercise.reps) details.push(`${exercise.reps} reps`);
+      if (exercise.sets) details.push(`${exercise.sets} rounds`);
+      if (exercise.duration_seconds)
+        details.push(`${exercise.duration_seconds}s cap`);
+    } else if (blockType === "ladder") {
+      if (exercise.reps) details.push(`${exercise.reps} reps`);
+      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
+    } else {
+      // Default: show all available data
+      if (exercise.sets) details.push(`${exercise.sets} sets`);
+      if (exercise.reps) details.push(`${exercise.reps} reps`);
+      if (exercise.duration_seconds)
+        details.push(`${exercise.duration_seconds}s`);
+      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
     }
-    if (blockType === "tabata" && exercise.work_seconds) {
-      return <>{exercise.work_seconds}s work</>;
-    }
-    if (blockType === "giant_set") {
-      return (
-        <>
-          {exercise.sets && `${exercise.sets} sets`}
-          {exercise.reps && ` • ${exercise.reps} reps`}
-          {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
-        </>
-      );
-    }
-    if (blockType === "superset") {
-      return (
-        <>
-          {exercise.sets && `${exercise.sets} sets`}
-          {exercise.reps && ` • ${exercise.reps} reps`}
-        </>
-      );
-    }
-    if (blockType === "pre_exhaustion") {
-      return (
-        <>
-          {exercise.reps && `${exercise.reps} reps`}
-          {exercise.type && ` (${exercise.type})`}
-        </>
-      );
-    }
-    // Default
-    return (
-      <>
-        {exercise.sets && `${exercise.sets} sets`}
-        {exercise.reps && ` • ${exercise.reps} reps`}
-      </>
-    );
+
+    // Common fields that should always be shown if present
+    if (exercise.weight) details.push(`${exercise.weight} kg`);
+    if (exercise.load_percentage)
+      details.push(`${exercise.load_percentage}% load`);
+    if (exercise.tempo) details.push(`Tempo: ${exercise.tempo}`);
+    if (exercise.rir) details.push(`RIR: ${exercise.rir}`);
+    if (exercise.rpe) details.push(`RPE: ${exercise.rpe}`);
+
+    return details.length > 0 ? details.join(" • ") : "No details";
   };
 
   return (
     <div
-      className={`flex items-center gap-3 p-2 sm:p-3 rounded-lg ${theme.card} border ${theme.border} bg-opacity-50`}
+      className={`flex flex-wrap items-center gap-3 p-2 sm:p-3 rounded-lg ${theme.card} border ${theme.border} bg-opacity-50`}
     >
       <Badge variant="outline" className="text-xs flex-shrink-0">
         {String.fromCharCode(65 + index)} {/* A, B, C, etc. */}
       </Badge>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 w-full sm:w-auto">
         <div className={`font-medium ${theme.text} text-sm break-words`}>
           {exerciseName}
         </div>
         <div className={`text-xs ${theme.textSecondary} break-words`}>
           {renderDetails()}
         </div>
+        {exercise.notes && (
+          <div
+            className={`text-xs ${theme.textSecondary} mt-1 italic break-words`}
+          >
+            Note: {exercise.notes}
+          </div>
+        )}
       </div>
     </div>
   );

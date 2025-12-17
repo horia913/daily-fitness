@@ -1,6 +1,8 @@
 'use client'
 
 import { supabase } from './supabase'
+import { ProgramProgressionService } from './programProgressionService'
+import { WorkoutBlockService } from './workoutBlockService'
 
 // Enhanced interfaces for the new architecture
 export interface WorkoutTemplate {
@@ -17,6 +19,7 @@ export interface WorkoutTemplate {
   exercises?: TemplateExercise[]
   usage_count?: number
   rating?: number
+  exercise_count?: number
 }
 
 export interface TemplateExercise {
@@ -83,9 +86,12 @@ export interface ProgramSchedule {
   program_day: number // 1-6 (Day 1, Day 2, ..., Day 6)
   week_number: number // Week number in the program
   template_id: string
-  is_optional: boolean
+  is_optional?: boolean // Optional field (not in DB schema, defaults to false)
   is_active: boolean
   notes?: string
+  template_name?: string
+  template_description?: string
+  estimated_duration?: number | null
   created_at: string
   updated_at: string
   template?: WorkoutTemplate
@@ -112,21 +118,35 @@ export interface ProgramAssignment {
   client_id: string
   coach_id?: string
   start_date: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
+  total_days: number
+  status?: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface ProgramDayAssignment {
   id: string
-  assignment_id: string
-  week_number: number
-  program_day: number
-  workout_template_id: string
-  is_optional?: boolean
-  notes?: string
+  program_assignment_id: string
+  program_day_id: string | null
+  day_number: number | null
+  day_type: string | null
+  workout_assignment_id: string | null
+  name: string | null
+  description: string | null
+  estimated_duration: number | null
+  target_muscles: string[] | null
+  intensity_level: string | null
+  rest_focus: string | null
+  recommended_activities: string[] | null
+  is_completed: boolean | null
+  completed_date: string | null
+  notes: string | null
+  is_customized: boolean | null
   created_at: string
   updated_at: string
+  program_day: number | null
+  workout_template_id: string | null
+  week_number?: number | null
 }
 
 export interface DailyWorkout {
@@ -226,10 +246,134 @@ export class WorkoutTemplateService {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return data || []
+      const templates = data || []
+
+      if (templates.length === 0) {
+        return []
+      }
+
+      const templateIds = templates.map((t: any) => t.id)
+
+      const { data: exerciseRows, error: exerciseError } = await supabase
+        .from('workout_block_exercises')
+        .select('id, workout_blocks!inner(template_id)')
+        .in('workout_blocks.template_id', templateIds)
+
+      const counts: Record<string, number> = {}
+      if (!exerciseError && exerciseRows) {
+        exerciseRows.forEach((row: any) => {
+          const templateId = row.workout_blocks?.template_id
+          if (templateId) {
+            counts[templateId] = (counts[templateId] || 0) + 1
+          }
+        })
+      } else if (exerciseError) {
+        console.warn('Unable to load exercise counts for templates:', exerciseError.message)
+      }
+
+      return templates.map((template: any) => ({
+        ...template,
+        exercise_count: counts[template.id] || 0,
+      }))
     } catch (error) {
       console.error('Error fetching workout templates:', error)
       return []
+    }
+  }
+
+  static async getWorkoutTemplateById(templateId: string): Promise<WorkoutTemplate | null> {
+    try {
+      const { data, error } = await supabase
+        .from('workout_templates')
+        .select('*')
+        .eq('id', templateId)
+        .maybeSingle()
+
+      if (error) throw error
+      return data || null
+    } catch (error) {
+      console.error('Error fetching workout template:', error)
+      return null
+    }
+  }
+
+  static async assignWorkoutToClient(
+    clientRelationshipId: string,
+    clientProfileId: string,
+    templateId: string,
+    coachId: string,
+    scheduledDate: string,
+    notes?: string | null
+  ): Promise<any | null> {
+    try {
+      const template = await this.getWorkoutTemplateById(templateId)
+
+      const { data: existing, error: existingError } = await supabase
+        .from('workout_assignments')
+        .select('*')
+        .eq('client_id', clientProfileId)
+        .eq('workout_template_id', templateId)
+        .maybeSingle()
+
+      if (existingError && existingError.code !== 'PGRST116') {
+        throw existingError
+      }
+
+      let assignment = existing || null
+
+      if (!assignment) {
+        const insertPayload: any = {
+          client_id: clientProfileId,
+          workout_template_id: templateId,
+          coach_id: coachId,
+          scheduled_date: scheduledDate,
+          status: 'assigned',
+          name: template?.name ?? 'Workout Assignment',
+          notes: notes ?? null,
+        }
+
+        const { data, error } = await supabase
+          .from('workout_assignments')
+          .insert(insertPayload)
+          .select('*')
+          .single()
+
+        if (error) throw error
+        assignment = data
+      } else {
+        const updates: any = {}
+        if (scheduledDate && assignment.scheduled_date !== scheduledDate) {
+          updates.scheduled_date = scheduledDate
+        }
+        if (notes !== undefined && assignment.notes !== notes) {
+          updates.notes = notes
+        }
+        if (template?.name && assignment.name !== template.name) {
+          updates.name = template.name
+        }
+
+        if (Object.keys(updates).length > 0) {
+          const { data, error } = await supabase
+            .from('workout_assignments')
+            .update(updates)
+            .eq('id', assignment.id)
+            .select('*')
+            .single()
+
+          if (error) throw error
+          assignment = data
+        }
+      }
+
+      if (!assignment?.id) {
+        return null
+      }
+
+      // No longer creating copies - assignment links directly to original template
+      return assignment
+    } catch (error) {
+      console.error('Error assigning workout to client:', error)
+      return null
     }
   }
 
@@ -242,6 +386,7 @@ export class WorkoutTemplateService {
         .single()
 
       if (error) throw error
+
       return data
     } catch (error) {
       console.error('Error creating workout template:', error)
@@ -522,11 +667,11 @@ export class WorkoutTemplateService {
   // ===== PROGRAM SCHEDULE MANAGEMENT =====
   
   static async getProgramSchedule(programId: string): Promise<ProgramSchedule[]> {
-    // New schema: program_days (not program_schedule). Columns may vary.
+    // Use program_schedule table with columns: program_id, day_of_week, week_number, template_id
     // Avoid DB-side ordering on unknown columns; fetch and sort client-side.
     try {
       const { data: rows, error } = await supabase
-        .from('program_days')
+        .from('program_schedule')
         .select('*')
         .eq('program_id', programId)
 
@@ -550,7 +695,7 @@ export class WorkoutTemplateService {
             ? row.week
             : 1
 
-        const templateId = row.workout_template_id ?? row.template_id
+        const templateId = row.template_id ?? row.workout_template_id
 
         return {
           id: row.id,
@@ -558,9 +703,14 @@ export class WorkoutTemplateService {
           program_day: programDay,
           week_number: weekNumber,
           template_id: templateId,
-          is_optional: !!row.is_optional,
+          is_optional: false, // Default value since column doesn't exist in DB
           is_active: row.is_active ?? true,
           notes: row.notes,
+          template_name: row.template_name ?? undefined,
+          template_description: row.template_description ?? undefined,
+          estimated_duration: row.estimated_duration ?? null,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
         } as unknown as ProgramSchedule
       })
 
@@ -585,21 +735,65 @@ export class WorkoutTemplateService {
 
   static async createProgramAssignment(clientId: string, programId: string, startDate: string, coachId?: string): Promise<ProgramAssignment | null> {
     try {
-      const { data, error } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('program_assignments')
-        .insert({
-          client_id: clientId,
-          program_id: programId,
-          start_date: startDate,
-          coach_id: coachId,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
         .select('*')
-        .single()
+        .eq('client_id', clientId)
+        .eq('program_id', programId)
+        .maybeSingle()
 
-      if (error) throw error
+      if (existingError && existingError.code !== 'PGRST116') {
+        throw existingError
+      }
+
+      const schedule = await this.getProgramSchedule(programId)
+      const totalDays = schedule?.length || 0
+
+      const insertPayload: any = {
+        client_id: clientId,
+        program_id: programId,
+        start_date: startDate,
+        total_days: totalDays,
+      }
+
+      if (coachId) {
+        insertPayload.coach_id = coachId
+      }
+
+      let data: any = existing
+      if (!existing) {
+        const insertResponse = await supabase
+          .from('program_assignments')
+          .insert(insertPayload)
+          .select('*')
+          .single()
+
+        if (insertResponse.error) throw insertResponse.error
+        data = insertResponse.data
+      }
+
+      if (data?.id) {
+        await ProgramProgressionService.deleteClientProgramProgressionRules(
+          data.id
+        )
+        const copied =
+          await ProgramProgressionService.copyProgramRulesToClient(
+            programId,
+            data.id,
+            clientId
+          )
+        if (!copied) {
+          console.warn(
+            '[ClientProgramCopy] Failed to copy progression rules for assignment',
+            {
+              programId,
+              assignmentId: data.id,
+              clientId,
+            }
+          )
+        }
+      }
+
       return data
     } catch (error) {
       console.error('Error creating program assignment:', error)
@@ -623,18 +817,53 @@ export class WorkoutTemplateService {
     }
   }
 
-  static async upsertProgramDayAssignment(assignmentId: string, weekNumber: number, programDay: number, workoutTemplateId: string, isOptional?: boolean, notes?: string): Promise<ProgramDayAssignment | null> {
+  static async upsertProgramDayAssignment(
+    programAssignmentId: string,
+    weekNumber: number,
+    programDay: number,
+    workoutTemplateId: string | null,
+    notes?: string | null,
+    overrides?: {
+      name?: string | null
+      description?: string | null
+      estimated_duration?: number | null
+    }
+  ): Promise<ProgramDayAssignment | null> {
     try {
+      const dayNumber = (weekNumber - 1) * 7 + programDay
+      const dayType = workoutTemplateId ? 'workout' : 'rest'
+      const defaultName =
+        dayType === 'workout'
+          ? `Workout Day ${weekNumber}-${programDay}`
+          : `Rest Day ${weekNumber}-${programDay}`
+      const name = overrides?.name ?? defaultName
+      const defaultDescription =
+        dayType === 'rest' ? 'Rest day' : null
+      const description = overrides?.description ?? defaultDescription
+
+      const payload: any = {
+        program_assignment_id: programAssignmentId,
+        program_day_id: null,
+        day_number: dayNumber,
+        day_type: dayType,
+        workout_template_id: workoutTemplateId ?? null,
+        name,
+        description,
+        notes: notes ?? null,
+        is_customized: overrides?.description || overrides?.name ? true : false,
+        is_completed: false,
+        program_day: programDay,
+        target_muscles: [],
+        recommended_activities: [],
+      }
+
+      if (overrides?.name !== undefined) payload.name = overrides.name
+      if (overrides?.description !== undefined) payload.description = overrides.description
+      if (overrides?.estimated_duration !== undefined) payload.estimated_duration = overrides.estimated_duration
+
       const { data, error } = await supabase
         .from('program_day_assignments')
-        .upsert({
-          assignment_id: assignmentId,
-          week_number: weekNumber,
-          program_day: programDay,
-          workout_template_id: workoutTemplateId,
-          is_optional: isOptional,
-          notes
-        })
+        .upsert(payload)
         .select('*')
         .single()
 
@@ -646,14 +875,15 @@ export class WorkoutTemplateService {
     }
   }
 
-  static async removeProgramDayAssignment(assignmentId: string, weekNumber: number, programDay: number): Promise<boolean> {
+  static async removeProgramDayAssignment(programAssignmentId: string, weekNumber: number, programDay: number): Promise<boolean> {
     try {
+      const dayNumber = (weekNumber - 1) * 7 + programDay
       const { error } = await supabase
         .from('program_day_assignments')
         .delete()
-        .eq('assignment_id', assignmentId)
-        .eq('week_number', weekNumber)
+        .eq('program_assignment_id', programAssignmentId)
         .eq('program_day', programDay)
+        .eq('day_number', dayNumber)
 
       if (error) throw error
       return true
@@ -663,18 +893,40 @@ export class WorkoutTemplateService {
     }
   }
 
-  static async getProgramAssignmentDetail(assignmentId: string): Promise<{ assignment: ProgramAssignment | null; days: ProgramDayAssignment[] }> {
+  static async getProgramAssignmentDetail(programAssignmentId: string): Promise<{ assignment: ProgramAssignment | null; days: ProgramDayAssignment[] }> {
     try {
       const [{ data: assignment, error: aErr }, { data: days, error: dErr }] = await Promise.all([
-        supabase.from('program_assignments').select('*').eq('id', assignmentId).single(),
-        supabase.from('program_day_assignments').select('*').eq('assignment_id', assignmentId)
+        supabase.from('program_assignments').select('*').eq('id', programAssignmentId).single(),
+        supabase.from('program_day_assignments').select('*').eq('program_assignment_id', programAssignmentId)
       ])
 
       if (aErr) throw aErr
       if (dErr) throw dErr
 
-      const sorted = (days || []).sort((a: any, b: any) => (a.week_number - b.week_number) || (a.program_day - b.program_day))
-      return { assignment: assignment || null, days: sorted as ProgramDayAssignment[] }
+      const sorted = (days || []).sort((a: any, b: any) => {
+        const da = typeof a.day_number === 'number' ? a.day_number : 0
+        const db = typeof b.day_number === 'number' ? b.day_number : 0
+        if (da !== db) return da - db
+        const pa = typeof a.program_day === 'number' ? a.program_day : 0
+        const pb = typeof b.program_day === 'number' ? b.program_day : 0
+        return pa - pb
+      })
+
+      const mapped = sorted.map((day: any) => {
+        const dayNumber = typeof day.day_number === 'number' ? day.day_number : null
+        const derivedWeek =
+          dayNumber !== null ? Math.floor((dayNumber - 1) / 7) + 1 : null
+        return {
+          ...day,
+          program_assignment_id: day.program_assignment_id || day.assignment_id,
+          week_number: derivedWeek,
+        }
+      }) as ProgramDayAssignment[]
+
+      return {
+        assignment: assignment || null,
+        days: mapped,
+      }
     } catch (error) {
       console.error('Error fetching program assignment detail:', error)
       return { assignment: null, days: [] }
@@ -684,7 +936,13 @@ export class WorkoutTemplateService {
   /**
    * Convenience method: assign a program to multiple clients and copy program days
    */
-  static async assignProgramToClients(programId: string, clientIds: string[], coachId: string | undefined, startDate: string, notes?: string): Promise<number> {
+  static async assignProgramToClients(
+    programId: string,
+    clientIds: string[],
+    coachId: string | undefined,
+    startDate: string,
+    notes?: string
+  ): Promise<number> {
     let successCount = 0
     // fetch program days once
     const days = await this.getProgramSchedule(programId)
@@ -694,17 +952,41 @@ export class WorkoutTemplateService {
       if (!assignment) continue
 
       if (days && days.length > 0) {
-        const rows = days.map(d => ({
-          assignment_id: assignment.id,
-          week_number: d.week_number,
-          program_day: d.program_day,
-          workout_template_id: d.template_id,
-          is_optional: d.is_optional,
-          notes
-        }))
-        const { error } = await supabase
-          .from('program_day_assignments')
-          .insert(rows)
+        const rows = days.map((d) => {
+          const weekNumber = d.week_number ?? 1
+          const programDay = d.program_day ?? 1
+          const dayNumber = (weekNumber - 1) * 7 + programDay
+          const dayType = d.template_id ? 'workout' : 'rest'
+          const defaultName =
+            dayType === 'workout'
+              ? `Workout Day ${weekNumber}-${programDay}`
+              : `Rest Day ${weekNumber}-${programDay}`
+          const name = d.template_name ?? defaultName
+          const description =
+            d.template_description ??
+            (dayType === 'rest' ? 'Rest day' : d.notes ?? null)
+
+          return {
+            program_assignment_id: assignment.id,
+            program_day_id: null,
+            program_day: programDay,
+            day_number: dayNumber,
+            day_type: dayType,
+            workout_template_id: d.template_id ?? null,
+            name,
+            description,
+            estimated_duration: d.estimated_duration ?? null,
+            target_muscles: [],
+            intensity_level: null,
+            rest_focus: null,
+            recommended_activities: [],
+            is_completed: false,
+            completed_date: null,
+            notes: notes ?? d.notes ?? null,
+            is_customized: false,
+          }
+        })
+        const { error } = await supabase.from('program_day_assignments').insert(rows)
         if (error) {
           console.error('Error copying program days to assignment:', error)
         }
@@ -716,34 +998,84 @@ export class WorkoutTemplateService {
 
   static async setProgramSchedule(programId: string, programDay: number, weekNumber: number, templateId: string, isOptional: boolean = false, notes?: string): Promise<ProgramSchedule | null> {
     try {
+      // programDay is 1-based (Day 1, Day 2, etc.), but DB uses day_of_week (0-based)
+      // Use program_schedule table with template_id (not workout_template_id)
+      const dayOfWeek = programDay - 1; // Convert to 0-based
+      
       const { data, error } = await supabase
-        .from('program_days')
+        .from('program_schedule')
         .upsert({
           program_id: programId,
-          program_day: programDay, // 1-based
+          day_of_week: dayOfWeek, // 0-based (0=Monday, 1=Tuesday, etc.)
           week_number: weekNumber,
-          workout_template_id: templateId,
-          is_optional: isOptional,
-          notes
+          template_id: templateId
         })
         .select('*')
         .single()
 
-      if (error) throw error
-      return data
-    } catch (error) {
+      if (error) {
+        console.error('Supabase error details:', error)
+        throw error
+      }
+      
+      // Map to ProgramSchedule interface, setting is_optional to false by default
+      return {
+        id: data.id,
+        program_id: data.program_id,
+        program_day: programDay, // Keep 1-based for interface
+        week_number: weekNumber,
+        template_id: templateId,
+        is_optional: false, // Default value since column doesn't exist in DB
+        is_active: true,
+        notes: data.notes || undefined,
+        created_at: data.created_at || new Date().toISOString(),
+        updated_at: data.updated_at || new Date().toISOString(),
+      } as ProgramSchedule
+    } catch (error: any) {
       console.error('Error setting program schedule:', error)
+      console.error('Error details:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint
+      })
       return null
     }
   }
 
   static async removeProgramSchedule(programId: string, programDay: number, weekNumber: number): Promise<boolean> {
     try {
+      // programDay is 1-based (Day 1, Day 2, etc.), but DB uses day_of_week (0-based)
+      const dayOfWeek = programDay - 1; // Convert to 0-based
+
+      // Find existing schedule rows for this slot so we can clean up progression rules first
+      const { data: scheduleRows, error: selectError } = await supabase
+        .from('program_schedule')
+        .select('id')
+        .eq('program_id', programId)
+        .eq('day_of_week', dayOfWeek)
+        .eq('week_number', weekNumber)
+
+      if (selectError) throw selectError
+
+      if (scheduleRows && scheduleRows.length > 0) {
+        for (const row of scheduleRows) {
+          if (row?.id) {
+            await ProgramProgressionService.deleteProgressionRules(row.id, weekNumber).catch(
+              (err) => {
+                console.error('Error deleting progression rules before removing schedule:', err)
+              }
+            )
+          }
+        }
+      }
+
+      // Use program_schedule table to delete the schedule entry
       const { error } = await supabase
-        .from('program_days')
+        .from('program_schedule')
         .delete()
         .eq('program_id', programId)
-        .eq('program_day', programDay)
+        .eq('day_of_week', dayOfWeek)
         .eq('week_number', weekNumber)
 
       if (error) throw error
@@ -789,27 +1121,78 @@ export class WorkoutTemplateService {
   
   static async getProgressionRules(programId: string, exerciseId?: string): Promise<ProgressionRule[]> {
     try {
+      // First, get the progression rules without the join (since there's no foreign key relationship)
       let query = supabase
         .from('program_progression_rules')
-        .select(`
-          *,
-          exercise:exercises(
-            *,
-            category:exercise_categories(*)
-          )
-        `)
+        .select('*')
         .eq('program_id', programId)
 
       if (exerciseId) {
-        query = query.eq('exercise_id', exerciseId)
+        query = query.eq('template_exercise_id', exerciseId)
       }
 
       const { data, error } = await query
         .order('week_number')
-        .order('exercise_id')
+        .order('template_exercise_id')
 
-      if (error) throw error
-      return data || []
+      if (error) {
+        // If table doesn't exist or has schema issues, return empty array
+        if (error.code === 'PGRST204' || error.code === '42P01' || error.message?.includes('does not exist')) {
+          console.warn('program_progression_rules table may not exist or has schema issues:', error.message)
+          return []
+        }
+        throw error
+      }
+      
+      // If no data, return empty array
+      if (!data || data.length === 0) {
+        return []
+      }
+      
+      // Enrich with exercise details by looking up from workout_block_exercises
+      // Get unique template_exercise_ids to batch fetch
+      const templateExerciseIds = [...new Set(data.map(rule => rule.template_exercise_id).filter(Boolean))]
+      
+      if (templateExerciseIds.length === 0) {
+        return data as ProgressionRule[]
+      }
+      
+      // Fetch all block exercises in one query
+      const { data: blockExercises, error: blockExercisesError } = await supabase
+        .from('workout_block_exercises')
+        .select(`
+          id,
+          exercise_id,
+          sets,
+          reps,
+          rest_seconds,
+          exercise:exercises(
+            id,
+            name,
+            description,
+            video_url
+          )
+        `)
+        .in('id', templateExerciseIds)
+
+      if (blockExercisesError) {
+        console.warn('Error fetching block exercises for progression rules:', blockExercisesError)
+        // Return rules without exercise details
+        return data as ProgressionRule[]
+      }
+
+      // Create a map for quick lookup
+      const exerciseMap = new Map(
+        (blockExercises || []).map(be => [be.id, be.exercise])
+      )
+
+      // Enrich rules with exercise data
+      const enrichedData = data.map((rule) => ({
+        ...rule,
+        exercise: exerciseMap.get(rule.template_exercise_id),
+      }))
+      
+      return enrichedData as ProgressionRule[]
     } catch (error) {
       console.error('Error fetching progression rules:', error)
       return []
@@ -882,7 +1265,7 @@ export class WorkoutTemplateService {
         // Handle specific error cases gracefully
         if (error.code === 'PGRST202') {
           console.log('get_next_due_workout function not found, falling back to legacy method')
-          return this.getDailyWorkout(clientId, new Date())
+          return this.getDailyWorkout(clientId, new Date().toISOString().split('T')[0])
         }
         console.log('Error calling get_next_due_workout:', error)
         // Return a default response instead of throwing

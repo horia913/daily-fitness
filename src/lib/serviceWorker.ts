@@ -2,7 +2,17 @@
 
 // Service Worker Registration
 export function registerServiceWorker() {
-  if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  const isBrowser = typeof window !== 'undefined' && typeof navigator !== 'undefined'
+  const isProduction = process.env.NODE_ENV === 'production'
+
+  if (!isBrowser) return
+
+  if (!isProduction) {
+    console.info('[serviceWorker] Skipping registration in non-production environment')
+    return
+  }
+
+  if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
         .then((registration) => {

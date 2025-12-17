@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -85,7 +87,7 @@ interface OptimizedDetailedReportsProps {
 }
 
 export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedReportsProps) {
-  const { getThemeStyles } = useTheme()
+  const { getThemeStyles, performanceSettings } = useTheme()
   const router = useRouter()
   const theme = getThemeStyles()
 
@@ -337,8 +339,10 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
   }
 
   return (
-    <div className={`min-h-screen ${theme.background}`}>
-      {/* Enhanced Header */}
+    <AnimatedBackground>
+      {performanceSettings.floatingParticles && <FloatingParticles />}
+      <div className="min-h-screen">
+        {/* Enhanced Header */}
       <div className={`p-6 ${theme.background} relative overflow-hidden`}>
         {/* Floating background elements */}
         <div className="absolute inset-0 overflow-hidden">
@@ -784,6 +788,6 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
           </div>
         </div>
       </div>
-    </div>
+    </AnimatedBackground>
   )
 }

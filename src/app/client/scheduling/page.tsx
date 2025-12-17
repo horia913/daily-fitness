@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { useTheme } from '@/contexts/ThemeContext'
 import { 
   Calendar,
   Clock,
@@ -155,6 +158,7 @@ const DAYS_OF_WEEK = [
 ]
 
 export default function ClientScheduling() {
+  const { performanceSettings } = useTheme()
   const [coaches, setCoaches] = useState<Coach[]>([])
   const [selectedCoach, setSelectedCoach] = useState<string>('')
   const [clipcards, setClipcards] = useState<ClipCard[]>([])
@@ -525,7 +529,9 @@ export default function ClientScheduling() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 dark:from-slate-900 dark:to-slate-800">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
         <div className="p-4">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Header */}
@@ -1029,7 +1035,7 @@ export default function ClientScheduling() {
             )}
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,7 +86,7 @@ interface MealPlanAssignment {
 
 export default function CoachMealsPage() {
   const { user } = useAuth();
-  const { getThemeStyles } = useTheme();
+  const { getThemeStyles, performanceSettings } = useTheme();
   const theme = getThemeStyles();
 
   const [activeTab, setActiveTab] = useState("meal-plans");
@@ -574,8 +576,10 @@ export default function CoachMealsPage() {
   };
 
   return (
-    <div className={`min-h-screen ${theme.background}`}>
-      {/* Floating Background Elements */}
+    <AnimatedBackground>
+      {performanceSettings.floatingParticles && <FloatingParticles />}
+      <div className="min-h-screen">
+        {/* Floating Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-orange-500/5 rounded-full blur-3xl"></div>
@@ -1713,6 +1717,6 @@ export default function CoachMealsPage() {
           )}
         </div>
       </div>
-    </div>
+    </AnimatedBackground>
   );
 }

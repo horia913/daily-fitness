@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -40,6 +43,7 @@ interface HabitAssignment {
 
 export default function ClientHabitsPage() {
   const { user } = useAuth()
+  const { performanceSettings } = useTheme()
   const [loading, setLoading] = useState(true)
   const [habits, setHabits] = useState<HabitAssignment[]>([])
   const [optimisticUpdates, setOptimisticUpdates] = useState<Set<string>>(new Set())
@@ -327,7 +331,9 @@ export default function ClientHabitsPage() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen">
         <div className="p-4">
           <div className="max-w-4xl mx-auto space-y-6">
             
@@ -654,7 +660,7 @@ export default function ClientHabitsPage() {
             )}
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

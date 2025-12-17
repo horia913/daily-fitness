@@ -13,6 +13,7 @@ export type WorkoutBlockType =
   | 'amrap'            // As Many Rounds As Possible
   | 'emom'             // Every Minute On the Minute
   | 'tabata'           // 20s work / 10s rest protocol
+  | 'circuit'          // Circuit training with variable timing
   | 'for_time'         // Complete as fast as possible
   | 'ladder'           // Ascending/descending rep schemes
 
@@ -59,6 +60,7 @@ export interface WorkoutBlockExercise {
   sets?: number
   reps?: string
   weight_kg?: number
+  load_percentage?: number            // Percentage of 1RM for suggested weight
   rir?: number                        // Reps in reserve
   tempo?: string                      // Tempo notation
   rest_seconds?: number               // Exercise-specific rest
@@ -358,6 +360,20 @@ export const WORKOUT_BLOCK_CONFIGS: Record<WorkoutBlockType, WorkoutBlockConfig>
     icon: '⚡',
     color: 'amber',
     requiresMultipleExercises: false,
+    supportsTimeProtocols: true,
+    supportsDropSets: false,
+    supportsClusterSets: false,
+    supportsPyramidSets: false,
+    supportsRestPause: false,
+    supportsLadder: false
+  },
+  circuit: {
+    type: 'circuit',
+    name: 'Circuit',
+    description: 'Circuit training with variable timing per exercise',
+    icon: '🔄',
+    color: 'violet',
+    requiresMultipleExercises: true,
     supportsTimeProtocols: true,
     supportsDropSets: false,
     supportsClusterSets: false,

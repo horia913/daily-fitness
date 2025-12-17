@@ -8,7 +8,7 @@ interface WorkoutAssignment {
   id: string
   coach_id: string
   client_id: string
-  template_id: string
+  workout_template_id: string
   scheduled_date: string
   status: string
   notes?: string
@@ -75,7 +75,7 @@ export function useWorkoutAssignments(userId: string) {
                 id, name, description, estimated_duration, difficulty_level,
                 category:workout_categories(name, color)
               `)
-              .eq('id', assignment.template_id)
+              .eq('id', assignment.workout_template_id)
               .single()
 
             if (templateError) {
@@ -83,7 +83,7 @@ export function useWorkoutAssignments(userId: string) {
               return {
                 ...assignment,
                 template: {
-                  id: assignment.template_id,
+                id: assignment.workout_template_id,
                   name: 'Workout',
                   description: 'Your assigned workout',
                   estimated_duration: 30,
@@ -112,17 +112,18 @@ export function useWorkoutAssignments(userId: string) {
         // Get exercise count for each template
         const assignmentsWithCounts = await Promise.all(
           (data || []).map(async (assignment) => {
-            console.log(`Getting exercise count for template ${assignment.template_id}`)
+            const templateId = assignment.workout_template_id
+            console.log(`Getting exercise count for template ${templateId}`)
             const { count, error } = await supabase
               .from('workout_template_exercises')
               .select('*', { count: 'exact', head: true })
-              .eq('template_id', assignment.template_id)
+              .eq('template_id', templateId)
             
             if (error) {
-              console.error(`Error getting exercise count for template ${assignment.template_id}:`, error)
+              console.error(`Error getting exercise count for template ${templateId}:`, error)
             }
             
-            console.log(`Exercise count for template ${assignment.template_id}:`, count)
+            console.log(`Exercise count for template ${templateId}:`, count)
             
             return {
               ...assignment,

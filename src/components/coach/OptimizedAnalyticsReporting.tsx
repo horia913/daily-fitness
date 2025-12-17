@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -94,7 +96,7 @@ interface OptimizedAnalyticsReportingProps {
 }
 
 export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyticsReportingProps) {
-  const { isDark, getThemeStyles } = useTheme()
+  const { isDark, getThemeStyles, performanceSettings } = useTheme()
   const router = useRouter()
   const theme = getThemeStyles()
 
@@ -317,8 +319,10 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#E8E9F3', paddingBottom: '100px' }}>
-      {/* Enhanced Header */}
+    <AnimatedBackground>
+      {performanceSettings.floatingParticles && <FloatingParticles />}
+      <div style={{ minHeight: '100vh', paddingBottom: '100px' }}>
+        {/* Enhanced Header */}
       <div style={{ padding: '24px 20px', backgroundColor: '#E8E9F3', borderRadius: '24px' }}>
         {/* Floating background elements */}
         <div className="absolute inset-0 overflow-hidden">
@@ -743,6 +747,6 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
           </Tabs>
         </div>
       </div>
-    </div>
+    </AnimatedBackground>
   )
 }
