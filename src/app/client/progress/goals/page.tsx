@@ -18,20 +18,21 @@ export default function GoalsAndHabitsPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen">
-        <div className="p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* Back Button */}
-            <Button
-              onClick={() => router.push("/client/progress")}
-              variant="outline"
-              className="rounded-xl"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Progress
-            </Button>
+          <div className="p-4 sm:p-6">
+            <div className="max-w-7xl mx-auto space-y-6">
+              {/* Back Button */}
+              <Button
+                onClick={() => router.push("/client/progress")}
+                variant="outline"
+                className="rounded-xl"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Progress
+              </Button>
 
-            {/* Goals & Habits Component */}
-            <GoalsAndHabits loading={false} />
+              {/* Goals & Habits Component */}
+              <GoalsAndHabits loading={false} />
+            </div>
           </div>
         </div>
       </AnimatedBackground>
