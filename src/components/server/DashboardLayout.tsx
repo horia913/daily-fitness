@@ -109,7 +109,7 @@ export function DashboardLayout({
           {/* Static Content Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Tips Card */}
-            <Card className={`${theme.card} border ${theme.border}`}>
+            <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
                   <Lightbulb className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
@@ -128,7 +128,7 @@ export function DashboardLayout({
             </Card>
 
             {/* Motivation Card */}
-            <Card className={`${isDark ? 'bg-gradient-to-br from-indigo-900/20 to-purple-900/20 border-indigo-800' : 'bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200'}`}>
+            <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-200 dark:border-indigo-800">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
                   <Trophy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
@@ -219,7 +219,7 @@ export function DashboardLayout({
         {/* Static Content Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Coaching Tips */}
-          <Card className={`${theme.card} border ${theme.border}`}>
+          <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
                 <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -238,7 +238,7 @@ export function DashboardLayout({
           </Card>
 
           {/* Resources */}
-          <Card className={`${isDark ? 'bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border-emerald-800' : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200'}`}>
+          <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-emerald-200 dark:border-emerald-800">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
                 <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />

@@ -1717,6 +1717,7 @@ export default function CoachMealsPage() {
           )}
         </div>
       </div>
+      </div>
     </AnimatedBackground>
   );
 }

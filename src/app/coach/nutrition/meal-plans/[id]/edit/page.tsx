@@ -78,7 +78,7 @@ export default function EditMealPlanPage() {
         description: formData.description,
         target_calories: formData.target_calories
           ? parseInt(formData.target_calories)
-          : null,
+          : undefined,
       });
 
       // Navigate back to detail page

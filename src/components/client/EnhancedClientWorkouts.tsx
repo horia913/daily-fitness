@@ -30,6 +30,7 @@ import {
   ArrowRight,
   Lightbulb,
   X,
+  Video,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import WorkoutTemplateService, {
@@ -215,7 +216,9 @@ export default function EnhancedClientWorkouts({
           );
         } else {
           // Use WorkoutBlockService to fetch blocks (handles RLS properly)
-          const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
+          const { WorkoutBlockService } = await import(
+            "@/lib/workoutBlockService"
+          );
           const workoutBlocks = await WorkoutBlockService.getWorkoutBlocks(
             assignmentToUse.workout_template_id
           );
@@ -226,29 +229,31 @@ export default function EnhancedClientWorkouts({
             );
           } else {
             // Convert WorkoutBlock[] to ClientBlockRecord[] format
-            const clientBlocks: ClientBlockRecord[] = workoutBlocks.map((block) => ({
-              id: block.id,
-              block_order: block.block_order,
-              block_type: block.block_type,
-              block_name: block.block_name ?? null,
-              block_notes: block.block_notes ?? null,
-              total_sets: block.total_sets ?? null,
-              reps_per_set: block.reps_per_set ?? null,
-              rest_seconds: block.rest_seconds ?? null,
-              exercises: (block.exercises ?? []).map((ex) => ({
-                id: ex.id,
-                exercise_id: ex.exercise_id,
-                exercise_order: ex.exercise_order,
-                exercise_letter: ex.exercise_letter ?? null,
-                sets: ex.sets ?? null,
-                reps: ex.reps ?? null,
-                weight_kg: ex.weight_kg ?? null,
-                rir: ex.rir ?? null,
-                tempo: ex.tempo ?? null,
-                rest_seconds: ex.rest_seconds ?? null,
-                notes: ex.notes ?? null,
-              })) as any[],
-            }));
+            const clientBlocks: ClientBlockRecord[] = workoutBlocks.map(
+              (block) => ({
+                id: block.id,
+                block_order: block.block_order,
+                block_type: block.block_type,
+                block_name: block.block_name ?? null,
+                block_notes: block.block_notes ?? null,
+                total_sets: block.total_sets ?? null,
+                reps_per_set: block.reps_per_set ?? null,
+                rest_seconds: block.rest_seconds ?? null,
+                exercises: (block.exercises ?? []).map((ex) => ({
+                  id: ex.id,
+                  exercise_id: ex.exercise_id,
+                  exercise_order: ex.exercise_order,
+                  exercise_letter: ex.exercise_letter ?? null,
+                  sets: ex.sets ?? null,
+                  reps: ex.reps ?? null,
+                  weight_kg: ex.weight_kg ?? null,
+                  rir: ex.rir ?? null,
+                  tempo: ex.tempo ?? null,
+                  rest_seconds: ex.rest_seconds ?? null,
+                  notes: ex.notes ?? null,
+                })) as any[],
+              })
+            );
 
             const exerciseIds = Array.from(
               new Set(
@@ -321,7 +326,9 @@ export default function EnhancedClientWorkouts({
                         ? `${exercise.weight_kg} kg`
                         : undefined,
                     restSeconds:
-                      exercise.rest_seconds ?? block.rest_seconds ?? 60,
+                      (exercise as any).rest_seconds ??
+                      block.rest_seconds ??
+                      60,
                     progressionNotes:
                       exercise.rir !== null && exercise.rir !== undefined
                         ? `RIR ${exercise.rir}`
@@ -636,7 +643,7 @@ export default function EnhancedClientWorkouts({
 
       // Load workout history
       // Handle gracefully if new tables don't exist yet
-      let workoutHistory = [];
+      let workoutHistory: any[] = [];
       try {
         workoutHistory = await WorkoutTemplateService.getWorkoutHistory(
           clientId,
@@ -678,7 +685,7 @@ export default function EnhancedClientWorkouts({
 
       // Load completed programs
       // Handle gracefully if new tables don't exist yet
-      let completedProgramsData = [];
+      let completedProgramsData: any[] = [];
       try {
         completedProgramsData =
           await WorkoutTemplateService.getCompletedPrograms(clientId);
@@ -1403,14 +1410,16 @@ export default function EnhancedClientWorkouts({
                                             // Handle different exercise types and data scenarios
                                             if (
                                               exercise.reps &&
-                                              exercise.reps > 0
+                                              Number(exercise.reps) > 0
                                             ) {
                                               return `${exercise.sets} × ${
                                                 exercise.reps
                                               }${
-                                                exercise.weight &&
-                                                exercise.weight > 0
-                                                  ? ` @ ${exercise.weight}kg`
+                                                (exercise as any).weight &&
+                                                (exercise as any).weight > 0
+                                                  ? ` @ ${
+                                                      (exercise as any).weight
+                                                    }kg`
                                                   : ""
                                               }`;
                                             } else if (
@@ -1418,16 +1427,20 @@ export default function EnhancedClientWorkouts({
                                               exercise.sets > 0
                                             ) {
                                               return `${exercise.sets} sets${
-                                                exercise.weight &&
-                                                exercise.weight > 0
-                                                  ? ` @ ${exercise.weight}kg`
+                                                (exercise as any).weight &&
+                                                (exercise as any).weight > 0
+                                                  ? ` @ ${
+                                                      (exercise as any).weight
+                                                    }kg`
                                                   : ""
                                               }`;
                                             } else if (
-                                              exercise.weight &&
-                                              exercise.weight > 0
+                                              (exercise as any).weight &&
+                                              (exercise as any).weight > 0
                                             ) {
-                                              return `Weight: ${exercise.weight}kg`;
+                                              return `Weight: ${
+                                                (exercise as any).weight
+                                              }kg`;
                                             } else {
                                               return "Tap to view details";
                                             }
@@ -1495,8 +1508,11 @@ export default function EnhancedClientWorkouts({
                                                 </div>
                                                 <div className="mb-3">
                                                   • Rest:{" "}
-                                                  {exercise.rest_seconds}s
-                                                  between rounds
+                                                  {
+                                                    (exercise as any)
+                                                      .rest_seconds
+                                                  }
+                                                  s between rounds
                                                 </div>
 
                                                 {/* Individual exercises in Giant Set */}
@@ -1504,17 +1520,20 @@ export default function EnhancedClientWorkouts({
                                                   <div className="font-medium">
                                                     Exercises in this Giant Set:
                                                   </div>
-                                                  {exercise.notes_data?.giant_set_exercises?.map(
+                                                  {(
+                                                    exercise as any
+                                                  ).notes_data?.giant_set_exercises?.map(
                                                     (
                                                       ex: any,
                                                       exIndex: number
                                                     ) => {
-                                                      const exerciseDetail =
-                                                        exercise.exercise_details?.find(
-                                                          (ed: any) =>
-                                                            ed.id ===
-                                                            ex.exercise_id
-                                                        );
+                                                      const exerciseDetail = (
+                                                        exercise as any
+                                                      ).exercise_details?.find(
+                                                        (ed: any) =>
+                                                          ed.id ===
+                                                          ex.exercise_id
+                                                      );
                                                       return (
                                                         <div
                                                           key={exIndex}
@@ -1557,7 +1576,7 @@ export default function EnhancedClientWorkouts({
                                                               }
                                                               className="text-xs px-2 py-1 h-6"
                                                             >
-                                                              <RefreshCw className="w-3 h-3" />
+                                                              <RefreshCcw className="w-3 h-3" />
                                                             </Button>
                                                           </div>
                                                         </div>
@@ -1590,8 +1609,11 @@ export default function EnhancedClientWorkouts({
                                                 </div>
                                                 <div className="mb-3">
                                                   • Rest:{" "}
-                                                  {exercise.rest_seconds}s
-                                                  between supersets
+                                                  {
+                                                    (exercise as any)
+                                                      .rest_seconds
+                                                  }
+                                                  s between supersets
                                                 </div>
 
                                                 {/* Individual exercises in Superset */}
@@ -1603,11 +1625,15 @@ export default function EnhancedClientWorkouts({
                                                   <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-700 rounded-lg p-2">
                                                     <div className="flex-1">
                                                       <div className="font-medium">
-                                                        {exerciseTemplate.exercise_name ||
+                                                        {(exercise as any)
+                                                          .exercise_name ||
+                                                          (exercise as any)
+                                                            .exercise?.name ||
                                                           "Exercise A"}
                                                       </div>
                                                       <div className="text-xs text-slate-500">
-                                                        {exercise.notes_data
+                                                        {(exercise as any)
+                                                          .notes_data
                                                           ?.exercise_a ||
                                                           exercise.reps}{" "}
                                                         reps
@@ -1619,42 +1645,50 @@ export default function EnhancedClientWorkouts({
                                                         variant="outline"
                                                         onClick={() =>
                                                           showExerciseAlternatives(
-                                                            exerciseTemplate.exercise_id
+                                                            exercise.exerciseId ||
+                                                              (exercise as any)
+                                                                .exercise_id
                                                           )
                                                         }
                                                         className="text-xs px-2 py-1 h-6"
                                                       >
-                                                        <RefreshCw className="w-3 h-3" />
+                                                        <RefreshCcw className="w-3 h-3" />
                                                       </Button>
                                                     </div>
                                                   </div>
                                                   {/* Exercise B (superset partner) */}
-                                                  {exercise.notes_data
+                                                  {(exercise as any).notes_data
                                                     ?.superset_exercise_id && (
                                                     <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-700 rounded-lg p-2">
                                                       <div className="flex-1">
                                                         <div className="font-medium">
-                                                          {exercise.exercise_details?.find(
+                                                          {(
+                                                            exercise as any
+                                                          ).exercise_details?.find(
                                                             (ed: any) =>
                                                               ed.id ===
-                                                              exercise
+                                                              (exercise as any)
                                                                 .notes_data
                                                                 .superset_exercise_id
                                                           )?.name ||
                                                             "Exercise B"}
                                                         </div>
                                                         <div className="text-xs text-slate-500">
-                                                          {exercise.notes_data
+                                                          {(exercise as any)
+                                                            .notes_data
                                                             ?.exercise_b ||
                                                             "N/A"}{" "}
                                                           reps
                                                         </div>
                                                       </div>
                                                       <div className="flex gap-1">
-                                                        {exercise.exercise_details?.find(
+                                                        {(
+                                                          exercise as any
+                                                        ).exercise_details?.find(
                                                           (ed: any) =>
                                                             ed.id ===
-                                                            exercise.notes_data
+                                                            (exercise as any)
+                                                              .notes_data
                                                               .superset_exercise_id
                                                         )?.video_url && (
                                                           <Button
@@ -1662,11 +1696,14 @@ export default function EnhancedClientWorkouts({
                                                             variant="outline"
                                                             onClick={() =>
                                                               window.open(
-                                                                exercise.exercise_details.find(
+                                                                (
+                                                                  exercise as any
+                                                                ).exercise_details.find(
                                                                   (ed: any) =>
                                                                     ed.id ===
-                                                                    exercise
-                                                                      .notes_data
+                                                                    (
+                                                                      exercise as any
+                                                                    ).notes_data
                                                                       .superset_exercise_id
                                                                 ).video_url,
                                                                 "_blank"
@@ -1682,14 +1719,14 @@ export default function EnhancedClientWorkouts({
                                                           variant="outline"
                                                           onClick={() =>
                                                             showExerciseAlternatives(
-                                                              exercise
+                                                              (exercise as any)
                                                                 .notes_data
                                                                 .superset_exercise_id
                                                             )
                                                           }
                                                           className="text-xs px-2 py-1 h-6"
                                                         >
-                                                          <RefreshCw className="w-3 h-3" />
+                                                          <RefreshCcw className="w-3 h-3" />
                                                         </Button>
                                                       </div>
                                                     </div>
@@ -1714,8 +1751,11 @@ export default function EnhancedClientWorkouts({
                                                 </div>
                                                 <div className="mb-3">
                                                   • Rest:{" "}
-                                                  {exercise.rest_seconds}s
-                                                  between rounds
+                                                  {
+                                                    (exercise as any)
+                                                      .rest_seconds
+                                                  }
+                                                  s between rounds
                                                 </div>
 
                                                 {/* Individual exercises in Circuit */}
@@ -1723,17 +1763,20 @@ export default function EnhancedClientWorkouts({
                                                   <div className="font-medium">
                                                     Exercises in this Circuit:
                                                   </div>
-                                                  {exercise.notes_data?.circuit_sets?.map(
+                                                  {(
+                                                    exercise as any
+                                                  ).notes_data?.circuit_sets?.map(
                                                     (
                                                       ex: any,
                                                       exIndex: number
                                                     ) => {
-                                                      const exerciseDetail =
-                                                        exercise.exercise_details?.find(
-                                                          (ed: any) =>
-                                                            ed.id ===
-                                                            ex.exercise_id
-                                                        );
+                                                      const exerciseDetail = (
+                                                        exercise as any
+                                                      ).exercise_details?.find(
+                                                        (ed: any) =>
+                                                          ed.id ===
+                                                          ex.exercise_id
+                                                      );
                                                       return (
                                                         <div
                                                           key={exIndex}
@@ -1778,7 +1821,7 @@ export default function EnhancedClientWorkouts({
                                                               }
                                                               className="text-xs px-2 py-1 h-6"
                                                             >
-                                                              <RefreshCw className="w-3 h-3" />
+                                                              <RefreshCcw className="w-3 h-3" />
                                                             </Button>
                                                           </div>
                                                         </div>
@@ -1808,8 +1851,11 @@ export default function EnhancedClientWorkouts({
                                                 </div>
                                                 <div>
                                                   • Rest:{" "}
-                                                  {exercise.rest_seconds}s
-                                                  between exercises
+                                                  {
+                                                    (exercise as any)
+                                                      .rest_seconds
+                                                  }
+                                                  s between exercises
                                                 </div>
                                               </div>
                                             );
@@ -1848,8 +1894,11 @@ export default function EnhancedClientWorkouts({
                                                 </div>
                                                 <div>
                                                   • Rest:{" "}
-                                                  {exercise.rest_seconds}s
-                                                  between sets
+                                                  {
+                                                    (exercise as any)
+                                                      .rest_seconds
+                                                  }
+                                                  s between sets
                                                 </div>
                                               </div>
                                             );
@@ -1865,18 +1914,23 @@ export default function EnhancedClientWorkouts({
                                                 </div>
                                                 <div>
                                                   • Reps:{" "}
-                                                  {exercise.reps > 0
+                                                  {Number(exercise.reps) > 0
                                                     ? exercise.reps
                                                     : "To failure"}
                                                 </div>
                                                 <div>
                                                   • Rest:{" "}
-                                                  {exercise.rest_seconds}s
-                                                  between sets
+                                                  {
+                                                    (exercise as any)
+                                                      .rest_seconds
+                                                  }
+                                                  s between sets
                                                 </div>
-                                                {exercise.weight > 0 && (
+                                                {(exercise as any).weight >
+                                                  0 && (
                                                   <div>
-                                                    • Weight: {exercise.weight}
+                                                    • Weight:{" "}
+                                                    {(exercise as any).weight}
                                                     kg
                                                   </div>
                                                 )}
@@ -2382,18 +2436,24 @@ export default function EnhancedClientWorkouts({
                               <Trophy className="w-6 h-6 text-white" />
                             </div>
                             <Badge className="bg-gradient-to-r from-green-600 to-emerald-600 text-white border-0 px-3 py-1">
-                              {program.completion_percentage}% Complete
+                              {(program as any).completion_percentage ||
+                                Math.round(
+                                  (program.current_week / program.total_weeks) *
+                                    100
+                                )}
+                              % Complete
                             </Badge>
                           </div>
                           <h4
                             className={`font-bold text-lg mb-2 ${theme.text}`}
                           >
-                            {program.program_name}
+                            {(program as any).program_name || program.name}
                           </h4>
                           <p
                             className={`text-sm ${theme.textSecondary} mb-4 line-clamp-2`}
                           >
-                            {program.program_description}
+                            {(program as any).program_description ||
+                              program.description}
                           </p>
                           <div className="space-y-2 text-sm">
                             <div className="flex items-center justify-between">
@@ -2417,7 +2477,7 @@ export default function EnhancedClientWorkouts({
                                 Workouts:
                               </span>
                               <span className={theme.text}>
-                                {program.total_workouts_completed}
+                                {(program as any).total_workouts_completed || 0}
                               </span>
                             </div>
                             <div className="flex items-center justify-between">
@@ -2426,7 +2486,7 @@ export default function EnhancedClientWorkouts({
                               </span>
                               <span className={theme.text}>
                                 {new Date(
-                                  program.completed_date
+                                  (program as any).completed_date || new Date()
                                 ).toLocaleDateString()}
                               </span>
                             </div>
@@ -2437,14 +2497,27 @@ export default function EnhancedClientWorkouts({
                                 Progress
                               </span>
                               <span className={theme.text}>
-                                {program.completion_percentage}%
+                                {(program as any).completion_percentage ||
+                                  Math.round(
+                                    (program.current_week /
+                                      program.total_weeks) *
+                                      100
+                                  )}
+                                %
                               </span>
                             </div>
                             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                               <div
                                 className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
                                 style={{
-                                  width: `${program.completion_percentage}%`,
+                                  width: `${
+                                    (program as any).completion_percentage ||
+                                    Math.round(
+                                      (program.current_week /
+                                        program.total_weeks) *
+                                        100
+                                    )
+                                  }%`,
                                 }}
                               ></div>
                             </div>
@@ -2849,10 +2922,14 @@ export default function EnhancedClientWorkouts({
                                   <span
                                     className={`text-sm ${theme.textSecondary}`}
                                   >
-                                    {
-                                      alternative.alternative_exercise?.category
-                                        ?.name
-                                    }
+                                    {typeof alternative.alternative_exercise
+                                      ?.category === "string"
+                                      ? alternative.alternative_exercise
+                                          .category
+                                      : (
+                                          alternative.alternative_exercise
+                                            ?.category as any
+                                        )?.name}
                                   </span>
                                 </div>
                               </div>

@@ -111,9 +111,7 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
     : null;
 
   return (
-    <GlassCard
-      elevation={2}
-      className="p-6 transition-all duration-300 hover:shadow-xl"
+    <div
       style={{
         background: isDark
           ? `rgba(255,255,255,${isCompleted ? "0.08" : "0.05"})`
@@ -122,6 +120,10 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
           ? "1px solid rgba(255,255,255,0.1)"
           : "1px solid rgba(0,0,0,0.1)",
       }}
+    >
+    <GlassCard
+      elevation={2}
+      className="p-6 transition-all duration-300 hover:shadow-xl"
     >
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
@@ -303,6 +305,7 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
         )}
       </div>
     </GlassCard>
+    </div>
   );
 }
 

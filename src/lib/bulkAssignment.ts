@@ -244,6 +244,11 @@ export class BulkAssignmentManager {
       suggestions.push('Consider creating a template for this bulk assignment for future use')
     }
 
+    // Calculate totalClients for suggestions (count unique clients across all items)
+    const totalClients = operationData.items 
+      ? new Set(operationData.items.flatMap(item => item.client_ids || [])).size
+      : 0
+
     if (totalClients > 20) {
       suggestions.push('Consider scheduling this operation during off-peak hours')
     }
@@ -509,12 +514,12 @@ export class BulkAssignmentManager {
     const successRate = totalOperations > 0 ? (completedOperations / totalOperations) * 100 : 0
 
     return {
-      totalOperations,
-      completedOperations,
-      failedOperations,
-      pendingOperations,
-      totalItemsAssigned,
-      successRate
+      total_operations: totalOperations,
+      completed_operations: completedOperations,
+      failed_operations: failedOperations,
+      pending_operations: pendingOperations,
+      total_items_assigned: totalItemsAssigned,
+      success_rate: successRate
     }
   }
 

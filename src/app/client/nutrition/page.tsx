@@ -273,13 +273,13 @@ function NutritionDashboardContent() {
           type: meal.meal_type,
           name: meal.name,
           emoji:
-            (meal.meal_type === "breakfast"
+            meal.meal_type === "breakfast"
               ? "🍳"
               : meal.meal_type === "lunch"
               ? "🥗"
               : meal.meal_type === "dinner"
               ? "🍽️"
-              : "🍎") || "🍽️",
+              : "🍎",
           items: mappedFoodItems,
           logged: !!(completions && completions.length > 0),
           photoUrl:

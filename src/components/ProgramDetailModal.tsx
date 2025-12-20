@@ -74,7 +74,8 @@ interface ProgramDetailModalProps {
 }
 
 export default function ProgramDetailModal({ isOpen, onClose, program, onEdit }: ProgramDetailModalProps) {
-  const { theme, isDark } = useTheme()
+  const { isDark, getThemeStyles } = useTheme()
+  const theme = getThemeStyles()
   const [loading, setLoading] = useState(false)
   const [programDetails, setProgramDetails] = useState<WorkoutProgram | null>(null)
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])

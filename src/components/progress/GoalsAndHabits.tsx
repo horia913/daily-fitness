@@ -271,6 +271,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
           type: "bench_press",
           targetValue: 0,
           currentValue: 0,
+          bodyPart: "total" as Goal["bodyPart"],
           deadline: "",
         });
         setShowCreateGoal(false);
@@ -970,6 +971,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                           type: goalType.type as Goal["type"],
                           targetValue: 0,
                           currentValue: 0,
+                          bodyPart: "total" as Goal["bodyPart"],
                           deadline: "",
                         })
                       }

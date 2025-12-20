@@ -83,7 +83,7 @@ export default function DailyAdherenceLog({ clientId, clientName, dailyLogs }: D
     {
       date: '2024-01-11',
       workout: { completed: true, duration: 50, notes: 'Good form today' },
-      nutrition: { logged: false, notes: 'Forgot to log' },
+      nutrition: { logged: false, mealsLogged: 0, notes: 'Forgot to log' },
       habit: { completed: true, habitsCompleted: 3, notes: 'Partial completion' },
       session: { attended: true, duration: 35, notes: 'Detailed discussion' }
     },
@@ -91,7 +91,7 @@ export default function DailyAdherenceLog({ clientId, clientName, dailyLogs }: D
       date: '2024-01-10',
       workout: { completed: true, duration: 40, notes: 'Light workout' },
       nutrition: { logged: true, mealsLogged: 3, notes: 'All meals logged' },
-      habit: { completed: false, notes: 'Missed morning routine' },
+      habit: { completed: false, habitsCompleted: 0, notes: 'Missed morning routine' },
       session: { attended: true, duration: 20, notes: 'Brief update' }
     }
   ]

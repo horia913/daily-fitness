@@ -28,26 +28,25 @@ export default function NotificationBell() {
     return () => clearInterval(interval)
   }, [])
 
-  const updateUnreadCount = () => {
-    const count = notificationService.getUnreadCount()
+  const updateUnreadCount = async () => {
+    const count = await notificationService.getUnreadCount()
     setUnreadCount(count)
   }
 
   const handleBellClick = async () => {
     if (!permissionGranted) {
       try {
-        const permission = await notificationService.requestPermission()
-        setPermissionGranted(permission.granted)
-        
-        if (permission.granted) {
-          // Send a welcome notification
-          await notificationService.sendNotification({
-            type: 'message',
-            title: '🔔 Notifications Enabled!',
-            body: 'You\'ll now receive workout reminders and achievement notifications.',
-            userId: 'current-user-id'
-          })
-          updateUnreadCount()
+        if ('Notification' in window) {
+          const permission = await Notification.requestPermission()
+          setPermissionGranted(permission === 'granted')
+          
+          if (permission === 'granted') {
+            // Send a welcome notification
+            new Notification('🔔 Notifications Enabled!', {
+              body: 'You\'ll now receive workout reminders and achievement notifications.',
+            })
+            updateUnreadCount()
+          }
         }
       } catch (error) {
         console.error('Error requesting notification permission:', error)

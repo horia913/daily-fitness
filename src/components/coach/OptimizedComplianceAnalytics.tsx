@@ -67,7 +67,6 @@ import {
   Scale,
   Ruler,
   Weight,
-  Muscle,
   Target as TargetIcon,
   TrendingUp as TrendingUpIcon,
   Calendar as CalendarIcon,
@@ -75,7 +74,6 @@ import {
   Phone,
   Mail,
   MapPin,
-  Birthday,
   UserCheck,
   UserX,
   Edit,
@@ -89,25 +87,7 @@ import {
   CirclePause,
   CirclePlay,
   CircleStop,
-  CircleHelp,
-  CircleInfo,
-  CircleQuestion,
-  CircleWarning,
-  CircleExclamation,
-  CircleCheckBig,
-  CircleXBig,
-  CircleAlertBig,
-  CircleMinusBig,
-  CirclePlusBig,
-  CircleDotBig,
-  CirclePauseBig,
-  CirclePlayBig,
-  CircleStopBig,
-  CircleHelpBig,
-  CircleInfoBig,
-  CircleQuestionBig,
-  CircleWarningBig,
-  CircleExclamationBig
+  CircleHelp
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -254,15 +234,16 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
         email: client.email || 'no-email@example.com',
         join_date: client.created_at?.split('T')[0] || '2024-01-01',
         program: 'General Fitness',
-        goals: ['Stay healthy']
+        goals: ['Stay healthy'],
+        compliance_status: 'on_track' as const
       },
       overallCompliance: Math.floor(Math.random() * 30) + 70,
       workoutCompliance: Math.floor(Math.random() * 30) + 70,
       nutritionCompliance: Math.floor(Math.random() * 30) + 70,
       habitCompliance: Math.floor(Math.random() * 30) + 70,
-      trend: Math.random() > 0.5 ? 'up' : 'down',
-      lastActive: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-      riskLevel: Math.random() > 0.7 ? 'at_risk' : Math.random() > 0.5 ? 'on_track' : 'needs_attention'
+      lastActivity: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+      streakDays: Math.floor(Math.random() * 14),
+      missedDays: Math.floor(Math.random() * 5)
     }))
   }
 

@@ -36,7 +36,7 @@ export default function ComplianceSummaryWidget({ clients, selectedPeriod }: Com
       : 0
     const totalAlerts = clients.reduce((sum, c) => sum + c.alerts.length, 0)
     const criticalAlerts = clients.reduce((sum, c) => 
-      sum + c.alerts.filter(a => a.alert_level === 'critical').length, 0
+      sum + c.alerts.filter((a: any) => a.alert_level === 'critical').length, 0
     )
 
     // Calculate compliance distribution

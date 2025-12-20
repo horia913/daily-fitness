@@ -179,7 +179,7 @@ export default function WorkoutLogsPage() {
             console.error("Error fetching sets for log:", log.id, setsError);
           }
 
-          const workoutSets = (sets || []) as WorkoutSet[];
+          const workoutSets = (sets || []) as any[];
           
           // Calculate totals from sets (or use database totals as fallback)
           const calculatedTotalSets = workoutSets.length;
@@ -439,11 +439,14 @@ export default function WorkoutLogsPage() {
                   }
 
                   return (
-                    <GlassCard
+                    <div
                       key={log.id}
-                      elevation={2}
-                      className="p-6 transition-all hover:scale-[1.01] cursor-pointer hover:shadow-xl"
                       onClick={() => router.push(`/client/progress/workout-logs/${log.id}`)}
+                      className="cursor-pointer"
+                    >
+                    <GlassCard
+                      elevation={2}
+                      className="p-6 transition-all hover:scale-[1.01] hover:shadow-xl"
                     >
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
@@ -580,6 +583,7 @@ export default function WorkoutLogsPage() {
                         </div>
                       )}
                     </GlassCard>
+                    </div>
                   );
                 })}
               </div>

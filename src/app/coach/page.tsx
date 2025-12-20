@@ -190,7 +190,7 @@ function CoachDashboardContent() {
             </div>
             <AnimatedNumber
               value={stats.totalClients}
-              size="4xl"
+              size="heroLg"
               weight="bold"
               color={getSemanticColor("trust").primary}
             />
@@ -223,7 +223,7 @@ function CoachDashboardContent() {
             <div className="flex items-baseline gap-2">
               <AnimatedNumber
                 value={stats.activeClients}
-                size="4xl"
+                size="heroLg"
                 weight="bold"
                 color={getSemanticColor("success").primary}
               />
@@ -260,7 +260,7 @@ function CoachDashboardContent() {
             </div>
             <AnimatedNumber
               value={stats.totalWorkouts}
-              size="4xl"
+              size="heroLg"
               weight="bold"
               color={getSemanticColor("trust").primary}
             />
@@ -290,7 +290,7 @@ function CoachDashboardContent() {
             </div>
             <AnimatedNumber
               value={stats.totalMealPlans}
-              size="4xl"
+              size="heroLg"
               weight="bold"
               color={getSemanticColor("energy").primary}
             />

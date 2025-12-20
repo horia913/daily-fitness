@@ -111,23 +111,24 @@ export default function CoachProfilePage() {
 
       if (data) {
         setProfile(data);
+        const profileData = data as any
         setFormData({
-          first_name: data?.first_name || "",
-          last_name: data?.last_name || "",
-          email: data?.email || "",
-          bio: data?.bio || "",
-          phone: data?.phone || "",
-          date_of_birth: data?.date_of_birth || "",
-          specialization: data?.specialization || [],
-          certifications: data?.certifications || [],
-          experience_years: data?.experience_years || "",
-          location: data?.location || "",
-          hourly_rate: data?.hourly_rate || "",
-          availability: data?.availability || "",
-          languages: data?.languages || [],
-          emergency_contact: data?.emergency_contact || "",
-          medical_conditions: data?.medical_conditions || "",
-          injuries: data?.injuries || "",
+          first_name: profileData?.first_name || "",
+          last_name: profileData?.last_name || "",
+          email: profileData?.email || "",
+          bio: profileData?.bio || "",
+          phone: profileData?.phone || "",
+          date_of_birth: profileData?.date_of_birth || "",
+          specialization: profileData?.specialization || [],
+          certifications: profileData?.certifications || [],
+          experience_years: profileData?.experience_years || "",
+          location: profileData?.location || "",
+          hourly_rate: profileData?.hourly_rate || "",
+          availability: profileData?.availability || "",
+          languages: profileData?.languages || [],
+          emergency_contact: profileData?.emergency_contact || "",
+          medical_conditions: profileData?.medical_conditions || "",
+          injuries: profileData?.injuries || "",
         });
       }
     } catch (error) {
@@ -171,8 +172,8 @@ export default function CoachProfilePage() {
         console.error("Upload error:", uploadError);
         console.error("Error details:", {
           message: uploadError.message,
-          statusCode: uploadError.statusCode,
-          error: uploadError.error,
+          statusCode: (uploadError as any).statusCode,
+          error: (uploadError as any).error,
         });
 
         if (uploadError.message.includes("row-level security policy")) {

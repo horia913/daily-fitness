@@ -272,7 +272,7 @@ export class DynamicSummaryGenerator {
     }
 
     // Consistency highlight
-    if (comparison?.weeklyProgress.workoutsThisWeek >= 3) {
+    if (comparison?.weeklyProgress?.workoutsThisWeek && comparison.weeklyProgress.workoutsThisWeek >= 3) {
       highlights.push(`${comparison.weeklyProgress.workoutsThisWeek} workouts this week! 🔥`)
     }
 
@@ -319,7 +319,7 @@ export class DynamicSummaryGenerator {
     }
 
     // Consistency insight
-    if (comparison?.weeklyProgress.workoutsThisWeek >= 4) {
+    if (comparison?.weeklyProgress?.workoutsThisWeek && comparison.weeklyProgress.workoutsThisWeek >= 4) {
       insights.push({
         type: 'motivation',
         title: 'Consistency King!',

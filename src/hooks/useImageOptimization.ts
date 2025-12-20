@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { ImageTransform } from '@/lib/imageTransform'
+import { ImageTransform, IMAGE_QUALITY } from '@/lib/imageTransform'
 
 interface UseImageOptimizationOptions {
   src: string
@@ -49,7 +49,7 @@ export function useImageOptimization({
       ? ImageTransform.getOptimizedImageUrl(src, {
           width,
           height,
-          quality: ImageTransform.IMAGE_QUALITY[quality],
+          quality: IMAGE_QUALITY[quality.toUpperCase() as keyof typeof IMAGE_QUALITY],
           format,
           resize: 'cover'
         })
@@ -72,7 +72,7 @@ export function useImageOptimization({
 
     try {
       const dimensions = await ImageTransform.getImageDimensions(src)
-      setState(prev => ({ ...prev, dimensions }))
+      setState(prev => ({ ...prev, dimensions: dimensions || undefined }))
     } catch (error) {
       console.warn('Failed to get image dimensions:', error)
     }

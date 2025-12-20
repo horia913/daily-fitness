@@ -25,15 +25,15 @@ interface NotificationCenterProps {
 
 const getNotificationIcon = (type: NotificationData['type']) => {
   switch (type) {
-    case 'workout_reminder':
+    case 'reminder':
       return <Clock className="w-4 h-4 text-blue-600" />
     case 'achievement':
       return <Trophy className="w-4 h-4 text-yellow-600" />
-    case 'message':
-      return <MessageCircle className="w-4 h-4 text-green-600" />
-    case 'workout_complete':
+    case 'workout':
       return <Dumbbell className="w-4 h-4 text-purple-600" />
-    case 'goal_reminder':
+    case 'session':
+      return <MessageCircle className="w-4 h-4 text-green-600" />
+    case 'general':
       return <Target className="w-4 h-4 text-orange-600" />
     default:
       return <Bell className="w-4 h-4 text-slate-600" />
@@ -42,15 +42,15 @@ const getNotificationIcon = (type: NotificationData['type']) => {
 
 const getNotificationColor = (type: NotificationData['type']) => {
   switch (type) {
-    case 'workout_reminder':
+    case 'reminder':
       return 'bg-blue-100 text-blue-800'
     case 'achievement':
       return 'bg-yellow-100 text-yellow-800'
-    case 'message':
+    case 'session':
       return 'bg-green-100 text-green-800'
-    case 'workout_complete':
+    case 'workout':
       return 'bg-purple-100 text-purple-800'
-    case 'goal_reminder':
+    case 'general':
       return 'bg-orange-100 text-orange-800'
     default:
       return 'bg-slate-100 text-slate-800'
@@ -86,13 +86,13 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
     }
   }, [isOpen])
 
-  const loadNotifications = () => {
+  const loadNotifications = async () => {
     setLoading(true)
     try {
-      const allNotifications = notificationService.getNotifications()
-      const unreadCount = notificationService.getUnreadCount()
+      const unreadCount = await notificationService.getUnreadCount()
       
-      setNotifications(allNotifications)
+      // For now, use empty array as notifications are handled server-side
+      setNotifications([])
       setUnreadCount(unreadCount)
     } catch (error) {
       console.error('Error loading notifications:', error)
@@ -106,15 +106,22 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
     loadNotifications()
   }
 
-  const handleMarkAllAsRead = () => {
-    notificationService.markAllAsRead()
-    loadNotifications()
+  const handleMarkAllAsRead = async () => {
+    // Mark all notifications as read individually
+    notifications.forEach(notification => {
+      notificationService.markAsRead(notification.id)
+    })
+    await loadNotifications()
   }
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (confirm('Are you sure you want to clear all notifications?')) {
-      notificationService.clearAllNotifications()
-      loadNotifications()
+      // Mark all notifications as read to clear them
+      notifications.forEach(notification => {
+        notificationService.markAsRead(notification.id)
+      })
+      setNotifications([])
+      await loadNotifications()
     }
   }
 
@@ -208,14 +215,14 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                               {notification.title}
                             </h4>
                             <p className="text-sm text-slate-600 mb-2 line-clamp-2">
-                              {notification.body}
+                              {notification.message}
                             </p>
                             <div className="flex items-center gap-2">
                               <Badge className={`text-xs ${getNotificationColor(notification.type)}`}>
                                 {notification.type.replace('_', ' ')}
                               </Badge>
                               <span className="text-xs text-slate-500">
-                                {formatTimestamp(notification.timestamp)}
+                                {formatTimestamp(notification.timestamp instanceof Date ? notification.timestamp.getTime() : new Date(notification.timestamp).getTime())}
                               </span>
                             </div>
                           </div>

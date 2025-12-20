@@ -88,15 +88,18 @@ export default function ProgramCard({
   const difficultyColor = getDifficultyColor(program.difficulty_level);
 
   return (
-    <GlassCard
-      elevation={2}
-      className="overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.02]"
-      onClick={onOpenDetails}
+    <div 
+      onClick={onOpenDetails} 
+      className="cursor-pointer"
       style={{
         boxShadow: isDark
           ? "0 4px 12px rgba(0,0,0,0.3)"
           : "0 4px 12px rgba(0,0,0,0.1)",
       }}
+    >
+    <GlassCard
+      elevation={2}
+      className="overflow-hidden transition-all duration-300 hover:scale-[1.02]"
     >
       {/* Header with gradient background */}
       <div
@@ -352,5 +355,6 @@ export default function ProgramCard({
         </div>
       </div>
     </GlassCard>
+    </div>
   );
 }

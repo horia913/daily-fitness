@@ -44,6 +44,7 @@ import {
   Send,
   BarChart3,
   TrendingUp,
+  TrendingDown,
   BookOpen,
   Library,
   Tag,
@@ -175,7 +176,7 @@ export default function CoachHabitsManagement() {
       setHabits([
         {
           id: '1',
-          coach_id: user.id,
+          coach_id: user?.id || '',
           category_id: '1',
           name: 'Drink Water',
           description: 'Stay hydrated by drinking enough water throughout the day',
@@ -191,7 +192,7 @@ export default function CoachHabitsManagement() {
         },
         {
           id: '2',
-          coach_id: user.id,
+          coach_id: user?.id || '',
           category_id: '2',
           name: 'Morning Meditation',
           description: 'Start your day with 10 minutes of mindfulness meditation',
@@ -207,7 +208,7 @@ export default function CoachHabitsManagement() {
         },
         {
           id: '3',
-          coach_id: user.id,
+          coach_id: user?.id || '',
           category_id: '3',
           name: 'Strength Training',
           description: 'Complete strength training workouts 3 times per week',
@@ -334,7 +335,7 @@ export default function CoachHabitsManagement() {
     try {
       const newHabit: Habit = {
         id: Date.now().toString(),
-        coach_id: user.id,
+        coach_id: user?.id || '',
         category_id: habitForm.category_id,
         name: habitForm.name,
         description: habitForm.description,
@@ -566,7 +567,7 @@ export default function CoachHabitsManagement() {
       id: `user-habit-${habit.id}-${client.id}`,
       user_id: client.id,
       habit_id: habit.id,
-      coach_id: user.id,
+      coach_id: user?.id || '',
       custom_name: habit.name,
       custom_description: habit.description,
       target_value: habit.target_value,
@@ -2259,6 +2260,7 @@ export default function CoachHabitsManagement() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </AnimatedBackground>
     </ProtectedRoute>
   )

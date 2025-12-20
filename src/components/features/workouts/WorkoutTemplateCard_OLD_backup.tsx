@@ -74,11 +74,14 @@ export default function WorkoutTemplateCard({
   const getPrimaryCategory = () => {
     if (template.exercises && template.exercises.length > 0) {
       const firstExercise = template.exercises[0];
+      const category = firstExercise.exercise?.category;
       return (
-        firstExercise.exercise?.category?.name || template.category || "General"
+        (typeof category === 'string' ? category : (category as any)?.name) || 
+        (typeof template.category === 'string' ? template.category : (template.category as any)?.name) || 
+        "General"
       );
     }
-    return template.category || "General";
+    return typeof template.category === 'string' ? template.category : (template.category as any)?.name || "General";
   };
 
   const primaryCategory = getPrimaryCategory();

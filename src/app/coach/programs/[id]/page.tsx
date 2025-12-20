@@ -264,7 +264,7 @@ function ProgramDetailsContent() {
               </div>
               <AnimatedNumber
                 value={program.duration_weeks}
-                size="2xl"
+                size="h2"
                 weight="bold"
                 color={isDark ? "#fff" : "#1A1A1A"}
               />
@@ -292,7 +292,7 @@ function ProgramDetailsContent() {
               </div>
               <AnimatedNumber
                 value={0}
-                size="2xl"
+                size="h2"
                 weight="bold"
                 color={isDark ? "#fff" : "#1A1A1A"}
               />
@@ -320,7 +320,7 @@ function ProgramDetailsContent() {
               </div>
               <AnimatedNumber
                 value={program.duration_weeks}
-                size="2xl"
+                size="h2"
                 weight="bold"
                 color={isDark ? "#fff" : "#1A1A1A"}
               />

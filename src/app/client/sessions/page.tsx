@@ -70,7 +70,6 @@ import {
   Timer,
   Play,
   Pause,
-  Stop,
   SkipForward,
   SkipBack,
   Volume2,
@@ -106,7 +105,6 @@ import {
   Timer as TimerIcon,
   Play as PlayIcon,
   Pause as PauseIcon,
-  Stop as StopIcon,
   SkipForward as SkipForwardIcon,
   SkipBack as SkipBackIcon,
   Volume2 as Volume2Icon,
@@ -1102,6 +1100,7 @@ export default function ClientSessions() {
             </div>
           </div>
         )}
+        </div>
       </AnimatedBackground>
     </ProtectedRoute>
   )

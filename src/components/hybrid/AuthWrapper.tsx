@@ -262,10 +262,17 @@ export function AuthWrapper() {
 
         if (data.user) {
           // Update invite code usage
+          // Fetch current used_count first
+          const { data: inviteData } = await supabase
+            .from("invite_codes")
+            .select("used_count")
+            .eq("code", inviteCode.trim())
+            .single();
+          
           await supabase
             .from("invite_codes")
             .update({
-              used_count: supabase.raw("used_count + 1"),
+              used_count: (inviteData?.used_count || 0) + 1,
               last_used_at: new Date().toISOString(),
             })
             .eq("code", inviteCode.trim());

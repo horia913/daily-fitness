@@ -43,8 +43,7 @@ export function WorkoutCompletionModal({
   onShare,
   onContinue,
 }: WorkoutCompletionModalProps) {
-  const { theme, getSemanticColor } = useTheme();
-  const isDark = theme === "dark";
+  const { isDark, getSemanticColor } = useTheme();
   const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
@@ -181,7 +180,7 @@ export function WorkoutCompletionModal({
               </div>
               <AnimatedNumber
                 value={stats.duration}
-                size="2xl"
+                size="h2"
                 weight="bold"
                 color={getSemanticColor("trust").primary}
                 suffix=" min"
@@ -215,7 +214,7 @@ export function WorkoutCompletionModal({
               </div>
               <AnimatedNumber
                 value={stats.calories}
-                size="2xl"
+                size="h2"
                 weight="bold"
                 color={getSemanticColor("energy").primary}
               />
@@ -248,7 +247,7 @@ export function WorkoutCompletionModal({
               </div>
               <AnimatedNumber
                 value={stats.exercises}
-                size="2xl"
+                size="h2"
                 weight="bold"
                 color={getSemanticColor("success").primary}
               />

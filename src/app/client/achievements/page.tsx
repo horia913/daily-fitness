@@ -1040,6 +1040,7 @@ export default function ClientAchievements() {
             </div>
           </div>
         </div>
+        </div>
       </AnimatedBackground>
     </ProtectedRoute>
   );

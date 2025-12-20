@@ -13,6 +13,10 @@ export interface UserContext {
     showStreak: boolean
     showWeather: boolean
     showMotivation: boolean
+    showTimeContext: boolean
+    showQuickStats: boolean
+    autoRefresh: boolean
+    refreshInterval: number
   }
 }
 

@@ -183,7 +183,7 @@ export function useCoachStats(userId: string) {
 
       try {
         // Try to get from cache first
-        const cachedData = cache.get(cacheKey)
+        const cachedData = cache.get<{ activeClients: number; workoutsCreated: number }>(cacheKey)
         if (cachedData) {
           setStats(cachedData)
           setLoading(false)

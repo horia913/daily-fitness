@@ -87,6 +87,8 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
   const [loading, setLoading] = useState(false)
   const [newInstruction, setNewInstruction] = useState('')
   const [newTip, setNewTip] = useState('')
+  const [newMuscleGroup, setNewMuscleGroup] = useState('')
+  const [newEquipment, setNewEquipment] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   useEffect(() => {

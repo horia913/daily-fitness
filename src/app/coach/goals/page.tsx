@@ -288,6 +288,9 @@ export default function CoachGoals() {
         title: '',
         description: '',
         metric_type: 'weight',
+        selected_exercises: [],
+        selected_body_parts: [],
+        selected_nutrients: [],
         target_value: 0,
         current_value: 0,
         unit: 'kg',
@@ -364,6 +367,9 @@ export default function CoachGoals() {
       title: goal.title,
       description: goal.description || '',
       metric_type: goal.metric_type,
+      selected_exercises: (goal as any).selected_exercises || [],
+      selected_body_parts: (goal as any).selected_body_parts || [],
+      selected_nutrients: (goal as any).selected_nutrients || [],
       target_value: goal.target_value,
       current_value: goal.current_value,
       unit: goal.unit,
@@ -1043,6 +1049,7 @@ export default function CoachGoals() {
               </DialogContent>
             </Dialog>
           </div>
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

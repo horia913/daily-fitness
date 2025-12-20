@@ -1069,6 +1069,7 @@ export default function CoachAchievements() {
             </Dialog>
           </div>
         </div>
+        </div>
       </AnimatedBackground>
     </ProtectedRoute>
   )

@@ -358,7 +358,6 @@ export default function FMSAssessmentPage() {
                           >
                             {new Date(
                               assessment.assessed_date ||
-                                assessment.assessment_date ||
                                 new Date()
                             ).toLocaleDateString("en-US", {
                               year: "numeric",
@@ -532,7 +531,7 @@ export default function FMSAssessmentPage() {
                 <Input
                   type="date"
                   value={
-                    formData.assessed_date || formData.assessment_date || ""
+                    formData.assessed_date || ""
                   }
                   onChange={(e) =>
                     setFormData({

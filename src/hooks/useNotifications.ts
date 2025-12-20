@@ -24,10 +24,10 @@ export function useNotifications() {
     return () => clearInterval(interval)
   }, [])
 
-  const loadNotifications = useCallback(() => {
+  const loadNotifications = useCallback(async () => {
     try {
-      const allNotifications = notificationService.getNotifications()
-      const unreadCount = notificationService.getUnreadCount()
+      const allNotifications = await notificationService.getNotifications()
+      const unreadCount = await notificationService.getUnreadCount()
       
       setNotifications(allNotifications)
       setUnreadCount(unreadCount)
@@ -92,18 +92,18 @@ export function useNotifications() {
     }
   }, [loadNotifications])
 
-  const markAsRead = useCallback((notificationId: string) => {
-    notificationService.markAsRead(notificationId)
+  const markAsRead = useCallback(async (notificationId: string) => {
+    await notificationService.markAsRead(notificationId)
     loadNotifications()
   }, [loadNotifications])
 
-  const markAllAsRead = useCallback(() => {
-    notificationService.markAllAsRead()
+  const markAllAsRead = useCallback(async () => {
+    await notificationService.markAllAsRead()
     loadNotifications()
   }, [loadNotifications])
 
-  const clearAllNotifications = useCallback(() => {
-    notificationService.clearAllNotifications()
+  const clearAllNotifications = useCallback(async () => {
+    await notificationService.clearAllNotifications()
     loadNotifications()
   }, [loadNotifications])
 

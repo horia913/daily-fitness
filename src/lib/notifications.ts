@@ -136,7 +136,7 @@ export async function sendNotification({
   emailSubject,
   emailHtml,
   sendPush = true,
-  sendEmail = true
+  sendEmail: shouldSendEmail = true
 }: {
   userIds: string[]
   title: string
@@ -161,7 +161,7 @@ export async function sendNotification({
     })
   }
 
-  if (sendEmail && emailSubject && emailHtml) {
+  if (shouldSendEmail && emailSubject && emailHtml) {
     results.email = await sendEmail({
       userIds,
       subject: emailSubject,
@@ -185,15 +185,69 @@ export const notificationService = {
     return 'Notification' in window && Notification.permission === 'granted'
   },
   
+  async getNotifications(): Promise<NotificationData[]> {
+    // This would typically fetch from your database
+    // For now, return empty array as we're just setting up OneSignal
+    return []
+  },
+  
   async getUnreadCount(): Promise<number> {
     // This would typically fetch from your database
     // For now, return 0 as we're just setting up OneSignal
     return 0
   },
   
+  async requestPermission(): Promise<{ granted: boolean }> {
+    if (typeof window === 'undefined') return { granted: false }
+    if (!('Notification' in window)) return { granted: false }
+    
+    const permission = await Notification.requestPermission()
+    return { granted: permission === 'granted' }
+  },
+  
+  async sendWorkoutReminder(workoutName: string, scheduledTime: string): Promise<void> {
+    // This would send a workout reminder notification
+    console.log('Sending workout reminder:', workoutName, scheduledTime)
+  },
+  
+  async sendAchievementNotification(achievementName: string, description: string): Promise<void> {
+    // This would send an achievement notification
+    console.log('Sending achievement notification:', achievementName, description)
+  },
+  
+  async sendWorkoutCompleteNotification(workoutName: string, duration: number): Promise<void> {
+    // This would send a workout complete notification
+    console.log('Sending workout complete notification:', workoutName, duration)
+  },
+  
+  async sendMessageNotification(senderName: string, message: string): Promise<void> {
+    // This would send a message notification
+    console.log('Sending message notification:', senderName, message)
+  },
+  
+  async sendGoalReminder(goalName: string, progress: string): Promise<void> {
+    // This would send a goal reminder notification
+    console.log('Sending goal reminder:', goalName, progress)
+  },
+  
+  async sendNotification(params: { type: string; title: string; body: string; userId: string }): Promise<void> {
+    // This would send a generic notification
+    console.log('Sending notification:', params)
+  },
+  
   async markAsRead(notificationId: string): Promise<void> {
     // This would update your database
     console.log('Marking notification as read:', notificationId)
+  },
+  
+  async markAllAsRead(): Promise<void> {
+    // This would update your database
+    console.log('Marking all notifications as read')
+  },
+  
+  async clearAllNotifications(): Promise<void> {
+    // This would clear all notifications from database
+    console.log('Clearing all notifications')
   }
 }
 

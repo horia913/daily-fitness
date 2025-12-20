@@ -223,6 +223,7 @@ export default function MealDetailPage() {
               </div>
             </div>
           </div>
+          </div>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -243,6 +244,7 @@ export default function MealDetailPage() {
                 <Button className="rounded-xl">Back to Nutrition</Button>
               </Link>
             </div>
+          </div>
           </div>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -677,6 +679,7 @@ export default function MealDetailPage() {
               </div>
             )}
           </div>
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

@@ -156,7 +156,7 @@ export default function CoachClipCards() {
       // Load clients
       const { data: clientsData, error: clientsError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, email')
         .eq('role', 'client')
 
       if (clientsError) {
@@ -579,6 +579,7 @@ export default function CoachClipCards() {
             </DialogContent>
           </Dialog>
           </div>
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

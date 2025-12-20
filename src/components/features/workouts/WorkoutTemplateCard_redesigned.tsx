@@ -88,11 +88,14 @@ export default function WorkoutTemplateCard({
   const getPrimaryCategory = () => {
     if (template.exercises && template.exercises.length > 0) {
       const firstExercise = template.exercises[0];
+      const category = firstExercise.exercise?.category;
       return (
-        firstExercise.exercise?.category?.name || template.category || "General"
+        (typeof category === 'string' ? category : (category as any)?.name) || 
+        (typeof template.category === 'string' ? template.category : (template.category as any)?.name) || 
+        "General"
       );
     }
-    return template.category || "General";
+    return typeof template.category === 'string' ? template.category : (template.category as any)?.name || "General";
   };
 
   const primaryCategory = getPrimaryCategory();
@@ -100,15 +103,18 @@ export default function WorkoutTemplateCard({
   const difficultyColor = getDifficultyColor(template.difficulty_level);
 
   return (
-    <GlassCard
-      elevation={2}
-      className="overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.02]"
-      onClick={onOpenDetails}
+    <div 
+      onClick={onOpenDetails} 
+      className="cursor-pointer"
       style={{
         boxShadow: isDark
           ? "0 4px 12px rgba(0,0,0,0.3)"
           : "0 4px 12px rgba(0,0,0,0.1)",
       }}
+    >
+    <GlassCard
+      elevation={2}
+      className="overflow-hidden transition-all duration-300 hover:scale-[1.02]"
     >
       {/* Header with gradient background */}
       <div
@@ -356,5 +362,6 @@ export default function WorkoutTemplateCard({
         </div>
       </div>
     </GlassCard>
+    </div>
   );
 }

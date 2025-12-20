@@ -243,7 +243,7 @@ export default function WorkoutTemplateEditor({
           </div>
 
           {/* Template Info */}
-          <div className={`p-4 rounded-xl ${theme.backgroundSecondary}`}>
+          <div className={`p-4 rounded-xl ${theme.card}`}>
             <h4 className={`text-sm font-medium ${theme.text} mb-3 flex items-center gap-2`}>
               <Info className="w-4 h-4" />
               Template Information

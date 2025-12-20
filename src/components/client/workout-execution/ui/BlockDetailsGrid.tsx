@@ -2,7 +2,7 @@
 
 import React from "react";
 
-interface BlockDetail {
+export interface BlockDetail {
   label: string;
   value: string | number | null | undefined;
   unit?: string;

@@ -115,7 +115,7 @@ export default function CoachDashboardHeader() {
               </div>
               <div>
                 <p className={`text-2xl font-bold ${theme.text}`}>
-                  {stats?.todaysSessions?.length || 0}
+                  {(stats as any)?.todaysSessions?.length || 0}
                 </p>
                 <p className={`text-sm ${theme.textSecondary}`}>
                   Today's Sessions

@@ -679,7 +679,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
             </div>
 
             {/* Detailed Progress Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-6">
               <TabsList className="flex w-full bg-white dark:bg-gray-800 shadow-lg rounded-2xl border-2 border-gray-100 dark:border-gray-700 p-1 min-h-[56px] overflow-hidden">
                 <TabsTrigger 
                   value="overview" 

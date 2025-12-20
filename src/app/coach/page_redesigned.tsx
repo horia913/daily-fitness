@@ -57,8 +57,7 @@ interface ComplianceClient {
 
 function CoachDashboardContent() {
   const { user } = useAuth();
-  const { theme, getSemanticColor, performanceSettings } = useTheme();
-  const isDark = theme === "dark";
+  const { isDark, getSemanticColor, performanceSettings } = useTheme();
 
   const [stats, setStats] = useState<DashboardStats>({
     totalClients: 0,
@@ -141,11 +140,10 @@ function CoachDashboardContent() {
       : 0;
 
   return (
-    <div className="relative min-h-screen">
-      <AnimatedBackground />
-      {performanceSettings.particles && <FloatingParticles />}
-
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
+    <AnimatedBackground>
+      {performanceSettings.floatingParticles && <FloatingParticles />}
+      <div className="relative min-h-screen">
+        <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
           <GlassCard elevation={1} className="p-6">
@@ -192,7 +190,7 @@ function CoachDashboardContent() {
             </div>
             <AnimatedNumber
               value={stats.totalClients}
-              size="4xl"
+              size="heroLg"
               weight="bold"
               color={getSemanticColor("trust").primary}
             />
@@ -225,7 +223,7 @@ function CoachDashboardContent() {
             <div className="flex items-baseline gap-2">
               <AnimatedNumber
                 value={stats.activeClients}
-                size="4xl"
+                size="heroLg"
                 weight="bold"
                 color={getSemanticColor("success").primary}
               />
@@ -262,7 +260,7 @@ function CoachDashboardContent() {
             </div>
             <AnimatedNumber
               value={stats.totalWorkouts}
-              size="4xl"
+              size="heroLg"
               weight="bold"
               color={getSemanticColor("trust").primary}
             />
@@ -292,7 +290,7 @@ function CoachDashboardContent() {
             </div>
             <AnimatedNumber
               value={stats.totalMealPlans}
-              size="4xl"
+              size="heroLg"
               weight="bold"
               color={getSemanticColor("energy").primary}
             />
@@ -647,7 +645,8 @@ function CoachDashboardContent() {
           </GlassCard>
         </div>
       </div>
-    </div>
+      </div>
+    </AnimatedBackground>
   );
 }
 

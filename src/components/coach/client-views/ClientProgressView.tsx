@@ -188,11 +188,11 @@ export default function ClientProgressView({
                   }}
                 >
                   {checkIns.length > 1 &&
-                  checkIns[0].weight &&
-                  checkIns[checkIns.length - 1].weight
+                  checkIns[0]?.weight &&
+                  checkIns[checkIns.length - 1]?.weight
                     ? `${(
-                        checkIns[checkIns.length - 1].weight -
-                        checkIns[0].weight
+                        (checkIns[checkIns.length - 1]?.weight || 0) -
+                        (checkIns[0]?.weight || 0)
                       ).toFixed(1)}kg`
                     : "-"}
                 </p>

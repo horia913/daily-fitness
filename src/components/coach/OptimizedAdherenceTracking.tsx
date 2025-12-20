@@ -615,6 +615,7 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
           )}
         </div>
       </div>
+      </div>
     </AnimatedBackground>
   )
 }

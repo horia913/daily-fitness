@@ -140,18 +140,19 @@ export default function ClientHabitsPage() {
             .eq('assignment_id', assignment.id)
             .gte('log_date', weekAgoStr)
 
-          const expectedDays = assignment.habits?.frequency_type === 'daily' ? 7 : assignment.habits?.target_days || 1
+          const habit = Array.isArray(assignment.habits) ? assignment.habits[0] : assignment.habits
+          const expectedDays = habit?.frequency_type === 'daily' ? 7 : habit?.target_days || 1
           const completedDays = weekLogs?.length || 0
           const completionRate = Math.round((completedDays / expectedDays) * 100)
 
           return {
             id: assignment.id,
             habit_id: assignment.habit_id,
-            habit_name: assignment.habits?.name || 'Unknown Habit',
-            habit_description: assignment.habits?.description,
-            habit_icon: assignment.habits?.icon || '🎯',
-            frequency_type: assignment.habits?.frequency_type || 'daily',
-            target_days: assignment.habits?.target_days || 1,
+            habit_name: habit?.name || 'Unknown Habit',
+            habit_description: habit?.description,
+            habit_icon: habit?.icon || '🎯',
+            frequency_type: habit?.frequency_type || 'daily',
+            target_days: habit?.target_days || 1,
             start_date: assignment.start_date,
             is_logged_today: loggedToday.has(assignment.id),
             streak_days: streakDays,
@@ -659,6 +660,7 @@ export default function ClientHabitsPage() {
               </Card>
             )}
           </div>
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

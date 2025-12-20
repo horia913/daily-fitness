@@ -68,10 +68,6 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
     { value: 'snack', label: 'Snack', color: 'bg-purple-100 text-purple-800' }
   ]
 
-  useEffect(() => {
-    loadMeals()
-  }, [loadMeals])
-
   const toggleMealDetails = (mealId: string) => {
     setShowMealDetails(prev => ({
       ...prev,
@@ -97,7 +93,7 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
 
       // Calculate totals for each meal
       const mealsWithTotals = data?.map(meal => {
-        const foodItems = meal.meal_food_items.map(item => ({
+        const foodItems = meal.meal_food_items.map((item: any) => ({
           ...item,
           food_name: item.foods.name,
           calories: (item.foods.calories_per_serving * item.quantity) / item.foods.serving_size,
@@ -107,7 +103,7 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
           fiber: (item.foods.fiber * item.quantity) / item.foods.serving_size
         }))
 
-        const totals = foodItems.reduce((acc, item) => ({
+        const totals = foodItems.reduce((acc: any, item: any) => ({
           calories: acc.calories + item.calories,
           protein: acc.protein + item.protein,
           carbs: acc.carbs + item.carbs,
@@ -127,6 +123,10 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
       console.error('Error loading meals:', error)
     }
   }, [mealPlanId])
+
+  useEffect(() => {
+    loadMeals()
+  }, [loadMeals])
 
   const handleAddMeal = (mealType: string) => {
     setSelectedMealType(mealType)

@@ -115,7 +115,8 @@ export function ChartsAndGraphs({
   onRefresh,
   className = '' 
 }: ChartsAndGraphsProps) {
-  const theme = useTheme()
+  const { isDark, getThemeStyles } = useTheme()
+  const theme = getThemeStyles()
   const [selectedChart, setSelectedChart] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [timeRange, setTimeRange] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>('3M')
@@ -275,7 +276,7 @@ export function ChartsAndGraphs({
 
   if (loading) {
     return (
-      <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", theme.card)}>
+      <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
         <CardHeader className="p-6 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -306,7 +307,7 @@ export function ChartsAndGraphs({
   }
 
   return (
-    <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden w-full", theme.card, className)}>
+    <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden w-full", isDark ? "bg-slate-800/50" : "bg-white", className)}>
       <CardHeader className="p-4 sm:p-6 pb-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -497,7 +498,8 @@ function ChartCard({
   isSelected: boolean
   getChartIcon: (type: string) => React.ReactNode
 }) {
-  const theme = useTheme()
+  const { isDark, getThemeStyles } = useTheme()
+  const theme = getThemeStyles()
   const [isExpanded, setIsExpanded] = useState(false)
   const [selectedDataset, setSelectedDataset] = useState<string | null>(null)
   const [hoveredPoint, setHoveredPoint] = useState<ChartDataPoint | null>(null)

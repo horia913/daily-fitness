@@ -84,7 +84,7 @@ export function PreExhaustionExecutor({
   useEffect(() => {
     if (showTimer && timerSeconds > 0) {
       timerRef.current = setInterval(() => {
-        setTimerSeconds((prev) => {
+        setTimerSeconds((prev: number) => {
           if (prev <= 1) {
             setShowTimer(false);
             return restBetween;

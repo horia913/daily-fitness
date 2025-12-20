@@ -28,7 +28,8 @@ import {
   Star,
   Bookmark,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Settings
 } from 'lucide-react'
 
 interface TemplateExercise {
@@ -350,11 +351,11 @@ export default function DraggableExerciseCard({
                         placeholder="Add coaching notes, form cues, or modifications..."
                       />
                     ) : (
-                      <div className={`p-3 rounded-lg ${theme.backgroundSecondary}`}>
+                      <div className={`p-3 rounded-lg ${theme.card}`}>
                         {exercise.notes ? (
                           <p className={`text-sm ${theme.textSecondary}`}>{exercise.notes}</p>
                         ) : (
-                          <p className={`text-sm ${theme.textMuted} italic`}>
+                          <p className={`text-sm ${theme.textSecondary} italic`}>
                             No notes added yet. Click edit to add coaching notes.
                           </p>
                         )}

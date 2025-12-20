@@ -20,6 +20,23 @@ export const initOneSignal = async () => {
       safari_web_id: process.env.NEXT_PUBLIC_ONESIGNAL_SAFARI_WEB_ID,
       notifyButton: {
         enable: false, // We'll use custom UI
+        prenotify: false,
+        showCredit: false,
+        text: {
+          'tip.state.unsubscribed': 'Subscribe to notifications',
+          'tip.state.subscribed': "You're subscribed to notifications",
+          'tip.state.blocked': "You've blocked notifications",
+          'message.prenotify': 'Click to subscribe to notifications',
+          'message.action.subscribing': 'Subscribing...',
+          'message.action.subscribed': "Thanks for subscribing!",
+          'message.action.resubscribed': "You're subscribed to notifications",
+          'message.action.unsubscribed': "You won't receive notifications again",
+          'dialog.main.title': 'Manage Site Notifications',
+          'dialog.main.button.subscribe': 'SUBSCRIBE',
+          'dialog.main.button.unsubscribe': 'UNSUBSCRIBE',
+          'dialog.blocked.title': 'Unblock Notifications',
+          'dialog.blocked.message': "Follow these instructions to allow notifications:"
+        }
       },
       allowLocalhostAsSecureOrigin: true, // For development
       serviceWorkerParam: { scope: '/' },

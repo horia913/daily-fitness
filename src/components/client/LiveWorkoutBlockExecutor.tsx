@@ -76,7 +76,7 @@ export default function LiveWorkoutBlockExecutor({
   console.log("📍 LiveWorkoutBlockExecutor received:", {
     assignmentId,
     blockId: block.block.id,
-    blockType: block.block.type,
+    blockType: (block.block as any).type || block.block.block_type,
   });
   
   useEffect(() => {
@@ -229,7 +229,7 @@ export default function LiveWorkoutBlockExecutor({
           const requestBody: any = {
             // Required for workout_set_logs
             block_id: block.block.id,
-            block_type: data.block_type || block.block.type,
+            block_type: data.block_type || (block.block as any).type || block.block.block_type,
             client_id: user.id,
             workout_assignment_id: assignmentId || undefined,
             // For API to get/create workout_log_id (session tracking)
@@ -373,7 +373,7 @@ export default function LiveWorkoutBlockExecutor({
 
         if (restSeconds > 0) {
           setRestDuration(restSeconds);
-          setRestLabel(`Next Exercise: ${nextExercise.exercise?.name || nextExercise.name || 'Exercise'}`);
+          setRestLabel(`Next Exercise: ${nextExercise.exercise?.name || (nextExercise as any).name || 'Exercise'}`);
           setPendingAction('exercise');
           setShowRestTimer(true);
         } else {

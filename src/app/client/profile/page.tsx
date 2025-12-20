@@ -130,20 +130,21 @@ export default function ClientProfilePage() {
       
       if (data) {
         setProfile(data)
+        const profileData = data as any
         setFormData({
-          first_name: data?.first_name || '',
-          last_name: data?.last_name || '',
-          email: data?.email || '',
-          fitness_level: data?.fitness_level || '',
-          goals: data?.goals || [],
-          bio: data?.bio || '',
-          phone: data?.phone || '',
-          date_of_birth: data?.date_of_birth || '',
-          height: data?.height || '',
-          weight: data?.weight || '',
-          emergency_contact: data?.emergency_contact || '',
-          medical_conditions: data?.medical_conditions || '',
-          injuries: data?.injuries || ''
+          first_name: profileData?.first_name || '',
+          last_name: profileData?.last_name || '',
+          email: profileData?.email || '',
+          fitness_level: profileData?.fitness_level || '',
+          goals: profileData?.goals || [],
+          bio: profileData?.bio || '',
+          phone: profileData?.phone || '',
+          date_of_birth: profileData?.date_of_birth || '',
+          height: profileData?.height || '',
+          weight: profileData?.weight || '',
+          emergency_contact: profileData?.emergency_contact || '',
+          medical_conditions: profileData?.medical_conditions || '',
+          injuries: profileData?.injuries || ''
         })
       }
     } catch (error) {
@@ -185,8 +186,8 @@ export default function ClientProfilePage() {
         console.error('Upload error:', uploadError)
         console.error('Error details:', {
           message: uploadError.message,
-          statusCode: uploadError.statusCode,
-          error: uploadError.error
+          statusCode: (uploadError as any).statusCode,
+          error: (uploadError as any).error
         })
         
         if (uploadError.message.includes('row-level security policy')) {

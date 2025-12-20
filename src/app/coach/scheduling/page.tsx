@@ -491,6 +491,7 @@ export default function CoachScheduling() {
               </div>
             </div>
           </div>
+          </div>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -1083,6 +1084,7 @@ export default function CoachScheduling() {
               </DialogContent>
             </Dialog>
           </div>
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

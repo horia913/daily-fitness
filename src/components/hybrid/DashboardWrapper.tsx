@@ -93,25 +93,25 @@ export function ClientDashboardWrapper() {
               <div className="space-y-4">
                 <div>
                   <CardTitle className="text-xl text-slate-800">
-                    {todaysWorkout.template?.name || 'Workout'}
+                    {(todaysWorkout as any).template?.name || 'Workout'}
                   </CardTitle>
                   <CardDescription className="text-slate-600 mt-1">
-                    {todaysWorkout.template?.description || 'Your assigned workout for today'}
+                    {(todaysWorkout as any).template?.description || 'Your assigned workout for today'}
                   </CardDescription>
                 </div>
                 
                 <div className="flex items-center gap-4 text-sm text-slate-600">
                   <div className="flex items-center gap-1">
                     <Clock className="w-4 h-4" />
-                    <span>{todaysWorkout.template?.estimated_duration || 45} min</span>
+                    <span>{(todaysWorkout as any).template?.estimated_duration || 45} min</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Dumbbell className="w-4 h-4" />
-                    <span>{todaysWorkout.exercise_count || 0} exercises</span>
+                    <span>{(todaysWorkout as any).exercise_count || 0} exercises</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Target className="w-4 h-4" />
-                    <span>{todaysWorkout.template?.difficulty_level || 'Intermediate'}</span>
+                    <span>{(todaysWorkout as any).template?.difficulty_level || 'Intermediate'}</span>
                   </div>
                 </div>
 

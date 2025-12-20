@@ -155,7 +155,7 @@ export const safeWindow = {
       return window.location.href
     },
     
-    set href(value: string): void {
+    set href(value: string) {
       if (!isBrowser()) return
       try {
         window.location.href = value

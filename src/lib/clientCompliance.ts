@@ -373,12 +373,12 @@ export class ClientComplianceTracker {
     }
 
     // Alert-based recommendations
-    const criticalAlerts = alerts.filter(a => a.alert_level === 'critical' && !a.is_resolved)
+    const criticalAlerts = alerts.filter((a: any) => a.alert_level === 'critical' && !a.is_resolved)
     if (criticalAlerts.length > 0) {
       recommendations.push('Address critical alerts immediately with direct client contact')
     }
 
-    const warningAlerts = alerts.filter(a => a.alert_level === 'warning' && !a.is_resolved)
+    const warningAlerts = alerts.filter((a: any) => a.alert_level === 'warning' && !a.is_resolved)
     if (warningAlerts.length > 2) {
       recommendations.push('Multiple warning alerts suggest systemic issues that need addressing')
     }
@@ -461,8 +461,8 @@ export class ClientComplianceTracker {
     const trends = {
       compliance_level: complianceLevel.level,
       engagement_level: engagementLevel.level,
-      primary_strengths: [],
-      primary_concerns: []
+      primary_strengths: [] as string[],
+      primary_concerns: [] as string[]
     }
     
     // Identify strengths and concerns
@@ -477,7 +477,7 @@ export class ClientComplianceTracker {
     if (compliance.engagement_score < 40) trends.primary_concerns.push('Platform engagement')
     
     const achievements = milestones.filter(m => m.is_achieved).map(m => m.milestone_name)
-    const concerns = alerts.filter(a => !a.is_resolved).map(a => a.alert_message)
+    const concerns = alerts.filter((a: any) => !a.is_resolved).map((a: any) => a.alert_message)
     
     return {
       summary,

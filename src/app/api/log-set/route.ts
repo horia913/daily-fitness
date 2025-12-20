@@ -632,7 +632,7 @@ export async function POST(req: NextRequest) {
       primaryReps &&
       ['straight_set', 'superset', 'dropset', 'cluster_set', 'rest_pause'].includes(blockType)
 
-    if (shouldCalculateE1RM) {
+    if (shouldCalculateE1RM && primaryWeight !== null && primaryReps !== null) {
       // e1RM = weight × (1 + 0.0333 × reps)
       e1rm = primaryWeight * (1 + 0.0333 * primaryReps)
     }

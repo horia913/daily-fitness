@@ -47,6 +47,7 @@ export const semanticColors = {
     primary: '#9E9E9E',
     light: '#BDBDBD',
     dark: '#757575',
+    gradient: 'linear-gradient(135deg, #9E9E9E 0%, #757575 100%)',
   },
 } as const;
 
@@ -76,13 +77,13 @@ export function getTimeBasedGradient(isDark: boolean = false): string[] {
   const mode = isDark ? 'dark' : 'light';
   
   if (hour >= 5 && hour < 12) {
-    return timeBasedGradients.morning[mode];
+    return [...timeBasedGradients.morning[mode]] as string[];
   } else if (hour >= 12 && hour < 18) {
-    return timeBasedGradients.afternoon[mode];
+    return [...timeBasedGradients.afternoon[mode]] as string[];
   } else if (hour >= 18 && hour < 22) {
-    return timeBasedGradients.evening[mode];
+    return [...timeBasedGradients.evening[mode]] as string[];
   } else {
-    return timeBasedGradients.night[mode];
+    return [...timeBasedGradients.night[mode]] as string[];
   }
 }
 

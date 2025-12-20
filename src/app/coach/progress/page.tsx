@@ -27,6 +27,7 @@ import {
   CheckCircle,
   AlertTriangle,
   ArrowRight,
+  ArrowLeft,
   Sparkles,
   Star,
   Copy,
@@ -304,6 +305,16 @@ export default function CoachProgress() {
       data.push(Math.floor(Math.random() * 5) + 1)
     }
     return data
+  }
+
+  // Convert array of numbers to sparkline points
+  const convertToSparklinePoints = (data: number[]) => {
+    const max = Math.max(...data, 1)
+    return data.map((value, index) => ({
+      height: (value / max) * 60,
+      y: value,
+      x: index
+    }))
   }
 
   // Get trend direction
@@ -1596,7 +1607,7 @@ export default function CoachProgress() {
                                     <span className={`text-sm ${theme.textSecondary}`}>12 months</span>
                                   </div>
                                   <div className="flex items-end gap-1 h-16">
-                                    {generateSparklineData(analyticsData.trendData.adherence).map((point, index) => (
+                                    {convertToSparklinePoints(analyticsData.trendData.adherence as any).map((point, index) => (
                                       <div
                                         key={index}
                                         className="flex-1 bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-sm"
@@ -1618,7 +1629,7 @@ export default function CoachProgress() {
                                     <span className={`text-sm ${theme.textSecondary}`}>12 months</span>
                                   </div>
                                   <div className="flex items-end gap-1 h-16">
-                                    {generateSparklineData(analyticsData.trendData.workouts).map((point, index) => (
+                                    {convertToSparklinePoints(analyticsData.trendData.workouts as any).map((point, index) => (
                                       <div
                                         key={index}
                                         className="flex-1 bg-gradient-to-t from-green-500 to-green-400 rounded-t-sm"
@@ -1874,6 +1885,7 @@ export default function CoachProgress() {
                 </TabsContent>
               </Tabs>
           </div>
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

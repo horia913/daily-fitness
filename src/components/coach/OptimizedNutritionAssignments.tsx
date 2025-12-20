@@ -200,7 +200,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
                 first_name: 'John',
                 last_name: 'Doe',
                 email: 'john@example.com',
-                avatar_url: null
+                avatar_url: undefined
               },
               meal_plan: {
                 id: 'mealplan1',
@@ -231,7 +231,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
                 first_name: 'Jane',
                 last_name: 'Smith',
                 email: 'jane@example.com',
-                avatar_url: null
+                avatar_url: undefined
               },
               meal_plan: {
                 id: 'mealplan2',
@@ -262,7 +262,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
                 first_name: 'Mike',
                 last_name: 'Johnson',
                 email: 'mike@example.com',
-                avatar_url: null
+                avatar_url: undefined
               },
               meal_plan: {
                 id: 'mealplan3',

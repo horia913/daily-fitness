@@ -288,6 +288,7 @@ export default function ClientClipCards() {
               </div>
             </div>
           </div>
+          </div>
         </AnimatedBackground>
       </ProtectedRoute>
     )
@@ -538,6 +539,7 @@ export default function ClientClipCards() {
               )}
             </div>
           </div>
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

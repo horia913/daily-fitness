@@ -77,7 +77,7 @@ export default function ExerciseCategoryForm({
     name: '',
     description: '',
     color: categoryColors[0].value,
-    icon: iconOptions[0]
+    icon: iconOptions[0].value
   })
   const [loading, setLoading] = useState(false)
 
@@ -87,7 +87,7 @@ export default function ExerciseCategoryForm({
         name: category.name || '',
         description: category.description || '',
         color: category.color || categoryColors[0].value,
-        icon: category.icon || iconOptions[0]
+        icon: typeof category.icon === 'string' ? category.icon : (category.icon as any)?.value || iconOptions[0].value
       })
     } else if (isOpen) {
       resetForm()
@@ -99,7 +99,7 @@ export default function ExerciseCategoryForm({
       name: '',
       description: '',
       color: categoryColors[0].value,
-      icon: iconOptions[0]
+      icon: iconOptions[0].value
     })
   }
 
@@ -238,8 +238,7 @@ export default function ExerciseCategoryForm({
                         : 'hover:scale-105'
                     }`}
                     style={{ 
-                      backgroundColor: color.value,
-                      ringColor: color.value
+                      backgroundColor: color.value
                     }}
                     title={color.name}
                   >

@@ -177,7 +177,7 @@ export const ImageHelpers = {
       return { valid: false, error: 'File size too large. Maximum 10MB allowed.' }
     }
 
-    if (!IMAGE_CONFIG.UPLOAD.ALLOWED_FORMATS.includes(file.type)) {
+    if (!IMAGE_CONFIG.UPLOAD.ALLOWED_FORMATS.includes(file.type as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif')) {
       return { valid: false, error: 'Invalid file format. Only JPEG, PNG, WebP, and GIF are allowed.' }
     }
 

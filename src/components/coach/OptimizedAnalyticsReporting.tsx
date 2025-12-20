@@ -747,6 +747,7 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
           </Tabs>
         </div>
       </div>
+      </div>
     </AnimatedBackground>
   )
 }

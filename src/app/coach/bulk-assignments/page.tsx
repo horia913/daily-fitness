@@ -59,7 +59,6 @@ import {
   ShoppingCart,
   ChevronLeft,
   ChevronRight,
-  Today,
   Grid,
   List,
   MapPin,
@@ -479,7 +478,7 @@ export default function CoachBulkAssignmentsPage() {
                         <div
                           className={`text-3xl font-bold ${theme.text} group-hover:text-blue-600 transition-colors`}
                         >
-                          {stats.totalOperations}
+                          {stats.total_operations}
                         </div>
                         <div
                           className={`text-sm ${theme.textSecondary} font-medium`}
@@ -505,7 +504,7 @@ export default function CoachBulkAssignmentsPage() {
                         <div
                           className={`text-3xl font-bold ${theme.text} group-hover:text-green-600 transition-colors`}
                         >
-                          {stats.completedOperations}
+                          {stats.completed_operations}
                         </div>
                         <div
                           className={`text-sm ${theme.textSecondary} font-medium`}
@@ -531,7 +530,7 @@ export default function CoachBulkAssignmentsPage() {
                         <div
                           className={`text-3xl font-bold ${theme.text} group-hover:text-purple-600 transition-colors`}
                         >
-                          {stats.totalItemsAssigned}
+                          {stats.total_items_assigned}
                         </div>
                         <div
                           className={`text-sm ${theme.textSecondary} font-medium`}
@@ -557,7 +556,7 @@ export default function CoachBulkAssignmentsPage() {
                         <div
                           className={`text-3xl font-bold ${theme.text} group-hover:text-orange-600 transition-colors`}
                         >
-                          {stats.successRate.toFixed(1)}%
+                          {stats.success_rate.toFixed(1)}%
                         </div>
                         <div
                           className={`text-sm ${theme.textSecondary} font-medium`}
@@ -912,6 +911,7 @@ export default function CoachBulkAssignmentsPage() {
               coachId={user?.id || ""}
             />
           )}
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

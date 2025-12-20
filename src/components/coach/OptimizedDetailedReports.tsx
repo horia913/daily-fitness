@@ -43,7 +43,8 @@ import {
   Edit,
   Trash2,
   Copy,
-  Send
+  Send,
+  CheckCircle
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -787,6 +788,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
             </div>
           </div>
         </div>
+      </div>
       </div>
     </AnimatedBackground>
   )

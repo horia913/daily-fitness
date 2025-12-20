@@ -99,9 +99,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <GlassCard
-        elevation={3}
-        className="w-full max-w-md p-6 md:p-8 mt-8 mb-8"
+      <div
         style={{
           background: isDark
             ? "rgba(30, 30, 30, 0.95)"
@@ -111,6 +109,10 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
             : "1px solid rgba(0,0,0,0.1)",
         }}
         onClick={(e) => e.stopPropagation()}
+      >
+      <GlassCard
+        elevation={3}
+        className="w-full max-w-md p-6 md:p-8 mt-8 mb-8"
       >
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
@@ -301,6 +303,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
           💡 Custom goals are tracked manually - you'll update progress yourself.
         </p>
       </GlassCard>
+      </div>
     </div>
   );
 }

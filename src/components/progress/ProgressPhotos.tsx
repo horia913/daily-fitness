@@ -66,7 +66,8 @@ export function ProgressPhotos({
   onShare, 
   onDelete 
 }: ProgressPhotosProps) {
-  const theme = useTheme()
+  const { isDark, getThemeStyles } = useTheme()
+  const theme = getThemeStyles()
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('grid')
   const [showComparison, setShowComparison] = useState(false)
@@ -139,7 +140,7 @@ export function ProgressPhotos({
 
   if (loading) {
     return (
-      <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", theme.card)}>
+      <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
         <CardHeader className="p-6 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -176,7 +177,7 @@ export function ProgressPhotos({
   if (photos.length === 0) {
     return (
       <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-        <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", theme.card)}>
+        <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
           <CardHeader className="p-6 pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -184,8 +185,8 @@ export function ProgressPhotos({
                   <Camera className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <CardTitle className={`text-2xl font-bold ${theme.isDark ? 'text-slate-200' : 'text-slate-800'}`}>Progress Photos</CardTitle>
-                  <p className={`${theme.isDark ? 'text-slate-400' : 'text-slate-600'}`}>Your transformation journey</p>
+                  <CardTitle className={`text-2xl font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Progress Photos</CardTitle>
+                  <p className={`${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Your transformation journey</p>
                 </div>
               </div>
             </div>
@@ -225,7 +226,7 @@ export function ProgressPhotos({
   }
 
   return (
-    <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden w-full", theme.card)}>
+    <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden w-full", isDark ? "bg-slate-800/50" : "bg-white")}>
       <CardHeader className="p-4 sm:p-6 pb-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -391,7 +392,8 @@ function PhotoCard({
   getTimeAgo: (date: string) => string
   getTransformationMessage: (photo: ProgressPhoto) => string | null
 }) {
-  const theme = useTheme()
+  const { isDark, getThemeStyles } = useTheme()
+  const theme = getThemeStyles()
   const [isHovered, setIsHovered] = useState(false)
   const transformationMessage = getTransformationMessage(photo)
 
@@ -523,11 +525,12 @@ function TimelinePhotoCard({
   getTimeAgo: (date: string) => string
   getTransformationMessage: (photo: ProgressPhoto) => string | null
 }) {
-  const theme = useTheme()
+  const { isDark, getThemeStyles } = useTheme()
+  const theme = getThemeStyles()
   const transformationMessage = getTransformationMessage(photo)
 
   return (
-    <Card className={cn("rounded-2xl shadow-lg border-0 overflow-hidden", theme.card)}>
+    <Card className={cn("rounded-2xl shadow-lg border-0 overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
       <div className="flex flex-col md:flex-row">
         {/* Photo */}
         <div className="relative w-full md:w-48 h-48 md:h-32">
@@ -646,7 +649,8 @@ function ComparisonModal({
   onClose: () => void
   formatDate: (date: string) => string
 }) {
-  const theme = useTheme()
+  const { isDark, getThemeStyles } = useTheme()
+  const theme = getThemeStyles()
   const [sliderPosition, setSliderPosition] = useState(50)
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -665,7 +669,7 @@ function ComparisonModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className={cn("relative w-full max-w-4xl h-[80vh] rounded-3xl overflow-hidden", theme.card)}>
+      <div className={cn("relative w-full max-w-4xl h-[80vh] rounded-3xl overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 z-10 p-6 bg-gradient-to-b from-black/80 to-transparent">
           <div className="flex items-center justify-between">

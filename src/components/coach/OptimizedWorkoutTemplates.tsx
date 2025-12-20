@@ -24,7 +24,8 @@ import {
   Grid3X3,
   List,
   SortAsc,
-  SortDesc
+  SortDesc,
+  Zap
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'

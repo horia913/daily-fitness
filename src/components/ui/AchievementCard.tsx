@@ -131,8 +131,7 @@ export function AchievementCard({
     <GlassCard
       pressable={false}
       elevation={1}
-      className={`p-4 relative ${className}`}
-      style={{ opacity: 0.6 }}
+      className={`p-4 relative opacity-60 ${className}`}
     >
       <div className="flex items-start gap-4">
         {/* Locked icon */}

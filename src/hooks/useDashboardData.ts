@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { DatabaseService, Profile, WorkoutSession, Achievement, Session } from '@/lib/database'
+import { DatabaseService, Profile, WorkoutSession, WorkoutAssignment, Achievement, Session } from '@/lib/database'
 import { PrefetchService, cache } from '@/lib/prefetch'
 
 // Client dashboard data hook with pre-fetching
@@ -11,7 +11,7 @@ export function useClientDashboardData() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<{
     profile: Profile | null
-    todaysWorkout: WorkoutSession | null
+    todaysWorkout: WorkoutAssignment | null
     stats: { thisWeek: number; goalCompletion: number }
     achievements: Achievement[]
   }>({
@@ -30,7 +30,12 @@ export function useClientDashboardData() {
       
       try {
         // Try to get from cache first
-        const cachedData = cache.get(cacheKey)
+        const cachedData = cache.get<{
+          profile: Profile | null
+          todaysWorkout: WorkoutAssignment | null
+          stats: { thisWeek: number; goalCompletion: number }
+          achievements: Achievement[]
+        }>(cacheKey)
         if (cachedData) {
           setData(cachedData)
           setLoading(false)
@@ -107,7 +112,16 @@ export function useCoachDashboardData() {
       
       try {
         // Try to get from cache first
-        const cachedData = cache.get(cacheKey)
+        const cachedData = cache.get<{
+          profile: Profile | null
+          stats: { activeClients: number; workoutsCreated: number }
+          todaysSessions: Session[]
+          clientProgress: Array<{
+            client: Profile
+            progress: number
+            recentAchievement?: string
+          }>
+        }>(cacheKey)
         if (cachedData) {
           setData(cachedData)
           setLoading(false)

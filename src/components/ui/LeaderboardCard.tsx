@@ -255,7 +255,7 @@ function LeaderboardRow({
 }) {
   const { isDark, getSemanticColor } = useTheme();
 
-  const rankChange = user.previousRank - user.rank;
+  const rankChange = (user.previousRank ?? user.rank ?? 0) - (user.rank ?? 0);
   const trendIcon =
     rankChange > 0 ? (
       <TrendingUp

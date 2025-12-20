@@ -81,7 +81,8 @@ export function DynamicInsights({
   onRefresh,
   className = '' 
 }: DynamicInsightsProps) {
-  const theme = useTheme()
+  const { isDark, getThemeStyles } = useTheme()
+  const theme = getThemeStyles()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showExpired, setShowExpired] = useState(false)
@@ -250,7 +251,7 @@ export function DynamicInsights({
 
   if (loading) {
     return (
-      <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", theme.card)}>
+      <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
         <CardHeader className="p-6 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -285,7 +286,7 @@ export function DynamicInsights({
   }
 
   return (
-    <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", theme.card, className)}>
+    <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white", className)}>
       <CardHeader className="p-6 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -449,7 +450,8 @@ function InsightCard({
   getPriorityColor: (priority: string) => string
   formatTimeAgo: (dateString: string) => string
 }) {
-  const theme = useTheme()
+  const { isDark, getThemeStyles } = useTheme()
+  const theme = getThemeStyles()
   const [isHovered, setIsHovered] = useState(false)
 
   const cardClasses = cn(

@@ -638,7 +638,7 @@ export class WorkoutBlockService {
       }
     }
 
-    return configs[blockType] || configs.straight_set
+    return configs[blockType as keyof typeof configs] || configs.straight_set
   }
 
   // Validate block configuration

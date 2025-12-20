@@ -138,6 +138,7 @@ export default function WorkoutTemplateForm({
     emom_duration: "",
     // Tabata specific
     rounds: "",
+    rest_after: "",
     // Drop set specific
     drop_percentage: "",
     drop_set_reps: "",
@@ -145,7 +146,7 @@ export default function WorkoutTemplateForm({
     superset_exercise_id: "",
     superset_reps: "",
     // Giant set specific
-    giant_set_exercises: [],
+    giant_set_exercises: [] as Array<{ exercise_id: string; sets: string; reps: string; [key: string]: any }>,
     // Cluster set specific
     cluster_reps: "",
     clusters_per_set: "",
@@ -167,9 +168,9 @@ export default function WorkoutTemplateForm({
     emom_mode: "",
     emom_reps: "",
     // Tabata specific
-    tabata_sets: [],
+    tabata_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
     // Circuit specific
-    circuit_sets: [],
+    circuit_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
   });
 
   // Workout Block System (integrated with exercises)
@@ -555,9 +556,9 @@ export default function WorkoutTemplateForm({
           formData.difficulty_level || "intermediate"
         ).toLowerCase(),
         estimated_duration:
-          formData.estimated_duration === ""
+          formData.estimated_duration === 0 || !formData.estimated_duration
             ? 60
-            : parseInt(formData.estimated_duration) || 60,
+            : formData.estimated_duration || 60,
         category: formData.category || "general",
       };
 
@@ -1188,11 +1189,12 @@ export default function WorkoutTemplateForm({
         work_seconds: "",
         emom_duration: "",
         rounds: "",
+        rest_after: "",
         drop_percentage: "",
         drop_set_reps: "",
         superset_exercise_id: "",
         superset_reps: "",
-        giant_set_exercises: [],
+        giant_set_exercises: [] as Array<{ exercise_id: string; sets: string; reps: string; [key: string]: any }>,
         cluster_reps: "",
         clusters_per_set: "",
         intra_cluster_rest: "",
@@ -1204,11 +1206,12 @@ export default function WorkoutTemplateForm({
         compound_reps: "",
         target_reps: "",
         time_cap: "",
+        rest_between_rungs: "",
 
         emom_mode: "",
         emom_reps: "",
-        tabata_sets: [],
-        circuit_sets: [],
+        tabata_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
+        circuit_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
       });
       setShowAddExercise(false);
       setEditingExerciseId(null);
@@ -3300,6 +3303,7 @@ export default function WorkoutTemplateForm({
                                   ...(newExercise.giant_set_exercises || []),
                                   {
                                     exercise_id: "",
+                                    sets: "",
                                     reps: "",
                                   },
                                 ];

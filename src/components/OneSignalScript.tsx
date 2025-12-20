@@ -39,8 +39,9 @@ export default function OneSignalScript() {
       onError={() => {
         console.warn('OneSignal script failed to load')
         if (typeof window !== 'undefined') {
-          (window as any).OneSignalLoaded = false
-          (window as any).OneSignalError = true
+          const win = window as any
+          win.OneSignalLoaded = false
+          win.OneSignalError = true
         }
       }}
     />

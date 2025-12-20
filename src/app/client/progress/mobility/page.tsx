@@ -226,8 +226,8 @@ export default function MobilityMetricsPage() {
                   <CardContent className="p-6 pt-0">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {/* Shoulder Metrics */}
-                      {(metric.left_shoulder_flexion ||
-                        metric.right_shoulder_flexion) && (
+                      {((metric as any).left_shoulder_flexion ||
+                        (metric as any).right_shoulder_flexion) && (
                         <div className="col-span-full">
                           <h4
                             className={`text-sm font-semibold ${theme.text} mb-3`}
@@ -235,7 +235,7 @@ export default function MobilityMetricsPage() {
                             Shoulder Mobility
                           </h4>
                           <div className="grid grid-cols-2 gap-3">
-                            {metric.left_shoulder_flexion && (
+                            {(metric as any).left_shoulder_flexion && (
                               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                                 <span
                                   className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
@@ -245,11 +245,11 @@ export default function MobilityMetricsPage() {
                                 <p
                                   className={`text-lg font-bold ${theme.text}`}
                                 >
-                                  {metric.left_shoulder_flexion}°
+                                  {(metric as any).left_shoulder_flexion}°
                                 </p>
                               </div>
                             )}
-                            {metric.right_shoulder_flexion && (
+                            {(metric as any).right_shoulder_flexion && (
                               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                                 <span
                                   className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
@@ -259,7 +259,7 @@ export default function MobilityMetricsPage() {
                                 <p
                                   className={`text-lg font-bold ${theme.text}`}
                                 >
-                                  {metric.right_shoulder_flexion}°
+                                  {(metric as any).right_shoulder_flexion}°
                                 </p>
                               </div>
                             )}
@@ -268,8 +268,8 @@ export default function MobilityMetricsPage() {
                       )}
 
                       {/* Hip Metrics */}
-                      {(metric.left_hip_flexion ||
-                        metric.right_hip_flexion) && (
+                      {((metric as any).left_hip_flexion ||
+                        (metric as any).right_hip_flexion) && (
                         <div className="col-span-full mt-2">
                           <h4
                             className={`text-sm font-semibold ${theme.text} mb-3`}
@@ -277,7 +277,7 @@ export default function MobilityMetricsPage() {
                             Hip Mobility
                           </h4>
                           <div className="grid grid-cols-2 gap-3">
-                            {metric.left_hip_flexion && (
+                            {(metric as any).left_hip_flexion && (
                               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                                 <span
                                   className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
@@ -287,11 +287,11 @@ export default function MobilityMetricsPage() {
                                 <p
                                   className={`text-lg font-bold ${theme.text}`}
                                 >
-                                  {metric.left_hip_flexion}°
+                                  {(metric as any).left_hip_flexion}°
                                 </p>
                               </div>
                             )}
-                            {metric.right_hip_flexion && (
+                            {(metric as any).right_hip_flexion && (
                               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                                 <span
                                   className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
@@ -301,7 +301,7 @@ export default function MobilityMetricsPage() {
                                 <p
                                   className={`text-lg font-bold ${theme.text}`}
                                 >
-                                  {metric.right_hip_flexion}°
+                                  {(metric as any).right_hip_flexion}°
                                 </p>
                               </div>
                             )}
@@ -310,8 +310,8 @@ export default function MobilityMetricsPage() {
                       )}
 
                       {/* Ankle Metrics */}
-                      {(metric.left_ankle_dorsiflexion ||
-                        metric.right_ankle_dorsiflexion) && (
+                      {((metric as any).left_ankle_dorsiflexion ||
+                        (metric as any).right_ankle_dorsiflexion) && (
                         <div className="col-span-full mt-2">
                           <h4
                             className={`text-sm font-semibold ${theme.text} mb-3`}
@@ -319,7 +319,7 @@ export default function MobilityMetricsPage() {
                             Ankle Mobility
                           </h4>
                           <div className="grid grid-cols-2 gap-3">
-                            {metric.left_ankle_dorsiflexion && (
+                            {(metric as any).left_ankle_dorsiflexion && (
                               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                                 <span
                                   className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
@@ -329,11 +329,11 @@ export default function MobilityMetricsPage() {
                                 <p
                                   className={`text-lg font-bold ${theme.text}`}
                                 >
-                                  {metric.left_ankle_dorsiflexion}°
+                                  {(metric as any).left_ankle_dorsiflexion}°
                                 </p>
                               </div>
                             )}
-                            {metric.right_ankle_dorsiflexion && (
+                            {(metric as any).right_ankle_dorsiflexion && (
                               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                                 <span
                                   className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
@@ -343,7 +343,7 @@ export default function MobilityMetricsPage() {
                                 <p
                                   className={`text-lg font-bold ${theme.text}`}
                                 >
-                                  {metric.right_ankle_dorsiflexion}°
+                                  {(metric as any).right_ankle_dorsiflexion}°
                                 </p>
                               </div>
                             )}
@@ -352,7 +352,7 @@ export default function MobilityMetricsPage() {
                       )}
 
                       {/* Overall Score */}
-                      {metric.overall_score && (
+                      {(metric as any).overall_score && (
                         <div className="col-span-full mt-2">
                           <div className="p-4 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800">
                             <span
@@ -363,7 +363,7 @@ export default function MobilityMetricsPage() {
                             <p
                               className={`text-3xl font-bold text-green-600 dark:text-green-400`}
                             >
-                              {metric.overall_score}/100
+                              {(metric as any).overall_score}/100
                             </p>
                           </div>
                         </div>
@@ -454,7 +454,7 @@ export default function MobilityMetricsPage() {
                 assessmentType={formData.assessment_type || "overall"}
                 formData={formData}
                 setFormData={setFormData}
-                clientId={user.id}
+                clientId={user?.id || ''}
                 recordId={editingMetric?.id}
               />
 
@@ -486,6 +486,7 @@ export default function MobilityMetricsPage() {
               </div>
             </form>
           </ResponsiveModal>
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

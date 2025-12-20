@@ -702,6 +702,7 @@ export default function AvailabilitySettings() {
             </div>
           </div>
         </div>
+        </div>
       </AnimatedBackground>
     </ProtectedRoute>
   )

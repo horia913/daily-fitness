@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Bell, X } from 'lucide-react'
-import { requestPushPermission, getPermissionStatus } from '@/lib/oneSignal'
+import { requestPushPermission, getPermissionStatus } from '@/lib/onesignal'
 import { useTheme } from '@/contexts/ThemeContext'
 
 export default function NotificationPrompt() {

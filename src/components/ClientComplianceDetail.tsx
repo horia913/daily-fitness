@@ -408,7 +408,7 @@ export default function ClientComplianceDetailComponent({
               </div>
               <div>
                 <div className={`text-3xl font-bold ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>
-                  {clientData.alerts.filter(a => !a.is_resolved).length}
+                  {clientData.alerts.filter((a: any) => !a.is_resolved).length}
                 </div>
                 <div className={`text-sm font-medium ${theme.textSecondary}`}>Active Alerts</div>
                 <div className={`text-xs ${theme.textSecondary} mt-1`}>

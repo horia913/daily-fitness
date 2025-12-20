@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Slider } from '@/components/ui/slider'
+// Slider component removed - using input instead
 import { Badge } from '@/components/ui/badge'
 import { 
   X, 
@@ -402,12 +402,13 @@ export default function SetLoggingForm({
                             <span className={`text-sm font-medium ${getRpeColor(formData.rpe)}`}>/10</span>
                           </div>
                         </div>
-                        <Slider
-                          value={[formData.rpe]}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, rpe: value[0] }))}
-                          max={10}
+                        <Input
+                          type="range"
                           min={1}
+                          max={10}
                           step={1}
+                          value={formData.rpe}
+                          onChange={(e) => setFormData(prev => ({ ...prev, rpe: parseInt(e.target.value) }))}
                           className="w-full"
                         />
                         <div className="flex justify-between text-xs mt-2">

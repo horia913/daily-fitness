@@ -903,6 +903,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
           )}
         </div>
       </div>
+      </div>
     </AnimatedBackground>
   )
 }

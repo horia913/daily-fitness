@@ -735,6 +735,7 @@ export default function CoachSessions() {
             </Dialog>
           </div>
         </div>
+        </div>
       </AnimatedBackground>
     </ProtectedRoute>
   )

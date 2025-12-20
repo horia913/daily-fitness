@@ -74,7 +74,7 @@ export default function ExerciseSelector({ isOpen, onClose, onSelect, templateId
           setExercises(exerciseData)
           
           // Extract unique categories
-          const uniqueCategories = [...new Set(exerciseData.map((ex: any) => ex.category))].sort()
+          const uniqueCategories = [...new Set(exerciseData.map((ex: any) => ex.category))].sort() as string[]
           setCategories(uniqueCategories)
         } else {
           // Sample data

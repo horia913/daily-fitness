@@ -141,7 +141,7 @@ export default function ExerciseCategories() {
               </div>
             </div>
           </div>
-        </AnimatedBackground>
+        </div>
       </ProtectedRoute>
     )
   }
@@ -534,6 +534,7 @@ export default function ExerciseCategories() {
               category={editingCategory}
             />
           </div>
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

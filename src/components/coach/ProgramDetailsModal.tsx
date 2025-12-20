@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useTheme } from '@/contexts/ThemeContext'
-import { Program, WorkoutTemplate, Exercise, ExerciseCategory } from '@/lib/database'
+import { Program, WorkoutTemplate, Exercise, ExerciseCategory } from '@/lib/workoutTemplateService'
 import { 
   X, 
   Calendar, 
@@ -163,7 +163,7 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
               <CardContent className="p-6 pt-0">
                 <div className="grid grid-cols-7 gap-2">
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => {
-                    const dayWorkouts = program.program_schedule?.filter((s: any) => s.day_of_week === index) || []
+                    const dayWorkouts = (program.schedule as any)?.filter((s: any) => s.program_day === index + 1) || []
                     return (
                       <div key={day} className={`p-3 rounded-lg ${theme.card} border ${theme.border} text-center`}>
                         <h4 className={`font-semibold ${theme.text} mb-2`}>{day.slice(0, 3)}</h4>

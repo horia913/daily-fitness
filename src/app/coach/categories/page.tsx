@@ -207,7 +207,7 @@ export default function WorkoutCategories() {
               </div>
             </div>
           </div>
-        </AnimatedBackground>
+        </div>
       </ProtectedRoute>
     )
   }
@@ -594,6 +594,7 @@ export default function WorkoutCategories() {
               colors={categoryColors}
             />
           </div>
+        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

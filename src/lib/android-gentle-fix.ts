@@ -18,12 +18,12 @@ export const applyAndroidGentleFix = () => {
   // Only apply minimal, safe fixes
   const applyGentleFixes = () => {
     // Fix body rendering
-    document.body.style.webkitTextSizeAdjust = '100%'
-    document.body.style.webkitFontSmoothing = 'antialiased'
+    ;(document.body.style as any).webkitTextSizeAdjust = '100%'
+    ;(document.body.style as any).webkitFontSmoothing = 'antialiased'
     
     // Fix scrolling
-    document.documentElement.style.webkitOverflowScrolling = 'touch'
-    document.body.style.webkitOverflowScrolling = 'touch'
+    ;(document.documentElement.style as any).webkitOverflowScrolling = 'touch'
+    ;(document.body.style as any).webkitOverflowScrolling = 'touch'
     
     // Add Android-specific class to body (should already be there from MobileCompatibilityProvider)
     if (!document.body.classList.contains('android-device')) {

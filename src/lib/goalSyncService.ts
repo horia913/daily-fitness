@@ -72,7 +72,7 @@ export async function syncStrengthGoal(
     // Step 2: Get current goal value
     const { data: goal, error: goalError } = await supabaseAdmin
       .from('goals')
-      .select('current_value, progress_percentage, target_value, status')
+      .select('current_value, progress_percentage, target_value, status, completed_date')
       .eq('id', goalId)
       .single()
 
@@ -196,7 +196,7 @@ export async function syncBodyCompositionGoal(
     // Step 2: Get goal info
     const { data: goal, error: goalError } = await supabaseAdmin
       .from('goals')
-      .select('current_value, progress_percentage, target_value, status, created_at')
+      .select('current_value, progress_percentage, target_value, status, created_at, completed_date')
       .eq('id', goalId)
       .single()
 
@@ -354,7 +354,7 @@ export async function syncWorkoutConsistencyGoal(
     // Step 3: Get goal info
     const { data: goal, error: goalError } = await supabaseAdmin
       .from('goals')
-      .select('current_value, progress_percentage, target_value, status')
+      .select('current_value, progress_percentage, target_value, status, completed_date')
       .eq('id', goalId)
       .single()
 
@@ -481,7 +481,7 @@ export async function syncNutritionTrackingGoal(
     // Step 3: Get goal info
     const { data: goal, error: goalError } = await supabaseAdmin
       .from('goals')
-      .select('current_value, progress_percentage, target_value, status')
+      .select('current_value, progress_percentage, target_value, status, completed_date')
       .eq('id', goalId)
       .single()
 

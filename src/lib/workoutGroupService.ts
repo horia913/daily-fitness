@@ -85,10 +85,10 @@ export class WorkoutGroupService {
             exercise_id: exerciseData.exercise_id,
             group_id: groupId,
             group_letter: 'A',
-            sets: exerciseData.sets ? parseInt(exerciseData.sets) : null,
+            sets: exerciseData.sets ? parseInt(exerciseData.sets) : undefined,
             reps: exerciseData.reps || null,
-            rest_seconds: exerciseData.rest_seconds ? parseInt(exerciseData.rest_seconds) : null,
-            rir: exerciseData.rir ? parseInt(exerciseData.rir) : null,
+            rest_seconds: exerciseData.rest_seconds ? parseInt(exerciseData.rest_seconds) : undefined,
+            rir: exerciseData.rir ? parseInt(exerciseData.rir) : undefined,
             tempo: exerciseData.tempo || null,
             notes: exerciseData.notes || null
           })
@@ -100,9 +100,9 @@ export class WorkoutGroupService {
             exercise_id: exerciseData.superset_exercise_id,
             group_id: groupId,
             group_letter: 'B',
-            sets: exerciseData.superset_reps || exerciseData.sets ? parseInt(exerciseData.superset_reps || exerciseData.sets) : null,
+            sets: exerciseData.superset_reps || exerciseData.sets ? parseInt(exerciseData.superset_reps || exerciseData.sets) : undefined,
             reps: exerciseData.reps || null,
-            rest_seconds: exerciseData.rest_seconds ? parseInt(exerciseData.rest_seconds) : null,
+            rest_seconds: exerciseData.rest_seconds ? parseInt(exerciseData.rest_seconds) : undefined,
             notes: exerciseData.notes || null
           })
         }
@@ -117,9 +117,9 @@ export class WorkoutGroupService {
               exercise_id: ex.exercise_id,
               group_id: groupId,
               group_letter: String.fromCharCode(65 + index), // A, B, C, D...
-              sets: ex.sets ? parseInt(ex.sets) : null,
+              sets: ex.sets ? parseInt(ex.sets) : undefined,
               reps: ex.reps || null,
-              rest_seconds: ex.rest_seconds ? parseInt(ex.rest_seconds) : null,
+              rest_seconds: ex.rest_seconds ? parseInt(ex.rest_seconds) : undefined,
               notes: ex.notes || null
             })
           })
@@ -137,9 +137,9 @@ export class WorkoutGroupService {
                   exercise_id: ex.exercise_id,
                   group_id: groupId,
                   group_letter: String.fromCharCode(65 + index),
-                  work_seconds: ex.work_seconds ? parseInt(ex.work_seconds) : null,
-                  rest_seconds: ex.rest_seconds ? parseInt(ex.rest_seconds) : null,
-                  sets: ex.sets ? parseInt(ex.sets) : null,
+                  work_seconds: ex.work_seconds ? parseInt(ex.work_seconds) : undefined,
+                  rest_seconds: ex.rest_seconds ? parseInt(ex.rest_seconds) : undefined,
+                  sets: ex.sets ? parseInt(ex.sets) : undefined,
                   reps: ex.reps || null,
                   notes: ex.notes || null
                 })
@@ -160,8 +160,8 @@ export class WorkoutGroupService {
                   exercise_id: ex.exercise_id,
                   group_id: groupId,
                   group_letter: String.fromCharCode(65 + index),
-                  work_seconds: ex.work_seconds ? parseInt(ex.work_seconds) : null,
-                  rest_seconds: ex.rest_seconds ? parseInt(ex.rest_seconds) : null,
+                  work_seconds: ex.work_seconds ? parseInt(ex.work_seconds) : undefined,
+                  rest_seconds: ex.rest_seconds ? parseInt(ex.rest_seconds) : undefined,
                   notes: ex.notes || null
                 })
               })
@@ -179,7 +179,7 @@ export class WorkoutGroupService {
               template_id: templateId,
               exercise_id: exerciseData.exercise_id,
               group_id: groupId,
-              group_letter: null,
+              group_letter: undefined,
               weight_kg: drop.weight_kg || null,
               reps: drop.reps || exerciseData.reps || null,
               rest_seconds: drop.rest_seconds ? parseInt(drop.rest_seconds) : 0,
@@ -198,10 +198,10 @@ export class WorkoutGroupService {
               template_id: templateId,
               exercise_id: exerciseData.exercise_id,
               group_id: groupId,
-              group_letter: null,
+              group_letter: undefined,
               weight_kg: pyramid.weight_kg || null,
               reps: pyramid.reps || null,
-              rest_seconds: pyramid.rest_seconds ? parseInt(pyramid.rest_seconds) : null,
+              rest_seconds: pyramid.rest_seconds ? parseInt(pyramid.rest_seconds) : undefined,
               notes: pyramid.notes || exerciseData.notes || null
             })
           })
@@ -217,9 +217,9 @@ export class WorkoutGroupService {
             exercise_id: exerciseData.exercise_id,
             group_id: groupId,
             group_letter: 'A',
-            sets: exerciseData.sets ? parseInt(exerciseData.sets) : null,
+            sets: exerciseData.sets ? parseInt(exerciseData.sets) : undefined,
             reps: exerciseData.isolation_reps || exerciseData.reps || null,
-            rest_seconds: exerciseData.rest_seconds ? parseInt(exerciseData.rest_seconds) : null,
+            rest_seconds: exerciseData.rest_seconds ? parseInt(exerciseData.rest_seconds) : undefined,
             notes: exerciseData.notes || null
           })
           
@@ -229,9 +229,9 @@ export class WorkoutGroupService {
             exercise_id: exerciseData.compound_exercise_id,
             group_id: groupId,
             group_letter: 'B',
-            sets: exerciseData.sets ? parseInt(exerciseData.sets) : null,
+            sets: exerciseData.sets ? parseInt(exerciseData.sets) : undefined,
             reps: exerciseData.compound_reps || exerciseData.reps || null,
-            rest_seconds: exerciseData.rest_seconds ? parseInt(exerciseData.rest_seconds) : null,
+            rest_seconds: exerciseData.rest_seconds ? parseInt(exerciseData.rest_seconds) : undefined,
             notes: exerciseData.notes || null
           })
         }
@@ -250,8 +250,8 @@ export class WorkoutGroupService {
               template_id: templateId,
               exercise_id: ex.exercise_id || exerciseData.exercise_id,
               group_id: groupId,
-              group_letter: exerciseList.length > 1 ? String.fromCharCode(65 + index) : null,
-              sets: ex.sets ? parseInt(ex.sets) : (exerciseData.sets ? parseInt(exerciseData.sets) : null),
+              group_letter: exerciseList.length > 1 ? String.fromCharCode(65 + index) : undefined,
+              sets: ex.sets ? parseInt(ex.sets) : (exerciseData.sets ? parseInt(exerciseData.sets) : undefined),
               reps: ex.reps || exerciseData.reps || null,
               notes: ex.notes || exerciseData.notes || null
             })
@@ -262,8 +262,8 @@ export class WorkoutGroupService {
             template_id: templateId,
             exercise_id: exerciseData.exercise_id,
             group_id: groupId,
-            group_letter: null,
-            sets: exerciseData.sets ? parseInt(exerciseData.sets) : null,
+            group_letter: undefined,
+            sets: exerciseData.sets ? parseInt(exerciseData.sets) : undefined,
             reps: exerciseData.reps || null,
             notes: exerciseData.notes || null
           })
@@ -280,11 +280,11 @@ export class WorkoutGroupService {
             template_id: templateId,
             exercise_id: exerciseData.exercise_id,
             group_id: groupId,
-            group_letter: null,
-            sets: exerciseData.sets ? parseInt(exerciseData.sets) : null,
+            group_letter: undefined,
+            sets: exerciseData.sets ? parseInt(exerciseData.sets) : undefined,
             reps: exerciseData.reps || null,
-            rest_seconds: exerciseData.rest_seconds ? parseInt(exerciseData.rest_seconds) : null,
-            rir: exerciseData.rir ? parseInt(exerciseData.rir) : null,
+            rest_seconds: exerciseData.rest_seconds ? parseInt(exerciseData.rest_seconds) : undefined,
+            rir: exerciseData.rir ? parseInt(exerciseData.rir) : undefined,
             tempo: exerciseData.tempo || null,
             weight_kg: exerciseData.weight_kg || null,
             notes: exerciseData.notes || null

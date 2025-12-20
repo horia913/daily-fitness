@@ -1182,7 +1182,7 @@ export default function EnhancedWorkoutTemplateManager({
           onEdit={(template) => {
             setShowTemplateDetails(false);
             setSelectedTemplate(null);
-            setEditingTemplate(template);
+            setEditingTemplate(template as WorkoutTemplate);
             setShowTemplateBuilder(true);
           }}
         />
@@ -1556,8 +1556,9 @@ function WorkoutTemplateCard({
   const getPrimaryCategory = () => {
     if (template.exercises && template.exercises.length > 0) {
       const firstExercise = template.exercises[0];
+      const category = firstExercise.exercise?.category;
       return (
-        firstExercise.exercise?.category?.name || template.category || "General"
+        (typeof category === 'string' ? category : (category as any)?.name) || template.category || "General"
       );
     }
     return template.category || "General";

@@ -54,7 +54,7 @@ export function ForTimeExecutor({
     exercisesData: exercises?.map(ex => ({
       id: ex.id,
       exercise_id: ex.exercise_id,
-      name: ex.name,
+      name: (ex as any).name || ex.exercise?.name,
       keys: Object.keys(ex)
     })),
     allBlockData: block
@@ -285,11 +285,11 @@ export function ForTimeExecutor({
 
     // For For Time, exercise_id is optional (can be null)
     // Try to get exercise_id if available, but don't require it
-    let exerciseIdToUse = currentExercise?.exercise_id;
+    let exerciseIdToUse: string | undefined = currentExercise?.exercise_id;
     if (!exerciseIdToUse && exercises.length > 0) {
       // Try to find any exercise with an exercise_id
       const exerciseWithId = exercises.find((ex) => ex.exercise_id);
-      exerciseIdToUse = exerciseWithId?.exercise_id || null;
+      exerciseIdToUse = exerciseWithId?.exercise_id || undefined;
     }
 
     console.log("ForTimeExecutor handleLog: exercise_id check", {

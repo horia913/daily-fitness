@@ -42,7 +42,7 @@ export default function CreateMealPlanPage() {
         name: formData.name,
         target_calories: formData.target_calories
           ? parseInt(formData.target_calories)
-          : null,
+          : undefined,
         coach_id: user.id,
         is_active: true,
       });

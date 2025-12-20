@@ -62,7 +62,7 @@ export function OptimizedImage({
     ? ImageTransform.getOptimizedImageUrl(src, {
         width,
         height,
-        quality: IMAGE_QUALITY[quality],
+        quality: IMAGE_QUALITY[quality.toUpperCase() as keyof typeof IMAGE_QUALITY],
         format,
         resize: 'cover'
       })
@@ -229,7 +229,7 @@ export function ResponsiveImage({
           media="(min-width: 1024px)"
           srcSet={ImageTransform.getOptimizedImageUrl(src, {
             ...IMAGE_SIZES.DESKTOP,
-            quality: IMAGE_QUALITY.high,
+            quality: IMAGE_QUALITY.HIGH,
             format: 'webp'
           })}
           type="image/webp"
@@ -242,7 +242,7 @@ export function ResponsiveImage({
           media="(min-width: 640px)"
           srcSet={ImageTransform.getOptimizedImageUrl(src, {
             ...IMAGE_SIZES.TABLET,
-            quality: IMAGE_QUALITY.medium,
+            quality: IMAGE_QUALITY.MEDIUM,
             format: 'webp'
           })}
           type="image/webp"
@@ -255,7 +255,7 @@ export function ResponsiveImage({
           media="(max-width: 639px)"
           srcSet={ImageTransform.getOptimizedImageUrl(src, {
             ...IMAGE_SIZES.MOBILE,
-            quality: IMAGE_QUALITY.medium,
+            quality: IMAGE_QUALITY.MEDIUM,
             format: 'webp'
           })}
           type="image/webp"

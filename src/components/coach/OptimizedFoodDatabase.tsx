@@ -368,7 +368,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                 Refresh
               </Button>
               <Button
-                onClick={() => setShowAddFood(true)}
+                onClick={() => setShowAddForm(true)}
                 style={{ backgroundColor: '#6C5CE7', borderRadius: '20px', padding: '16px 32px', fontSize: '16px', fontWeight: '600', color: '#FFFFFF' }}
               >
                 <Plus className="w-4 h-4 mr-2" />

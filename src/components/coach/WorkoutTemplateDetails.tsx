@@ -77,7 +77,10 @@ export default function WorkoutTemplateDetails({
     }
   };
 
-  const CategoryIcon = getCategoryIcon(template.category || "");
+  const categoryName = typeof (template as any).category === 'string' 
+    ? (template as any).category 
+    : (template as any).category?.name || ''
+  const CategoryIcon = getCategoryIcon(categoryName);
 
   useEffect(() => {
     if (isOpen && template) {
@@ -166,8 +169,8 @@ export default function WorkoutTemplateDetails({
                   ex.rest_seconds?.toString() ||
                   block.rest_seconds?.toString() ||
                   "",
-                work_seconds: ex.work_seconds?.toString(),
-                rest_after: ex.rest_after?.toString(),
+                work_seconds: (ex as any).work_seconds?.toString(),
+                rest_after: (ex as any).rest_after?.toString(),
                 exercise: ex.exercise,
               })) || [];
 
@@ -346,7 +349,9 @@ export default function WorkoutTemplateDetails({
                 <p
                   className={`text-xs sm:text-sm ${theme.textSecondary} mt-1 break-words`}
                 >
-                  {template.category || "General"} • {template.difficulty_level}
+                  {typeof (template as any).category === 'string' 
+                    ? (template as any).category 
+                    : (template as any).category?.name || "General"} • {template.difficulty_level}
                 </p>
               </div>
             </div>
@@ -425,7 +430,7 @@ export default function WorkoutTemplateDetails({
                       </span>
                     </div>
                     <p className={`text-2xl font-bold ${theme.text}`}>
-                      {template.usage_count || 0}
+                      {(template as any).usage_count || 0}
                     </p>
                   </div>
 
@@ -439,7 +444,7 @@ export default function WorkoutTemplateDetails({
                       </span>
                     </div>
                     <p className={`text-2xl font-bold ${theme.text}`}>
-                      {template.rating || 0}
+                      {(template as any).rating || 0}
                     </p>
                   </div>
                 </div>
@@ -510,7 +515,7 @@ export default function WorkoutTemplateDetails({
                           exercise={exercise}
                           index={index}
                           availableExercises={availableExercisesList}
-                          renderMode="details"
+                          renderMode="view"
                         />
                       );
                     })}

@@ -624,8 +624,8 @@ export default function WorkoutTemplateDetailsPage() {
                           ex.rest_seconds?.toString() ||
                           block.rest_seconds?.toString() ||
                           "",
-                        work_seconds: ex.work_seconds?.toString(),
-                        rest_after: ex.rest_after?.toString(),
+                        work_seconds: (ex as any).work_seconds?.toString(),
+                        rest_after: (ex as any).rest_after?.toString(),
                         exercise: ex.exercise,
                       })) || [];
 
@@ -775,7 +775,7 @@ export default function WorkoutTemplateDetailsPage() {
                       exercise={exercise}
                       index={index}
                       availableExercises={availableExercises}
-                      renderMode="details"
+                      renderMode="view"
                     />
                   );
                 })}
