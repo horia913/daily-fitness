@@ -144,22 +144,163 @@ export class ProgramProgressionService {
 
       // 3. Insert into program_progression_rules
       // Ensure we never include legacy fields like template_exercise_id
+      // Also ensure reps fields are strings (can contain ranges like "12-15")
+      // AND ensure integer fields are actually integers (not strings like "12-15")
       const sanitizedProgressionRules = progressionRules.map((rule: any) => {
         const { template_exercise_id, ...rest } = rule
-        return rest
+        const sanitized: any = { ...rest }
+        
+        // Ensure INTEGER fields are actually integers (not strings or ranges)
+        // These fields should only contain numbers
+        const integerFields = ['sets', 'rest_seconds', 'rir', 'exercise_order', 'block_order', 'week_number', 
+          'weight_reduction_percentage', 'reps_per_cluster', 'clusters_per_set', 'intra_cluster_rest',
+          'rest_pause_duration', 'max_rest_pauses', 'duration_minutes', 'target_reps', 'work_seconds', 
+          'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise', 'pyramid_order', 'ladder_order',
+          'rest_between_pairs']
+        
+        for (const field of integerFields) {
+          if (sanitized[field] !== undefined && sanitized[field] !== null) {
+            // If it's already a number, keep it
+            if (typeof sanitized[field] === 'number') {
+              continue
+            }
+            // If it's a string that looks like a number, parse it
+            const strValue = String(sanitized[field])
+            // Handle ranges like "12-15" by taking first number
+            const numValue = parseInt(strValue.split('-')[0], 10)
+            if (!isNaN(numValue)) {
+              sanitized[field] = numValue
+            } else {
+              // If it can't be parsed, remove it to avoid errors
+              delete sanitized[field]
+            }
+          }
+        }
+        
+        // Convert all TEXT reps fields to strings (preserving ranges like "12-15")
+        // NOTE: These should be TEXT in database, but handle both TEXT and INTEGER cases
+        const stringRepsFields = ['reps', 'first_exercise_reps', 'second_exercise_reps', 'exercise_reps', 'drop_set_reps', 'isolation_reps', 'compound_reps']
+        for (const field of stringRepsFields) {
+          if (sanitized[field] !== undefined && sanitized[field] !== null) {
+            const value = sanitized[field]
+            const strValue = String(value)
+            // Check if it's a range like "12-15"
+            if (strValue.includes('-') && /^\d+-\d+$/.test(strValue.trim())) {
+              // It's a range - store as string for TEXT columns
+              // If column is INTEGER, this will fail and we'll need to handle it differently
+              sanitized[field] = strValue
+            } else if (typeof value === 'string') {
+              sanitized[field] = value
+            } else if (typeof value === 'number') {
+              sanitized[field] = String(value)
+            } else {
+              sanitized[field] = String(value)
+            }
+          }
+        }
+        
+        return sanitized
       })
 
+      // Log a sample rule to debug any type issues
+      if (sanitizedProgressionRules.length > 0) {
+        const sample = sanitizedProgressionRules[0]
+        console.log('[ProgressionCopy] Sample rule before insert:', {
+          exercise_id: sample.exercise_id,
+          block_type: sample.block_type,
+          reps: sample.reps,
+          repsType: typeof sample.reps,
+          sets: sample.sets,
+          setsType: typeof sample.sets,
+          exercise_order: sample.exercise_order,
+          exerciseOrderType: typeof sample.exercise_order,
+          rest_seconds: sample.rest_seconds,
+          restSecondsType: typeof sample.rest_seconds,
+          rest_between_pairs: sample.rest_between_pairs,
+          restBetweenPairsType: typeof sample.rest_between_pairs,
+        })
+        
+        // Final validation: ensure no integer field has a string rep range
+        for (const rule of sanitizedProgressionRules) {
+          const integerFields = ['sets', 'rest_seconds', 'rir', 'exercise_order', 'block_order', 'week_number', 
+            'rest_between_pairs', 'weight_reduction_percentage', 'reps_per_cluster', 'clusters_per_set', 
+            'intra_cluster_rest', 'rest_pause_duration', 'max_rest_pauses', 'duration_minutes', 'target_reps', 
+            'work_seconds', 'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise', 
+            'pyramid_order', 'ladder_order']
+          
+          for (const field of integerFields) {
+            if (rule[field] !== undefined && rule[field] !== null) {
+              const value = rule[field]
+              // Check if it's a string that contains a dash (like "12-15")
+              if (typeof value === 'string' && value.includes('-')) {
+                console.warn(`[ProgressionCopy] WARNING: Integer field "${field}" has rep range value:`, value)
+                // Parse to get first number
+                const parsed = parseInt(value.split('-')[0], 10)
+                if (!isNaN(parsed)) {
+                  rule[field] = parsed
+                  console.log(`[ProgressionCopy] Converted "${field}" from "${value}" to ${parsed}`)
+                } else {
+                  delete rule[field]
+                }
+              }
+            }
+          }
+        }
+      }
+      
       console.log('[ProgressionCopy] Inserting rules', {
         insertCount: sanitizedProgressionRules.length,
         programId,
         programScheduleId,
       })
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('program_progression_rules')
         .insert(sanitizedProgressionRules)
         .select()
       
-      if (error) {
+      // If error is about integer column receiving "12-15", try parsing rep ranges
+      if (error && error.code === '22P02' && error.message?.includes('"12-15"')) {
+        console.log('[ProgressionCopy] Retrying with parsed rep ranges (database may have INTEGER reps column)')
+        // Re-sanitize: if reps fields contain ranges, parse to first number for INTEGER columns
+        const reSanitized = sanitizedProgressionRules.map((rule: any) => {
+          const sanitized: any = { ...rule }
+          // If reps is a range like "12-15", parse it to integer (first number)
+          // This handles case where database column is INTEGER instead of TEXT
+          if (sanitized.reps && typeof sanitized.reps === 'string' && sanitized.reps.includes('-')) {
+            const parsed = parseInt(sanitized.reps.split('-')[0], 10)
+            if (!isNaN(parsed)) {
+              sanitized.reps = parsed
+              console.log(`[ProgressionCopy] Parsed reps range "${rule.reps}" to integer ${parsed}`)
+            }
+          }
+          // Same for other reps fields
+          const repsFields = ['first_exercise_reps', 'second_exercise_reps', 'exercise_reps', 'drop_set_reps', 'isolation_reps', 'compound_reps']
+          for (const field of repsFields) {
+            if (sanitized[field] && typeof sanitized[field] === 'string' && sanitized[field].includes('-')) {
+              const parsed = parseInt(sanitized[field].split('-')[0], 10)
+              if (!isNaN(parsed)) {
+                sanitized[field] = parsed
+                console.log(`[ProgressionCopy] Parsed ${field} range "${rule[field]}" to integer ${parsed}`)
+              }
+            }
+          }
+          return sanitized
+        })
+        
+        // Retry insert with parsed values
+        const retryResult = await supabase
+          .from('program_progression_rules')
+          .insert(reSanitized)
+          .select()
+        
+        if (retryResult.error) {
+          console.error('❌ Error inserting progression rules (after retry):', retryResult.error)
+          throw retryResult.error
+        }
+        
+        data = retryResult.data
+        error = null
+      } else if (error) {
         console.error('❌ Error inserting progression rules:', error)
         throw error
       }
@@ -492,7 +633,7 @@ export class ProgramProgressionService {
             exercise_order: exercise.exercise_order,
             duration_minutes: amrapTimeProtocol?.total_duration_minutes || block.duration_seconds ? Math.floor((block.duration_seconds || 0) / 60) : undefined,
             reps: exercise.reps || undefined,
-            target_reps: exercise.reps ? parseInt(exercise.reps) : undefined,
+            target_reps: exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined,
             tempo: exercise.tempo || undefined,
             notes: exercise.notes || undefined,
           })
@@ -508,7 +649,7 @@ export class ProgramProgressionService {
             exercise_order: exercise.exercise_order,
             emom_mode: 'target_reps', // or 'target_time'
             duration_minutes: emomTimeProtocol?.total_duration_minutes || undefined,
-            target_reps: exercise.reps ? parseInt(exercise.reps) : undefined,
+            target_reps: exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined,
             work_seconds: emomTimeProtocol?.work_seconds || undefined,
             tempo: exercise.tempo || undefined,
             notes: exercise.notes || undefined,
@@ -540,7 +681,7 @@ export class ProgramProgressionService {
             ...baseRule,
             exercise_id: exercise.exercise_id,
             exercise_order: exercise.exercise_order,
-            target_reps: exercise.reps ? parseInt(exercise.reps) : undefined,
+            target_reps: exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined,
             time_cap_minutes: forTimeProtocol?.total_duration_minutes || undefined,
             tempo: exercise.tempo || undefined,
             notes: exercise.notes || undefined,

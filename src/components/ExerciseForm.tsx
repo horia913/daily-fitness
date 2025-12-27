@@ -17,13 +17,10 @@ import {
   Dumbbell, 
   Target, 
   Clock, 
-  Users, 
   Image, 
   Video, 
   FileText, 
   Save, 
-  Eye,
-  EyeOff,
   CheckCircle,
   AlertCircle,
   Info
@@ -61,11 +58,6 @@ const equipmentOptions = [
   'Rowing Machine', 'Elliptical', 'Jump Rope'
 ]
 
-const difficultyLevels = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'advanced', label: 'Advanced' }
-]
 
 export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: ExerciseFormProps) {
   const { isDark, getThemeStyles } = useTheme()
@@ -76,12 +68,11 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
     description: '',
     category: '',
     muscle_groups: [] as string[],
-    equipment: [] as string[],
-    difficulty: 'beginner',
+    equipment_types: [] as string[],
     instructions: [''],
     tips: [''],
     video_url: '',
-    is_public: false
+    image_url: ''
   })
   const [categories, setCategories] = useState<ExerciseCategory[]>([])
   const [loading, setLoading] = useState(false)
@@ -89,7 +80,6 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
   const [newTip, setNewTip] = useState('')
   const [newMuscleGroup, setNewMuscleGroup] = useState('')
   const [newEquipment, setNewEquipment] = useState('')
-  const [showAdvanced, setShowAdvanced] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -100,12 +90,11 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
           description: exercise.description || '',
           category: exercise.category || '',
           muscle_groups: exercise.muscle_groups || [],
-          equipment: exercise.equipment || [],
-          difficulty: exercise.difficulty || 'beginner',
+          equipment_types: exercise.equipment_types || exercise.equipment || [],
           instructions: exercise.instructions?.length > 0 ? exercise.instructions : [''],
           tips: exercise.tips?.length > 0 ? exercise.tips : [''],
           video_url: exercise.video_url || '',
-          is_public: exercise.is_public || false
+          image_url: exercise.image_url || ''
         })
       } else {
         resetForm()
@@ -122,12 +111,40 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
 
       if (error) {
         console.error('Error loading categories:', error)
+        // Fallback to default categories if table doesn't exist
+        setCategories([
+          { id: '1', name: 'Strength', description: 'Strength training exercises', icon: '💪', color: '#8B5CF6' },
+          { id: '2', name: 'Cardio', description: 'Cardiovascular exercises', icon: '❤️', color: '#F97316' },
+          { id: '3', name: 'Flexibility', description: 'Flexibility and mobility', icon: '🧘', color: '#10B981' },
+          { id: '4', name: 'HIIT', description: 'High intensity interval training', icon: '⚡', color: '#EF4444' },
+          { id: '5', name: 'Yoga', description: 'Yoga and stretching', icon: '🧘‍♀️', color: '#6366F1' },
+        ])
+        return
+      }
+
+      if (!data || data.length === 0) {
+        // Fallback to default categories if no data
+        setCategories([
+          { id: '1', name: 'Strength', description: 'Strength training exercises', icon: '💪', color: '#8B5CF6' },
+          { id: '2', name: 'Cardio', description: 'Cardiovascular exercises', icon: '❤️', color: '#F97316' },
+          { id: '3', name: 'Flexibility', description: 'Flexibility and mobility', icon: '🧘', color: '#10B981' },
+          { id: '4', name: 'HIIT', description: 'High intensity interval training', icon: '⚡', color: '#EF4444' },
+          { id: '5', name: 'Yoga', description: 'Yoga and stretching', icon: '🧘‍♀️', color: '#6366F1' },
+        ])
         return
       }
 
       setCategories(data || [])
     } catch (error) {
       console.error('Error loading categories:', error)
+      // Fallback to default categories on error
+      setCategories([
+        { id: '1', name: 'Strength', description: 'Strength training exercises', icon: '💪', color: '#8B5CF6' },
+        { id: '2', name: 'Cardio', description: 'Cardiovascular exercises', icon: '❤️', color: '#F97316' },
+        { id: '3', name: 'Flexibility', description: 'Flexibility and mobility', icon: '🧘', color: '#10B981' },
+        { id: '4', name: 'HIIT', description: 'High intensity interval training', icon: '⚡', color: '#EF4444' },
+        { id: '5', name: 'Yoga', description: 'Yoga and stretching', icon: '🧘‍♀️', color: '#6366F1' },
+      ])
     }
   }, [])
 
@@ -137,16 +154,14 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
       description: '',
       category: '',
       muscle_groups: [],
-      equipment: [],
-      difficulty: 'beginner',
+      equipment_types: [],
       instructions: [''],
       tips: [''],
       video_url: '',
-      is_public: false
+      image_url: ''
     })
     setNewInstruction('')
     setNewTip('')
-    setShowAdvanced(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -154,37 +169,73 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
     setLoading(true)
 
     try {
+      // Validate required fields
+      if (!formData.name.trim()) {
+        alert('Please enter an exercise name')
+        setLoading(false)
+        return
+      }
+
+      if (!formData.category) {
+        alert('Please select a category')
+        setLoading(false)
+        return
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
-      const exerciseData = {
-        ...formData,
+      // Prepare data - only send fields that exist in database
+      const exerciseData: any = {
+        name: formData.name.trim(),
+        description: formData.description?.trim() || null,
+        category: formData.category,
         coach_id: user.id,
+        // Filter out empty strings and ensure arrays are not empty
         instructions: formData.instructions.filter(instruction => instruction.trim() !== ''),
         tips: formData.tips.filter(tip => tip.trim() !== ''),
-        muscle_groups: formData.muscle_groups,
-        equipment: formData.equipment,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        muscle_groups: formData.muscle_groups.length > 0 ? formData.muscle_groups : [],
+        equipment_types: formData.equipment_types.length > 0 ? formData.equipment_types : [],
+        video_url: formData.video_url?.trim() || null,
+        image_url: formData.image_url?.trim() || null
       }
+
+      // Remove null/undefined/empty values that might cause issues (keep description, video_url, image_url as they can be null)
+      Object.keys(exerciseData).forEach(key => {
+        if (exerciseData[key] === null || exerciseData[key] === undefined || exerciseData[key] === '') {
+          if (key !== 'description' && key !== 'video_url' && key !== 'image_url') {
+            delete exerciseData[key]
+          }
+        }
+      })
 
       try {
         if (exercise) {
-          const { error } = await supabase
+          const { error, data } = await supabase
             .from('exercises')
             .update(exerciseData)
             .eq('id', exercise.id)
+            .select()
 
-          if (error) throw error
+          if (error) {
+            console.error('Database update error:', error)
+            throw error
+          }
         } else {
-          const { error } = await supabase
+          const { error, data } = await supabase
             .from('exercises')
             .insert(exerciseData)
+            .select()
 
-          if (error) throw error
+          if (error) {
+            console.error('Database insert error:', error)
+            console.error('Error details:', JSON.stringify(error, null, 2))
+            console.error('Data being sent:', JSON.stringify(exerciseData, null, 2))
+            throw error
+          }
         }
-      } catch (dbError) {
-        console.log('Database not ready, using localStorage fallback')
+      } catch (dbError: any) {
+        console.log('Database error, using localStorage fallback:', dbError)
         
         const savedExercises = localStorage.getItem(`exercises_${user.id}`)
         let exercises = savedExercises ? JSON.parse(savedExercises) : []
@@ -200,12 +251,15 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
         localStorage.setItem(`exercises_${user.id}`, JSON.stringify(exercises))
       }
 
-      onSuccess()
-      onClose()
+      // Reset form and close modal
       resetForm()
-    } catch (error) {
+      onClose()
+      // Call onSuccess to trigger refresh in parent component
+      onSuccess()
+    } catch (error: any) {
       console.error('Error saving exercise:', error)
-      alert('Error saving exercise. Please try again.')
+      const errorMessage = error?.message || error?.details || 'Unknown error occurred'
+      alert(`Error saving exercise: ${errorMessage}. The exercise has been saved to local storage as a fallback.`)
     } finally {
       setLoading(false)
     }
@@ -229,10 +283,10 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
   }
 
   const addEquipment = () => {
-    if (newEquipment.trim() && !formData.equipment.includes(newEquipment.trim())) {
+    if (newEquipment.trim() && !formData.equipment_types.includes(newEquipment.trim())) {
       setFormData(prev => ({
         ...prev,
-        equipment: [...prev.equipment, newEquipment.trim()]
+        equipment_types: [...prev.equipment_types, newEquipment.trim()]
       }))
       setNewEquipment('')
     }
@@ -241,7 +295,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
   const removeEquipment = (equipment: string) => {
     setFormData(prev => ({
       ...prev,
-      equipment: prev.equipment.filter(e => e !== equipment)
+      equipment_types: prev.equipment_types.filter(e => e !== equipment)
     }))
   }
 
@@ -284,7 +338,15 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
   return (
     <div 
       className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 ${isDark ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/50 backdrop-blur-sm'}`}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => {
+        // Don't close if clicking on Select dropdown
+        if ((e.target as HTMLElement).closest('[data-slot="select-content"]')) {
+          return
+        }
+        if (e.target === e.currentTarget) {
+          onClose()
+        }
+      }}
       data-theme={isDark ? 'dark' : 'light'}
     >
       <div 
@@ -356,15 +418,21 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
                     value={formData.category}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
                   >
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue placeholder="Select category" />
+                    <SelectTrigger className="rounded-xl w-full">
+                      <SelectValue placeholder={categories.length > 0 ? "Select category" : "Loading categories..."} />
                     </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(category => (
-                        <SelectItem key={category.id} value={category.name}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="z-[10000]">
+                      {categories.length > 0 ? (
+                        categories.map(category => (
+                          <SelectItem key={category.id} value={category.name}>
+                            {category.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          Loading categories...
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -381,24 +449,6 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="difficulty" className={`text-sm font-medium ${theme.text}`}>Difficulty Level</Label>
-                  <Select
-                    value={formData.difficulty}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, difficulty: value }))}
-                  >
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {difficultyLevels.map(level => (
-                        <SelectItem key={level.value} value={level.value}>
-                          {level.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </CardContent>
             </Card>
 
@@ -465,13 +515,13 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
                     <CardTitle className={`text-lg font-bold ${theme.text}`}>Equipment</CardTitle>
                   </div>
                   <p className={`text-sm ${theme.textSecondary} mt-2`}>
-                    Select all required equipment ({formData.equipment.length} selected)
+                    Select all required equipment ({formData.equipment_types.length} selected)
                   </p>
                 </CardHeader>
                 <CardContent className="p-6 pt-0">
                   <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto">
                     {equipmentOptions.map(equipment => {
-                      const isSelected = formData.equipment.includes(equipment)
+                      const isSelected = formData.equipment_types.includes(equipment)
                       return (
                         <label
                           key={equipment}
@@ -488,7 +538,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
                               if (e.target.checked) {
                                 setFormData(prev => ({
                                   ...prev,
-                                  equipment: [...prev.equipment, equipment]
+                                  equipment_types: [...prev.equipment_types, equipment]
                                 }))
                               } else {
                                 removeEquipment(equipment)
@@ -659,43 +709,6 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
               </CardContent>
             </Card>
 
-            {/* Advanced Options */}
-            <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
-              <CardHeader className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                      <Users className={`w-5 h-5 ${theme.textSecondary}`} />
-                    </div>
-                    <CardTitle className={`text-lg font-bold ${theme.text}`}>Visibility</CardTitle>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className={`p-2 rounded-xl transition-all duration-200 ${theme.textSecondary} hover:${theme.text} hover:${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}
-                  >
-                    {showAdvanced ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </CardHeader>
-              {showAdvanced && (
-                <CardContent className="p-6 pt-0">
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id="is_public"
-                      checked={formData.is_public}
-                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_public: !!checked }))}
-                      className="rounded"
-                    />
-                    <Label htmlFor="is_public" className={`text-sm ${theme.textSecondary}`}>
-                      Make this exercise public (other coaches can see it)
-                    </Label>
-                  </div>
-                </CardContent>
-              )}
-            </Card>
           </form>
         </div>
 

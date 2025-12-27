@@ -877,49 +877,48 @@ function EditProgramContent() {
                                 );
                               setSchedule(sched || []);
 
-                              // Auto-fill logic: If Week 1 is being set, apply to all empty weeks
+                              // Auto-fill logic: If Week 1 is being set, apply to ALL other weeks
                               if (selectedWeek === 1) {
                                 const totalWeeks = form.duration_weeks || 1;
                                 const autoFillPromises: Promise<any>[] = [];
-                                const weeksToFill: number[] = [];
+                                const weeksUpdated: number[] = [];
 
                                 // Get the complete Week 1 schedule
                                 const week1Schedule = (sched || []).filter(
                                   (s) => (s.week_number || 1) === 1
                                 );
 
+                                // Copy Week 1 schedule to ALL other weeks (2, 3, 4, etc.)
                                 for (let week = 2; week <= totalWeeks; week++) {
-                                  // Check if this week is completely empty (all 7 days have no workouts)
-                                  const weekSchedule = (sched || []).filter(
-                                    (s) => (s.week_number || 1) === week
-                                  );
-                                  const hasAnyWorkout = weekSchedule.some(
-                                    (s) =>
-                                      s.template_id && s.template_id !== "rest"
-                                  );
-
-                                  // If week has no workouts, copy entire Week 1 schedule to this week
-                                  if (
-                                    !hasAnyWorkout &&
-                                    week1Schedule.length > 0
-                                  ) {
-                                    weeksToFill.push(week);
-                                    // Copy all Week 1 workouts to this week
-                                    for (const week1Item of week1Schedule) {
-                                      if (
-                                        week1Item.template_id &&
-                                        week1Item.template_id !== "rest"
-                                      ) {
-                                        autoFillPromises.push(
-                                          WorkoutTemplateService.setProgramSchedule(
-                                            form.id,
-                                            week1Item.program_day,
-                                            week,
-                                            week1Item.template_id
-                                          )
-                                        );
-                                      }
+                                  // Copy all Week 1 workouts to this week
+                                  // This will overwrite existing workouts for that day/week combination
+                                  for (const week1Item of week1Schedule) {
+                                    if (
+                                      week1Item.template_id &&
+                                      week1Item.template_id !== "rest"
+                                    ) {
+                                      autoFillPromises.push(
+                                        WorkoutTemplateService.setProgramSchedule(
+                                          form.id,
+                                          week1Item.program_day,
+                                          week,
+                                          week1Item.template_id
+                                        )
+                                      );
+                                    } else if (week1Item.template_id === "rest" || !week1Item.template_id) {
+                                      // Also copy rest days - remove schedule for that day/week
+                                      autoFillPromises.push(
+                                        WorkoutTemplateService.removeProgramSchedule(
+                                          form.id,
+                                          week1Item.program_day,
+                                          week
+                                        )
+                                      );
                                     }
+                                  }
+                                  
+                                  if (week1Schedule.length > 0) {
+                                    weeksUpdated.push(week);
                                   }
                                 }
 
@@ -927,9 +926,9 @@ function EditProgramContent() {
                                 if (autoFillPromises.length > 0) {
                                   await Promise.all(autoFillPromises);
                                   console.log(
-                                    `✅ Auto-filled Week 1 schedule to ${
-                                      weeksToFill.length
-                                    } empty week(s): ${weeksToFill.join(", ")}`
+                                    `✅ Auto-applied Week 1 schedule to all other weeks (${
+                                      weeksUpdated.length
+                                    } week(s)): ${weeksUpdated.join(", ")}`
                                   );
 
                                   // Reload schedule after auto-fill
@@ -938,6 +937,54 @@ function EditProgramContent() {
                                       form.id
                                     );
                                   setSchedule(sched || []);
+
+                                  // Copy workout data (progression rules) for all the new schedules
+                                  const allWeeksSchedule = sched || [];
+                                  const copyPromises: Promise<void>[] = [];
+                                  
+                                  for (const week of weeksUpdated) {
+                                    const weekSchedule = allWeeksSchedule.filter(
+                                      (s) => (s.week_number || 1) === week
+                                    );
+                                    
+                                    for (const scheduleItem of weekSchedule) {
+                                      if (
+                                        scheduleItem.template_id &&
+                                        scheduleItem.template_id !== "rest" &&
+                                        scheduleItem.id
+                                      ) {
+                                        copyPromises.push(
+                                          (async () => {
+                                            try {
+                                              await ProgramProgressionService.deleteProgressionRules(
+                                                scheduleItem.id,
+                                                week
+                                              );
+                                              await ProgramProgressionService.copyWorkoutToProgram(
+                                                form.id,
+                                                scheduleItem.id,
+                                                scheduleItem.template_id,
+                                                week
+                                              );
+                                            } catch (error) {
+                                              console.error(
+                                                `Error copying workout data for Week ${week}, Day ${scheduleItem.program_day}:`,
+                                                error
+                                              );
+                                            }
+                                          })()
+                                        );
+                                      }
+                                    }
+                                  }
+                                  
+                                  // Wait for all copy operations to complete
+                                  if (copyPromises.length > 0) {
+                                    await Promise.all(copyPromises);
+                                    console.log(
+                                      `✅ Copied workout data to progression rules for ${copyPromises.length} schedule(s)`
+                                    );
+                                  }
                                 }
                               }
 
@@ -1086,9 +1133,7 @@ function EditProgramContent() {
                     }}
                   >
                     Configure the workout schedule for each week of your
-                    program. Select a workout template for each training day, or
-                    choose "Rest Day" for recovery. Changes are saved
-                    automatically when you make a selection.
+                    program. When you set workouts for <strong>Week 1</strong>, they will automatically be applied to all other weeks. You can then customize individual weeks later if needed. Select a workout template for each training day, or choose "Rest Day" for recovery. Changes are saved automatically when you make a selection.
                   </p>
                 </div>
               </GlassCard>

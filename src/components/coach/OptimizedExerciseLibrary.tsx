@@ -129,6 +129,9 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      let exercisesFromDB: Exercise[] = []
+      let useLocalStorage = false
+
       try {
         const { data, error } = await supabase
           .from('exercises')
@@ -138,13 +141,22 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
 
         if (error) throw error
 
-        setExercises(data || [])
-      } catch {
+        exercisesFromDB = data || []
+      } catch (dbError) {
         console.log('Database not ready, using localStorage fallback')
-        const savedExercises = localStorage.getItem(`exercises_${user.id}`)
-        if (savedExercises) {
-          setExercises(JSON.parse(savedExercises))
+        useLocalStorage = true
+      }
+
+      // Always check localStorage as fallback or merge with DB data
+      const savedExercises = localStorage.getItem(`exercises_${user.id}`)
+      const exercisesFromStorage = savedExercises ? JSON.parse(savedExercises) : []
+
+      if (useLocalStorage) {
+        // Use localStorage if database failed
+        if (exercisesFromStorage.length > 0) {
+          setExercises(exercisesFromStorage)
         } else {
+          // Initialize with sample exercises if nothing in localStorage
           const sampleExercises = [
             {
               id: '1',
@@ -197,6 +209,16 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
           ]
           setExercises(sampleExercises)
           localStorage.setItem(`exercises_${user.id}`, JSON.stringify(sampleExercises))
+        }
+      } else {
+        // Database worked - use DB data, but merge with localStorage if DB is empty
+        if (exercisesFromDB.length > 0) {
+          setExercises(exercisesFromDB)
+        } else if (exercisesFromStorage.length > 0) {
+          // DB is empty but localStorage has data - use localStorage
+          setExercises(exercisesFromStorage)
+        } else {
+          setExercises([])
         }
       }
     } catch (error) {
@@ -664,7 +686,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                       </div>
 
                       {/* Quick Actions */}
-                      <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                         <Button
                           variant="outline"
                           size="sm"
@@ -690,6 +712,19 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                         >
                           <Shuffle className="w-3 h-3 mr-1" />
                           Swaps
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            deleteExercise(exercise.id)
+                          }}
+                          className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 rounded-xl text-xs sm:text-sm"
+                          title="Delete Exercise"
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Delete
                         </Button>
                       </div>
                     </CardContent>
@@ -813,7 +848,8 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                               e.stopPropagation()
                               deleteExercise(exercise.id)
                             }}
-                            className="text-red-600 hover:text-red-700 rounded-xl p-2"
+                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 rounded-xl p-2"
+                            title="Delete Exercise"
                           >
                             <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                           </Button>

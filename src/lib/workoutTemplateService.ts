@@ -72,7 +72,7 @@ export interface Program {
   difficulty_level: 'beginner' | 'intermediate' | 'advanced'
   duration_weeks: number
   target_audience: string
-  is_public: boolean
+  is_public?: boolean // Optional - not in database schema
   is_active: boolean
   created_at: string
   updated_at: string
@@ -1009,6 +1009,8 @@ export class WorkoutTemplateService {
           day_of_week: dayOfWeek, // 0-based (0=Monday, 1=Tuesday, etc.)
           week_number: weekNumber,
           template_id: templateId
+        }, {
+          onConflict: 'program_id,day_of_week,week_number'
         })
         .select('*')
         .single()

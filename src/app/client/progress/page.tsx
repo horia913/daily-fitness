@@ -20,6 +20,7 @@ import {
   Scale,
   Target,
   FileText,
+  Activity,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -588,6 +589,62 @@ function ProgressHubContent() {
                     style={{ color: getSemanticColor("trust").primary }}
                   >
                     Track all your completed workouts →
+                  </p>
+                </div>
+              </GlassCard>
+            </Link>
+
+            {/* Analytics Card */}
+            <Link href="/client/progress/analytics">
+              <GlassCard
+                elevation={2}
+                className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer h-full"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #EC4899 0%, #BE185D 100%)",
+                      boxShadow: "0 4px 12px rgba(236, 72, 153, 0.3)",
+                    }}
+                  >
+                    <Activity className="w-7 h-7 text-white" />
+                  </div>
+                  <ChevronRight
+                    className="w-6 h-6"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.4)"
+                        : "rgba(0,0,0,0.4)",
+                    }}
+                  />
+                </div>
+
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  Analytics
+                </h3>
+
+                <div className="space-y-2">
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.6)"
+                        : "rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    Workout frequency, strength & body trends
+                  </p>
+
+                  <p
+                    className="text-xs font-medium"
+                    style={{ color: getSemanticColor("trust").primary }}
+                  >
+                    View detailed analytics →
                   </p>
                 </div>
               </GlassCard>

@@ -46,7 +46,6 @@ function CreateProgramContent() {
         target_audience: targetAudience,
         coach_id: user.id,
         is_active: true,
-        is_public: false,
       };
       const created = await WorkoutTemplateService.createProgram(payload);
       if (created?.id) {

@@ -171,6 +171,8 @@ export default function WorkoutTemplateForm({
     tabata_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
     // Circuit specific
     circuit_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
+    // Load percentage
+    load_percentage: "",
   });
 
   // Workout Block System (integrated with exercises)
@@ -382,6 +384,8 @@ export default function WorkoutTemplateForm({
               ? String(block.block_parameters.drop_percentage)
               : "",
             drop_set_reps: block.block_parameters?.drop_set_reps || "",
+            // Load percentage (from exercise data)
+            load_percentage: block.exercises?.[0]?.load_percentage?.toString() || "",
           };
 
           // Handle complex block types with nested exercises
@@ -667,7 +671,7 @@ export default function WorkoutTemplateForm({
                     : undefined,
                   reps_per_set: exercise.reps || undefined,
                   rest_seconds: exercise.rest_seconds
-                    ? parseInt(exercise.rest_seconds)
+                    ? Math.round(parseFloat(exercise.rest_seconds))
                     : undefined,
                   duration_seconds: exercise.amrap_duration
                     ? parseInt(exercise.amrap_duration) * 60
@@ -692,7 +696,7 @@ export default function WorkoutTemplateForm({
                       sets: exercise.sets ? parseInt(exercise.sets) : undefined,
                       reps: exercise.reps || undefined,
                       rest_seconds: exercise.rest_seconds
-                        ? parseInt(exercise.rest_seconds)
+                        ? Math.round(parseFloat(exercise.rest_seconds))
                         : undefined,
                       rir: exercise.rir ? parseInt(exercise.rir) : undefined,
                       tempo: exercise.tempo || undefined,
@@ -715,7 +719,7 @@ export default function WorkoutTemplateForm({
                       reps:
                         exercise.superset_reps || exercise.reps || undefined,
                       rest_seconds: exercise.rest_seconds
-                        ? parseInt(exercise.rest_seconds)
+                        ? Math.round(parseFloat(exercise.rest_seconds))
                         : undefined,
                     }
                   );
@@ -837,14 +841,16 @@ export default function WorkoutTemplateForm({
                               rest_seconds:
                                 exerciseType === "tabata"
                                   ? tabataRestAfter
-                                    ? parseInt(String(tabataRestAfter))
+                                    ? Math.round(parseFloat(String(tabataRestAfter)))
                                     : undefined
                                   : set.rest_between_sets ||
                                     exercise.rest_seconds
-                                  ? parseInt(
-                                      String(
-                                        set.rest_between_sets ||
-                                          exercise.rest_seconds
+                                  ? Math.round(
+                                      parseFloat(
+                                        String(
+                                          set.rest_between_sets ||
+                                            exercise.rest_seconds
+                                        )
                                       )
                                     )
                                   : undefined,
@@ -1087,7 +1093,8 @@ export default function WorkoutTemplateForm({
       // Helper function to preserve empty strings for form fields
       const cleanNumericForForm = (value: any) => {
         if (value === "" || value === null || value === undefined) return "";
-        const parsed = parseInt(value);
+        // Use Math.round to ensure we get the exact integer value
+        const parsed = Math.round(parseFloat(value));
         return isNaN(parsed) ? "" : parsed.toString();
       };
 
@@ -1147,6 +1154,8 @@ export default function WorkoutTemplateForm({
 
         // Circuit specific
         circuit_sets: newExercise.circuit_sets,
+        // Load percentage
+        load_percentage: cleanNumericForForm(newExercise.load_percentage),
         exercise: selectedExercise || null,
       };
 
@@ -1212,6 +1221,7 @@ export default function WorkoutTemplateForm({
         emom_reps: "",
         tabata_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
         circuit_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
+        load_percentage: "",
       });
       setShowAddExercise(false);
       setEditingExerciseId(null);
@@ -1408,6 +1418,8 @@ export default function WorkoutTemplateForm({
             rest_between_sets: set.rest_between_sets || "",
           }))
         : [],
+      // Load percentage
+      load_percentage: exercise.load_percentage?.toString() || "",
     });
     setShowAddExercise(true);
   };
@@ -4181,7 +4193,39 @@ export default function WorkoutTemplateForm({
                       </div>
                     )}
 
-                    {/* Common notes field for all types */}
+                    {/* Common fields for all types */}
+                    <div>
+                      <Label
+                        htmlFor="load_percentage"
+                        className={`text-sm font-medium ${theme.text}`}
+                      >
+                        Load (% of 1RM)
+                      </Label>
+                      <Input
+                        id="load_percentage"
+                        type="number"
+                        value={
+                          newExercise.load_percentage === ""
+                            ? ""
+                            : newExercise.load_percentage || ""
+                        }
+                        onChange={(e) =>
+                          setNewExercise({
+                            ...newExercise,
+                            load_percentage: e.target.value === "" ? "" : e.target.value,
+                          })
+                        }
+                        placeholder="e.g., 70"
+                        min="0"
+                        max="200"
+                        step="1"
+                        className="mt-2 rounded-xl"
+                      />
+                      <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                        Percentage of estimated 1RM to use for suggested weight (e.g., 70 = 70% of 1RM)
+                      </p>
+                    </div>
+
                     <div>
                       <Label
                         htmlFor="notes"

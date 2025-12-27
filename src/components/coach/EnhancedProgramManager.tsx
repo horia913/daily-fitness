@@ -62,7 +62,7 @@ interface Program {
   difficulty_level: "beginner" | "intermediate" | "advanced";
   duration_weeks: number;
   target_audience: string;
-  is_public: boolean;
+  is_public?: boolean; // Optional - not in database schema
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -2182,7 +2182,6 @@ function ProgramCreateForm({
     difficulty_level: program?.difficulty_level || "intermediate",
     duration_weeks: program?.duration_weeks || 8,
     target_audience: program?.target_audience || "general_fitness",
-    is_public: program?.is_public || false,
   });
 
   const [schedule, setSchedule] = useState<ProgramSchedule[]>([]);
@@ -3344,20 +3343,6 @@ function ProgramCreateForm({
                 </Select>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="is_public"
-                  checked={formData.is_public}
-                  onChange={(e) =>
-                    setFormData({ ...formData, is_public: e.target.checked })
-                  }
-                  className="rounded"
-                />
-                <label htmlFor="is_public" className="text-sm font-medium">
-                  Make this program public (visible to other coaches)
-                </label>
-              </div>
             </div>
           )}
 

@@ -28,7 +28,7 @@ interface Program {
   difficulty_level: "beginner" | "intermediate" | "advanced";
   duration_weeks: number;
   target_audience: string;
-  is_public: boolean;
+  is_public?: boolean; // Optional - not in database schema
   is_active: boolean;
   created_at: string;
   updated_at: string;
