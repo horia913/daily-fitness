@@ -31,15 +31,14 @@ export function TabataExecutor({
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
   const [showTimerModal, setShowTimerModal] = useState(false);
 
-  // Get tabata_sets from block_parameters or exercise meta
+  // Get tabata_sets from exercise meta (block_parameters removed)
   const tabataSets = 
-    (block.block.block_parameters as any)?.tabata_sets ||
     (currentExercise as any)?.meta?.tabata_sets ||
     (currentExercise as any)?.tabata_sets ||
     [];
 
-  // Get rounds from block_parameters
-  const rounds = (block.block.block_parameters as any)?.rounds || 8;
+  // Get rounds from time_protocols table (block_parameters removed)
+  const rounds = block.block.total_sets || 8; // TODO: Get from workout_time_protocols table
 
   // Build exercise lookup
   const exerciseLookup: Record<string, { name: string }> = {};

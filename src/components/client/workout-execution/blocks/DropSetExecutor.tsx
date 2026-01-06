@@ -47,12 +47,10 @@ export function DropSetExecutor({
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   const isManuallyEditingDropWeight = useRef(false);
 
-  // Get drop percentage from block parameters or default to 20%
-  const dropPercentage =
-    (block.block.block_parameters as any)?.drop_percentage || 20;
+  // Get drop percentage from drop_set table or default to 20% (block_parameters removed)
+  const dropPercentage = 20; // TODO: Get from workout_drop_sets table
   const exerciseReps = currentExercise?.reps || block.block.reps_per_set || "";
-  const dropSetReps =
-    (block.block.block_parameters as any)?.drop_set_reps || exerciseReps;
+  const dropSetReps = exerciseReps; // TODO: Get from workout_drop_sets table
 
   // Pre-fill with suggested weight
   useEffect(() => {

@@ -1913,7 +1913,7 @@ function ProgramDetailsModal({
                 gap: "16px",
               }}
             >
-              {["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6"].map(
+              {["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"].map(
                 (dayName, dayIndex) => {
                   const scheduledTemplate = program.schedule?.find(
                     (s) => s.program_day === dayIndex + 1

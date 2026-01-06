@@ -518,7 +518,6 @@ const duplicateWorkout = async (
             reps_per_set: block.reps_per_set,
             rest_seconds: block.rest_seconds,
             duration_seconds: block.duration_seconds,
-            block_parameters: block.block_parameters,
           }
         );
 

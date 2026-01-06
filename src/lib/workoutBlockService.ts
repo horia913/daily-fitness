@@ -38,9 +38,6 @@ export class WorkoutBlockService {
       if (blockData.rest_seconds) insertData.rest_seconds = blockData.rest_seconds;
       if (blockData.total_sets) insertData.total_sets = blockData.total_sets;
       if (blockData.reps_per_set) insertData.reps_per_set = blockData.reps_per_set;
-      if (blockData.block_parameters && Object.keys(blockData.block_parameters).length > 0) {
-        insertData.block_parameters = blockData.block_parameters;
-      }
       
       // Try block_type, if it fails the error will be informative
       insertData.block_type = blockType;
@@ -93,63 +90,79 @@ export class WorkoutBlockService {
 
       // 2) Collect IDs for batch queries
       const allBlockIds = blocks.map((b: any) => b.id)
-      const allExerciseIds = (
-        blocks.flatMap((b: any) => (b.exercises || []).map((e: any) => e.id))
-      ).filter(Boolean)
 
-      // If no exercises, still fetch time protocols and return quickly
+      // If no blocks, return early
+      if (allBlockIds.length === 0) return []
+
       // 3) Run related-table queries in parallel (batched)
+      // NOTE: Special tables now use block_id, exercise_id, exercise_order (NOT block_exercise_id)
       const [timeProtocolsRes, dropRes, clusterRes, pyramidRes, ladderRes, restPauseRes] = await Promise.all([
         supabase.from('workout_time_protocols').select('*').in('block_id', allBlockIds),
-        allExerciseIds.length > 0
-          ? supabase.from('workout_drop_sets').select('*').in('block_exercise_id', allExerciseIds)
-          : Promise.resolve({ data: [], error: null } as any),
-        allExerciseIds.length > 0
-          ? supabase.from('workout_cluster_sets').select('*').in('block_exercise_id', allExerciseIds)
-          : Promise.resolve({ data: [], error: null } as any),
-        allExerciseIds.length > 0
-          ? supabase.from('workout_pyramid_sets').select('*').in('block_exercise_id', allExerciseIds)
-          : Promise.resolve({ data: [], error: null } as any),
-        allExerciseIds.length > 0
-          ? supabase.from('workout_ladder_sets').select('*').in('block_exercise_id', allExerciseIds)
-          : Promise.resolve({ data: [], error: null } as any),
-        allExerciseIds.length > 0
-          ? supabase.from('workout_rest_pause_sets').select('*').in('block_exercise_id', allExerciseIds)
-          : Promise.resolve({ data: [], error: null } as any)
+        supabase.from('workout_drop_sets').select('*').in('block_id', allBlockIds),
+        supabase.from('workout_cluster_sets').select('*').in('block_id', allBlockIds),
+        supabase.from('workout_pyramid_sets').select('*').in('block_id', allBlockIds),
+        supabase.from('workout_ladder_sets').select('*').in('block_id', allBlockIds),
+        supabase.from('workout_rest_pause_sets').select('*').in('block_id', allBlockIds)
       ])
 
       // 4) Build lookup maps
-      const timeByBlock = new Map<string, any>()
-      ;(timeProtocolsRes.data || []).forEach((tp: any) => timeByBlock.set(tp.block_id, tp))
+      // Time protocols: one per block (or multiple for circuit/tabata)
+      const timeProtocolsByBlock = new Map<string, any[]>()
+      ;(timeProtocolsRes.data || []).forEach((tp: any) => {
+        if (!timeProtocolsByBlock.has(tp.block_id)) {
+          timeProtocolsByBlock.set(tp.block_id, [])
+        }
+        timeProtocolsByBlock.get(tp.block_id)!.push(tp)
+      })
 
-      const groupBy = (arr: any[], key: string) => {
+      // Helper to create composite key for matching: block_id + exercise_id + exercise_order
+      const createExerciseKey = (blockId: string, exerciseId: string, exerciseOrder: number) => {
+        return `${blockId}:${exerciseId}:${exerciseOrder}`
+      }
+
+      // Group special table data by composite key
+      const groupByExercise = (arr: any[], tableName: string) => {
         const map = new Map<string, any[]>()
         arr.forEach((row: any) => {
-          const k = String(row[key])
+          const k = createExerciseKey(row.block_id, row.exercise_id, row.exercise_order)
           if (!map.has(k)) map.set(k, [])
           map.get(k)!.push(row)
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`WorkoutBlockService -> Grouping ${tableName}: Key '${k}' with data`, row);
+          }
         })
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`WorkoutBlockService -> ${tableName} Map Keys:`, Array.from(map.keys()));
+        }
         return map
       }
 
-      const dropByExercise = groupBy(dropRes.data || [], 'block_exercise_id')
-      const clusterByExercise = groupBy(clusterRes.data || [], 'block_exercise_id')
-      const pyramidByExercise = groupBy(pyramidRes.data || [], 'block_exercise_id')
-      const ladderByExercise = groupBy(ladderRes.data || [], 'block_exercise_id')
-      const restPauseByExercise = groupBy(restPauseRes.data || [], 'block_exercise_id')
+      const dropByExercise = groupByExercise(dropRes.data || [], "drop_sets")
+      const clusterByExercise = groupByExercise(clusterRes.data || [], "cluster_sets")
+      const pyramidByExercise = groupByExercise(pyramidRes.data || [], "pyramid_sets")
+      const ladderByExercise = groupByExercise(ladderRes.data || [], "ladder_sets")
+      const restPauseByExercise = groupByExercise(restPauseRes.data || [], "rest_pause_sets")
 
       // 5) Attach to blocks/exercises without further queries
       const enriched = (blocks || []).map((block: any) => {
-        block.time_protocol = timeByBlock.get(block.id) || null
+        // Attach time protocols (array for circuit/tabata, single for others)
+        const blockTimeProtocols = timeProtocolsByBlock.get(block.id) || []
+        block.time_protocols = blockTimeProtocols
+        block.time_protocol = blockTimeProtocols.length > 0 ? blockTimeProtocols[0] : null // Keep for backward compatibility
+
         if (block.exercises && block.exercises.length > 0) {
-          block.exercises = block.exercises.map((ex: any) => ({
-            ...ex,
-            drop_sets: dropByExercise.get(ex.id) || [],
-            cluster_sets: clusterByExercise.get(ex.id) || [],
-            pyramid_sets: pyramidByExercise.get(ex.id) || [],
-            ladder_sets: ladderByExercise.get(ex.id) || [],
-            rest_pause_sets: restPauseByExercise.get(ex.id) || []
-          }))
+          block.exercises = block.exercises.map((ex: any) => {
+            // Create composite key to match special table data
+            const exerciseKey = createExerciseKey(block.id, ex.exercise_id, ex.exercise_order)
+            return {
+              ...ex,
+              drop_sets: dropByExercise.get(exerciseKey) || [],
+              cluster_sets: clusterByExercise.get(exerciseKey) || [],
+              pyramid_sets: pyramidByExercise.get(exerciseKey) || [],
+              ladder_sets: ladderByExercise.get(exerciseKey) || [],
+              rest_pause_sets: restPauseByExercise.get(exerciseKey) || []
+            }
+          })
         }
         return block
       })
@@ -201,6 +214,9 @@ export class WorkoutBlockService {
       if (exerciseData.notes !== undefined && exerciseData.notes !== null && exerciseData.notes !== '') {
         insertData.notes = exerciseData.notes;
       }
+      if (exerciseData.load_percentage !== undefined && exerciseData.load_percentage !== null) {
+        insertData.load_percentage = exerciseData.load_percentage;
+      }
 
       const { data, error } = await supabase
         .from('workout_block_exercises')
@@ -234,21 +250,25 @@ export class WorkoutBlockService {
 
   // Create drop set configuration
   static async createDropSet(
-    blockExerciseId: string,
+    blockId: string,
+    exerciseId: string,
+    exerciseOrder: number,
     dropOrder: number,
     weightKg: number,
-    reps: string,
-    restSeconds: number = 0
+    reps: string
+    // rest_seconds removed - rest is stored in workout_blocks.rest_seconds
   ): Promise<WorkoutDropSet | null> {
     try {
       const { data, error } = await supabase
         .from('workout_drop_sets')
         .insert({
-          block_exercise_id: blockExerciseId,
+          block_id: blockId,
+          exercise_id: exerciseId,
+          exercise_order: exerciseOrder,
           drop_order: dropOrder,
           weight_kg: weightKg,
-          reps: reps,
-          rest_seconds: restSeconds
+          reps: reps
+          // rest_seconds was removed from schema
         })
         .select()
         .single()
@@ -263,7 +283,9 @@ export class WorkoutBlockService {
 
   // Create cluster set configuration
   static async createClusterSet(
-    blockExerciseId: string,
+    blockId: string,
+    exerciseId: string,
+    exerciseOrder: number,
     repsPerCluster: number,
     clustersPerSet: number,
     intraClusterRest: number = 15,
@@ -273,7 +295,9 @@ export class WorkoutBlockService {
       const { data, error } = await supabase
         .from('workout_cluster_sets')
         .insert({
-          block_exercise_id: blockExerciseId,
+          block_id: blockId,
+          exercise_id: exerciseId,
+          exercise_order: exerciseOrder,
           reps_per_cluster: repsPerCluster,
           clusters_per_set: clustersPerSet,
           intra_cluster_rest: intraClusterRest,
@@ -321,9 +345,11 @@ export class WorkoutBlockService {
 
   // Create rest-pause set configuration
   static async createRestPauseSet(
-    blockExerciseId: string,
-    initialWeightKg: number,
-    initialReps: number,
+    blockId: string,
+    exerciseId: string,
+    exerciseOrder: number,
+    weightKg: number, // Renamed from initialWeightKg
+    // initialReps removed - reps are tracked in workout_blocks table
     restPauseDuration: number = 15,
     maxRestPauses: number = 3
   ): Promise<WorkoutRestPauseSet | null> {
@@ -331,9 +357,11 @@ export class WorkoutBlockService {
       const { data, error } = await supabase
         .from('workout_rest_pause_sets')
         .insert({
-          block_exercise_id: blockExerciseId,
-          initial_weight_kg: initialWeightKg,
-          initial_reps: initialReps,
+          block_id: blockId,
+          exercise_id: exerciseId,
+          exercise_order: exerciseOrder,
+          weight_kg: weightKg, // Column renamed from initial_weight_kg to weight_kg
+          // initial_reps was removed from schema
           rest_pause_duration: restPauseDuration,
           max_rest_pauses: maxRestPauses
         })
@@ -348,10 +376,12 @@ export class WorkoutBlockService {
     }
   }
 
-  // Create time protocol configuration
+  // Create time protocol configuration (one per exercise)
   static async createTimeProtocol(
     blockId: string,
-    protocolType: 'amrap' | 'emom' | 'for_time' | 'ladder',
+    exerciseId: string,
+    exerciseOrder: number,
+    protocolType: 'amrap' | 'emom' | 'for_time' | 'tabata' | 'circuit',
     protocolData: Partial<WorkoutTimeProtocol>
   ): Promise<WorkoutTimeProtocol | null> {
     try {
@@ -359,11 +389,18 @@ export class WorkoutBlockService {
         .from('workout_time_protocols')
         .insert({
           block_id: blockId,
+          exercise_id: exerciseId,
+          exercise_order: exerciseOrder,
           protocol_type: protocolType,
           total_duration_minutes: protocolData.total_duration_minutes,
           work_seconds: protocolData.work_seconds,
           rest_seconds: protocolData.rest_seconds,
-          rounds: protocolData.rounds
+          rest_after_set: protocolData.rest_after_set, // New column for Circuit/Tabata
+          rounds: protocolData.rounds,
+          // target_reps and time_cap_minutes columns don't exist in schema - removed
+          // time_cap_minutes: protocolData.time_cap_minutes, // Column doesn't exist - use block_parameters instead
+          reps_per_round: protocolData.reps_per_round,
+          set: protocolData.set // For Tabata/Circuit to identify which set
         })
         .select()
         .single()
@@ -426,9 +463,26 @@ export class WorkoutBlockService {
     }
   }
 
-  // Delete workout block
+  // Delete all special table data for a block (helper for updates)
+  static async deleteBlockSpecialData(blockId: string): Promise<void> {
+    // Delete all special table data that references this block
+    await supabase.from('workout_block_exercises').delete().eq('block_id', blockId);
+    await supabase.from('workout_drop_sets').delete().eq('block_id', blockId);
+    await supabase.from('workout_cluster_sets').delete().eq('block_id', blockId);
+    await supabase.from('workout_rest_pause_sets').delete().eq('block_id', blockId);
+    await supabase.from('workout_pyramid_sets').delete().eq('block_id', blockId);
+    await supabase.from('workout_ladder_sets').delete().eq('block_id', blockId);
+    await supabase.from('workout_time_protocols').delete().eq('block_id', blockId);
+  }
+
+  // Delete workout block (and all related special table data)
   static async deleteWorkoutBlock(blockId: string): Promise<boolean> {
     try {
+      // First, delete all special table data that references this block
+      // This must be done before deleting the block due to foreign key constraints
+      await this.deleteBlockSpecialData(blockId);
+
+      // Now delete the block itself
       const { error } = await supabase
         .from('workout_blocks')
         .delete()

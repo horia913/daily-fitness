@@ -36,9 +36,9 @@ export function LadderExecutor({
   const { addToast } = useToast();
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
   const rounds = block.block.total_sets || 1;
-  const startReps = (block.block.block_parameters as any)?.start_reps || 5;
-  const ladderOrder =
-    (block.block.block_parameters as any)?.ladder_order || "ascending";
+  // Ladder parameters (block_parameters removed - TODO: Get from workout_ladder_sets table)
+  const startReps = 5; // TODO: Get from workout_ladder_sets table
+  const ladderOrder = "ascending"; // TODO: Get from workout_ladder_sets table
 
   // Generate ladder array based on start reps and order
   const generateLadder = () => {

@@ -31,15 +31,14 @@ export function CircuitExecutor({
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
   const [showTimerModal, setShowTimerModal] = useState(false);
 
-  // Get circuit_sets from block_parameters or exercise meta
+  // Get circuit_sets from exercise meta (block_parameters removed)
   const circuitSets = 
-    (block.block.block_parameters as any)?.circuit_sets ||
     (currentExercise as any)?.meta?.circuit_sets ||
     (currentExercise as any)?.circuit_sets ||
     [];
 
-  // Get rounds from block_parameters
-  const rounds = (block.block.block_parameters as any)?.rounds || 1;
+  // Get rounds from block total_sets (block_parameters removed)
+  const rounds = block.block.total_sets || 1;
 
   // Build exercise lookup
   const exerciseLookup: Record<string, { name: string }> = {};

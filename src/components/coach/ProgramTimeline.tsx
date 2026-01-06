@@ -91,14 +91,15 @@ export default function ProgramTimeline({
   const [editingWeek, setEditingWeek] = useState<string | null>(null)
   const [editingWorkout, setEditingWorkout] = useState<string | null>(null)
 
-  const dayNames = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6']
+  const dayNames = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7']
   const dayColors = [
     'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
     'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
     'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
     'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
     'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-    'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+    'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300',
+    'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
   ]
 
   const toggleWeekExpansion = (weekId: string) => {

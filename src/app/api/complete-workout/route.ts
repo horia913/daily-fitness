@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createErrorResponse, handleApiError, validateRequiredFields } from '@/lib/apiErrorHandler'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -25,19 +26,14 @@ export async function POST(req: NextRequest) {
       has_duration_minutes: duration_minutes !== undefined,
     })
 
-    if (!workout_log_id) {
-      console.error('❌ Missing workout_log_id')
-      return NextResponse.json(
-        { error: 'Missing required field: workout_log_id' },
-        { status: 400 }
-      )
-    }
-
-    if (!client_id) {
-      console.error('❌ Missing client_id')
-      return NextResponse.json(
-        { error: 'Missing required field: client_id' },
-        { status: 400 }
+    // Validate required fields
+    const validation = validateRequiredFields(body, ['workout_log_id', 'client_id'])
+    if (!validation.valid) {
+      return createErrorResponse(
+        'Missing required fields',
+        `Missing: ${validation.missing?.join(', ')}`,
+        'VALIDATION_ERROR',
+        400
       )
     }
 
@@ -52,9 +48,11 @@ export async function POST(req: NextRequest) {
 
     if (logError || !workoutLog) {
       console.error('❌ Error fetching workout_log:', logError)
-      return NextResponse.json(
-        { error: 'Workout log not found', details: logError?.message },
-        { status: 404 }
+      return createErrorResponse(
+        'Workout log not found',
+        logError?.message,
+        'NOT_FOUND',
+        404
       )
     }
 
@@ -76,9 +74,11 @@ export async function POST(req: NextRequest) {
 
     if (setsError) {
       console.error('❌ Error fetching workout_set_logs:', setsError)
-      return NextResponse.json(
-        { error: 'Failed to fetch set logs', details: setsError.message },
-        { status: 500 }
+      return createErrorResponse(
+        'Failed to fetch set logs',
+        setsError.message,
+        'DATABASE_ERROR',
+        500
       )
     }
 
@@ -160,9 +160,11 @@ export async function POST(req: NextRequest) {
         details: updateError.details,
         hint: updateError.hint,
       });
-      return NextResponse.json(
-        { error: 'Failed to update workout log', details: updateError.message },
-        { status: 500 }
+      return createErrorResponse(
+        'Failed to update workout log',
+        updateError.message,
+        'DATABASE_ERROR',
+        500
       )
     }
 
@@ -208,15 +210,7 @@ export async function POST(req: NextRequest) {
       },
     }, { status: 200 })
   } catch (error) {
-    console.error('❌ Unexpected error in /api/complete-workout:', {
-      error,
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    return NextResponse.json(
-      { error: 'Unexpected error', details: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    )
+    return handleApiError(error, 'Failed to complete workout')
   }
 }
 

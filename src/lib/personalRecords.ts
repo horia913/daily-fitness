@@ -48,27 +48,39 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
       return getFallbackPersonalRecords()
     }
 
-    // Get exercise logs
+    // Get set logs from workout_set_logs table (correct table name)
     const { data: logs, error: exerciseLogsError } = await supabase
-      .from('workout_exercise_logs')
+      .from('workout_set_logs')
       .select(`
-        *,
-        exercise_assignment:workout_exercise_assignments(
-          exercise:exercises(id, name, category)
+        id,
+        workout_log_id,
+        exercise_id,
+        weight,
+        reps,
+        completed_at,
+        created_at,
+        exercises (
+          id,
+          name,
+          category
         )
       `)
       .in('workout_log_id', workoutLogs.map(wl => wl.id))
-      .not('weight_kg', 'is', null)
-      .not('reps_completed', 'is', null)
+      .not('weight', 'is', null)
+      .not('reps', 'is', null)
 
-    if (exerciseLogsError) return getFallbackPersonalRecords()
+    if (exerciseLogsError) {
+      console.error('Error fetching workout_set_logs:', exerciseLogsError)
+      return getFallbackPersonalRecords()
+    }
     if (!logs || logs.length === 0) return getFallbackPersonalRecords()
 
     // Group logs by exercise name
     const exerciseGroups = new Map<string, any[]>()
 
     logs.forEach(log => {
-      const exerciseName = log.exercise_assignment?.exercise?.name || 'Unknown Exercise'
+      const exerciseName = (Array.isArray(log.exercises) && log.exercises[0]?.name) || 
+        (log.exercises as any)?.name || 'Unknown Exercise'
       if (!exerciseGroups.has(exerciseName)) {
         exerciseGroups.set(exerciseName, [])
       }
@@ -82,40 +94,42 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
     exerciseGroups.forEach((exerciseLogs, exerciseName) => {
       // Find max weight record
       const maxWeightLog = exerciseLogs.reduce((max, log) => 
-        (log.weight_kg || 0) > (max.weight_kg || 0) ? log : max
+        (log.weight || 0) > (max.weight || 0) ? log : max
       )
 
       // Find max reps record
       const maxRepsLog = exerciseLogs.reduce((max, log) => 
-        (log.reps_completed || 0) > (max.reps_completed || 0) ? log : max
+        (log.reps || 0) > (max.reps || 0) ? log : max
       )
 
       // Create PR for max weight
-      const weightKg = maxWeightLog.weight_kg || 0
+      const weightKg = maxWeightLog.weight || 0
       if (weightKg > 0) {
-        const isRecent = new Date(maxWeightLog.created_at || new Date()) >= thirtyDaysAgo
+        const logDate = maxWeightLog.completed_at || maxWeightLog.created_at || new Date().toISOString()
+        const isRecent = new Date(logDate) >= thirtyDaysAgo
         personalRecords.push({
           id: `weight-${maxWeightLog.id}`,
           exerciseName,
-          record: `${weightKg}kg for ${maxWeightLog.reps_completed || 0} reps`,
-          date: maxWeightLog.created_at || new Date().toISOString(),
+          record: `${weightKg}kg for ${maxWeightLog.reps || 0} reps`,
+          date: logDate,
           weight: weightKg,
-          reps: maxWeightLog.reps_completed || 0,
+          reps: maxWeightLog.reps || 0,
           isRecent
         })
       }
 
       // Create PR for max reps (if different from max weight)
-      const repsCompleted = maxRepsLog.reps_completed || 0
-      const maxWeightReps = maxWeightLog.reps_completed || 0
+      const repsCompleted = maxRepsLog.reps || 0
+      const maxWeightReps = maxWeightLog.reps || 0
       if (repsCompleted > maxWeightReps && repsCompleted > 0) {
-        const isRecent = new Date(maxRepsLog.created_at || new Date()) >= thirtyDaysAgo
+        const logDate = maxRepsLog.completed_at || maxRepsLog.created_at || new Date().toISOString()
+        const isRecent = new Date(logDate) >= thirtyDaysAgo
         personalRecords.push({
           id: `reps-${maxRepsLog.id}`,
           exerciseName,
-          record: `${maxRepsLog.weight_kg || 0}kg for ${repsCompleted} reps`,
-          date: maxRepsLog.created_at || new Date().toISOString(),
-          weight: maxRepsLog.weight_kg || 0,
+          record: `${maxRepsLog.weight || 0}kg for ${repsCompleted} reps`,
+          date: logDate,
+          weight: maxRepsLog.weight || 0,
           reps: repsCompleted,
           isRecent
         })

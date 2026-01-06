@@ -125,37 +125,50 @@ export default function WorkoutTemplateDetails({
             rest_seconds: block.rest_seconds?.toString() || "",
             notes: block.block_notes || "",
             block_name: block.block_name,
-            // Copy block parameters
-            rounds: block.block_parameters?.rounds
-              ? String(block.block_parameters.rounds)
-              : undefined,
-            work_seconds: block.block_parameters?.work_seconds
-              ? String(block.block_parameters.work_seconds)
-              : undefined,
-            rest_after: block.block_parameters?.rest_after
-              ? String(block.block_parameters.rest_after)
-              : undefined,
-            amrap_duration: block.block_parameters?.amrap_duration
-              ? String(block.block_parameters.amrap_duration)
-              : undefined,
-            emom_duration: block.block_parameters?.emom_duration
-              ? String(block.block_parameters.emom_duration)
-              : undefined,
-            emom_reps: block.block_parameters?.emom_reps
-              ? String(block.block_parameters.emom_reps)
-              : undefined,
-            emom_mode: block.block_parameters?.emom_mode,
-            target_reps: block.block_parameters?.target_reps
-              ? String(block.block_parameters.target_reps)
-              : undefined,
-            time_cap: block.block_parameters?.time_cap
-              ? String(block.block_parameters.time_cap)
-              : undefined,
-            drop_percentage: block.block_parameters?.drop_percentage
-              ? String(block.block_parameters.drop_percentage)
-              : "",
-            drop_set_reps: block.block_parameters?.drop_set_reps || "",
           };
+
+          // Get first exercise and its special table data
+          const firstExercise = block.exercises?.[0];
+          const firstExerciseId = firstExercise?.exercise_id;
+          const firstExerciseOrder = firstExercise?.exercise_order || 1;
+          
+          // Get time protocol for this block/exercise (for time-based blocks)
+          const timeProtocol = block.time_protocols?.find(
+            (tp: any) => tp.exercise_id === firstExerciseId && tp.exercise_order === firstExerciseOrder
+          ) || block.time_protocols?.[0]; // Fallback to first if not found
+          
+          // Get special table data from first exercise
+          const dropSet = firstExercise?.drop_sets?.[0];
+          const clusterSet = firstExercise?.cluster_sets?.[0];
+          const restPauseSet = firstExercise?.rest_pause_sets?.[0];
+          const pyramidSets = firstExercise?.pyramid_sets || [];
+          const ladderSets = firstExercise?.ladder_sets || [];
+
+          // Load data from special tables
+          exercise.rounds = timeProtocol?.rounds?.toString() || undefined;
+          exercise.work_seconds = timeProtocol?.work_seconds?.toString() || undefined;
+          exercise.rest_after = timeProtocol?.rest_seconds?.toString() || undefined;
+          exercise.amrap_duration = timeProtocol?.total_duration_minutes?.toString() || undefined;
+          exercise.emom_duration = timeProtocol?.total_duration_minutes?.toString() || undefined;
+          exercise.emom_reps = timeProtocol?.reps_per_round?.toString() || undefined;
+          exercise.emom_mode = timeProtocol?.emom_mode || "";
+          exercise.target_reps = timeProtocol?.target_reps?.toString() || undefined;
+          exercise.time_cap = timeProtocol?.time_cap_minutes?.toString() || undefined;
+          
+          // Drop set specific (from special table)
+          if (dropSet) {
+            const initialWeight = firstExercise?.weight_kg || 0;
+            const dropWeight = dropSet.weight_kg || 0;
+            if (initialWeight > 0 && dropWeight > 0) {
+              const calculatedPercentage = Math.round(((initialWeight - dropWeight) / initialWeight) * 100);
+              exercise.drop_percentage = String(calculatedPercentage);
+            }
+            exercise.drop_set_reps = dropSet.reps || "";
+          } else {
+            // No drop set data available
+            exercise.drop_percentage = "";
+            exercise.drop_set_reps = "";
+          }
 
           // Handle complex block types with nested exercises
           const blockType = block.block_type as string;
@@ -175,98 +188,116 @@ export default function WorkoutTemplateDetails({
               })) || [];
 
             if (blockType === "tabata") {
-              const restAfter =
-                block.block_parameters?.rest_after ||
-                block.rest_seconds ||
+              // Get time protocol data for tabata (use first exercise's protocol as default)
+              const tabataProtocol = block.time_protocols?.find(
+                (tp: any) => tp.protocol_type === 'tabata'
+              ) || timeProtocol;
+              
+              const restAfter = tabataProtocol?.rest_seconds?.toString() ||
+                block.rest_seconds?.toString() ||
                 "10";
               exercise.rest_after = String(restAfter);
-              exercise.rounds =
-                block.block_parameters?.rounds ||
+              exercise.rounds = tabataProtocol?.rounds?.toString() ||
                 block.total_sets?.toString() ||
                 "8";
-              exercise.work_seconds = block.block_parameters?.work_seconds
-                ? String(block.block_parameters.work_seconds)
-                : "20";
+              exercise.work_seconds = tabataProtocol?.work_seconds?.toString() ||
+                "20";
 
-              if (
-                block.block_parameters?.tabata_sets &&
-                Array.isArray(block.block_parameters.tabata_sets)
-              ) {
-                exercise.tabata_sets = block.block_parameters.tabata_sets.map(
-                  (set: any) => ({
-                    exercises: Array.isArray(set.exercises)
-                      ? set.exercises.map((ex: any) => ({
-                          ...ex,
-                          exercise:
-                            ex.exercise ||
-                            availableExercisesList.find(
-                              (e: any) => e.id === ex.exercise_id
-                            ),
-                        }))
-                      : [],
-                    rest_between_sets:
-                      set.rest_between_sets || String(restAfter),
-                  })
-                );
-              } else {
-                const numSets = block.total_sets || 1;
-                exercise.tabata_sets = Array.from(
-                  { length: numSets },
-                  (_, setIdx) => ({
-                    exercises: exercisesArray.map((ex: any) => ({
-                      ...ex,
-                    })),
+              // Build tabata_sets from exercises and their time protocols
+              const numSets = block.total_sets || 1;
+              exercise.tabata_sets = Array.from(
+                { length: numSets },
+                (_, setIdx) => {
+                  // Get time protocol for each exercise if available
+                  const exerciseProtocols = block.time_protocols?.filter(
+                    (tp: any) => tp.protocol_type === 'tabata'
+                  ) || [];
+                  
+                  return {
+                    exercises: exercisesArray.map((ex: any, exIdx: number) => {
+                      const exProtocol = exerciseProtocols.find(
+                        (tp: any) => tp.exercise_id === ex.exercise_id && tp.exercise_order === (exIdx + 1)
+                      );
+                      return {
+                        ...ex,
+                        exercise: ex.exercise || availableExercisesList.find((e: any) => e.id === ex.exercise_id),
+                        rest_seconds: exProtocol?.rest_seconds?.toString() || restAfter,
+                      };
+                    }),
                     rest_between_sets: String(restAfter),
-                  })
-                );
-              }
+                  };
+                }
+              );
+              
               exercise.circuit_sets = exercise.tabata_sets;
             } else {
-              if (
-                block.block_parameters?.circuit_sets &&
-                Array.isArray(block.block_parameters.circuit_sets)
-              ) {
-                exercise.circuit_sets = block.block_parameters.circuit_sets.map(
-                  (set: any) => ({
-                    exercises: Array.isArray(set.exercises)
-                      ? set.exercises.map((ex: any) => ({
-                          ...ex,
-                          exercise:
-                            ex.exercise ||
-                            availableExercisesList.find(
-                              (e: any) => e.id === ex.exercise_id
-                            ),
-                        }))
-                      : [],
-                    rest_between_sets:
-                      set.rest_between_sets ||
+              // Circuit uses circuit_sets
+              // Get time protocol data for circuit
+              const circuitProtocol = block.time_protocols?.find(
+                (tp: any) => tp.protocol_type === 'circuit'
+              ) || timeProtocol;
+              
+              // Build circuit_sets from exercises and their time protocols
+              const numSets = block.total_sets || 1;
+              exercise.circuit_sets = Array.from(
+                { length: numSets },
+                (_, setIdx) => {
+                  // Get time protocol for each exercise if available
+                  const exerciseProtocols = block.time_protocols?.filter(
+                    (tp: any) => tp.protocol_type === 'circuit'
+                  ) || [];
+                  
+                  return {
+                    exercises: exercisesArray.map((ex: any, exIdx: number) => {
+                      const exProtocol = exerciseProtocols.find(
+                        (tp: any) => tp.exercise_id === ex.exercise_id && tp.exercise_order === (exIdx + 1)
+                      );
+                      return {
+                        ...ex,
+                        exercise: ex.exercise || availableExercisesList.find((e: any) => e.id === ex.exercise_id),
+                        rest_seconds: exProtocol?.rest_seconds?.toString() || 
+                          block.rest_seconds?.toString() || 
+                          "60",
+                      };
+                    }),
+                    rest_between_sets: circuitProtocol?.rest_seconds?.toString() ||
                       block.rest_seconds?.toString() ||
                       "60",
-                  })
-                );
-              } else {
-                const numSets = block.total_sets || 1;
-                exercise.circuit_sets = Array.from(
-                  { length: numSets },
-                  (_, setIdx) => ({
-                    exercises: exercisesArray.map((ex: any) => ({
-                      ...ex,
-                    })),
-                    rest_between_sets: block.rest_seconds?.toString() || "60",
-                  })
-                );
-              }
+                  };
+                }
+              );
+              
+              // circuit_sets should come from relational tables (block_parameters removed)
+              // TODO: Check if circuit_sets data exists in relational tables
             }
           } else if (block.block_type === "drop_set") {
-            if (block.block_parameters?.drop_percentage !== undefined) {
-              exercise.drop_percentage = String(
-                block.block_parameters.drop_percentage
-              );
+            // Already handled above in the special table loading section
+          } else if (block.block_type === "cluster_set") {
+            // Load cluster set data from special table
+            if (clusterSet) {
+              exercise.cluster_reps = clusterSet.reps_per_cluster?.toString() || exercise.reps || "";
+              exercise.clusters_per_set = clusterSet.clusters_per_set?.toString() || "";
+              exercise.intra_cluster_rest = clusterSet.intra_cluster_rest?.toString() || "15";
             }
-            if (block.block_parameters?.drop_set_reps) {
-              exercise.drop_set_reps = String(
-                block.block_parameters.drop_set_reps
-              );
+          } else if (block.block_type === "rest_pause") {
+            // Load rest pause data from special table
+            if (restPauseSet) {
+              exercise.rest_pause_duration = restPauseSet.rest_pause_duration?.toString() || "15";
+              exercise.max_rest_pauses = restPauseSet.max_rest_pauses?.toString() || "3";
+            }
+          } else if (block.block_type === "pyramid_set") {
+            // Load pyramid set data from special table
+            if (pyramidSets.length > 0) {
+              // Use first pyramid step as base
+              exercise.weight_kg = pyramidSets[0]?.weight_kg?.toString() || "";
+              exercise.reps = pyramidSets[0]?.reps || "";
+            }
+          } else if (block.block_type === "ladder") {
+            // Load ladder set data from special table
+            if (ladderSets.length > 0) {
+              // Use first ladder step as base
+              exercise.weight_kg = ladderSets[0]?.weight_kg?.toString() || "";
+              exercise.reps = ladderSets[0]?.reps?.toString() || "";
             }
           } else if (block.block_type === "giant_set") {
             exercise.giant_set_exercises =

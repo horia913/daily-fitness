@@ -29,6 +29,8 @@ import { supabase } from '@/lib/supabase'
 import { ImageTransform } from '@/lib/imageTransform'
 import { useImageUpload } from '@/hooks/useImageOptimization'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/components/ui/toast-provider'
+import { showErrorToast, showSuccessToast } from '@/lib/errorUtils'
 
 interface ExerciseCategory {
   id: string
@@ -62,6 +64,7 @@ const equipmentOptions = [
 export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: ExerciseFormProps) {
   const { isDark, getThemeStyles } = useTheme()
   const theme = getThemeStyles()
+  const { addToast } = useToast()
   
   const [formData, setFormData] = useState({
     name: '',
@@ -171,13 +174,13 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
     try {
       // Validate required fields
       if (!formData.name.trim()) {
-        alert('Please enter an exercise name')
+        showErrorToast(addToast, 'Please enter an exercise name', 'Validation Error')
         setLoading(false)
         return
       }
 
       if (!formData.category) {
-        alert('Please select a category')
+        showErrorToast(addToast, 'Please select a category', 'Validation Error')
         setLoading(false)
         return
       }
@@ -186,10 +189,11 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
       if (!user) throw new Error('User not authenticated')
 
       // Prepare data - only send fields that exist in database
+      // Use category_id (foreign key) instead of category (string)
       const exerciseData: any = {
         name: formData.name.trim(),
         description: formData.description?.trim() || null,
-        category: formData.category,
+        category_id: formData.category || null, // Use category_id as foreign key
         coach_id: user.id,
         // Filter out empty strings and ensure arrays are not empty
         instructions: formData.instructions.filter(instruction => instruction.trim() !== ''),
@@ -259,7 +263,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
     } catch (error: any) {
       console.error('Error saving exercise:', error)
       const errorMessage = error?.message || error?.details || 'Unknown error occurred'
-      alert(`Error saving exercise: ${errorMessage}. The exercise has been saved to local storage as a fallback.`)
+      showErrorToast(addToast, `Error saving exercise: ${errorMessage}. The exercise has been saved to local storage as a fallback.`, 'Save Error')
     } finally {
       setLoading(false)
     }

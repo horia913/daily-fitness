@@ -83,15 +83,16 @@ export interface Program {
 export interface ProgramSchedule {
   id: string
   program_id: string
-  program_day: number // 1-6 (Day 1, Day 2, ..., Day 6)
+  program_day: number // 1-7 (Day 1, Day 2, ..., Day 7) - Interface uses program_day, DB uses day_of_week
   week_number: number // Week number in the program
   template_id: string
+  // Note: is_optional, is_active, notes are NOT in database schema (mapped/optional fields)
   is_optional?: boolean // Optional field (not in DB schema, defaults to false)
-  is_active: boolean
-  notes?: string
-  template_name?: string
-  template_description?: string
-  estimated_duration?: number | null
+  is_active?: boolean // Optional field (not in DB schema, defaults to true)
+  notes?: string // Optional field (not in DB schema)
+  template_name?: string // Computed/joined from workout_templates
+  template_description?: string // Computed/joined from workout_templates
+  estimated_duration?: number | null // Computed/joined from workout_templates
   created_at: string
   updated_at: string
   template?: WorkoutTemplate
@@ -117,9 +118,17 @@ export interface ProgramAssignment {
   program_id: string
   client_id: string
   coach_id?: string
-  start_date: string
+  current_day_number?: number // Current day in the program (default: 1)
+  completed_days?: number // Number of days completed (default: 0)
   total_days: number
-  status?: string
+  start_date: string
+  preferred_workout_days?: number[] // Array of preferred workout days
+  status?: string // Assignment status (default: 'active')
+  is_customized?: boolean // Whether assignment is customized (default: false)
+  notes?: string // Optional notes
+  name?: string // Optional assignment name
+  description?: string // Optional assignment description
+  duration_weeks?: number // Program duration in weeks
   created_at?: string
   updated_at?: string
 }
@@ -155,7 +164,7 @@ export interface DailyWorkout {
   templateName?: string
   templateDescription?: string
   weekNumber?: number
-  programDay?: number // Day 1-6 instead of dayOfWeek
+  programDay?: number // Day 1-7 instead of dayOfWeek
   estimatedDuration?: number
   difficultyLevel?: string
   exercises?: DailyWorkoutExercise[]
@@ -172,7 +181,7 @@ export interface ProgramAssignmentProgress {
   client_id: string
   program_id: string
   current_week: number
-  current_day: number // Day 1-6
+  current_day: number // Day 1-7
   days_completed_this_week: number
   cycle_start_date: string
   last_workout_date?: string
@@ -472,7 +481,6 @@ export class WorkoutTemplateService {
               reps_per_set: block.reps_per_set,
               rest_seconds: block.rest_seconds,
               duration_seconds: block.duration_seconds,
-              block_parameters: block.block_parameters,
             }
           )
 
@@ -998,15 +1006,20 @@ export class WorkoutTemplateService {
 
   static async setProgramSchedule(programId: string, programDay: number, weekNumber: number, templateId: string, isOptional: boolean = false, notes?: string): Promise<ProgramSchedule | null> {
     try {
-      // programDay is 1-based (Day 1, Day 2, etc.), but DB uses day_of_week (0-based)
+      // programDay is 1-based (Day 1-7), but DB uses day_of_week (0-based, 0-6)
+      // Validate programDay is between 1-7
+      if (programDay < 1 || programDay > 7) {
+        throw new Error(`Invalid program_day: ${programDay}. Must be between 1-7.`)
+      }
+      
       // Use program_schedule table with template_id (not workout_template_id)
-      const dayOfWeek = programDay - 1; // Convert to 0-based
+      const dayOfWeek = programDay - 1; // Convert to 0-based (1→0, 2→1, ..., 7→6)
       
       const { data, error } = await supabase
         .from('program_schedule')
         .upsert({
           program_id: programId,
-          day_of_week: dayOfWeek, // 0-based (0=Monday, 1=Tuesday, etc.)
+          day_of_week: dayOfWeek, // 0-based (0=Day 1, 1=Day 2, ..., 6=Day 7)
           week_number: weekNumber,
           template_id: templateId
         }, {
@@ -1024,7 +1037,7 @@ export class WorkoutTemplateService {
       return {
         id: data.id,
         program_id: data.program_id,
-        program_day: programDay, // Keep 1-based for interface
+        program_day: programDay, // Keep 1-based for interface (1-7)
         week_number: weekNumber,
         template_id: templateId,
         is_optional: false, // Default value since column doesn't exist in DB
@@ -1047,8 +1060,13 @@ export class WorkoutTemplateService {
 
   static async removeProgramSchedule(programId: string, programDay: number, weekNumber: number): Promise<boolean> {
     try {
-      // programDay is 1-based (Day 1, Day 2, etc.), but DB uses day_of_week (0-based)
-      const dayOfWeek = programDay - 1; // Convert to 0-based
+      // Validate programDay is between 1-7
+      if (programDay < 1 || programDay > 7) {
+        throw new Error(`Invalid program_day: ${programDay}. Must be between 1-7.`)
+      }
+      
+      // programDay is 1-based (Day 1-7), but DB uses day_of_week (0-based, 0-6)
+      const dayOfWeek = programDay - 1; // Convert to 0-based (1→0, 2→1, ..., 7→6)
 
       // Find existing schedule rows for this slot so we can clean up progression rules first
       const { data: scheduleRows, error: selectError } = await supabase

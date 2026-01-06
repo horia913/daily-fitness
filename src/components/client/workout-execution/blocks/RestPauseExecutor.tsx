@@ -41,10 +41,10 @@ export function RestPauseExecutor({
   const completedSets = block.completedSets || 0;
   const currentSet = completedSets;
 
-  const restPauseDuration =
-    (block.block.block_parameters as any)?.rest_pause_duration || 30;
-  const maxRestPauses =
-    (block.block.block_parameters as any)?.max_rest_pauses || 2;
+  // Read from special table (rest_pause_sets)
+  const restPauseSet = currentExercise?.rest_pause_sets?.[0];
+  const restPauseDuration = restPauseSet?.rest_pause_duration || 30;
+  const maxRestPauses = restPauseSet?.max_rest_pauses || 2;
 
   const [weight, setWeight] = useState("");
   const [initialReps, setInitialReps] = useState("");

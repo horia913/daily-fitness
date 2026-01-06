@@ -75,13 +75,9 @@ export function useNotifications() {
   }, [loadNotifications])
 
   const sendMessageNotification = useCallback(async (senderName: string, message: string) => {
-    try {
-      await notificationService.sendMessageNotification(senderName, message)
-      loadNotifications()
-    } catch (error) {
-      console.error('Error sending message notification:', error)
-    }
-  }, [loadNotifications])
+    // Deprecated - messaging moved to WhatsApp
+    console.log('Message notifications disabled - use WhatsApp for coach-client communication')
+  }, [])
 
   const sendGoalReminder = useCallback(async (goalName: string, progress: string) => {
     try {

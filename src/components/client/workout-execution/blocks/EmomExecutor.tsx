@@ -36,11 +36,18 @@ export function EmomExecutor({
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
-  const durationMinutes = (block.block.duration_seconds || 600) / 60; // Default 10 minutes
-  const emomMode =
-    (block.block.block_parameters as any)?.emom_mode || "target_reps";
-  const targetReps = (block.block.block_parameters as any)?.emom_reps;
-  const workSeconds = (block.block.block_parameters as any)?.work_seconds;
+  
+  // Read from special table (time_protocols)
+  const timeProtocol = block.block.time_protocols?.find(
+    (tp: any) => tp.protocol_type === 'emom' && 
+    (tp.exercise_id === currentExercise?.exercise_id || !currentExercise?.exercise_id)
+  ) || block.block.time_protocols?.[0];
+  
+  const durationMinutes = timeProtocol?.total_duration_minutes ||
+    ((block.block.duration_seconds || 600) / 60); // Default 10 minutes
+  const emomMode = timeProtocol?.emom_mode || "target_reps";
+  const targetReps = timeProtocol?.target_reps || timeProtocol?.reps_per_round;
+  const workSeconds = timeProtocol?.work_seconds;
 
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");

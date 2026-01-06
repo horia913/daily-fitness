@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { supabase } from "@/lib/supabase";
@@ -31,6 +32,10 @@ import {
   Lightbulb,
   X,
   Video,
+  Info,
+  Layers,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import WorkoutTemplateService, {
@@ -99,6 +104,7 @@ export default function EnhancedClientWorkouts({
 }: EnhancedClientWorkoutsProps) {
   const { isDark, getSemanticColor, performanceSettings, getThemeStyles } =
     useTheme();
+  const { user, profile } = useAuth();
   const theme = getThemeStyles();
   const router = useRouter();
 
@@ -110,6 +116,13 @@ export default function EnhancedClientWorkouts({
   const [workoutHistory, setWorkoutHistory] = useState<DailyWorkout[]>([]);
   const [completedPrograms, setCompletedPrograms] = useState<Program[]>([]);
   const [allAssignedWorkouts, setAllAssignedWorkouts] = useState<any[]>([]);
+  const [weeklyProgress, setWeeklyProgress] = useState({ current: 0, goal: 0 });
+  const [weeklyStats, setWeeklyStats] = useState({
+    totalVolume: 0,
+    activeTime: 0,
+  });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [thisWeekAssignments, setThisWeekAssignments] = useState<any[]>([]);
 
   // Modal states
   const [showAlternatives, setShowAlternatives] = useState<string | null>(null);
@@ -849,12 +862,123 @@ export default function EnhancedClientWorkouts({
         console.log("Error loading assigned workouts/programs:", error);
         setAllAssignedWorkouts([]);
       }
+
+      // Load weekly progress
+      try {
+        const { getDashboardStats } = await import(
+          "@/lib/clientDashboardService"
+        );
+        const stats = await getDashboardStats(clientId);
+        setWeeklyProgress(stats.weeklyProgress);
+
+        // Calculate weekly stats (volume and time) from workout logs
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const monday = new Date(now);
+        monday.setDate(now.getDate() + diffToMonday);
+        monday.setHours(0, 0, 0, 0);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
+
+        const { data: weeklyLogs } = await supabase
+          .from("workout_logs")
+          .select("id, completed_at, total_duration_minutes")
+          .eq("client_id", clientId)
+          .not("completed_at", "is", null)
+          .gte("completed_at", monday.toISOString())
+          .lte("completed_at", sunday.toISOString());
+
+        const activeTime =
+          weeklyLogs?.reduce(
+            (sum, log) => sum + (log.total_duration_minutes || 0),
+            0
+          ) || 0;
+
+        // Calculate volume from workout_set_logs
+        const logIds = weeklyLogs?.map((log) => log.id) || [];
+        let totalVolume = 0;
+        if (logIds.length > 0) {
+          const { data: setLogs } = await supabase
+            .from("workout_set_logs")
+            .select("weight, reps")
+            .in("workout_log_id", logIds);
+
+          totalVolume =
+            setLogs?.reduce(
+              (sum, set) => sum + (set.weight || 0) * (set.reps || 0),
+              0
+            ) || 0;
+        }
+        setWeeklyStats({ totalVolume: Math.round(totalVolume), activeTime });
+
+        // Load this week's workout assignments
+        const mondayStr = monday.toISOString().split("T")[0];
+        const sundayStr = sunday.toISOString().split("T")[0];
+
+        const { data: thisWeekAssignmentsData } = await supabase
+          .from("workout_assignments")
+          .select("id, scheduled_date, name, status, workout_template_id")
+          .eq("client_id", clientId)
+          .gte("scheduled_date", mondayStr)
+          .lte("scheduled_date", sundayStr)
+          .order("scheduled_date", { ascending: true });
+
+        // Get workout logs to check completion status
+        const assignmentIdsForWeek =
+          thisWeekAssignmentsData?.map((a) => a.id) || [];
+        const { data: assignmentLogs } = await supabase
+          .from("workout_logs")
+          .select("workout_assignment_id, completed_at, total_duration_minutes")
+          .in("workout_assignment_id", assignmentIdsForWeek)
+          .not("completed_at", "is", null);
+
+        // Map assignments with completion status
+        const assignmentsWithStatus = (thisWeekAssignmentsData || []).map(
+          (assignment) => {
+            const log = assignmentLogs?.find(
+              (l) => l.workout_assignment_id === assignment.id
+            );
+            return {
+              ...assignment,
+              completed: !!log?.completed_at,
+              completed_at: log?.completed_at,
+              duration_minutes: log?.total_duration_minutes,
+            };
+          }
+        );
+
+        setThisWeekAssignments(assignmentsWithStatus);
+      } catch (error) {
+        console.log("Error loading weekly stats:", error);
+      }
     } catch (error) {
       console.error("Error loading workout data:", error);
     } finally {
       setLoading(false);
     }
   }, [clientId]);
+
+  // Fetch avatar URL
+  useEffect(() => {
+    if (user?.id) {
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from("profiles")
+            .select("avatar_url")
+            .eq("id", user.id)
+            .single();
+          if (data?.avatar_url) {
+            setAvatarUrl(data.avatar_url);
+          }
+        } catch {
+          // Silently fail - avatar is optional
+        }
+      })();
+    }
+  }, [user]);
 
   useEffect(() => {
     loadWorkoutData().catch((error) => {
@@ -949,6 +1073,45 @@ export default function EnhancedClientWorkouts({
     return messages[Math.floor(Math.random() * messages.length)];
   };
 
+  // Quartz card style (faceted quartz surfaces)
+  // Using individual border properties instead of shorthand to avoid conflicts with borderLeft
+  const borderColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)";
+  const quartzCardStyle: React.CSSProperties = {
+    background: isDark
+      ? "linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%)"
+      : "linear-gradient(165deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)",
+    backdropFilter: "blur(24px) saturate(180%)",
+    WebkitBackdropFilter: "blur(24px) saturate(180%)",
+    borderTop: `1px solid ${borderColor}`,
+    borderRight: `1px solid ${borderColor}`,
+    borderBottom: `1px solid ${borderColor}`,
+    borderLeft: `1px solid ${borderColor}`,
+    borderRadius: "24px",
+    position: "relative" as const,
+    overflow: "hidden" as const,
+    transition: "all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)",
+  };
+
+  const getAvatarUrl = () => {
+    if (avatarUrl) return avatarUrl;
+    if (profile?.first_name) {
+      return `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.first_name}&backgroundColor=0A0A0A`;
+    }
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${
+      user?.id || "User"
+    }&backgroundColor=0A0A0A`;
+  };
+
+  const weeklyProgressPercent =
+    weeklyProgress.goal > 0
+      ? Math.min((weeklyProgress.current / weeklyProgress.goal) * 100, 100)
+      : 0;
+
+  // Get program week info for subtitle
+  const programSubtitle = currentProgram
+    ? `${currentProgram.name} • Week ${currentProgram.current_week}`
+    : "Training Schedule";
+
   if (loading) {
     return (
       <div className={`min-h-screen ${theme.background}`}>
@@ -971,6 +1134,21 @@ export default function EnhancedClientWorkouts({
 
   return (
     <AnimatedBackground>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        @keyframes rotate-shimmer {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse-red {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+      `,
+        }}
+      />
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div
         style={{
@@ -983,973 +1161,351 @@ export default function EnhancedClientWorkouts({
             className="max-w-4xl mx-auto"
             style={{ display: "flex", flexDirection: "column", gap: "20px" }}
           >
-            {/* Mobile-Optimized Header */}
-            <div style={{ textAlign: "center", padding: "16px 0" }}>
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <div
-                  style={{
-                    width: "64px",
-                    height: "64px",
-                    borderRadius: "18px",
-                    background:
-                      "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                  }}
-                >
-                  <Dumbbell
-                    style={{ width: "40px", height: "40px", color: "#FFFFFF" }}
-                  />
-                </div>
+            {/* Header Section */}
+            <header
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "40px",
+              }}
+            >
+              <div>
                 <h1
                   style={{
-                    fontSize: "32px",
-                    fontWeight: "800",
-                    color: "#1A1A1A",
-                    lineHeight: "1.2",
-                    margin: "0",
+                    fontSize: "30px",
+                    fontWeight: 700,
+                    lineHeight: "1.25",
+                    letterSpacing: "-0.02em",
+                    color: isDark ? "#FFFFFF" : "#1A1A1A",
+                    margin: 0,
+                    marginBottom: "4px",
                   }}
                 >
-                  My Workouts
+                  Your Workouts
                 </h1>
+                <p
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                    margin: 0,
+                  }}
+                >
+                  {programSubtitle}
+                </p>
               </div>
-              <p
+              <div
                 style={{
-                  fontSize: "16px",
-                  fontWeight: "400",
-                  color: "#6B7280",
-                  marginTop: "8px",
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "16px",
+                  ...quartzCardStyle,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "4px",
+                  border: `2px solid ${
+                    isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"
+                  }`,
                 }}
               >
-                Ready to crush your goals? 💪
-              </p>
-            </div>
+                <img
+                  src={getAvatarUrl()}
+                  alt="Avatar"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "12px",
+                    objectFit: "cover",
+                  }}
+                />
+              </div>
+            </header>
 
-            {/* PRIORITY 1: Today's Workout - Main Focus */}
+            {/* Today's Hero Card */}
             {todaysWorkout?.hasWorkout ? (
-              <Card
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "24px",
-                  padding: "0",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                  marginBottom: "20px",
-                  border: "none",
-                  overflow: "hidden",
-                  position: "relative",
-                }}
-              >
-                {/* Subtle decorative elements */}
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/30 to-purple-50/30 dark:from-indigo-900/20 dark:to-purple-900/20"></div>
-
-                <CardHeader
+              <section style={{ marginBottom: "32px" }}>
+                <div
                   style={{
-                    padding: "24px",
-                    paddingBottom: "12px",
+                    ...quartzCardStyle,
+                    padding: "32px",
+                    minHeight: "280px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    borderLeft: "4px solid #EF4444",
                     position: "relative",
-                    zIndex: 10,
                   }}
+                  className="kinetic-shimmer"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center" style={{ gap: "16px" }}>
-                      <div
-                        style={{
-                          width: "56px",
-                          height: "56px",
-                          borderRadius: "18px",
-                          background:
-                            "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        }}
-                      >
-                        <Zap
-                          style={{
-                            width: "32px",
-                            height: "32px",
-                            color: "#FFFFFF",
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <span
-                          style={{
-                            fontSize: "20px",
-                            fontWeight: "700",
-                            color: "#1A1A1A",
-                            display: "block",
-                          }}
-                        >
-                          Today&apos;s Workout
-                        </span>
-                        <div
-                          className="flex items-center"
-                          style={{ gap: "8px", marginTop: "4px" }}
-                        >
-                          <Sparkles
-                            style={{
-                              width: "16px",
-                              height: "16px",
-                              color: "#FFE082",
-                            }}
-                          />
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              fontWeight: "400",
-                              color: "#6B7280",
-                            }}
-                          >
-                            Week {todaysWorkout.weekNumber} • Day{" "}
-                            {todaysWorkout.programDay}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={loadWorkoutData}
-                      style={{
-                        padding: "12px",
-                        borderRadius: "16px",
-                        color: "#6B7280",
-                      }}
-                    >
-                      <RefreshCcw style={{ width: "20px", height: "20px" }} />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent
-                  style={{
-                    padding: "24px",
-                    paddingTop: "0",
-                    position: "relative",
-                    zIndex: 10,
-                  }}
-                >
+                  {/* Kinetic shimmer overlay */}
                   <div
                     style={{
+                      position: "absolute",
+                      top: "-150%",
+                      left: "-150%",
+                      width: "400%",
+                      height: "400%",
+                      background:
+                        "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 80%)",
+                      animation: "rotate-shimmer 12s infinite linear",
+                      pointerEvents: "none",
+                    }}
+                  />
+
+                  <div
+                    style={{
+                      position: "relative",
+                      zIndex: 10,
                       display: "flex",
                       flexDirection: "column",
                       gap: "24px",
+                      flex: 1,
                     }}
                   >
-                    <div style={{ textAlign: "center" }}>
-                      <h2
-                        style={{
-                          fontSize: "32px",
-                          fontWeight: "800",
-                          color: "#1A1A1A",
-                          lineHeight: "1.2",
-                          marginBottom: "12px",
-                        }}
-                      >
-                        {todaysWorkout.templateName}
-                      </h2>
-                      <p
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: "400",
-                          color: "#6B7280",
-                          lineHeight: "1.5",
-                        }}
-                      >
-                        {todaysWorkout.templateDescription}
-                      </p>
-                    </div>
-
-                    {/* Stat cards */}
-                    <div className="grid grid-cols-3" style={{ gap: "12px" }}>
-                      <div
-                        style={{
-                          backgroundColor: "#FFFFFF",
-                          borderRadius: "24px",
-                          padding: "24px",
-                          textAlign: "center",
-                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: "12px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "56px",
-                            height: "56px",
-                            borderRadius: "18px",
-                            background:
-                              "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          <Clock
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              color: "#FFFFFF",
-                            }}
-                          />
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "40px",
-                            fontWeight: "800",
-                            color: "#1A1A1A",
-                            lineHeight: "1.1",
-                          }}
-                        >
-                          {todaysWorkout.estimatedDuration}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: "400",
-                            color: "#6B7280",
-                          }}
-                        >
-                          min
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          backgroundColor: "#FFFFFF",
-                          borderRadius: "24px",
-                          padding: "24px",
-                          textAlign: "center",
-                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: "12px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "56px",
-                            height: "56px",
-                            borderRadius: "18px",
-                            background:
-                              "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          <Dumbbell
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              color: "#FFFFFF",
-                            }}
-                          />
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "40px",
-                            fontWeight: "800",
-                            color: "#1A1A1A",
-                            lineHeight: "1.1",
-                          }}
-                        >
-                          {todaysWorkout.exercises?.length || 0}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: "400",
-                            color: "#6B7280",
-                          }}
-                        >
-                          exercises
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          backgroundColor: "#FFFFFF",
-                          borderRadius: "24px",
-                          padding: "24px",
-                          textAlign: "center",
-                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: "12px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "56px",
-                            height: "56px",
-                            borderRadius: "18px",
-                            background:
-                              "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          <Target
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              color: "#FFFFFF",
-                            }}
-                          />
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "18px",
-                            fontWeight: "600",
-                            color: "#1A1A1A",
-                            lineHeight: "1.1",
-                            textTransform: "capitalize",
-                          }}
-                        >
-                          {todaysWorkout.difficultyLevel}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: "400",
-                            color: "#6B7280",
-                          }}
-                        >
-                          level
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* PRIORITY: Start Workout Button - Most Important */}
-                    <Button
-                      onClick={() => startWorkout(todaysWorkout)}
+                    <div
                       style={{
-                        width: "100%",
-                        backgroundColor: "#6C5CE7",
-                        color: "#FFFFFF",
-                        fontSize: "16px",
-                        fontWeight: "600",
-                        padding: "16px 32px",
-                        borderRadius: "20px",
-                        border: "none",
-                        boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                        cursor: "pointer",
                         display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "12px",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
                       }}
                     >
-                      <Play style={{ width: "24px", height: "24px" }} />
-                      Start Workout
-                    </Button>
-
-                    {/* Full Exercise Details - Enhanced */}
-                    {todaysWorkout.exercises &&
-                      todaysWorkout.exercises.length > 0 && (
-                        <div className="bg-slate-100/80 dark:bg-slate-700/80 backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-lg border border-slate-200/50 dark:border-slate-600/50">
-                          <div className="p-3 sm:p-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-slate-700 dark:text-slate-200 font-semibold text-sm sm:text-base">
-                                Workout Details (
-                                {todaysWorkout.exercises.length} exercises)
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  router.push(
-                                    `/client/workouts/${todaysWorkout.templateId}/details`
-                                  )
-                                }
-                                className="text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-600/50 p-2 rounded-lg text-xs"
-                              >
-                                <Eye className="w-4 h-4 mr-1" />
-                                View Full Details
-                              </Button>
-                            </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "12px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            padding: "4px 12px",
+                            borderRadius: "99px",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            background:
+                              "linear-gradient(90deg, #EF4444, #F59E0B)",
+                            color: "#FFFFFF",
+                            width: "fit-content",
+                            animation: "pulse-red 2s infinite",
+                          }}
+                        >
+                          <Zap
+                            style={{
+                              width: "12px",
+                              height: "12px",
+                              fill: "currentColor",
+                            }}
+                          />
+                          Today
+                        </span>
+                        <h2
+                          style={{
+                            fontSize: "30px",
+                            fontWeight: 700,
+                            lineHeight: "1.25",
+                            color: isDark ? "#FFFFFF" : "#1A1A1A",
+                            margin: 0,
+                            letterSpacing: "-0.02em",
+                          }}
+                        >
+                          {todaysWorkout.templateName}
+                        </h2>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "20px",
+                            color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            <Dumbbell
+                              style={{
+                                width: "20px",
+                                height: "20px",
+                                color: "#EF4444",
+                              }}
+                            />
+                            <span style={{ fontSize: "16px", fontWeight: 500 }}>
+                              {todaysWorkout.exercises?.length || 0} Exercises
+                            </span>
                           </div>
-                          <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
-                            {todaysWorkout.exercises.map((exercise, index) => {
-                              const isExpanded = expandedExercises.has(
-                                exercise.id
-                              );
-
-                              return (
-                                <div
-                                  key={exercise.id}
-                                  className="bg-white/60 dark:bg-slate-600/60 rounded-lg sm:rounded-xl shadow-sm border border-slate-200/50 dark:border-slate-500/50"
-                                >
-                                  {/* Exercise Header - Always Visible */}
-                                  <div
-                                    className="flex items-center justify-between p-2 sm:p-3 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-500/30 rounded-lg sm:rounded-xl transition-colors"
-                                    onClick={() =>
-                                      toggleExerciseExpanded(exercise.id)
-                                    }
-                                  >
-                                    <div className="flex items-center gap-2 sm:gap-3">
-                                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-sm">
-                                        {index + 1}
-                                      </div>
-                                      <div>
-                                        <div className="text-slate-800 dark:text-white font-semibold text-xs sm:text-sm">
-                                          {exercise.name}
-                                        </div>
-                                        <div className="text-slate-600 dark:text-slate-300 text-xs">
-                                          {(() => {
-                                            // Handle different exercise types and data scenarios
-                                            if (
-                                              exercise.reps &&
-                                              Number(exercise.reps) > 0
-                                            ) {
-                                              return `${exercise.sets} × ${
-                                                exercise.reps
-                                              }${
-                                                (exercise as any).weight &&
-                                                (exercise as any).weight > 0
-                                                  ? ` @ ${
-                                                      (exercise as any).weight
-                                                    }kg`
-                                                  : ""
-                                              }`;
-                                            } else if (
-                                              exercise.sets &&
-                                              exercise.sets > 0
-                                            ) {
-                                              return `${exercise.sets} sets${
-                                                (exercise as any).weight &&
-                                                (exercise as any).weight > 0
-                                                  ? ` @ ${
-                                                      (exercise as any).weight
-                                                    }kg`
-                                                  : ""
-                                              }`;
-                                            } else if (
-                                              (exercise as any).weight &&
-                                              (exercise as any).weight > 0
-                                            ) {
-                                              return `Weight: ${
-                                                (exercise as any).weight
-                                              }kg`;
-                                            } else {
-                                              return "Tap to view details";
-                                            }
-                                          })()}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          showExerciseAlternatives(
-                                            exercise.exerciseId
-                                          );
-                                        }}
-                                        className="text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-500/50 p-1 sm:p-2 rounded-lg text-xs"
-                                        title="Alternatives"
-                                      >
-                                        <Shuffle className="w-3 h-3 sm:w-4 sm:h-4" />
-                                      </Button>
-                                      <div
-                                        className={`transform transition-transform duration-200 ${
-                                          isExpanded ? "rotate-180" : ""
-                                        }`}
-                                      >
-                                        <svg
-                                          className="w-4 h-4 text-slate-600 dark:text-slate-300"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          viewBox="0 0 24 24"
-                                        >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M19 9l-7 7-7-7"
-                                          />
-                                        </svg>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Expandable Content */}
-                                  {isExpanded && (
-                                    <div className="px-2 sm:px-3 pb-2 sm:pb-3 border-t border-slate-200/50 dark:border-slate-500/50 mt-2 pt-2">
-                                      <div className="space-y-2">
-                                        {(() => {
-                                          // Render detailed information based on exercise type
-                                          const exerciseType = exercise.name;
-
-                                          if (exerciseType === "Giant Set") {
-                                            return (
-                                              <div className="text-xs text-slate-600 dark:text-slate-300">
-                                                <div className="font-medium mb-2">
-                                                  Giant Set Format:
-                                                </div>
-                                                <div className="mb-2">
-                                                  • Complete all exercises
-                                                  before resting
-                                                </div>
-                                                <div className="mb-2">
-                                                  • {exercise.sets} rounds total
-                                                </div>
-                                                <div className="mb-3">
-                                                  • Rest:{" "}
-                                                  {
-                                                    (exercise as any)
-                                                      .rest_seconds
-                                                  }
-                                                  s between rounds
-                                                </div>
-
-                                                {/* Individual exercises in Giant Set */}
-                                                <div className="space-y-2">
-                                                  <div className="font-medium">
-                                                    Exercises in this Giant Set:
-                                                  </div>
-                                                  {(
-                                                    exercise as any
-                                                  ).notes_data?.giant_set_exercises?.map(
-                                                    (
-                                                      ex: any,
-                                                      exIndex: number
-                                                    ) => {
-                                                      const exerciseDetail = (
-                                                        exercise as any
-                                                      ).exercise_details?.find(
-                                                        (ed: any) =>
-                                                          ed.id ===
-                                                          ex.exercise_id
-                                                      );
-                                                      return (
-                                                        <div
-                                                          key={exIndex}
-                                                          className="flex items-center justify-between bg-slate-50 dark:bg-slate-700 rounded-lg p-2"
-                                                        >
-                                                          <div className="flex-1">
-                                                            <div className="font-medium">
-                                                              {exerciseDetail?.name ||
-                                                                `Exercise ${
-                                                                  exIndex + 1
-                                                                }`}
-                                                            </div>
-                                                            <div className="text-xs text-slate-500">
-                                                              {ex.reps} reps
-                                                            </div>
-                                                          </div>
-                                                          <div className="flex gap-1">
-                                                            {exerciseDetail?.video_url && (
-                                                              <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() =>
-                                                                  window.open(
-                                                                    exerciseDetail.video_url,
-                                                                    "_blank"
-                                                                  )
-                                                                }
-                                                                className="text-xs px-2 py-1 h-6"
-                                                              >
-                                                                <Video className="w-3 h-3" />
-                                                              </Button>
-                                                            )}
-                                                            <Button
-                                                              size="sm"
-                                                              variant="outline"
-                                                              onClick={() =>
-                                                                showExerciseAlternatives(
-                                                                  ex.exercise_id
-                                                                )
-                                                              }
-                                                              className="text-xs px-2 py-1 h-6"
-                                                            >
-                                                              <RefreshCcw className="w-3 h-3" />
-                                                            </Button>
-                                                          </div>
-                                                        </div>
-                                                      );
-                                                    }
-                                                  ) || (
-                                                    <div className="text-slate-500">
-                                                      Exercise details not
-                                                      available
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            );
-                                          } else if (
-                                            exerciseType === "Superset"
-                                          ) {
-                                            return (
-                                              <div className="text-xs text-slate-600 dark:text-slate-300">
-                                                <div className="font-medium mb-2">
-                                                  Superset Format:
-                                                </div>
-                                                <div className="mb-2">
-                                                  • Exercise A → Exercise B →
-                                                  Rest
-                                                </div>
-                                                <div className="mb-2">
-                                                  • {exercise.sets} supersets
-                                                  total
-                                                </div>
-                                                <div className="mb-3">
-                                                  • Rest:{" "}
-                                                  {
-                                                    (exercise as any)
-                                                      .rest_seconds
-                                                  }
-                                                  s between supersets
-                                                </div>
-
-                                                {/* Individual exercises in Superset */}
-                                                <div className="space-y-2">
-                                                  <div className="font-medium">
-                                                    Exercises in this Superset:
-                                                  </div>
-                                                  {/* Exercise A (current exercise) */}
-                                                  <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-700 rounded-lg p-2">
-                                                    <div className="flex-1">
-                                                      <div className="font-medium">
-                                                        {(exercise as any)
-                                                          .exercise_name ||
-                                                          (exercise as any)
-                                                            .exercise?.name ||
-                                                          "Exercise A"}
-                                                      </div>
-                                                      <div className="text-xs text-slate-500">
-                                                        {(exercise as any)
-                                                          .notes_data
-                                                          ?.exercise_a ||
-                                                          exercise.reps}{" "}
-                                                        reps
-                                                      </div>
-                                                    </div>
-                                                    <div className="flex gap-1">
-                                                      <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                          showExerciseAlternatives(
-                                                            exercise.exerciseId ||
-                                                              (exercise as any)
-                                                                .exercise_id
-                                                          )
-                                                        }
-                                                        className="text-xs px-2 py-1 h-6"
-                                                      >
-                                                        <RefreshCcw className="w-3 h-3" />
-                                                      </Button>
-                                                    </div>
-                                                  </div>
-                                                  {/* Exercise B (superset partner) */}
-                                                  {(exercise as any).notes_data
-                                                    ?.superset_exercise_id && (
-                                                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-700 rounded-lg p-2">
-                                                      <div className="flex-1">
-                                                        <div className="font-medium">
-                                                          {(
-                                                            exercise as any
-                                                          ).exercise_details?.find(
-                                                            (ed: any) =>
-                                                              ed.id ===
-                                                              (exercise as any)
-                                                                .notes_data
-                                                                .superset_exercise_id
-                                                          )?.name ||
-                                                            "Exercise B"}
-                                                        </div>
-                                                        <div className="text-xs text-slate-500">
-                                                          {(exercise as any)
-                                                            .notes_data
-                                                            ?.exercise_b ||
-                                                            "N/A"}{" "}
-                                                          reps
-                                                        </div>
-                                                      </div>
-                                                      <div className="flex gap-1">
-                                                        {(
-                                                          exercise as any
-                                                        ).exercise_details?.find(
-                                                          (ed: any) =>
-                                                            ed.id ===
-                                                            (exercise as any)
-                                                              .notes_data
-                                                              .superset_exercise_id
-                                                        )?.video_url && (
-                                                          <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                              window.open(
-                                                                (
-                                                                  exercise as any
-                                                                ).exercise_details.find(
-                                                                  (ed: any) =>
-                                                                    ed.id ===
-                                                                    (
-                                                                      exercise as any
-                                                                    ).notes_data
-                                                                      .superset_exercise_id
-                                                                ).video_url,
-                                                                "_blank"
-                                                              )
-                                                            }
-                                                            className="text-xs px-2 py-1 h-6"
-                                                          >
-                                                            <Video className="w-3 h-3" />
-                                                          </Button>
-                                                        )}
-                                                        <Button
-                                                          size="sm"
-                                                          variant="outline"
-                                                          onClick={() =>
-                                                            showExerciseAlternatives(
-                                                              (exercise as any)
-                                                                .notes_data
-                                                                .superset_exercise_id
-                                                            )
-                                                          }
-                                                          className="text-xs px-2 py-1 h-6"
-                                                        >
-                                                          <RefreshCcw className="w-3 h-3" />
-                                                        </Button>
-                                                      </div>
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            );
-                                          } else if (
-                                            exerciseType === "Circuit"
-                                          ) {
-                                            return (
-                                              <div className="text-xs text-slate-600 dark:text-slate-300">
-                                                <div className="font-medium mb-2">
-                                                  Circuit Format:
-                                                </div>
-                                                <div className="mb-2">
-                                                  • Complete all exercises in
-                                                  sequence
-                                                </div>
-                                                <div className="mb-2">
-                                                  • {exercise.sets} rounds total
-                                                </div>
-                                                <div className="mb-3">
-                                                  • Rest:{" "}
-                                                  {
-                                                    (exercise as any)
-                                                      .rest_seconds
-                                                  }
-                                                  s between rounds
-                                                </div>
-
-                                                {/* Individual exercises in Circuit */}
-                                                <div className="space-y-2">
-                                                  <div className="font-medium">
-                                                    Exercises in this Circuit:
-                                                  </div>
-                                                  {(
-                                                    exercise as any
-                                                  ).notes_data?.circuit_sets?.map(
-                                                    (
-                                                      ex: any,
-                                                      exIndex: number
-                                                    ) => {
-                                                      const exerciseDetail = (
-                                                        exercise as any
-                                                      ).exercise_details?.find(
-                                                        (ed: any) =>
-                                                          ed.id ===
-                                                          ex.exercise_id
-                                                      );
-                                                      return (
-                                                        <div
-                                                          key={exIndex}
-                                                          className="flex items-center justify-between bg-slate-50 dark:bg-slate-700 rounded-lg p-2"
-                                                        >
-                                                          <div className="flex-1">
-                                                            <div className="font-medium">
-                                                              {exerciseDetail?.name ||
-                                                                `Exercise ${
-                                                                  exIndex + 1
-                                                                }`}
-                                                            </div>
-                                                            <div className="text-xs text-slate-500">
-                                                              {ex.reps ||
-                                                                "AMRAP"}{" "}
-                                                              reps
-                                                            </div>
-                                                          </div>
-                                                          <div className="flex gap-1">
-                                                            {exerciseDetail?.video_url && (
-                                                              <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() =>
-                                                                  window.open(
-                                                                    exerciseDetail.video_url,
-                                                                    "_blank"
-                                                                  )
-                                                                }
-                                                                className="text-xs px-2 py-1 h-6"
-                                                              >
-                                                                <Video className="w-3 h-3" />
-                                                              </Button>
-                                                            )}
-                                                            <Button
-                                                              size="sm"
-                                                              variant="outline"
-                                                              onClick={() =>
-                                                                showExerciseAlternatives(
-                                                                  ex.exercise_id
-                                                                )
-                                                              }
-                                                              className="text-xs px-2 py-1 h-6"
-                                                            >
-                                                              <RefreshCcw className="w-3 h-3" />
-                                                            </Button>
-                                                          </div>
-                                                        </div>
-                                                      );
-                                                    }
-                                                  ) || (
-                                                    <div className="text-slate-500">
-                                                      Exercise details not
-                                                      available
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            );
-                                          } else if (exerciseType === "AMRAP") {
-                                            return (
-                                              <div className="text-xs text-slate-600 dark:text-slate-300">
-                                                <div className="font-medium mb-1">
-                                                  AMRAP Format:
-                                                </div>
-                                                <div>
-                                                  • As Many Rounds As Possible
-                                                </div>
-                                                <div>
-                                                  • Duration:{" "}
-                                                  {exercise.reps || 10} minutes
-                                                </div>
-                                                <div>
-                                                  • Rest:{" "}
-                                                  {
-                                                    (exercise as any)
-                                                      .rest_seconds
-                                                  }
-                                                  s between exercises
-                                                </div>
-                                              </div>
-                                            );
-                                          } else if (
-                                            exerciseType === "Tabata"
-                                          ) {
-                                            return (
-                                              <div className="text-xs text-slate-600 dark:text-slate-300">
-                                                <div className="font-medium mb-1">
-                                                  Tabata Format:
-                                                </div>
-                                                <div>• 20s work, 10s rest</div>
-                                                <div>
-                                                  • {exercise.sets} rounds total
-                                                </div>
-                                                <div>
-                                                  • High intensity interval
-                                                  training
-                                                </div>
-                                              </div>
-                                            );
-                                          } else if (
-                                            exerciseType === "Drop Set"
-                                          ) {
-                                            return (
-                                              <div className="text-xs text-slate-600 dark:text-slate-300">
-                                                <div className="font-medium mb-1">
-                                                  Drop Set Format:
-                                                </div>
-                                                <div>
-                                                  • Reduce weight after each set
-                                                </div>
-                                                <div>
-                                                  • {exercise.sets} drop sets
-                                                  total
-                                                </div>
-                                                <div>
-                                                  • Rest:{" "}
-                                                  {
-                                                    (exercise as any)
-                                                      .rest_seconds
-                                                  }
-                                                  s between sets
-                                                </div>
-                                              </div>
-                                            );
-                                          } else {
-                                            // Straight Set or other single exercise types
-                                            return (
-                                              <div className="text-xs text-slate-600 dark:text-slate-300">
-                                                <div className="font-medium mb-1">
-                                                  Exercise Details:
-                                                </div>
-                                                <div>
-                                                  • Sets: {exercise.sets}
-                                                </div>
-                                                <div>
-                                                  • Reps:{" "}
-                                                  {Number(exercise.reps) > 0
-                                                    ? exercise.reps
-                                                    : "To failure"}
-                                                </div>
-                                                <div>
-                                                  • Rest:{" "}
-                                                  {
-                                                    (exercise as any)
-                                                      .rest_seconds
-                                                  }
-                                                  s between sets
-                                                </div>
-                                                {(exercise as any).weight >
-                                                  0 && (
-                                                  <div>
-                                                    • Weight:{" "}
-                                                    {(exercise as any).weight}
-                                                    kg
-                                                  </div>
-                                                )}
-                                              </div>
-                                            );
-                                          }
-                                        })()}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            <Layers
+                              style={{
+                                width: "20px",
+                                height: "20px",
+                                color: "#EF4444",
+                              }}
+                            />
+                            <span style={{ fontSize: "16px", fontWeight: 500 }}>
+                              {todaysWorkout.exercises?.reduce(
+                                (sum, e) => sum + (e.sets || 0),
+                                0
+                              ) || 0}{" "}
+                              Sets
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            <Clock
+                              style={{
+                                width: "20px",
+                                height: "20px",
+                                color: isDark
+                                  ? "rgba(255,255,255,0.4)"
+                                  : "#6B7280",
+                              }}
+                            />
+                            <span
+                              style={{
+                                fontSize: "16px",
+                                fontWeight: 500,
+                                fontFamily: "monospace",
+                              }}
+                            >
+                              ~{todaysWorkout.estimatedDuration || 0} min
+                            </span>
                           </div>
                         </div>
-                      )}
+                      </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "16px",
+                        marginTop: "32px",
+                      }}
+                    >
+                      <button
+                        onClick={() => startWorkout(todaysWorkout)}
+                        style={{
+                          height: "56px",
+                          background:
+                            "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                          boxShadow: "0 4px 20px rgba(16, 185, 129, 0.3)",
+                          borderRadius: "18px",
+                          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                          cursor: "pointer",
+                          border: "none",
+                          color: "#FFFFFF",
+                          fontSize: "18px",
+                          fontWeight: 700,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "12px",
+                          flex: 1,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow =
+                            "0 8px 24px rgba(16, 185, 129, 0.4)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow =
+                            "0 4px 20px rgba(16, 185, 129, 0.3)";
+                        }}
+                        onMouseDown={(e) => {
+                          e.currentTarget.style.transform = "scale(0.96)";
+                          e.currentTarget.style.filter = "brightness(0.9)";
+                        }}
+                        onMouseUp={(e) => {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.filter = "brightness(1)";
+                        }}
+                      >
+                        <Play
+                          style={{
+                            width: "24px",
+                            height: "24px",
+                            fill: "currentColor",
+                          }}
+                        />
+                        Start Workout
+                      </button>
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/client/workouts/${todaysWorkout.templateId}/details`
+                          )
+                        }
+                        style={{
+                          height: "48px",
+                          background: isDark
+                            ? "rgba(255,255,255,0.05)"
+                            : "rgba(0,0,0,0.02)",
+                          border: `1px solid ${
+                            isDark
+                              ? "rgba(255,255,255,0.08)"
+                              : "rgba(0,0,0,0.1)"
+                          }`,
+                          borderRadius: "16px",
+                          transition: "all 0.2s ease",
+                          cursor: "pointer",
+                          color: isDark ? "rgba(255,255,255,0.7)" : "#6B7280",
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "8px",
+                          padding: "0 24px",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = isDark
+                            ? "rgba(255,255,255,0.1)"
+                            : "rgba(0,0,0,0.05)";
+                          e.currentTarget.style.borderColor = isDark
+                            ? "rgba(255,255,255,0.2)"
+                            : "rgba(0,0,0,0.15)";
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = isDark
+                            ? "rgba(255,255,255,0.05)"
+                            : "rgba(0,0,0,0.02)";
+                          e.currentTarget.style.borderColor = isDark
+                            ? "rgba(255,255,255,0.08)"
+                            : "rgba(0,0,0,0.1)";
+                          e.currentTarget.style.transform = "translateY(0)";
+                        }}
+                      >
+                        <Info style={{ width: "20px", height: "20px" }} />
+                        Details
+                      </button>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </section>
             ) : (
               <Card className="bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 border-0 shadow-xl rounded-2xl sm:rounded-3xl overflow-hidden">
                 <CardContent className="p-8 sm:p-16 text-center">
@@ -2013,17 +1569,186 @@ export default function EnhancedClientWorkouts({
               </Card>
             )}
 
+            {/* Weekly Progress Banner */}
+            <section style={{ marginBottom: "32px" }}>
+              <div
+                style={{
+                  ...quartzCardStyle,
+                  padding: "24px",
+                  borderLeft: "4px solid #3B82F6",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "24px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                      flex: 1,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-end",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: 500,
+                          lineHeight: "1.25",
+                          color: isDark ? "#FFFFFF" : "#1A1A1A",
+                          margin: 0,
+                        }}
+                      >
+                        Weekly Progress
+                      </h3>
+                      <span
+                        style={{
+                          fontFamily: "monospace",
+                          fontSize: "16px",
+                          fontWeight: 700,
+                          color: "#3B82F6",
+                        }}
+                      >
+                        {weeklyProgress.current} / {weeklyProgress.goal}{" "}
+                        <span
+                          style={{
+                            color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                            fontWeight: 400,
+                          }}
+                        >
+                          Workouts
+                        </span>
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: "8px",
+                        background: isDark
+                          ? "rgba(255,255,255,0.05)"
+                          : "rgba(0,0,0,0.05)",
+                        borderRadius: "4px",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          background:
+                            "linear-gradient(90deg, #3B82F6, #10B981)",
+                          borderRadius: "4px",
+                          transition: "width 1s cubic-bezier(0.65, 0, 0.35, 1)",
+                          width: `${weeklyProgressPercent}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      height: "48px",
+                      width: "1px",
+                      background: isDark
+                        ? "rgba(255,255,255,0.1)"
+                        : "rgba(0,0,0,0.1)",
+                      display: "none",
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: "32px" }}>
+                    <div>
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 400,
+                          color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                          margin: "0 0 4px 0",
+                        }}
+                      >
+                        Total Volume
+                      </p>
+                      <p
+                        style={{
+                          fontSize: "20px",
+                          fontWeight: 700,
+                          fontFamily: "monospace",
+                          letterSpacing: "-0.02em",
+                          color: isDark ? "#FFFFFF" : "#1A1A1A",
+                          margin: 0,
+                        }}
+                      >
+                        {weeklyStats.totalVolume.toLocaleString()}
+                        <span
+                          style={{
+                            color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                            fontSize: "14px",
+                            fontWeight: 400,
+                            marginLeft: "4px",
+                          }}
+                        >
+                          kg
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 400,
+                          color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                          margin: "0 0 4px 0",
+                        }}
+                      >
+                        Active Time
+                      </p>
+                      <p
+                        style={{
+                          fontSize: "20px",
+                          fontWeight: 700,
+                          fontFamily: "monospace",
+                          letterSpacing: "-0.02em",
+                          color: isDark ? "#FFFFFF" : "#1A1A1A",
+                          margin: 0,
+                        }}
+                      >
+                        {weeklyStats.activeTime}
+                        <span
+                          style={{
+                            color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                            fontSize: "14px",
+                            fontWeight: 400,
+                            marginLeft: "4px",
+                          }}
+                        >
+                          min
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             {/* SECONDARY FEATURES - Below main workout */}
 
             {/* Quick Stats */}
             <div className="grid grid-cols-3" style={{ gap: "12px" }}>
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "24px",
+                  ...quartzCardStyle,
                   padding: "24px",
                   textAlign: "center",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -2051,7 +1776,7 @@ export default function EnhancedClientWorkouts({
                   style={{
                     fontSize: "40px",
                     fontWeight: "800",
-                    color: "#1A1A1A",
+                    color: isDark ? "#FFFFFF" : "#1A1A1A",
                     lineHeight: "1.1",
                   }}
                 >
@@ -2061,7 +1786,7 @@ export default function EnhancedClientWorkouts({
                   style={{
                     fontSize: "14px",
                     fontWeight: "400",
-                    color: "#6B7280",
+                    color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
                   }}
                 >
                   Day Streak
@@ -2069,11 +1794,9 @@ export default function EnhancedClientWorkouts({
               </div>
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "24px",
+                  ...quartzCardStyle,
                   padding: "24px",
                   textAlign: "center",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -2101,7 +1824,7 @@ export default function EnhancedClientWorkouts({
                   style={{
                     fontSize: "40px",
                     fontWeight: "800",
-                    color: "#1A1A1A",
+                    color: isDark ? "#FFFFFF" : "#1A1A1A",
                     lineHeight: "1.1",
                   }}
                 >
@@ -2111,7 +1834,7 @@ export default function EnhancedClientWorkouts({
                   style={{
                     fontSize: "14px",
                     fontWeight: "400",
-                    color: "#6B7280",
+                    color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
                   }}
                 >
                   This Month
@@ -2119,11 +1842,9 @@ export default function EnhancedClientWorkouts({
               </div>
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "24px",
+                  ...quartzCardStyle,
                   padding: "24px",
                   textAlign: "center",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -2151,7 +1872,7 @@ export default function EnhancedClientWorkouts({
                   style={{
                     fontSize: "40px",
                     fontWeight: "800",
-                    color: "#1A1A1A",
+                    color: isDark ? "#FFFFFF" : "#1A1A1A",
                     lineHeight: "1.1",
                   }}
                 >
@@ -2161,7 +1882,7 @@ export default function EnhancedClientWorkouts({
                   style={{
                     fontSize: "14px",
                     fontWeight: "400",
-                    color: "#6B7280",
+                    color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
                   }}
                 >
                   Success Rate
@@ -2245,167 +1966,228 @@ export default function EnhancedClientWorkouts({
               </details>
             )}
 
-            {/* Upcoming Workouts */}
-            {upcomingWorkouts.length > 0 && (
-              <Card
-                className={`${theme.card} ${theme.shadow} rounded-3xl overflow-hidden`}
-              >
-                <CardHeader className="p-8 border-b border-slate-200 dark:border-slate-700">
-                  <CardTitle className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-                      <CalendarIcon className="w-5 h-5 text-white" />
-                    </div>
-                    <span className={`text-2xl font-bold ${theme.text}`}>
-                      Upcoming Workouts
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {upcomingWorkouts.slice(0, 6).map((workout, index) => {
-                      const workoutDate = new Date();
-                      workoutDate.setDate(workoutDate.getDate() + index + 1);
-                      const dateString = workoutDate
-                        .toISOString()
-                        .split("T")[0];
+            {/* This Week's Workouts */}
+            {thisWeekAssignments.length > 0 && (
+              <section style={{ marginBottom: "32px" }}>
+                <h3
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: 600,
+                    lineHeight: "1.25",
+                    color: isDark ? "#FFFFFF" : "#1A1A1A",
+                    marginBottom: "16px",
+                    paddingLeft: "4px",
+                  }}
+                >
+                  This Week
+                </h3>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  {thisWeekAssignments.map((assignment) => {
+                    const workoutDate = new Date(assignment.scheduled_date);
+                    const isCompleted = assignment.completed;
+                    const isSkipped = assignment.status === "skipped";
+                    const isToday = assignment.scheduled_date === today;
 
-                      return (
-                        <Card
-                          key={index}
-                          className={`${theme.card} border-2 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600 transition-all duration-300 rounded-2xl`}
-                        >
-                          <CardContent className="p-6">
-                            <div className="flex items-center justify-between mb-4">
-                              <Badge
-                                variant="outline"
-                                className="border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 px-3 py-1"
-                              >
-                                {formatDate(dateString)}
-                              </Badge>
-                              <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 px-3 py-1">
-                                Week {workout.weekNumber} • Day{" "}
-                                {workout.programDay}
-                              </Badge>
-                            </div>
-                            <h4
-                              className={`font-bold text-lg mb-3 truncate ${theme.text}`}
-                            >
-                              {workout.templateName}
-                            </h4>
-                            <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 mb-4">
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-4 h-4" />
-                                <span>{workout.estimatedDuration}m</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Dumbbell className="w-4 h-4" />
-                                <span>{workout.exercises?.length || 0}</span>
-                              </div>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full rounded-xl border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                              onClick={() => {
-                                // Preview workout logic
-                                console.log("Preview workout:", workout);
-                              }}
-                            >
-                              <Eye className="w-4 h-4 mr-2" />
-                              Preview
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                    const monthAbbr = workoutDate.toLocaleDateString("en-US", {
+                      month: "short",
+                    });
+                    const day = workoutDate.getDate();
 
-            {/* Workout History */}
-            {workoutHistory.length > 0 && (
-              <Card
-                className={`${theme.card} ${theme.shadow} rounded-3xl overflow-hidden`}
-              >
-                <CardHeader className="p-8 border-b border-slate-200 dark:border-slate-700">
-                  <CardTitle className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl flex items-center justify-center">
-                      <BarChart3 className="w-5 h-5 text-white" />
-                    </div>
-                    <span className={`text-2xl font-bold ${theme.text}`}>
-                      Recent Workouts
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-8">
-                  <div className="space-y-4">
-                    {workoutHistory.slice(0, 5).map((workout, index) => {
-                      const workoutDate = new Date();
-                      workoutDate.setDate(workoutDate.getDate() - index - 1);
-                      const dateString = workoutDate
-                        .toISOString()
-                        .split("T")[0];
-                      const isCompleted = (
-                        workout as DailyWorkout & { completed: boolean }
-                      ).completed;
-
-                      return (
+                    return (
+                      <div
+                        key={assignment.id}
+                        style={{
+                          ...quartzCardStyle,
+                          padding: "20px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          cursor: "pointer",
+                          opacity: isSkipped ? 0.7 : 1,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = isDark
+                            ? "rgba(255,255,255,0.08)"
+                            : "rgba(255,255,255,0.95)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = isDark
+                            ? "linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%)"
+                            : "linear-gradient(165deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)";
+                        }}
+                        onClick={() => {
+                          router.push(
+                            `/client/workouts/${assignment.id}/details`
+                          );
+                        }}
+                      >
                         <div
-                          key={index}
-                          className={`flex items-center gap-6 p-6 rounded-2xl ${
-                            isCompleted
-                              ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
-                              : "bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
-                          }`}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "20px",
+                          }}
                         >
                           <div
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                              isCompleted
-                                ? "bg-green-100 dark:bg-green-800"
-                                : "bg-slate-100 dark:bg-slate-700"
-                            }`}
-                          >
-                            {isCompleted ? (
-                              <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-                            ) : (
-                              <AlertCircle className="w-6 h-6 text-slate-500 dark:text-slate-400" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <h4
-                              className={`font-bold text-lg mb-2 ${
+                            style={{
+                              width: "56px",
+                              height: "56px",
+                              borderRadius: "12px",
+                              background: isCompleted
+                                ? "rgba(16, 185, 129, 0.1)"
+                                : isSkipped
+                                ? isDark
+                                  ? "#1F2937"
+                                  : "#F3F4F6"
+                                : "rgba(59, 130, 246, 0.1)",
+                              border: `1px solid ${
                                 isCompleted
-                                  ? "text-green-900 dark:text-green-100"
-                                  : theme.text
-                              }`}
-                            >
-                              {workout.templateName}
-                            </h4>
-                            <div className="flex items-center gap-4 text-base text-slate-500 dark:text-slate-400">
-                              <span>{formatDate(dateString)}</span>
-                              <span>
-                                Week {workout.weekNumber} • Day{" "}
-                                {workout.programDay}
-                              </span>
-                              <span>{workout.estimatedDuration}min</span>
-                            </div>
-                          </div>
-                          <Badge
-                            className={
-                              isCompleted
-                                ? "bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300"
-                                : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2"
-                            }
+                                  ? "rgba(16, 185, 129, 0.2)"
+                                  : isSkipped
+                                  ? isDark
+                                    ? "#374151"
+                                    : "#E5E7EB"
+                                  : "rgba(59, 130, 246, 0.2)"
+                              }`,
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: isCompleted
+                                ? "#10B981"
+                                : isSkipped
+                                ? isDark
+                                  ? "#6B7280"
+                                  : "#9CA3AF"
+                                : "#3B82F6",
+                              fontFamily: "monospace",
+                            }}
                           >
-                            {isCompleted ? "Completed" : "Skipped"}
-                          </Badge>
+                            <span
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {monthAbbr}
+                            </span>
+                            <span style={{ fontSize: "20px", fontWeight: 700 }}>
+                              {day}
+                            </span>
+                          </div>
+                          <div>
+                            <h4
+                              style={{
+                                fontSize: "18px",
+                                fontWeight: 600,
+                                lineHeight: "1.25",
+                                color: isDark ? "#FFFFFF" : "#1A1A1A",
+                                margin: "0 0 4px 0",
+                              }}
+                            >
+                              {assignment.name || "Workout"}
+                            </h4>
+                            <p
+                              style={{
+                                fontSize: "14px",
+                                fontWeight: 400,
+                                color: isDark
+                                  ? "rgba(255,255,255,0.5)"
+                                  : "#6B7280",
+                                margin: 0,
+                              }}
+                            >
+                              {isCompleted && assignment.completed_at
+                                ? `Completed at ${new Date(
+                                    assignment.completed_at
+                                  ).toLocaleTimeString("en-US", {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })} • ${assignment.duration_minutes || 0} min`
+                                : isSkipped
+                                ? "Marked as skipped"
+                                : isToday
+                                ? "Scheduled for today"
+                                : "Scheduled"}
+                            </p>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "16px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              padding: "4px 12px",
+                              borderRadius: "99px",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              background: isCompleted
+                                ? "rgba(16, 185, 129, 0.2)"
+                                : isSkipped
+                                ? isDark
+                                  ? "#1F2937"
+                                  : "#F3F4F6"
+                                : "rgba(59, 130, 246, 0.2)",
+                              border: `1px solid ${
+                                isCompleted
+                                  ? "rgba(16, 185, 129, 0.3)"
+                                  : isSkipped
+                                  ? isDark
+                                    ? "#374151"
+                                    : "#E5E7EB"
+                                  : "rgba(59, 130, 246, 0.3)"
+                              }`,
+                              color: isCompleted
+                                ? "#10B981"
+                                : isSkipped
+                                ? isDark
+                                  ? "#6B7280"
+                                  : "#9CA3AF"
+                                : "#3B82F6",
+                            }}
+                          >
+                            {isCompleted && (
+                              <CheckCircle
+                                style={{ width: "14px", height: "14px" }}
+                              />
+                            )}
+                            {isCompleted
+                              ? "DONE"
+                              : isSkipped
+                              ? "SKIPPED"
+                              : "UPCOMING"}
+                          </span>
+                          <ChevronRight
+                            style={{
+                              width: "24px",
+                              height: "24px",
+                              color: isDark
+                                ? "rgba(255,255,255,0.4)"
+                                : "#9CA3AF",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             )}
 
             {/* Completed Programs */}
@@ -2532,331 +2314,323 @@ export default function EnhancedClientWorkouts({
 
             {/* All Assigned Workouts */}
             {allAssignedWorkouts.length > 0 && (
-              <Card
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "24px",
-                  padding: "0",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                  marginBottom: "20px",
-                  border: "none",
-                  overflow: "hidden",
-                }}
-              >
-                <CardHeader
-                  style={{
-                    padding: "24px",
-                    borderBottom: "1px solid #E5E7EB",
-                  }}
-                >
-                  <CardTitle
-                    className="flex items-center"
-                    style={{ gap: "16px" }}
+              <section className="space-y-6 mb-8">
+                {/* Header */}
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                      isDark
+                        ? "bg-gradient-to-br from-purple-600/20 to-blue-600/20 border border-white/10"
+                        : "bg-gradient-to-br from-purple-100 to-blue-100 border border-purple-200"
+                    }`}
+                    style={{
+                      backdropFilter: "blur(24px) saturate(180%)",
+                    }}
                   >
-                    <div
-                      style={{
-                        width: "56px",
-                        height: "56px",
-                        borderRadius: "18px",
-                        background:
-                          "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Dumbbell
+                    <Dumbbell
+                      className={isDark ? "text-purple-400" : "text-purple-600"}
+                      size={28}
+                    />
+                  </div>
+                  <h2
+                    className={`text-2xl font-bold tracking-tight ${
+                      isDark ? "text-white" : "text-slate-900"
+                    }`}
+                  >
+                    All Assigned Workouts
+                  </h2>
+                </div>
+
+                {/* Workout Cards */}
+                <div className="space-y-4">
+                  {allAssignedWorkouts.map((assignment) => {
+                    const template = assignment.workout_templates;
+                    const coach = assignment.profiles;
+                    const category = template?.exercise_categories;
+                    const assignedDate =
+                      assignment.assigned_date || assignment.start_date;
+                    const dateObj = assignedDate
+                      ? new Date(assignedDate)
+                      : new Date();
+                    const monthName = dateObj.toLocaleDateString("en-US", {
+                      month: "short",
+                    });
+                    const dayNumber = dateObj.getDate();
+
+                    // Determine status styling
+                    const getStatusBadge = () => {
+                      if (assignment.status === "assigned") {
+                        return {
+                          bg: isDark
+                            ? "bg-blue-500/20 border-blue-500/30"
+                            : "bg-blue-100 border-blue-200",
+                          text: isDark ? "text-blue-400" : "text-blue-700",
+                          label: "ASSIGNED",
+                        };
+                      } else if (
+                        assignment.status === "in_progress" ||
+                        assignment.status === "active"
+                      ) {
+                        return {
+                          bg: isDark
+                            ? "bg-green-500/20 border-green-500/30"
+                            : "bg-green-100 border-green-200",
+                          text: isDark ? "text-green-400" : "text-green-700",
+                          label: "ACTIVE",
+                        };
+                      } else {
+                        return {
+                          bg: isDark
+                            ? "bg-slate-800/50 border-slate-700"
+                            : "bg-slate-100 border-slate-200",
+                          text: isDark ? "text-slate-400" : "text-slate-600",
+                          label: assignment.status?.toUpperCase() || "PENDING",
+                        };
+                      }
+                    };
+
+                    const statusBadge = getStatusBadge();
+
+                    return (
+                      <div
+                        key={assignment.id}
+                        className={`group cursor-pointer transition-all duration-300 ${
+                          isDark
+                            ? "bg-gradient-to-br from-white/[0.06] to-white/[0.01] border border-white/10 hover:bg-white/[0.08] hover:border-white/20"
+                            : "bg-white border border-slate-200/80 hover:border-slate-300 hover:shadow-lg"
+                        }`}
                         style={{
-                          width: "32px",
-                          height: "32px",
-                          color: "#FFFFFF",
+                          borderRadius: "24px",
+                          padding: "20px",
+                          backdropFilter: isDark
+                            ? "blur(24px) saturate(180%)"
+                            : "none",
+                          position: "relative",
+                          overflow: "hidden",
                         }}
-                      />
-                    </div>
-                    <span
-                      style={{
-                        fontSize: "20px",
-                        fontWeight: "700",
-                        color: "#1A1A1A",
-                      }}
-                    >
-                      All Assigned Workouts
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent style={{ padding: "24px" }}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {allAssignedWorkouts.map((assignment) => {
-                      const template = assignment.workout_templates;
-                      const coach = assignment.profiles;
-                      const category = template?.exercise_categories;
+                        onClick={() => {
+                          if (assignment.type === "program") {
+                            router.push(
+                              `/client/programs/${assignment.program_id}/details`
+                            );
+                          } else {
+                            router.push(
+                              `/client/workouts/${assignment.id}/details`
+                            );
+                          }
+                        }}
+                      >
+                        {/* Shimmer effect overlay */}
+                        {isDark && (
+                          <div
+                            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-600"
+                            style={{
+                              background:
+                                "linear-gradient(135deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%)",
+                              backgroundSize: "200% 200%",
+                              pointerEvents: "none",
+                            }}
+                          />
+                        )}
 
-                      return (
-                        <Card
-                          key={assignment.id}
-                          style={{
-                            backgroundColor: "#FFFFFF",
-                            borderRadius: "24px",
-                            padding: "0",
-                            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                            border: "2px solid #E5E7EB",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <CardContent style={{ padding: "24px" }}>
-                            {/* Header */}
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative z-10">
+                          {/* Left: Date and Info */}
+                          <div className="flex items-center gap-5 flex-1 min-w-0">
+                            {/* Date Box */}
                             <div
-                              className="flex items-center justify-between"
-                              style={{ marginBottom: "16px" }}
+                              className={`w-14 h-14 flex-shrink-0 rounded-xl flex flex-col items-center justify-center font-bold ${
+                                assignment.status === "assigned"
+                                  ? isDark
+                                    ? "bg-blue-500/10 border border-blue-500/20 text-blue-400"
+                                    : "bg-blue-100 border border-blue-200 text-blue-700"
+                                  : assignment.status === "in_progress" ||
+                                    assignment.status === "active"
+                                  ? isDark
+                                    ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                                    : "bg-green-100 border border-green-200 text-green-700"
+                                  : isDark
+                                  ? "bg-slate-800 border border-slate-700 text-slate-500"
+                                  : "bg-slate-100 border border-slate-200 text-slate-600"
+                              }`}
                             >
-                              <div
-                                style={{
-                                  width: "56px",
-                                  height: "56px",
-                                  borderRadius: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                <Dumbbell
-                                  style={{
-                                    width: "32px",
-                                    height: "32px",
-                                    color: "#FFFFFF",
-                                  }}
-                                />
+                              <span className="text-xs font-bold uppercase tracking-wider">
+                                {monthName}
+                              </span>
+                              <span className="text-xl leading-none">
+                                {dayNumber}
+                              </span>
+                            </div>
+
+                            {/* Workout Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <h4
+                                  className={`text-lg font-semibold group-hover:transition-colors ${
+                                    assignment.status === "assigned"
+                                      ? isDark
+                                        ? "text-blue-400 group-hover:text-blue-300"
+                                        : "text-blue-700 group-hover:text-blue-600"
+                                      : assignment.status === "in_progress" ||
+                                        assignment.status === "active"
+                                      ? isDark
+                                        ? "text-green-400 group-hover:text-green-300"
+                                        : "text-green-700 group-hover:text-green-600"
+                                      : isDark
+                                      ? "text-white group-hover:text-slate-200"
+                                      : "text-slate-900 group-hover:text-slate-800"
+                                  }`}
+                                >
+                                  {template?.name ||
+                                    assignment.name ||
+                                    (assignment.type === "program"
+                                      ? "Program"
+                                      : "Workout")}
+                                </h4>
+                                <Badge
+                                  className={`${
+                                    assignment.type === "program"
+                                      ? isDark
+                                        ? "bg-purple-500/20 text-purple-400 border-purple-500/30"
+                                        : "bg-purple-100 text-purple-700 border-purple-200"
+                                      : isDark
+                                      ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                      : "bg-blue-100 text-blue-700 border-blue-200"
+                                  } px-2 py-0.5 text-xs font-bold uppercase tracking-wider border`}
+                                >
+                                  {assignment.type === "program"
+                                    ? "Program"
+                                    : "Workout"}
+                                </Badge>
                               </div>
-                              <Badge
-                                className={`${
-                                  assignment.status === "assigned"
-                                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                                    : assignment.status === "in_progress"
-                                    ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300"
-                                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                } px-3 py-1`}
-                              >
-                                {assignment.status === "assigned"
-                                  ? "Assigned"
-                                  : assignment.status === "in_progress"
-                                  ? "In Progress"
-                                  : assignment.status}
-                              </Badge>
-                            </div>
 
-                            {/* Workout/Program Name */}
-                            <h4
-                              style={{
-                                fontSize: "18px",
-                                fontWeight: "600",
-                                color: "#1A1A1A",
-                                marginBottom: "8px",
-                              }}
-                            >
-                              {template?.name ||
-                                assignment.name ||
-                                (assignment.type === "program"
-                                  ? "Program"
-                                  : "Workout")}
-                            </h4>
-
-                            {/* Type Badge */}
-                            <div className="mb-2">
-                              <Badge
-                                className={`${
-                                  assignment.type === "program"
-                                    ? "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
-                                    : "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                                } px-2 py-1 text-xs`}
-                              >
-                                {assignment.type === "program"
-                                  ? "Program"
-                                  : "Workout"}
-                              </Badge>
-                            </div>
-
-                            {/* Description */}
-                            {(template?.description ||
-                              assignment.description) && (
-                              <p
-                                style={{
-                                  fontSize: "14px",
-                                  fontWeight: "400",
-                                  color: "#6B7280",
-                                  marginBottom: "16px",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical",
-                                }}
-                              >
-                                {template?.description ||
-                                  assignment.description}
-                              </p>
-                            )}
-
-                            {/* Details */}
-                            <div className="space-y-2 text-sm mb-4">
-                              {category && (
-                                <div className="flex items-center justify-between">
-                                  <span className={theme.textSecondary}>
-                                    Category:
-                                  </span>
-                                  <span className={theme.text}>
-                                    {category.name}
-                                  </span>
-                                </div>
-                              )}
-                              {template?.difficulty && (
-                                <div className="flex items-center justify-between">
-                                  <span className={theme.textSecondary}>
-                                    Difficulty:
-                                  </span>
-                                  <Badge className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 capitalize">
-                                    {template.difficulty}
-                                  </Badge>
-                                </div>
-                              )}
-                              {assignment.type === "program"
-                                ? template?.duration_weeks && (
-                                    <div className="flex items-center justify-between">
-                                      <span className={theme.textSecondary}>
-                                        Duration:
-                                      </span>
-                                      <span className={theme.text}>
-                                        {template.duration_weeks} weeks
-                                      </span>
-                                    </div>
-                                  )
-                                : template?.duration_minutes && (
-                                    <div className="flex items-center justify-between">
-                                      <span className={theme.textSecondary}>
-                                        Duration:
-                                      </span>
-                                      <span className={theme.text}>
-                                        {template.duration_minutes} min
+                              {/* Description or Details */}
+                              <div className="space-y-1">
+                                {(template?.description ||
+                                  assignment.description) && (
+                                  <p
+                                    className={`text-sm ${
+                                      isDark
+                                        ? "text-slate-400"
+                                        : "text-slate-600"
+                                    } line-clamp-1`}
+                                  >
+                                    {template?.description ||
+                                      assignment.description}
+                                  </p>
+                                )}
+                                <div className="flex flex-wrap items-center gap-3 text-xs">
+                                  {template?.duration_minutes && (
+                                    <div
+                                      className={`flex items-center gap-1.5 ${
+                                        isDark
+                                          ? "text-slate-500"
+                                          : "text-slate-500"
+                                      }`}
+                                    >
+                                      <Clock size={14} />
+                                      <span className="font-mono">
+                                        ~{template.duration_minutes} min
                                       </span>
                                     </div>
                                   )}
-                              {coach && (
-                                <div className="flex items-center justify-between">
-                                  <span className={theme.textSecondary}>
-                                    Coach:
-                                  </span>
-                                  <span className={theme.text}>
-                                    {coach.first_name} {coach.last_name}
-                                  </span>
+                                  {coach && (
+                                    <div
+                                      className={`flex items-center gap-1.5 ${
+                                        isDark
+                                          ? "text-slate-500"
+                                          : "text-slate-500"
+                                      }`}
+                                    >
+                                      <span>Coach: {coach.first_name}</span>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                              {(assignment.assigned_date ||
-                                assignment.start_date) && (
-                                <div className="flex items-center justify-between">
-                                  <span className={theme.textSecondary}>
-                                    {assignment.type === "program"
-                                      ? "Started:"
-                                      : "Assigned:"}
-                                  </span>
-                                  <span className={theme.text}>
-                                    {new Date(
-                                      assignment.assigned_date ||
-                                        assignment.start_date
-                                    ).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Right: Status and Actions */}
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                            {/* Status Badge */}
+                            <div
+                              className={`px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.text} self-start sm:self-auto`}
+                            >
+                              {statusBadge.label}
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex" style={{ gap: "8px" }}>
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
                               <Button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   if (assignment.type === "program") {
                                     router.push(
                                       `/client/programs/${assignment.program_id}/details`
                                     );
                                   } else {
-                                    console.log(
-                                      "Navigating to workout details",
-                                      {
-                                        assignmentId: assignment.id,
-                                        templateId:
-                                          assignment.workout_template_id,
-                                      }
-                                    );
                                     router.push(
                                       `/client/workouts/${assignment.id}/details`
                                     );
                                   }
                                 }}
+                                className={`h-10 px-3 sm:px-4 rounded-xl font-semibold transition-all flex-1 sm:flex-initial ${
+                                  isDark
+                                    ? "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-300"
+                                    : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700"
+                                }`}
                                 variant="outline"
-                                style={{
-                                  flex: 1,
-                                  backgroundColor: "#FFFFFF",
-                                  color: "#6C5CE7",
-                                  fontSize: "16px",
-                                  fontWeight: "600",
-                                  padding: "16px 32px",
-                                  borderRadius: "20px",
-                                  border: "2px solid #6C5CE7",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  gap: "8px",
-                                }}
                               >
-                                <Eye
-                                  style={{ width: "20px", height: "20px" }}
-                                />
-                                View Details
+                                <Eye size={16} className="sm:mr-2" />
+                                <span className="hidden sm:inline">
+                                  Details
+                                </span>
                               </Button>
                               <Button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   if (assignment.type === "program") {
-                                    // For programs, we might want to show program details or go to a different page
-                                    console.log("Program clicked:", assignment);
-                                    // For now, we'll just log it - you can add program-specific navigation later
+                                    router.push(
+                                      `/client/programs/${assignment.program_id}/details`
+                                    );
                                   } else {
                                     router.push(
                                       `/client/workouts/${assignment.id}/start`
                                     );
                                   }
                                 }}
+                                className="h-10 px-4 sm:px-6 rounded-xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30 hover:shadow-green-500/40 transition-all flex-1 sm:flex-initial"
                                 style={{
-                                  flex: 1,
-                                  backgroundColor: "#6C5CE7",
-                                  color: "#FFFFFF",
-                                  fontSize: "16px",
-                                  fontWeight: "600",
-                                  padding: "16px 32px",
-                                  borderRadius: "20px",
-                                  border: "none",
-                                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  gap: "8px",
+                                  boxShadow: isDark
+                                    ? "0 4px 20px rgba(16, 185, 129, 0.3)"
+                                    : "0 4px 12px rgba(16, 185, 129, 0.2)",
                                 }}
                               >
                                 <Play
-                                  style={{ width: "20px", height: "20px" }}
+                                  size={16}
+                                  className="sm:mr-2 fill-current"
                                 />
-                                {assignment.type === "program"
-                                  ? "View Program"
-                                  : "Start Workout"}
+                                <span>
+                                  {assignment.type === "program"
+                                    ? "View"
+                                    : "Start"}
+                                </span>
                               </Button>
                             </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+
+                            <ChevronRight
+                              className={`w-6 h-6 transition-colors hidden md:block ${
+                                isDark
+                                  ? "text-slate-600 group-hover:text-white"
+                                  : "text-slate-400 group-hover:text-slate-600"
+                              }`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             )}
 
             {/* Exercise Alternatives Modal */}

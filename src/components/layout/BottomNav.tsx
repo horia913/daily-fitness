@@ -121,7 +121,6 @@ export default function BottomNav() {
               item.href === "/coach/programs-workouts";
             const isCoachProgramsItem = item.href === "/coach/programs";
             const isCoachNutritionItem = item.href === "/coach/nutrition";
-            const isCoachMessagesItem = item.href === "/coach/messages";
             const isCoachMenuItem = item.href === "/coach/menu";
 
             return (
@@ -136,8 +135,6 @@ export default function BottomNav() {
                       ? "text-purple-600 bg-gradient-to-br from-purple-50 to-purple-100 shadow-md transform scale-105"
                       : isCoachNutritionItem
                       ? "text-green-600 bg-gradient-to-br from-green-50 to-green-100 shadow-md transform scale-105"
-                      : isCoachMessagesItem
-                      ? "text-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-md transform scale-105"
                       : isCoachMenuItem
                       ? "text-slate-600 bg-gradient-to-br from-slate-50 to-slate-100 shadow-md transform scale-105"
                       : "text-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-md transform scale-105"
@@ -189,11 +186,6 @@ export default function BottomNav() {
                   <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
                 )}
 
-                {/* Special indicator for Coach Messages item */}
-                {isActive && isCoachMessagesItem && (
-                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
-                )}
-
                 {/* Special indicator for Coach Programs item */}
                 {isActive && isCoachProgramsItem && (
                   <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></div>
@@ -223,8 +215,6 @@ export default function BottomNav() {
                       ? "animate-pulse"
                       : isCoachNutritionItem && isActive
                       ? "animate-pulse"
-                      : isCoachMessagesItem && isActive
-                      ? "animate-pulse"
                       : isCoachMenuItem && isActive
                       ? "animate-pulse"
                       : ""
@@ -241,7 +231,6 @@ export default function BottomNav() {
                           isCoachWorkoutsItem ||
                           isCoachProgramsItem ||
                           isCoachNutritionItem ||
-                          isCoachMessagesItem ||
                           isCoachMenuItem
                         ? "w-5.5 h-5.5"
                         : "w-5 h-5"
@@ -261,8 +250,6 @@ export default function BottomNav() {
                           ? "text-purple-600"
                           : isCoachNutritionItem
                           ? "text-green-600"
-                          : isCoachMessagesItem
-                          ? "text-blue-600"
                           : isCoachMenuItem
                           ? "text-slate-600"
                           : "text-blue-600"
@@ -326,13 +313,6 @@ export default function BottomNav() {
                     </div>
                   )}
 
-                  {/* Special communication effect for active Coach Messages item */}
-                  {isActive && isCoachMessagesItem && (
-                    <div className="absolute -top-1 -right-1">
-                      <MessageCircle className="w-3 h-3 text-blue-400 animate-pulse" />
-                    </div>
-                  )}
-
                   {/* Special tools effect for active Coach Menu item */}
                   {isActive && isCoachMenuItem && (
                     <div className="absolute -top-1 -right-1">
@@ -359,8 +339,6 @@ export default function BottomNav() {
                         ? "text-purple-600"
                         : isCoachNutritionItem
                         ? "text-green-600"
-                        : isCoachMessagesItem
-                        ? "text-blue-600"
                         : isCoachMenuItem
                         ? "text-slate-600"
                         : "text-blue-600"
@@ -375,7 +353,6 @@ export default function BottomNav() {
                         isCoachWorkoutsItem ||
                         isCoachProgramsItem ||
                         isCoachNutritionItem ||
-                        isCoachMessagesItem ||
                         isCoachMenuItem
                       ? "text-[10.5px]"
                       : "text-[10px]"
@@ -424,11 +401,6 @@ export default function BottomNav() {
                   <div className="absolute inset-0 bg-gradient-to-br from-green-100/50 to-green-200/30 rounded-2xl blur-sm -z-10"></div>
                 )}
 
-                {/* Subtle background glow for active Coach Messages item */}
-                {isActive && isCoachMessagesItem && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-100/50 to-blue-200/30 rounded-2xl blur-sm -z-10"></div>
-                )}
-
                 {/* Subtle background glow for active Coach Menu item */}
                 {isActive && isCoachMenuItem && (
                   <div className="absolute inset-0 bg-gradient-to-br from-slate-100/50 to-slate-200/30 rounded-2xl blur-sm -z-10"></div>
@@ -467,11 +439,6 @@ export default function BottomNav() {
                 {/* Coach Nutrition indicator for active Coach Nutrition item */}
                 {isActive && isCoachNutritionItem && (
                   <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-green-400 to-green-600 rounded-full animate-pulse"></div>
-                )}
-
-                {/* Coach Messages indicator for active Coach Messages item */}
-                {isActive && isCoachMessagesItem && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full animate-pulse"></div>
                 )}
 
                 {/* Coach Menu indicator for active Coach Menu item */}

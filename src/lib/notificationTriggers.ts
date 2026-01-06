@@ -49,16 +49,13 @@ export class NotificationTriggers {
   }
 
   /**
-   * Trigger message notification
-   * Call this when a new message is received
+   * Trigger message notification (deprecated - use WhatsApp for messaging)
+   * This function is disabled as messaging has moved to WhatsApp
    */
   static async triggerNewMessage(senderName: string, message: string) {
-    try {
-      await notificationService.sendMessageNotification(senderName, message)
-      console.log('Message notification sent')
-    } catch (error) {
-      console.error('Error sending message notification:', error)
-    }
+    console.log('Message notifications disabled - use WhatsApp for coach-client communication')
+    // Function disabled - messaging moved to WhatsApp
+    return
   }
 
   /**

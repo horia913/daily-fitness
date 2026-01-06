@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createErrorResponse, handleApiError, validateRequiredFields } from '@/lib/apiErrorHandler'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -24,12 +25,11 @@ export async function POST(req: NextRequest) {
       console.log("📦 Request body parsed successfully");
     } catch (parseError) {
       console.error("❌ Error parsing request body:", parseError);
-      return NextResponse.json(
-        { 
-          error: "Invalid JSON in request body",
-          details: parseError instanceof Error ? parseError.message : String(parseError)
-        },
-        { status: 400 }
+      return createErrorResponse(
+        "Invalid JSON in request body",
+        parseError instanceof Error ? parseError.message : String(parseError),
+        'PARSE_ERROR',
+        400
       );
     }
     
@@ -824,19 +824,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(response, { status: 200 })
   } catch (error) {
-    console.error('❌ Unexpected error in /api/log-set:', {
-      error,
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
-    });
-    return NextResponse.json(
-      { 
-        error: 'Unexpected error',
-        details: error instanceof Error ? error.message : String(error),
-        type: error instanceof Error ? error.name : typeof error,
-      },
-      { status: 500 }
-    )
+    return handleApiError(error, 'Failed to log workout set')
   }
 }

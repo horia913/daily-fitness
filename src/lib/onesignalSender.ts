@@ -134,13 +134,14 @@ export class OneSignalSender {
   }
 
   /**
-   * Send message notification
+   * Send message notification (deprecated - use WhatsApp for messaging)
+   * Redirects to client dashboard instead
    */
   static async sendMessage(userId: string, senderName: string, message: string): Promise<boolean> {
     const shortMessage = message.length > 50 ? message.substring(0, 50) + '...' : message
     return this.sendToUser(userId, `💬 Message from ${senderName}`, shortMessage, {
-      action: 'open_messages',
-      url: '/client/messages',
+      action: 'open_dashboard',
+      url: '/client',
       type: 'message'
     })
   }

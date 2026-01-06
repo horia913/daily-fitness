@@ -36,8 +36,17 @@ export function AmrapExecutor({
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
-  const durationSeconds = block.block.duration_seconds || 600; // Default 10 minutes
-  const targetReps = (block.block.block_parameters as any)?.target_reps;
+  
+  // Read from special table (time_protocols)
+  const timeProtocol = block.block.time_protocols?.find(
+    (tp: any) => tp.protocol_type === 'amrap' && 
+    (tp.exercise_id === currentExercise?.exercise_id || !currentExercise?.exercise_id)
+  ) || block.block.time_protocols?.[0];
+  
+  const durationSeconds = timeProtocol?.total_duration_minutes 
+    ? timeProtocol.total_duration_minutes * 60
+    : block.block.duration_seconds || 600; // Default 10 minutes
+  const targetReps = timeProtocol?.target_reps;
 
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");

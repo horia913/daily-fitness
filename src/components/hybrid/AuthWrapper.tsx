@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { COACH_ROLES, isCoachRole } from "@/lib/roleGuard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -81,10 +82,10 @@ export function AuthWrapper() {
   // Fetch coaches for dropdown
   const fetchCoaches = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from("profiles")
         .select("id, email, first_name, last_name")
-        .in("role", Array.from(coachRoles))
+        .in("role", Array.from(COACH_ROLES))
         .order("first_name", { ascending: true });
 
       if (error) {
@@ -97,8 +98,6 @@ export function AuthWrapper() {
       console.error("Error fetching coaches:", error);
     }
   };
-
-  const coachRoles = new Set(["coach", "admin", "super_coach", "supercoach"]);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -115,7 +114,7 @@ export function AuthWrapper() {
           .single();
 
         if (profile) {
-          const redirectPath = coachRoles.has(profile.role ?? "")
+          const redirectPath = isCoachRole(profile.role)
             ? "/coach"
             : "/client";
           router.push(redirectPath);
@@ -192,7 +191,7 @@ export function AuthWrapper() {
             .single();
 
           const redirectPath =
-            profile && coachRoles.has(profile.role ?? "")
+            profile && isCoachRole(profile.role)
               ? "/coach"
               : "/client";
           setTimeout(() => router.push(redirectPath), 1500);

@@ -48,10 +48,10 @@ interface WorkoutSet {
   reps: number | null;
   notes: string | null;
   completed_at: string;
-  exercise?: {
+  exercises?: {
     id: string;
     name: string;
-    category: string | null;
+    category?: string | null;
   };
 }
 
@@ -518,7 +518,7 @@ export default function WorkoutLogsPage() {
                       {/* Exercise Summary */}
                       {log.workout_set_logs && log.workout_set_logs.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
                             <div>
                               <p
                                 className="text-xs font-semibold mb-1"
@@ -580,6 +580,85 @@ export default function WorkoutLogsPage() {
                               </p>
                             </div>
                           </div>
+
+                          {/* Individual Set Details - Expandable */}
+                          <details className="mt-4">
+                            <summary
+                              className="cursor-pointer text-sm font-semibold mb-2"
+                              style={{
+                                color: isDark
+                                  ? "rgba(255,255,255,0.7)"
+                                  : "rgba(0,0,0,0.7)",
+                              }}
+                            >
+                              View Set Details ({log.workout_set_logs.length} sets)
+                            </summary>
+                            <div className="mt-3 space-y-2">
+                              {log.workout_set_logs.map((set: any, idx: number) => (
+                                <div
+                                  key={set.id || idx}
+                                  className="p-3 rounded-lg"
+                                  style={{
+                                    background: isDark
+                                      ? "rgba(255,255,255,0.05)"
+                                      : "rgba(0,0,0,0.03)",
+                                  }}
+                                >
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <p
+                                        className="font-semibold text-sm mb-1"
+                                        style={{
+                                          color: isDark ? "#fff" : "#1A1A1A",
+                                        }}
+                                      >
+                                        {set.exercises?.name || "Exercise"}
+                                      </p>
+                                      <div className="flex gap-4 text-xs">
+                                        {set.weight && (
+                                          <span
+                                            style={{
+                                              color: isDark
+                                                ? "rgba(255,255,255,0.6)"
+                                                : "rgba(0,0,0,0.6)",
+                                            }}
+                                          >
+                                            {set.weight} kg
+                                          </span>
+                                        )}
+                                        {set.reps && (
+                                          <span
+                                            style={{
+                                              color: isDark
+                                                ? "rgba(255,255,255,0.6)"
+                                                : "rgba(0,0,0,0.6)",
+                                            }}
+                                          >
+                                            {set.reps} reps
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {set.completed_at && (
+                                      <span
+                                        className="text-xs"
+                                        style={{
+                                          color: isDark
+                                            ? "rgba(255,255,255,0.5)"
+                                            : "rgba(0,0,0,0.5)",
+                                        }}
+                                      >
+                                        {new Date(set.completed_at).toLocaleTimeString([], {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
                         </div>
                       )}
                     </GlassCard>

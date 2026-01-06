@@ -139,14 +139,21 @@ export default function WorkoutTemplateForm({
     // Tabata specific
     rounds: "",
     rest_after: "",
+    rest_after_set: "", // Block-level rest after set (applies to all sets)
     // Drop set specific
     drop_percentage: "",
     drop_set_reps: "",
     // Superset specific
     superset_exercise_id: "",
     superset_reps: "",
+    superset_load_percentage: "", // Load percentage for second exercise in superset
     // Giant set specific
-    giant_set_exercises: [] as Array<{ exercise_id: string; sets: string; reps: string; [key: string]: any }>,
+    giant_set_exercises: [] as Array<{
+      exercise_id: string;
+      sets: string;
+      reps: string;
+      [key: string]: any;
+    }>,
     // Cluster set specific
     cluster_reps: "",
     clusters_per_set: "",
@@ -159,6 +166,7 @@ export default function WorkoutTemplateForm({
     compound_exercise_id: "",
     isolation_reps: "",
     compound_reps: "",
+    compound_load_percentage: "", // Load percentage for compound exercise in pre-exhaustion
     // For time specific
     target_reps: "",
     time_cap: "",
@@ -169,8 +177,6 @@ export default function WorkoutTemplateForm({
     emom_reps: "",
     // Tabata specific
     tabata_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
-    // Circuit specific
-    circuit_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
     // Load percentage
     load_percentage: "",
   });
@@ -179,6 +185,68 @@ export default function WorkoutTemplateForm({
   const [workoutBlocks, setWorkoutBlocks] = useState<WorkoutBlock[]>([]);
   const hasLoadedBlocks = useRef(false);
   const previousTemplateId = useRef<string | null>(null);
+
+  // Save draft to localStorage (debounced)
+  const saveDraftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveDraft = useCallback(() => {
+    if (saveDraftTimeoutRef.current) {
+      clearTimeout(saveDraftTimeoutRef.current);
+    }
+    saveDraftTimeoutRef.current = setTimeout(() => {
+      try {
+        const storageKey = template?.id
+          ? `workout_template_draft_${template.id}`
+          : `workout_template_draft_new`;
+        const draft = {
+          formData,
+          exercises,
+          newExercise,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem(storageKey, JSON.stringify(draft));
+      } catch (error) {
+        console.error("Error saving draft to localStorage:", error);
+      }
+    }, 500); // Debounce: save 500ms after last change
+  }, [formData, exercises, newExercise, template?.id]);
+
+  // Load draft from localStorage
+  const loadDraft = useCallback(() => {
+    try {
+      const storageKey = template?.id
+        ? `workout_template_draft_${template.id}`
+        : `workout_template_draft_new`;
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const draft = JSON.parse(stored);
+        // Only restore if draft is less than 24 hours old
+        if (
+          draft.timestamp &&
+          Date.now() - draft.timestamp < 24 * 60 * 60 * 1000
+        ) {
+          if (draft.formData) setFormData(draft.formData);
+          if (draft.exercises) setExercises(draft.exercises);
+          if (draft.newExercise) setNewExercise(draft.newExercise);
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error("Error loading draft from localStorage:", error);
+    }
+    return false;
+  }, [template?.id]);
+
+  // Clear draft from localStorage
+  const clearDraft = useCallback(() => {
+    try {
+      const storageKey = template?.id
+        ? `workout_template_draft_${template.id}`
+        : `workout_template_draft_new`;
+      localStorage.removeItem(storageKey);
+    } catch (error) {
+      console.error("Error clearing draft from localStorage:", error);
+    }
+  }, [template?.id]);
 
   // Combined workout items (exercises and blocks in chronological order)
   // When blocks are loaded, they're converted to exercises, so we only use exercises to avoid duplicates
@@ -219,14 +287,18 @@ export default function WorkoutTemplateForm({
           hasLoadedBlocks.current = true;
         }
       } else {
-        resetForm();
-        setExercises([]);
+        // For new templates, try to load draft first
+        const draftLoaded = loadDraft();
+        if (!draftLoaded) {
+          resetForm();
+          setExercises([]);
+        }
         setWorkoutBlocks([]);
         hasLoadedBlocks.current = false;
         previousTemplateId.current = null;
       }
     }
-  }, [isOpen, template]);
+  }, [isOpen, template, loadDraft]);
 
   // Ensure Category and Difficulty autofill once data arrives
   useEffect(() => {
@@ -249,6 +321,23 @@ export default function WorkoutTemplateForm({
         : prev.difficulty_level || "Beginner",
     }));
   }, [isOpen, template, categories]);
+
+  // Auto-save draft to localStorage whenever formData, exercises, or newExercise changes
+  useEffect(() => {
+    if (isOpen && !template) {
+      // Only auto-save drafts for new templates (not when editing existing templates)
+      saveDraft();
+    }
+  }, [formData, exercises, newExercise, isOpen, template, saveDraft]);
+
+  // Cleanup: clear timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveDraftTimeoutRef.current) {
+        clearTimeout(saveDraftTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // If template has no category, default to first available when categories load
   useEffect(() => {
@@ -342,50 +431,60 @@ export default function WorkoutTemplateForm({
         const convertedExercises: any[] = [];
 
         blocks.forEach((block, blockIndex) => {
+          // Get first exercise and its special table data
+          const firstExercise = block.exercises?.[0];
+          const firstExerciseId = firstExercise?.exercise_id;
+          const firstExerciseOrder = firstExercise?.exercise_order || 1;
+
+          // Get time protocol for this block/exercise (for time-based blocks)
+          const timeProtocol =
+            block.time_protocols?.find(
+              (tp: any) =>
+                tp.exercise_id === firstExerciseId &&
+                tp.exercise_order === firstExerciseOrder
+            ) || block.time_protocols?.[0]; // Fallback to first if not found
+
+          // Get special table data from first exercise
+          const dropSet = firstExercise?.drop_sets?.[0];
+          const clusterSet = firstExercise?.cluster_sets?.[0];
+          const restPauseSet = firstExercise?.rest_pause_sets?.[0];
+          const pyramidSets = firstExercise?.pyramid_sets || [];
+          const ladderSets = firstExercise?.ladder_sets || [];
+
           // Create exercise object from block
-          // Use block id + blockIndex to ensure uniqueness
+          // IMPORTANT: Preserve block.id so we can update existing blocks instead of deleting/recreating
           const exercise: any = {
-            id: block.id || `block-${blockIndex}-${Date.now()}`,
+            id: block.id, // Preserve original block ID for smart updates
+            originalBlockId: block.id, // Keep reference to original block ID
             exercise_type: block.block_type,
-            exercise_id: block.exercises?.[0]?.exercise_id,
+            exercise_id: firstExerciseId,
             order_index: blockIndex + 1, // Add order_index for uniqueness
             sets: block.total_sets?.toString() || "",
             reps: block.reps_per_set || "",
             rest_seconds: block.rest_seconds?.toString() || "",
             notes: block.block_notes || "",
             block_name: block.block_name,
-            // Copy block parameters (convert to strings where needed)
-            rounds: block.block_parameters?.rounds
-              ? String(block.block_parameters.rounds)
-              : undefined,
-            work_seconds: block.block_parameters?.work_seconds
-              ? String(block.block_parameters.work_seconds)
-              : undefined,
-            rest_after: block.block_parameters?.rest_after
-              ? String(block.block_parameters.rest_after)
-              : undefined,
-            amrap_duration: block.block_parameters?.amrap_duration
-              ? String(block.block_parameters.amrap_duration)
-              : undefined,
-            emom_duration: block.block_parameters?.emom_duration
-              ? String(block.block_parameters.emom_duration)
-              : undefined,
-            emom_reps: block.block_parameters?.emom_reps
-              ? String(block.block_parameters.emom_reps)
-              : undefined,
-            target_reps: block.block_parameters?.target_reps
-              ? String(block.block_parameters.target_reps)
-              : undefined,
-            time_cap: block.block_parameters?.time_cap
-              ? String(block.block_parameters.time_cap)
-              : undefined,
-            // Drop set specific
-            drop_percentage: block.block_parameters?.drop_percentage
-              ? String(block.block_parameters.drop_percentage)
-              : "",
-            drop_set_reps: block.block_parameters?.drop_set_reps || "",
+            // RIR, Tempo, Notes from first exercise (for blocks that support these)
+            rir: firstExercise?.rir?.toString() || "",
+            tempo: firstExercise?.tempo || "",
+            // Time protocol data (from special table)
+            rounds: timeProtocol?.rounds?.toString() || undefined,
+            work_seconds: timeProtocol?.work_seconds?.toString() || undefined,
+            rest_after: timeProtocol?.rest_seconds?.toString() || undefined,
+            amrap_duration:
+              timeProtocol?.total_duration_minutes?.toString() || undefined,
+            emom_duration:
+              timeProtocol?.total_duration_minutes?.toString() || undefined,
+            emom_reps: timeProtocol?.reps_per_round?.toString() || undefined,
+            emom_mode: timeProtocol?.emom_mode || "",
+            target_reps: timeProtocol?.target_reps?.toString() || undefined,
+            time_cap: timeProtocol?.time_cap_minutes?.toString() || undefined,
+            // Drop set specific (from special table)
+            drop_percentage:
+              (dropSet as any)?.drop_percentage?.toString() || "",
+            drop_set_reps: dropSet?.reps || "",
             // Load percentage (from exercise data)
-            load_percentage: block.exercises?.[0]?.load_percentage?.toString() || "",
+            load_percentage: firstExercise?.load_percentage?.toString() || "",
           };
 
           // Handle complex block types with nested exercises
@@ -396,103 +495,130 @@ export default function WorkoutTemplateForm({
             const exercisesArray =
               block.exercises?.map((ex, idx) => ({
                 exercise_id: ex.exercise_id,
-                sets: ex.sets?.toString() || block.total_sets?.toString() || "",
+                // For circuit/tabata: don't set individual sets - rounds are in block.total_sets
+                sets: ex.sets?.toString() || "",
                 reps: ex.reps || block.reps_per_set || "",
                 rest_seconds:
                   ex.rest_seconds?.toString() ||
                   block.rest_seconds?.toString() ||
                   "",
+                load_percentage: ex.load_percentage?.toString() || "",
               })) || [];
 
             if (blockType === "tabata") {
               // Tabata uses tabata_sets - structure: [{ exercises: [...], rest_between_sets: "..." }]
+              // Get time protocol data for tabata (use first exercise's protocol as default)
+              const tabataProtocol =
+                block.time_protocols?.find(
+                  (tp: any) => tp.protocol_type === "tabata"
+                ) || timeProtocol;
+
               const restAfter =
-                block.block_parameters?.rest_after ||
-                block.rest_seconds ||
+                tabataProtocol?.rest_seconds?.toString() ||
+                block.rest_seconds?.toString() ||
                 "10";
               exercise.rest_after = String(restAfter);
+
+              // Load rest_after_set from time_protocols (block-level field)
+              // Use the first protocol's rest_after_set value (should be the same for all)
+              const restAfterSet =
+                tabataProtocol?.rest_after_set?.toString() || "10";
+              (exercise as any).rest_after_set = String(restAfterSet);
+
               exercise.rounds =
-                block.block_parameters?.rounds ||
+                tabataProtocol?.rounds?.toString() ||
                 block.total_sets?.toString() ||
                 "8";
-              exercise.work_seconds = block.block_parameters?.work_seconds
-                ? String(block.block_parameters.work_seconds)
-                : "20";
+              exercise.work_seconds =
+                tabataProtocol?.work_seconds?.toString() || "20";
 
-              // Check if tabata_sets already exists in block_parameters (from saved data)
-              if (
-                block.block_parameters?.tabata_sets &&
-                Array.isArray(block.block_parameters.tabata_sets)
-              ) {
-                // Use existing structure
-                exercise.tabata_sets = block.block_parameters.tabata_sets.map(
-                  (set: any) => ({
-                    exercises: Array.isArray(set.exercises)
-                      ? set.exercises
-                      : [],
-                    rest_between_sets:
-                      set.rest_between_sets || String(restAfter),
-                  })
+              // Build tabata_sets from exercises and their time protocols
+              // Group exercises by set number from time_protocols
+              const exerciseProtocols =
+                block.time_protocols?.filter(
+                  (tp: any) => tp.protocol_type === "tabata"
+                ) || [];
+
+              // Group exercises by set number
+              const setsMap = new Map<number, any[]>();
+              exercisesArray.forEach((ex: any, exIdx: number) => {
+                const exProtocol = exerciseProtocols.find(
+                  (tp: any) =>
+                    tp.exercise_id === ex.exercise_id &&
+                    tp.exercise_order === exIdx + 1
                 );
-              } else {
-                // Group exercises into sets - for tabata, typically one set contains all exercises
-                const numSets = block.total_sets || 1;
-                exercise.tabata_sets = Array.from(
-                  { length: numSets },
-                  (_, setIdx) => ({
-                    exercises: exercisesArray.map((ex: any) => ({
-                      ...ex,
-                    })),
-                    rest_between_sets: String(restAfter),
-                  })
-                );
-              }
+                const setNumber = exProtocol?.set || 1; // Default to set 1 if not found
+                if (!setsMap.has(setNumber)) {
+                  setsMap.set(setNumber, []);
+                }
+                setsMap.get(setNumber)!.push({
+                  ...ex,
+                  work_seconds:
+                    exProtocol?.work_seconds?.toString() ||
+                    exercise.work_seconds,
+                  rest_after: exProtocol?.rest_seconds?.toString() || restAfter,
+                });
+              });
+
+              // Convert map to array of sets
+              exercise.tabata_sets = Array.from(setsMap.entries())
+                .sort(([a], [b]) => a - b)
+                .map(([setNum, exercises]) => ({
+                  exercises,
+                  rest_between_sets: String(restAfter),
+                }));
+
               // Also set circuit_sets for compatibility
               exercise.circuit_sets = exercise.tabata_sets;
-            } else {
-              // Circuit uses circuit_sets - structure: [{ exercises: [...], rest_between_sets: "..." }]
-              // Check if circuit_sets already exists in block_parameters (from saved data)
-              if (
-                block.block_parameters?.circuit_sets &&
-                Array.isArray(block.block_parameters.circuit_sets)
-              ) {
-                // Use existing structure
-                exercise.circuit_sets = block.block_parameters.circuit_sets.map(
-                  (set: any) => ({
-                    exercises: Array.isArray(set.exercises)
-                      ? set.exercises
-                      : [],
-                    rest_between_sets:
-                      set.rest_between_sets ||
-                      block.rest_seconds?.toString() ||
-                      "60",
-                  })
-                );
-              } else {
-                // Group exercises into sets
-                const numSets = block.total_sets || 1;
-                exercise.circuit_sets = Array.from(
-                  { length: numSets },
-                  (_, setIdx) => ({
-                    exercises: exercisesArray.map((ex: any) => ({
-                      ...ex,
-                    })),
-                    rest_between_sets: block.rest_seconds?.toString() || "60",
-                  })
-                );
-              }
             }
+            // Circuit removed - skip loading circuit blocks
           } else if (block.block_type === "drop_set") {
-            // Ensure drop_percentage and drop_set_reps are loaded
-            if (block.block_parameters?.drop_percentage !== undefined) {
-              exercise.drop_percentage = String(
-                block.block_parameters.drop_percentage
-              );
+            // For dropset, main reps come from first exercise, not block.reps_per_set
+            exercise.reps = firstExercise?.reps || block.reps_per_set || "";
+            // Load drop set data from special table (fallback to block_parameters for old data)
+            if (dropSet) {
+              // Calculate drop percentage from first drop if needed
+              const initialWeight = firstExercise?.weight_kg || 0;
+              const dropWeight = dropSet.weight_kg || 0;
+              if (initialWeight > 0 && dropWeight > 0) {
+                const calculatedPercentage = Math.round(
+                  ((initialWeight - dropWeight) / initialWeight) * 100
+                );
+                exercise.drop_percentage = String(calculatedPercentage);
+              }
+              exercise.drop_set_reps = dropSet.reps || "";
             }
-            if (block.block_parameters?.drop_set_reps) {
-              exercise.drop_set_reps = String(
-                block.block_parameters.drop_set_reps
-              );
+          } else if (block.block_type === "cluster_set") {
+            // Load cluster set data from special table
+            if (clusterSet) {
+              exercise.cluster_reps =
+                clusterSet.reps_per_cluster?.toString() || exercise.reps || "";
+              exercise.clusters_per_set =
+                clusterSet.clusters_per_set?.toString() || "";
+              exercise.intra_cluster_rest =
+                clusterSet.intra_cluster_rest?.toString() || "15";
+            }
+          } else if (block.block_type === "rest_pause") {
+            // Load rest pause data from special table
+            if (restPauseSet) {
+              exercise.rest_pause_duration =
+                restPauseSet.rest_pause_duration?.toString() || "15";
+              exercise.max_rest_pauses =
+                restPauseSet.max_rest_pauses?.toString() || "3";
+            }
+          } else if (block.block_type === "pyramid_set") {
+            // Load pyramid set data from special table
+            if (pyramidSets.length > 0) {
+              // Use first pyramid step as base
+              exercise.weight_kg = pyramidSets[0]?.weight_kg?.toString() || "";
+              exercise.reps = pyramidSets[0]?.reps || "";
+            }
+          } else if (block.block_type === "ladder") {
+            // Load ladder set data from special table
+            if (ladderSets.length > 0) {
+              // Use first ladder step as base
+              exercise.weight_kg = ladderSets[0]?.weight_kg?.toString() || "";
+              exercise.reps = ladderSets[0]?.reps?.toString() || "";
             }
           } else if (block.block_type === "giant_set") {
             exercise.giant_set_exercises =
@@ -500,18 +626,29 @@ export default function WorkoutTemplateForm({
                 exercise_id: ex.exercise_id,
                 sets: ex.sets?.toString() || block.total_sets?.toString() || "",
                 reps: ex.reps || block.reps_per_set || "",
+                load_percentage: ex.load_percentage?.toString() || "",
               })) || [];
           } else if (block.block_type === "superset") {
             if (block.exercises && block.exercises.length >= 2) {
               exercise.superset_exercise_id = block.exercises[1].exercise_id;
               exercise.superset_reps =
                 block.exercises[1].reps || block.reps_per_set || "";
+              // Load percentage for first exercise (already loaded at line 425)
+              // Load percentage for second exercise (individual for each exercise in superset)
+              (exercise as any).superset_load_percentage =
+                block.exercises[1].load_percentage?.toString() || "";
             }
           } else if (block.block_type === "pre_exhaustion") {
             if (block.exercises && block.exercises.length >= 2) {
               exercise.compound_exercise_id = block.exercises[1].exercise_id;
               exercise.isolation_reps = block.exercises[0].reps || "";
               exercise.compound_reps = block.exercises[1].reps || "";
+              // Load percentage for isolation exercise (first exercise)
+              exercise.load_percentage =
+                block.exercises[0].load_percentage?.toString() || "";
+              // Load percentage for compound exercise (second exercise)
+              (exercise as any).compound_load_percentage =
+                block.exercises[1].load_percentage?.toString() || "";
             }
           }
 
@@ -604,105 +741,139 @@ export default function WorkoutTemplateForm({
           savedTemplateId = data[0].id;
         }
 
-        // Save workout blocks and exercises
+        // Save workout blocks and exercises using SMART UPDATE strategy
+        // This preserves block IDs to maintain referential integrity with historical workout data
         if (savedTemplateId) {
           console.log(
-            "🔍 Saving blocks and exercises for template:",
+            "🔍 Saving blocks and exercises for template (SMART UPDATE):",
             savedTemplateId
           );
 
-          // First, delete existing blocks for this template
-          try {
-            const existingBlocks = await WorkoutBlockService.getWorkoutBlocks(
-              savedTemplateId
-            );
-            for (const block of existingBlocks) {
-              await WorkoutBlockService.deleteWorkoutBlock(block.id);
-            }
-            console.log("🔍 Deleted existing blocks");
-          } catch (error) {
-            console.warn("Could not delete existing blocks:", error);
+          // Get existing blocks for this template
+          const existingBlocks = await WorkoutBlockService.getWorkoutBlocks(
+            savedTemplateId
+          );
+          const existingBlockIds = new Set(existingBlocks.map((b) => b.id));
+          const newExerciseIds = new Set(
+            exercises.map((e) => e.id).filter((id): id is string => Boolean(id))
+          );
+
+          // Delete blocks that were removed (exist in DB but not in new exercises)
+          const blocksToDelete = existingBlocks.filter(
+            (block) => !newExerciseIds.has(block.id)
+          );
+          for (const block of blocksToDelete) {
+            console.log(`🗑️ Deleting removed block: ${block.id}`);
+            await WorkoutBlockService.deleteWorkoutBlock(block.id);
+          }
+          if (blocksToDelete.length > 0) {
+            console.log(`🔍 Deleted ${blocksToDelete.length} removed block(s)`);
           }
 
-          // Convert exercises to blocks and save them
+          // Process each exercise: UPDATE if block exists, CREATE if new
           if (exercises.length > 0) {
             for (let i = 0; i < exercises.length; i++) {
               const exercise = exercises[i];
               const exerciseType = exercise.exercise_type || "straight_set";
+              const isUpdate = exercise.id && existingBlockIds.has(exercise.id);
 
-              // Prepare block parameters
-              const blockParameters: Record<string, any> = {};
-              if (exercise.rounds) blockParameters.rounds = exercise.rounds;
-              if (exercise.work_seconds)
-                blockParameters.work_seconds = exercise.work_seconds;
-              if (exercise.rest_after)
-                blockParameters.rest_after = exercise.rest_after;
-              if (exercise.amrap_duration)
-                blockParameters.amrap_duration = exercise.amrap_duration;
-              if (exercise.emom_duration)
-                blockParameters.emom_duration = exercise.emom_duration;
-              if (exercise.emom_reps)
-                blockParameters.emom_reps = exercise.emom_reps;
-              if (exercise.target_reps)
-                blockParameters.target_reps = exercise.target_reps;
-              if (exercise.time_cap)
-                blockParameters.time_cap = exercise.time_cap;
-              // Drop set specific
-              if (exercise.drop_percentage && exercise.drop_percentage !== "") {
-                const dropPct = parseInt(exercise.drop_percentage);
-                if (!isNaN(dropPct)) {
-                  blockParameters.drop_percentage = dropPct;
-                }
-              }
-              if (exercise.drop_set_reps && exercise.drop_set_reps !== "")
-                blockParameters.drop_set_reps = exercise.drop_set_reps;
+              // All block types now use relational tables - no block_parameters needed
 
-              // Create the block
-              const block = await WorkoutBlockService.createWorkoutBlock(
-                savedTemplateId,
-                exerciseType as any,
-                i + 1, // block_order
-                {
-                  block_name:
-                    exercise.block_name || exercise.notes || undefined,
-                  block_notes: exercise.notes || undefined,
-                  total_sets: exercise.sets
-                    ? parseInt(exercise.sets)
-                    : undefined,
-                  reps_per_set: exercise.reps || undefined,
-                  rest_seconds: exercise.rest_seconds
-                    ? Math.round(parseFloat(exercise.rest_seconds))
-                    : undefined,
-                  duration_seconds: exercise.amrap_duration
-                    ? parseInt(exercise.amrap_duration) * 60
-                    : exercise.emom_duration
-                    ? parseInt(exercise.emom_duration) * 60
-                    : undefined,
-                  block_parameters:
-                    Object.keys(blockParameters).length > 0
-                      ? blockParameters
+              // SMART UPDATE: Create new block OR update existing block
+              let block: WorkoutBlock | null = null;
+
+              if (isUpdate && exercise.id) {
+                // UPDATE existing block (preserves block ID for referential integrity)
+                console.log(`🔄 Updating existing block: ${exercise.id}`);
+
+                // Delete special table data first (will be recreated below)
+                await WorkoutBlockService.deleteBlockSpecialData(exercise.id);
+
+                // Update the block itself
+                block = await WorkoutBlockService.updateWorkoutBlock(
+                  exercise.id,
+                  {
+                    block_type: exerciseType as any,
+                    block_order: i + 1,
+                    block_name:
+                      exercise.block_name || exercise.notes || undefined,
+                    block_notes: exercise.notes || undefined,
+                    total_sets: exercise.sets
+                      ? parseInt(exercise.sets)
                       : undefined,
-                }
-              );
+                    reps_per_set: exercise.reps || undefined,
+                    rest_seconds: exercise.rest_seconds
+                      ? Math.round(parseFloat(exercise.rest_seconds))
+                      : undefined,
+                    duration_seconds: exercise.amrap_duration
+                      ? parseInt(exercise.amrap_duration) * 60
+                      : exercise.emom_duration
+                      ? parseInt(exercise.emom_duration) * 60
+                      : undefined,
+                  }
+                );
+              } else {
+                // CREATE new block
+                console.log(`➕ Creating new block for exercise ${i + 1}`);
+                block = await WorkoutBlockService.createWorkoutBlock(
+                  savedTemplateId,
+                  exerciseType as any,
+                  i + 1, // block_order
+                  {
+                    block_name:
+                      exercise.block_name || exercise.notes || undefined,
+                    block_notes: exercise.notes || undefined,
+                    total_sets: exercise.sets
+                      ? parseInt(exercise.sets)
+                      : undefined,
+                    reps_per_set: exercise.reps || undefined,
+                    rest_seconds: exercise.rest_seconds
+                      ? Math.round(parseFloat(exercise.rest_seconds))
+                      : undefined,
+                    duration_seconds: exercise.amrap_duration
+                      ? parseInt(exercise.amrap_duration) * 60
+                      : exercise.emom_duration
+                      ? parseInt(exercise.emom_duration) * 60
+                      : undefined,
+                  }
+                );
+              }
 
               if (block) {
                 // Add main exercise to block
+                let mainExerciseId: string | null = null;
+                let mainExerciseOrder = 1;
+
                 if (exercise.exercise_id) {
-                  await WorkoutBlockService.addExerciseToBlock(
-                    block.id,
-                    exercise.exercise_id,
-                    1,
-                    {
-                      sets: exercise.sets ? parseInt(exercise.sets) : undefined,
-                      reps: exercise.reps || undefined,
-                      rest_seconds: exercise.rest_seconds
-                        ? Math.round(parseFloat(exercise.rest_seconds))
-                        : undefined,
-                      rir: exercise.rir ? parseInt(exercise.rir) : undefined,
-                      tempo: exercise.tempo || undefined,
-                      notes: exercise.notes || undefined,
-                    }
-                  );
+                  const addedExercise =
+                    await WorkoutBlockService.addExerciseToBlock(
+                      block.id,
+                      exercise.exercise_id,
+                      1,
+                      {
+                        sets: exercise.sets
+                          ? parseInt(exercise.sets)
+                          : undefined,
+                        reps: exercise.reps || undefined,
+                        // For superset: NO rest_seconds for exercises (they're done back-to-back)
+                        // rest_seconds in workout_blocks is for rest AFTER completing the superset
+                        rest_seconds:
+                          exerciseType === "superset"
+                            ? undefined
+                            : exercise.rest_seconds
+                            ? Math.round(parseFloat(exercise.rest_seconds))
+                            : undefined,
+                        rir: exercise.rir ? parseInt(exercise.rir) : undefined,
+                        tempo: exercise.tempo || undefined,
+                        notes: exercise.notes || undefined,
+                        load_percentage: exercise.load_percentage
+                          ? parseFloat(exercise.load_percentage)
+                          : undefined,
+                      }
+                    );
+                  if (addedExercise) {
+                    mainExerciseId = exercise.exercise_id;
+                  }
                 }
 
                 // Add additional exercises for complex types
@@ -710,6 +881,8 @@ export default function WorkoutTemplateForm({
                   exerciseType === "superset" &&
                   exercise.superset_exercise_id
                 ) {
+                  // Superset exercises have NO rest between them (like giant set)
+                  // rest_seconds in workout_blocks is for rest AFTER completing the superset
                   await WorkoutBlockService.addExerciseToBlock(
                     block.id,
                     exercise.superset_exercise_id,
@@ -718,8 +891,12 @@ export default function WorkoutTemplateForm({
                       sets: exercise.sets ? parseInt(exercise.sets) : undefined,
                       reps:
                         exercise.superset_reps || exercise.reps || undefined,
-                      rest_seconds: exercise.rest_seconds
-                        ? Math.round(parseFloat(exercise.rest_seconds))
+                      // NO rest_seconds for superset exercises (they're done back-to-back)
+                      rest_seconds: undefined,
+                      // Load percentage for second exercise (individual for each exercise in superset)
+                      load_percentage: (exercise as any)
+                        .superset_load_percentage
+                        ? parseFloat((exercise as any).superset_load_percentage)
                         : undefined,
                     }
                   );
@@ -750,6 +927,12 @@ export default function WorkoutTemplateForm({
                           rest_seconds: exercise.rest_seconds
                             ? parseInt(exercise.rest_seconds)
                             : undefined,
+                          // Load percentage can be set individually for each exercise in giant set
+                          load_percentage: giantEx.load_percentage
+                            ? parseFloat(giantEx.load_percentage)
+                            : exercise.load_percentage
+                            ? parseFloat(exercise.load_percentage)
+                            : undefined,
                         }
                       );
                     }
@@ -767,6 +950,9 @@ export default function WorkoutTemplateForm({
                           ? parseInt(exercise.sets)
                           : undefined,
                         reps: exercise.isolation_reps || undefined,
+                        load_percentage: exercise.load_percentage
+                          ? parseFloat(exercise.load_percentage)
+                          : undefined,
                       }
                     );
                   }
@@ -780,115 +966,343 @@ export default function WorkoutTemplateForm({
                           ? parseInt(exercise.sets)
                           : undefined,
                         reps: exercise.compound_reps || undefined,
+                        load_percentage: exercise.load_percentage
+                          ? parseFloat(exercise.load_percentage)
+                          : undefined,
                       }
                     );
                   }
                 }
 
-                if (exerciseType === "circuit" || exerciseType === "tabata") {
-                  // Tabata uses tabata_sets, circuit uses circuit_sets
-                  // Structure: [{ exercises: [{ exercise_id, sets, reps, ... }], rest_between_sets: "..." }]
-                  const setsArray =
-                    exerciseType === "tabata"
-                      ? Array.isArray(exercise.tabata_sets)
-                        ? exercise.tabata_sets
-                        : []
-                      : Array.isArray(exercise.circuit_sets)
-                      ? exercise.circuit_sets
+                // Create special table records for block types that need them
+                if (mainExerciseId && exerciseType === "drop_set") {
+                  // Create drop set records
+                  const initialWeight = exercise.weight_kg
+                    ? parseFloat(exercise.weight_kg)
+                    : 0;
+                  const dropPercentage = exercise.drop_percentage
+                    ? parseInt(exercise.drop_percentage)
+                    : 20;
+
+                  // First drop (initial weight reduced)
+                  const firstDropWeight =
+                    initialWeight * (1 - dropPercentage / 100);
+                  await WorkoutBlockService.createDropSet(
+                    block.id,
+                    mainExerciseId,
+                    mainExerciseOrder,
+                    1, // drop_order
+                    firstDropWeight,
+                    exercise.drop_set_reps || exercise.reps || "8-10"
+                    // rest_seconds removed - rest is stored in workout_blocks.rest_seconds
+                  );
+                }
+
+                if (mainExerciseId && exerciseType === "cluster_set") {
+                  // Create cluster set record
+                  await WorkoutBlockService.createClusterSet(
+                    block.id,
+                    mainExerciseId,
+                    mainExerciseOrder,
+                    exercise.cluster_reps
+                      ? parseInt(exercise.cluster_reps)
+                      : parseInt(exercise.reps || "10"),
+                    exercise.clusters_per_set
+                      ? parseInt(exercise.clusters_per_set)
+                      : 3,
+                    exercise.intra_cluster_rest
+                      ? parseInt(exercise.intra_cluster_rest)
+                      : 15,
+                    exercise.rest_seconds
+                      ? Math.round(parseFloat(exercise.rest_seconds))
+                      : 120
+                  );
+                }
+
+                if (mainExerciseId && exerciseType === "rest_pause") {
+                  // Create rest pause record
+                  await WorkoutBlockService.createRestPauseSet(
+                    block.id,
+                    mainExerciseId,
+                    mainExerciseOrder,
+                    exercise.weight_kg ? parseFloat(exercise.weight_kg) : 0,
+                    // initialReps removed - reps are tracked in workout_blocks table
+                    exercise.rest_pause_duration
+                      ? parseInt(exercise.rest_pause_duration)
+                      : 15,
+                    exercise.max_rest_pauses
+                      ? parseInt(exercise.max_rest_pauses)
+                      : 3
+                  );
+                }
+
+                // DEPRECATED: pyramid_set and ladder_set block types are being removed
+                // Use giant_set with various load_percentages instead to achieve pyramid/ladder effects
+                // if (mainExerciseId && exerciseType === "pyramid_set") {
+                //   // ... pyramid set logic removed ...
+                // }
+                // if (mainExerciseId && exerciseType === "ladder") {
+                //   // ... ladder set logic removed ...
+                // }
+
+                // Time-based protocols (AMRAP, EMOM, FOR_TIME)
+                if (
+                  mainExerciseId &&
+                  (exerciseType === "amrap" ||
+                    exerciseType === "emom" ||
+                    exerciseType === "for_time")
+                ) {
+                  await WorkoutBlockService.createTimeProtocol(
+                    block.id,
+                    mainExerciseId,
+                    mainExerciseOrder,
+                    exerciseType as "amrap" | "emom" | "for_time",
+                    {
+                      total_duration_minutes:
+                        exerciseType === "amrap"
+                          ? exercise.amrap_duration
+                            ? parseInt(exercise.amrap_duration)
+                            : 10
+                          : exerciseType === "emom"
+                          ? exercise.emom_duration
+                            ? parseInt(exercise.emom_duration)
+                            : 10
+                          : undefined,
+                      work_seconds:
+                        exerciseType === "emom"
+                          ? exercise.work_seconds
+                            ? parseInt(exercise.work_seconds)
+                            : 30
+                          : undefined,
+                      rest_seconds:
+                        exerciseType === "emom"
+                          ? exercise.rest_after
+                            ? parseInt(exercise.rest_after)
+                            : 30
+                          : undefined,
+                      reps_per_round:
+                        exerciseType === "emom" && exercise.emom_reps
+                          ? parseInt(exercise.emom_reps)
+                          : undefined,
+                      target_reps: exercise.target_reps
+                        ? parseInt(exercise.target_reps)
+                        : undefined,
+                      time_cap_minutes:
+                        exerciseType === "for_time" && exercise.time_cap
+                          ? parseInt(exercise.time_cap)
+                          : undefined,
+                    }
+                  );
+                }
+
+                if (exerciseType === "tabata") {
+                  try {
+                    // Tabata uses tabata_sets
+                    // Structure: [{ exercises: [{ exercise_id, sets, reps, ... }], rest_between_sets: "..." }]
+                    const setsArray = Array.isArray(exercise.tabata_sets)
+                      ? exercise.tabata_sets
                       : [];
 
-                  if (setsArray && setsArray.length > 0) {
-                    // For tabata, ensure rest_after is consistent - use the first set's rest or exercise.rest_after
-                    let tabataRestAfter = exercise.rest_after;
-                    if (exerciseType === "tabata" && setsArray.length > 0) {
-                      // Get rest from first set or use rest_after
-                      const firstSetRest =
-                        setsArray[0]?.rest_between_sets ||
-                        setsArray[0]?.rest_seconds;
-                      tabataRestAfter =
-                        firstSetRest ||
-                        exercise.rest_after ||
-                        exercise.rest_seconds ||
-                        "10";
-                    }
+                    console.log(
+                      `🔍 Processing tabata with ${setsArray.length} sets:`,
+                      {
+                        blockId: block.id,
+                        exerciseType: "tabata",
+                        setsCount: setsArray.length,
+                        setsArray: setsArray.map((s: any) => ({
+                          exercisesCount: s.exercises?.length || 0,
+                          rest_between_sets: s.rest_between_sets,
+                        })),
+                      }
+                    );
 
-                    // Collect all exercises from all sets
-                    let exerciseOrder = 1;
-                    for (let setIdx = 0; setIdx < setsArray.length; setIdx++) {
-                      const set = setsArray[setIdx];
-                      const exercisesInSet = Array.isArray(set.exercises)
-                        ? set.exercises
-                        : [];
+                    if (setsArray && setsArray.length > 0) {
+                      // For tabata, use the block-level rest_after_set field that applies to ALL sets
+                      let tabataRestAfterSet: string | undefined = undefined;
+                      if (exerciseType === "tabata") {
+                        // Use the block-level rest_after_set field (set at the same level as rounds and work time)
+                        tabataRestAfterSet =
+                          exercise.rest_after_set ||
+                          exercise.rest_after ||
+                          exercise.rest_seconds ||
+                          "10";
+                      }
 
+                      // Collect all exercises from all sets
+                      let exerciseOrder = 1;
                       for (
-                        let exIdx = 0;
-                        exIdx < exercisesInSet.length;
-                        exIdx++
+                        let setIdx = 0;
+                        setIdx < setsArray.length;
+                        setIdx++
                       ) {
-                        const setEx = exercisesInSet[exIdx];
-                        if (setEx.exercise_id) {
-                          await WorkoutBlockService.addExerciseToBlock(
-                            block.id,
-                            setEx.exercise_id,
-                            exerciseOrder++,
-                            {
-                              sets:
-                                setEx.sets || exercise.sets
-                                  ? parseInt(setEx.sets || exercise.sets)
-                                  : undefined,
-                              reps: setEx.reps || exercise.reps || undefined,
-                              // For tabata, use consistent rest_after for all exercises
-                              rest_seconds:
-                                exerciseType === "tabata"
-                                  ? tabataRestAfter
-                                    ? Math.round(parseFloat(String(tabataRestAfter)))
-                                    : undefined
-                                  : set.rest_between_sets ||
-                                    exercise.rest_seconds
-                                  ? Math.round(
-                                      parseFloat(
-                                        String(
-                                          set.rest_between_sets ||
-                                            exercise.rest_seconds
+                        const set = setsArray[setIdx];
+                        const exercisesInSet = Array.isArray(set.exercises)
+                          ? set.exercises
+                          : [];
+
+                        for (
+                          let exIdx = 0;
+                          exIdx < exercisesInSet.length;
+                          exIdx++
+                        ) {
+                          const setEx = exercisesInSet[exIdx];
+                          if (setEx.exercise_id) {
+                            const currentExerciseOrder = exerciseOrder++;
+                            const addedExercise =
+                              await WorkoutBlockService.addExerciseToBlock(
+                                block.id,
+                                setEx.exercise_id,
+                                currentExerciseOrder,
+                                {
+                                  sets:
+                                    setEx.sets || exercise.sets
+                                      ? parseInt(setEx.sets || exercise.sets)
+                                      : undefined,
+                                  reps:
+                                    setEx.reps || exercise.reps || undefined,
+                                  // rest_seconds in workout_block_exercises = rest after THIS exercise (per exercise)
+                                  rest_seconds:
+                                    exerciseType === "tabata"
+                                      ? 10 // Tabata: short rest between exercises (typically 10s)
+                                      : setEx.rest_after
+                                      ? Math.round(
+                                          parseFloat(String(setEx.rest_after))
                                         )
+                                      : exercise.rest_seconds
+                                      ? Math.round(
+                                          parseFloat(
+                                            String(exercise.rest_seconds)
+                                          )
+                                        )
+                                      : undefined,
+                                  // Load percentage can be set individually for each exercise
+                                  load_percentage: setEx.load_percentage
+                                    ? parseFloat(String(setEx.load_percentage))
+                                    : exercise.load_percentage
+                                    ? parseFloat(
+                                        String(exercise.load_percentage)
                                       )
-                                    )
-                                  : undefined,
+                                    : undefined,
+                                }
+                              );
+
+                            if (!addedExercise) {
+                              console.error(
+                                `❌ Failed to add exercise to block:`,
+                                {
+                                  blockId: block.id,
+                                  exerciseId: setEx.exercise_id,
+                                  exerciseOrder: currentExerciseOrder,
+                                  setIndex: setIdx + 1,
+                                }
+                              );
+                              throw new Error(
+                                `Failed to add exercise ${setEx.exercise_id} to circuit block`
+                              );
                             }
-                          );
+
+                            // Create time protocol for this exercise
+                            const timeProtocolResult =
+                              await WorkoutBlockService.createTimeProtocol(
+                                block.id,
+                                setEx.exercise_id,
+                                currentExerciseOrder,
+                                exerciseType as "tabata" | "circuit",
+                                {
+                                  work_seconds:
+                                    exerciseType === "tabata"
+                                      ? exercise.work_seconds
+                                        ? parseInt(exercise.work_seconds)
+                                        : 20
+                                      : setEx.work_seconds
+                                      ? parseInt(setEx.work_seconds)
+                                      : exercise.work_seconds
+                                      ? parseInt(exercise.work_seconds)
+                                      : undefined,
+                                  // rest_seconds = rest after THIS exercise (per exercise)
+                                  rest_seconds:
+                                    exerciseType === "tabata"
+                                      ? 10 // Tabata: short rest between exercises (typically 10s)
+                                      : setEx.rest_after
+                                      ? Math.round(
+                                          parseFloat(String(setEx.rest_after))
+                                        )
+                                      : undefined,
+                                  // rest_after_set = rest after completing ALL exercises in the set (per set)
+                                  // For TABATA: use the general rest_after_set for ALL sets (same value)
+                                  // For CIRCUIT: use per-set rest_between_sets
+                                  rest_after_set:
+                                    exerciseType === "tabata" &&
+                                    tabataRestAfterSet
+                                      ? Math.round(
+                                          parseFloat(String(tabataRestAfterSet))
+                                        )
+                                      : undefined,
+                                  // For TABATA: rounds IS stored in time_protocols
+                                  rounds:
+                                    exerciseType === "tabata"
+                                      ? exercise.rounds
+                                        ? parseInt(exercise.rounds)
+                                        : 8
+                                      : undefined,
+                                  set: setIdx + 1, // Store set number (1-indexed)
+                                }
+                              );
+
+                            if (!timeProtocolResult) {
+                              console.error(
+                                `❌ Failed to create time protocol for ${exerciseType} exercise:`,
+                                {
+                                  blockId: block.id,
+                                  exerciseId: setEx.exercise_id,
+                                  exerciseOrder: currentExerciseOrder,
+                                  setIndex: setIdx + 1,
+                                }
+                              );
+                            }
+                          }
                         }
                       }
-                    }
-
-                    // Save tabata_sets/circuit_sets to block_parameters for proper loading
-                    const updatedParams = {
-                      ...blockParameters,
-                    };
-                    if (exerciseType === "tabata") {
-                      updatedParams.tabata_sets = setsArray;
-                      updatedParams.rest_after = tabataRestAfter;
-                      updatedParams.work_seconds = exercise.work_seconds
-                        ? parseInt(exercise.work_seconds)
-                        : 20;
-                      updatedParams.rounds = exercise.rounds
-                        ? parseInt(exercise.rounds)
-                        : 8;
                     } else {
-                      updatedParams.circuit_sets = setsArray;
+                      console.warn(`⚠️ tabata has no sets configured:`, {
+                        blockId: block.id,
+                        exerciseType: "tabata",
+                        hasTabataSets: !!exercise.tabata_sets,
+                      });
                     }
-                    await WorkoutBlockService.updateWorkoutBlock(block.id, {
-                      block_parameters: updatedParams,
+                  } catch (tabataError) {
+                    console.error(`❌ Error saving tabata block:`, {
+                      blockId: block.id,
+                      exerciseType: "tabata",
+                      error: tabataError,
+                      exercise: {
+                        id: exercise.id,
+                        exercise_id: exercise.exercise_id,
+                        sets: exercise.sets,
+                        tabata_sets: exercise.tabata_sets,
+                      },
                     });
+                    throw tabataError; // Re-throw to be caught by outer try-catch
                   }
                 }
 
                 console.log(
-                  `🔍 Saved block ${i + 1}/${exercises.length}:`,
+                  `🔍 ${isUpdate ? "Updated" : "Created"} block ${i + 1}/${
+                    exercises.length
+                  }:`,
                   block.id
+                );
+              } else {
+                console.error(
+                  `❌ Failed to ${
+                    isUpdate ? "update" : "create"
+                  } block for exercise ${i + 1}`
                 );
               }
             }
-            console.log("🔍 Successfully saved all blocks and exercises");
+            console.log(
+              "🔍 Successfully saved all blocks and exercises (SMART UPDATE - preserves block IDs)"
+            );
           } else {
             console.log("🔍 No exercises to save");
           }
@@ -925,6 +1339,8 @@ export default function WorkoutTemplateForm({
         );
       }
 
+      // Clear draft after successful save
+      clearDraft();
       onSuccess();
       onClose();
       resetForm();
@@ -974,40 +1390,9 @@ export default function WorkoutTemplateForm({
         return;
       }
     } else if (newExercise.exercise_type === "circuit") {
-      if (!newExercise.circuit_sets || newExercise.circuit_sets.length === 0) {
-        console.log("❌ No Circuit sets configured");
-        alert("Please add at least one Circuit set with exercises");
-        return;
-      }
-      // Check if any set has exercises
-      const hasExercises = newExercise.circuit_sets.some(
-        (set) => set.exercises && set.exercises.length > 0
-      );
-      if (!hasExercises) {
-        console.log("❌ No exercises in Circuit sets");
-        alert("Please add exercises to your Circuit sets");
-        return;
-      }
-
-      // For Circuit exercises, use the first exercise from the first set as the main exercise_id
-      const firstSet = newExercise.circuit_sets.find(
-        (set) => set.exercises && set.exercises.length > 0
-      );
-      if (firstSet && firstSet.exercises && firstSet.exercises.length > 0) {
-        newExercise.exercise_id = firstSet.exercises[0].exercise_id;
-        console.log(
-          "🔍 Circuit exercise - using first exercise as main exercise_id:",
-          newExercise.exercise_id
-        );
-      } else {
-        console.log(
-          "❌ No valid exercises found in Circuit sets for exercise_id"
-        );
-        alert(
-          "Please ensure at least one Circuit set has a valid exercise selected"
-        );
-        return;
-      }
+      // Circuit removed - skip validation
+      console.log("⚠️ Circuit block type is deprecated");
+      return;
     } else if (newExercise.exercise_type === "giant_set") {
       if (
         !newExercise.giant_set_exercises ||
@@ -1126,12 +1511,18 @@ export default function WorkoutTemplateForm({
         rounds: cleanNumericForForm(newExercise.rounds),
         tabata_sets: newExercise.tabata_sets,
         rest_after: cleanNumericForForm(newExercise.rest_after),
+        rest_after_set: cleanNumericForForm(
+          (newExercise as any).rest_after_set
+        ),
         // Drop set specific
         drop_percentage: cleanNumericForForm(newExercise.drop_percentage),
         drop_set_reps: cleanStringForForm(newExercise.drop_set_reps),
         // Superset specific
         superset_exercise_id: newExercise.superset_exercise_id,
         superset_reps: cleanStringForForm(newExercise.superset_reps),
+        superset_load_percentage: cleanNumericForForm(
+          (newExercise as any).superset_load_percentage
+        ),
         // Giant set specific
         giant_set_exercises: newExercise.giant_set_exercises,
         // Cluster set specific
@@ -1148,12 +1539,13 @@ export default function WorkoutTemplateForm({
         compound_exercise_id: newExercise.compound_exercise_id,
         isolation_reps: cleanStringForForm(newExercise.isolation_reps),
         compound_reps: cleanStringForForm(newExercise.compound_reps),
+        compound_load_percentage: cleanNumericForForm(
+          (newExercise as any).compound_load_percentage
+        ),
         // For time specific
         target_reps: cleanNumericForForm(newExercise.target_reps),
         time_cap: cleanNumericForForm(newExercise.time_cap),
 
-        // Circuit specific
-        circuit_sets: newExercise.circuit_sets,
         // Load percentage
         load_percentage: cleanNumericForForm(newExercise.load_percentage),
         exercise: selectedExercise || null,
@@ -1199,11 +1591,18 @@ export default function WorkoutTemplateForm({
         emom_duration: "",
         rounds: "",
         rest_after: "",
+        rest_after_set: "",
         drop_percentage: "",
         drop_set_reps: "",
         superset_exercise_id: "",
         superset_reps: "",
-        giant_set_exercises: [] as Array<{ exercise_id: string; sets: string; reps: string; [key: string]: any }>,
+        superset_load_percentage: "",
+        giant_set_exercises: [] as Array<{
+          exercise_id: string;
+          sets: string;
+          reps: string;
+          [key: string]: any;
+        }>,
         cluster_reps: "",
         clusters_per_set: "",
         intra_cluster_rest: "",
@@ -1213,14 +1612,17 @@ export default function WorkoutTemplateForm({
         compound_exercise_id: "",
         isolation_reps: "",
         compound_reps: "",
+        compound_load_percentage: "",
         target_reps: "",
         time_cap: "",
         rest_between_rungs: "",
 
         emom_mode: "",
         emom_reps: "",
-        tabata_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
-        circuit_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
+        tabata_sets: [] as Array<{
+          exercises: any[];
+          rest_between_sets: string;
+        }>,
         load_percentage: "",
       });
       setShowAddExercise(false);
@@ -1386,12 +1788,15 @@ export default function WorkoutTemplateForm({
           }))
         : [],
       rest_after: exercise.rest_after,
+      rest_after_set: (exercise as any).rest_after_set || "",
       // Drop set specific
       drop_percentage: exercise.drop_percentage,
       drop_set_reps: exercise.drop_set_reps,
       // Superset specific
       superset_exercise_id: exercise.superset_exercise_id,
       superset_reps: exercise.superset_reps,
+      superset_load_percentage:
+        (exercise as any).superset_load_percentage || "",
       // Giant set specific
       giant_set_exercises: exercise.giant_set_exercises,
       // Cluster set specific
@@ -1406,18 +1811,13 @@ export default function WorkoutTemplateForm({
       compound_exercise_id: exercise.compound_exercise_id,
       isolation_reps: exercise.isolation_reps,
       compound_reps: exercise.compound_reps,
+      compound_load_percentage:
+        (exercise as any).compound_load_percentage || "",
       // For time specific
       target_reps: exercise.target_reps,
       time_cap: exercise.time_cap,
 
       rest_between_rungs: exercise.rest_between_rungs,
-      // Circuit specific
-      circuit_sets: Array.isArray(exercise.circuit_sets)
-        ? exercise.circuit_sets.map((set: any) => ({
-            exercises: Array.isArray(set.exercises) ? set.exercises : [],
-            rest_between_sets: set.rest_between_sets || "",
-          }))
-        : [],
       // Load percentage
       load_percentage: exercise.load_percentage?.toString() || "",
     });
@@ -2301,16 +2701,12 @@ export default function WorkoutTemplateForm({
                           <SelectItem value="for_time" className="rounded-lg">
                             For Time
                           </SelectItem>
-
-                          <SelectItem value="circuit" className="rounded-lg">
-                            Circuit
-                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
-                    {/* Hide main exercise selector for Tabata, Circuit, and Giant Set */}
-                    {!["tabata", "circuit", "giant_set"].includes(
+                    {/* Hide main exercise selector for Tabata and Giant Set */}
+                    {!["tabata", "giant_set"].includes(
                       newExercise.exercise_type
                     ) && (
                       <div>
@@ -2593,6 +2989,68 @@ export default function WorkoutTemplateForm({
                                   })
                                 }
                                 placeholder="e.g., 8-12"
+                                className="mt-2 rounded-xl"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Load Percentage Fields */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                            <div>
+                              <Label
+                                className={`text-sm font-medium ${theme.text}`}
+                              >
+                                First Exercise Load %
+                              </Label>
+                              <Input
+                                type="number"
+                                value={
+                                  newExercise.load_percentage === ""
+                                    ? ""
+                                    : newExercise.load_percentage
+                                }
+                                onChange={(e) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    load_percentage: handleNumberChange(
+                                      e.target.value,
+                                      0
+                                    ),
+                                  })
+                                }
+                                placeholder="e.g., 85"
+                                min="0"
+                                max="100"
+                                step="1"
+                                className="mt-2 rounded-xl"
+                              />
+                            </div>
+                            <div>
+                              <Label
+                                className={`text-sm font-medium ${theme.text}`}
+                              >
+                                Second Exercise Load %
+                              </Label>
+                              <Input
+                                type="number"
+                                value={
+                                  (newExercise as any)
+                                    .superset_load_percentage === ""
+                                    ? ""
+                                    : (newExercise as any)
+                                        .superset_load_percentage
+                                }
+                                onChange={(e) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    superset_load_percentage:
+                                      handleNumberChange(e.target.value, 0),
+                                  })
+                                }
+                                placeholder="e.g., 85"
+                                min="0"
+                                max="100"
+                                step="1"
                                 className="mt-2 rounded-xl"
                               />
                             </div>
@@ -2897,6 +3355,39 @@ export default function WorkoutTemplateForm({
                                 min="4"
                                 className="mt-2 rounded-xl"
                               />
+                            </div>
+                            <div>
+                              <Label
+                                className={`text-sm font-medium ${theme.text}`}
+                              >
+                                Rest After Set (seconds)
+                              </Label>
+                              <Input
+                                type="number"
+                                value={
+                                  newExercise.rest_after_set === ""
+                                    ? ""
+                                    : newExercise.rest_after_set
+                                }
+                                onChange={(e) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    rest_after_set: handleNumberChange(
+                                      e.target.value,
+                                      0
+                                    ),
+                                  })
+                                }
+                                min="0"
+                                placeholder="e.g., 60"
+                                className="mt-2 rounded-xl"
+                              />
+                              <p
+                                className={`text-xs ${theme.textSecondary} mt-1`}
+                              >
+                                Rest time after completing all exercises in each
+                                set
+                              </p>
                             </div>
                           </div>
 
@@ -3278,29 +3769,62 @@ export default function WorkoutTemplateForm({
                                       <X className="w-3 h-3" />
                                     </Button>
                                   </div>
-                                  <div className="ml-10">
-                                    <Label
-                                      className={`text-xs font-medium ${theme.text}`}
-                                    >
-                                      Reps
-                                    </Label>
-                                    <Input
-                                      type="text"
-                                      value={exercise.reps || ""}
-                                      onChange={(e) => {
-                                        const updated = [
-                                          ...(newExercise.giant_set_exercises ||
-                                            []),
-                                        ];
-                                        updated[index].reps = e.target.value;
-                                        setNewExercise({
-                                          ...newExercise,
-                                          giant_set_exercises: updated,
-                                        });
-                                      }}
-                                      placeholder="e.g., 10-12"
-                                      className="mt-1 rounded-lg text-sm"
-                                    />
+                                  <div className="ml-10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <Label
+                                        className={`text-xs font-medium ${theme.text}`}
+                                      >
+                                        Reps
+                                      </Label>
+                                      <Input
+                                        type="text"
+                                        value={exercise.reps || ""}
+                                        onChange={(e) => {
+                                          const updated = [
+                                            ...(newExercise.giant_set_exercises ||
+                                              []),
+                                          ];
+                                          updated[index].reps = e.target.value;
+                                          setNewExercise({
+                                            ...newExercise,
+                                            giant_set_exercises: updated,
+                                          });
+                                        }}
+                                        placeholder="e.g., 10-12"
+                                        className="mt-1 rounded-lg text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label
+                                        className={`text-xs font-medium ${theme.text}`}
+                                      >
+                                        Load %
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        value={exercise.load_percentage || ""}
+                                        onChange={(e) => {
+                                          const updated = [
+                                            ...(newExercise.giant_set_exercises ||
+                                              []),
+                                          ];
+                                          updated[index].load_percentage =
+                                            handleNumberChange(
+                                              e.target.value,
+                                              0
+                                            );
+                                          setNewExercise({
+                                            ...newExercise,
+                                            giant_set_exercises: updated,
+                                          });
+                                        }}
+                                        placeholder="e.g., 85"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        className="mt-1 rounded-lg text-sm"
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                               )
@@ -3317,6 +3841,7 @@ export default function WorkoutTemplateForm({
                                     exercise_id: "",
                                     sets: "",
                                     reps: "",
+                                    load_percentage: "",
                                   },
                                 ];
                                 setNewExercise({
@@ -3801,6 +4326,68 @@ export default function WorkoutTemplateForm({
                                 />
                               </div>
                             </div>
+
+                            {/* Load Percentage Fields */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                              <div>
+                                <Label
+                                  className={`text-sm font-medium ${theme.text}`}
+                                >
+                                  Isolation Exercise Load %
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={
+                                    newExercise.load_percentage === ""
+                                      ? ""
+                                      : newExercise.load_percentage
+                                  }
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      load_percentage: handleNumberChange(
+                                        e.target.value,
+                                        0
+                                      ),
+                                    })
+                                  }
+                                  placeholder="e.g., 85"
+                                  min="0"
+                                  max="100"
+                                  step="1"
+                                  className="mt-2 rounded-xl"
+                                />
+                              </div>
+                              <div>
+                                <Label
+                                  className={`text-sm font-medium ${theme.text}`}
+                                >
+                                  Compound Exercise Load %
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={
+                                    (newExercise as any)
+                                      .compound_load_percentage === ""
+                                      ? ""
+                                      : (newExercise as any)
+                                          .compound_load_percentage
+                                  }
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      compound_load_percentage:
+                                        handleNumberChange(e.target.value, 0),
+                                    })
+                                  }
+                                  placeholder="e.g., 85"
+                                  min="0"
+                                  max="100"
+                                  step="1"
+                                  className="mt-2 rounded-xl"
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -3876,355 +4463,49 @@ export default function WorkoutTemplateForm({
                       </div>
                     )}
 
-                    {newExercise.exercise_type === "circuit" && (
-                      <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
-                          <h4
-                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-                          >
-                            <Activity className="w-4 h-4 text-purple-600" />
-                            Circuit Configuration
-                          </h4>
-                          <p className={`text-sm ${theme.textSecondary} mb-4`}>
-                            Circuit training with variable timing per exercise -
-                            flexible work and rest periods
-                          </p>
-
-                          {/* Circuit Parameters */}
-                          <div className="grid grid-cols-1 gap-4 mb-4">
-                            <div>
-                              <Label
-                                htmlFor="circuit-rounds"
-                                className={`text-sm font-medium ${theme.text}`}
-                              >
-                                Rounds
-                              </Label>
-                              <Input
-                                id="circuit-rounds"
-                                type="number"
-                                value={
-                                  newExercise.sets === "" ||
-                                  newExercise.sets === null
-                                    ? ""
-                                    : newExercise.sets
-                                }
-                                onChange={(e) =>
-                                  setNewExercise({
-                                    ...newExercise,
-                                    sets: handleNumberChange(e.target.value, 0),
-                                  })
-                                }
-                                min="1"
-                                placeholder="Number of rounds"
-                                className="mt-2 rounded-xl"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Sets */}
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between flex-wrap gap-2">
-                              <Label
-                                className={`text-sm font-medium ${theme.text}`}
-                              >
-                                Circuit Sets
-                              </Label>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const updated = [
-                                    ...(newExercise.circuit_sets || []),
-                                    {
-                                      exercises: [],
-                                      rest_between_sets: "",
-                                    },
-                                  ];
-                                  setNewExercise({
-                                    ...newExercise,
-                                    circuit_sets: updated,
-                                  });
-                                }}
-                                className="border-dashed border-purple-300 dark:border-purple-600 text-purple-600 dark:text-purple-400"
-                              >
-                                <Plus className="w-3 h-3 mr-1" />
-                                Add Set
-                              </Button>
-                            </div>
-
-                            {(newExercise.circuit_sets || []).map(
-                              (set, setIndex) => (
-                                <div
-                                  key={setIndex}
-                                  className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
-                                >
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <h5 className={`font-medium ${theme.text}`}>
-                                      Set {setIndex + 1}
-                                    </h5>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        const updated = [
-                                          ...(newExercise.circuit_sets || []),
-                                        ];
-                                        updated.splice(setIndex, 1);
-                                        setNewExercise({
-                                          ...newExercise,
-                                          circuit_sets: updated,
-                                        });
-                                      }}
-                                      className="text-red-500 hover:text-red-700"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-
-                                  {/* Exercises in this set */}
-                                  <div className="space-y-2 mb-3">
-                                    {(Array.isArray(set.exercises)
-                                      ? set.exercises
-                                      : []
-                                    ).map((exercise, exerciseIndex) => (
-                                      <div
-                                        key={exerciseIndex}
-                                        className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg"
-                                      >
-                                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                                          <span className="text-xs text-slate-500 w-6">
-                                            {exerciseIndex + 1}.
-                                          </span>
-                                          <div className="flex-1">
-                                            <SearchableSelect
-                                              value={exercise.exercise_id || ""}
-                                              onValueChange={(value) => {
-                                                const updated = [
-                                                  ...(newExercise.circuit_sets ||
-                                                    []),
-                                                ];
-                                                updated[setIndex].exercises[
-                                                  exerciseIndex
-                                                ].exercise_id = value;
-                                                setNewExercise({
-                                                  ...newExercise,
-                                                  circuit_sets: updated,
-                                                });
-                                              }}
-                                              placeholder="Search exercise..."
-                                              items={availableExercises.map(
-                                                (ex) => ({
-                                                  id: ex.id,
-                                                  name: ex.name,
-                                                  description: ex.description,
-                                                })
-                                              )}
-                                            />
-                                          </div>
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                              const updated = [
-                                                ...(newExercise.circuit_sets ||
-                                                  []),
-                                              ];
-                                              updated[
-                                                setIndex
-                                              ].exercises.splice(
-                                                exerciseIndex,
-                                                1
-                                              );
-                                              setNewExercise({
-                                                ...newExercise,
-                                                circuit_sets: updated,
-                                              });
-                                            }}
-                                            className="text-red-500 hover:text-red-700 p-1"
-                                          >
-                                            <X className="w-3 h-3" />
-                                          </Button>
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                          <div>
-                                            <Label
-                                              className={`text-xs font-medium ${theme.text}`}
-                                            >
-                                              Work (seconds)
-                                            </Label>
-                                            <Input
-                                              type="number"
-                                              value={
-                                                exercise.work_seconds === ""
-                                                  ? ""
-                                                  : exercise.work_seconds
-                                              }
-                                              onChange={(e) => {
-                                                const updated = [
-                                                  ...(newExercise.circuit_sets ||
-                                                    []),
-                                                ];
-                                                updated[setIndex].exercises[
-                                                  exerciseIndex
-                                                ].work_seconds =
-                                                  handleNumberChange(
-                                                    e.target.value,
-                                                    0
-                                                  );
-                                                setNewExercise({
-                                                  ...newExercise,
-                                                  circuit_sets: updated,
-                                                });
-                                              }}
-                                              min="10"
-                                              className="mt-1 rounded-lg text-sm"
-                                            />
-                                          </div>
-                                          <div>
-                                            <Label
-                                              className={`text-xs font-medium ${theme.text}`}
-                                            >
-                                              Rest After (seconds)
-                                            </Label>
-                                            <Input
-                                              type="number"
-                                              value={
-                                                exercise.rest_after === ""
-                                                  ? ""
-                                                  : exercise.rest_after
-                                              }
-                                              onChange={(e) => {
-                                                const updated = [
-                                                  ...(newExercise.circuit_sets ||
-                                                    []),
-                                                ];
-                                                updated[setIndex].exercises[
-                                                  exerciseIndex
-                                                ].rest_after =
-                                                  handleNumberChange(
-                                                    e.target.value,
-                                                    0
-                                                  );
-                                                setNewExercise({
-                                                  ...newExercise,
-                                                  circuit_sets: updated,
-                                                });
-                                              }}
-                                              min="0"
-                                              className="mt-1 rounded-lg text-sm"
-                                            />
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        const updated = [
-                                          ...(newExercise.circuit_sets || []),
-                                        ];
-                                        updated[setIndex].exercises.push({
-                                          exercise_id: "",
-                                          order:
-                                            updated[setIndex].exercises.length +
-                                            1,
-                                          work_seconds: "",
-                                          rest_after: "",
-                                        });
-                                        setNewExercise({
-                                          ...newExercise,
-                                          circuit_sets: updated,
-                                        });
-                                      }}
-                                      className="w-full border-dashed text-xs"
-                                    >
-                                      <Plus className="w-3 h-3 mr-1" />
-                                      Add Exercise
-                                    </Button>
-                                  </div>
-
-                                  {/* Rest After Set */}
-                                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600">
-                                    <Label
-                                      className={`text-xs font-medium ${theme.text}`}
-                                    >
-                                      Rest After Set (seconds)
-                                    </Label>
-                                    <Input
-                                      type="number"
-                                      value={
-                                        set.rest_between_sets === ""
-                                          ? ""
-                                          : set.rest_between_sets
-                                      }
-                                      onChange={(e) => {
-                                        const updated = [
-                                          ...(newExercise.circuit_sets || []),
-                                        ];
-                                        updated[setIndex].rest_between_sets =
-                                          handleNumberChange(e.target.value, 0);
-                                        setNewExercise({
-                                          ...newExercise,
-                                          circuit_sets: updated,
-                                        });
-                                      }}
-                                      min="0"
-                                      placeholder="Rest time after completing this set"
-                                      className="mt-1 rounded-lg text-sm"
-                                    />
-                                    <p
-                                      className={`text-xs ${theme.textSecondary} mt-1`}
-                                    >
-                                      Time to rest after completing all
-                                      exercises in this set
-                                    </p>
-                                  </div>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
+                    {/* Common fields for all types */}
+                    {/* Hide general load percentage for blocks with individual load percentage fields (superset, giant_set, pre_exhaustion) and time-based blocks (tabata, emom) */}
+                    {![
+                      "superset",
+                      "giant_set",
+                      "pre_exhaustion",
+                      "tabata",
+                      "emom",
+                    ].includes(newExercise.exercise_type) && (
+                      <div>
+                        <Label
+                          htmlFor="load_percentage"
+                          className={`text-sm font-medium ${theme.text}`}
+                        >
+                          Load (% of 1RM)
+                        </Label>
+                        <Input
+                          id="load_percentage"
+                          type="number"
+                          value={
+                            newExercise.load_percentage === ""
+                              ? ""
+                              : newExercise.load_percentage || ""
+                          }
+                          onChange={(e) =>
+                            setNewExercise({
+                              ...newExercise,
+                              load_percentage:
+                                e.target.value === "" ? "" : e.target.value,
+                            })
+                          }
+                          placeholder="e.g., 70"
+                          min="0"
+                          max="200"
+                          step="1"
+                          className="mt-2 rounded-xl"
+                        />
+                        <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                          Percentage of estimated 1RM to use for suggested
+                          weight (e.g., 70 = 70% of 1RM)
+                        </p>
                       </div>
                     )}
-
-                    {/* Common fields for all types */}
-                    <div>
-                      <Label
-                        htmlFor="load_percentage"
-                        className={`text-sm font-medium ${theme.text}`}
-                      >
-                        Load (% of 1RM)
-                      </Label>
-                      <Input
-                        id="load_percentage"
-                        type="number"
-                        value={
-                          newExercise.load_percentage === ""
-                            ? ""
-                            : newExercise.load_percentage || ""
-                        }
-                        onChange={(e) =>
-                          setNewExercise({
-                            ...newExercise,
-                            load_percentage: e.target.value === "" ? "" : e.target.value,
-                          })
-                        }
-                        placeholder="e.g., 70"
-                        min="0"
-                        max="200"
-                        step="1"
-                        className="mt-2 rounded-xl"
-                      />
-                      <p className={`text-xs ${theme.textSecondary} mt-1`}>
-                        Percentage of estimated 1RM to use for suggested weight (e.g., 70 = 70% of 1RM)
-                      </p>
-                    </div>
 
                     <div>
                       <Label
@@ -4286,7 +4567,10 @@ export default function WorkoutTemplateForm({
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={() => {
+                clearDraft();
+                onClose();
+              }}
               className="rounded-xl w-full sm:w-auto"
             >
               Cancel

@@ -20,6 +20,7 @@ import {
   Layers,
   FolderTree,
   User,
+  Trophy,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -93,6 +94,13 @@ const menuItems = [
     icon: Calendar,
     href: "/coach/sessions",
     color: "bg-teal-100 text-teal-600",
+  },
+  {
+    title: "Challenges",
+    description: "Create and manage client challenges",
+    icon: Trophy,
+    href: "/coach/challenges",
+    color: "bg-amber-100 text-amber-600",
   },
   {
     title: "Availability Settings",

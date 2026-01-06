@@ -61,9 +61,15 @@ export function ForTimeExecutor({
   });
 
   const { addToast } = useToast();
-  const timeCapMinutes =
-    (block.block.block_parameters as any)?.time_cap_minutes || 15;
-  const targetReps = (block.block.block_parameters as any)?.target_reps;
+  
+  // Read from special table (time_protocols)
+  const timeProtocol = block.block.time_protocols?.find(
+    (tp: any) => tp.protocol_type === 'for_time' && 
+    (tp.exercise_id === currentExercise?.exercise_id || !currentExercise?.exercise_id)
+  ) || block.block.time_protocols?.[0];
+  
+  const timeCapMinutes = timeProtocol?.time_cap_minutes || 15;
+  const targetReps = timeProtocol?.target_reps;
 
   // Debug logging for exercise data
   useEffect(() => {

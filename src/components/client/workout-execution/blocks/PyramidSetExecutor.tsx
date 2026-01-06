@@ -38,10 +38,8 @@ export function PyramidSetExecutor({
   const totalSets = block.block.total_sets || 1;
   const currentSet = block.completedSets || 0;
 
-  // Get progression from block parameters or use default
-  const progression =
-    (block.block.block_parameters as any)?.reps_progression ||
-    Array.from({ length: totalSets }, (_, i) => (i + 1).toString());
+  // Get progression from pyramid_sets table or use default (block_parameters removed)
+  const progression = Array.from({ length: totalSets }, (_, i) => (i + 1).toString()); // TODO: Get from workout_pyramid_sets table
 
   const [weights, setWeights] = useState<string[]>([]);
   const [reps, setReps] = useState<string[]>([]);

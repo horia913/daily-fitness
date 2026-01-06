@@ -570,6 +570,21 @@ export default function WorkoutTemplateDetailsPage() {
             {workoutBlocks.length > 0 ? (
               <div className="space-y-4">
                 {workoutBlocks.map((block, index) => {
+                  // Get first exercise and its special table data
+                  const firstExercise = block.exercises?.[0];
+                  const firstExerciseId = firstExercise?.exercise_id;
+                  const firstExerciseOrder = firstExercise?.exercise_order || 1;
+                  
+                  // Get time protocol for this block/exercise (for time-based blocks)
+                  const timeProtocol = block.time_protocols?.find(
+                    (tp: any) => tp.exercise_id === firstExerciseId && tp.exercise_order === firstExerciseOrder
+                  ) || block.time_protocols?.[0];
+                  
+                  // Get special table data from first exercise
+                  const dropSet = firstExercise?.drop_sets?.[0];
+                  const clusterSet = firstExercise?.cluster_sets?.[0];
+                  const restPauseSet = firstExercise?.rest_pause_sets?.[0];
+                  
                   const blockAsExercise = {
                     id: block.id,
                     exercise_type: block.block_type,
@@ -578,16 +593,31 @@ export default function WorkoutTemplateDetailsPage() {
                     reps: block.reps_per_set,
                     rest_seconds: block.rest_seconds,
                     duration_seconds: block.duration_seconds,
-                    rounds: block.block_parameters?.rounds,
-                    work_seconds: block.block_parameters?.work_seconds,
-                    rest_after: block.block_parameters?.rest_after,
-                    amrap_duration: block.block_parameters?.amrap_duration,
-                    emom_duration: block.block_parameters?.emom_duration,
-                    emom_reps: block.block_parameters?.emom_reps,
-                    exercise_id: block.exercises?.[0]?.exercise_id,
-                    exercise: block.exercises?.[0]?.exercise,
+                    // Read from workout_time_protocols (block_parameters removed)
+                    rounds: timeProtocol?.rounds,
+                    work_seconds: timeProtocol?.work_seconds,
+                    rest_after: timeProtocol?.rest_seconds,
+                    amrap_duration: timeProtocol?.total_duration_minutes,
+                    emom_duration: timeProtocol?.total_duration_minutes,
+                    emom_reps: timeProtocol?.reps_per_round,
+                    // Read from special tables (block_parameters removed)
+                    drop_percentage: dropSet ? (() => {
+                      const initialWeight = firstExercise?.weight_kg || 0;
+                      const dropWeight = dropSet.weight_kg || 0;
+                      if (initialWeight > 0 && dropWeight > 0) {
+                        return Math.round(((initialWeight - dropWeight) / initialWeight) * 100);
+                      }
+                      return undefined;
+                    })() : undefined,
+                    drop_set_reps: dropSet?.reps,
+                    cluster_reps: clusterSet?.reps_per_cluster,
+                    clusters_per_set: clusterSet?.clusters_per_set,
+                    intra_cluster_rest: clusterSet?.intra_cluster_rest,
+                    rest_pause_duration: restPauseSet?.rest_pause_duration,
+                    max_rest_pauses: restPauseSet?.max_rest_pauses,
+                    exercise_id: firstExerciseId,
+                    exercise: firstExercise?.exercise,
                     exercises: block.exercises,
-                    block_parameters: block.block_parameters,
                     notes: block.block_notes,
                     block_name: block.block_name,
                   };

@@ -1225,7 +1225,7 @@ function EditProgramContent() {
                     </div>
 
                     {/* Progression Rules Editor */}
-                    {selectedScheduleForProgression && form?.id && (
+                    {selectedScheduleForProgression && form?.id ? (
                       <ProgramProgressionRulesEditor
                         programId={form.id}
                         programScheduleId={
@@ -1237,12 +1237,12 @@ function EditProgramContent() {
                         templates={templates}
                         onUpdate={() => {
                           // Reload schedule to get updated IDs if program was just created
-                          load();
+                          load().catch((err) => {
+                            console.error("Error reloading schedule after progression update:", err);
+                          });
                         }}
                       />
-                    )}
-
-                    {!selectedScheduleForProgression && (
+                    ) : (
                       <div className="text-center py-8 text-slate-500 dark:text-slate-400">
                         <p>Select a day above to edit progression rules.</p>
                       </div>

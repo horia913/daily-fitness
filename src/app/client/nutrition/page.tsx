@@ -6,30 +6,18 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
-import { NutritionRing } from "@/components/ui/NutritionRing";
-import { MacroBars } from "@/components/ui/MacroBars";
-import { WaterTracker } from "@/components/ui/WaterTracker";
 import { Button } from "@/components/ui/button";
-import {
-  Apple,
-  Coffee,
-  Plus,
-  ChevronRight,
-  TrendingUp,
-  Lightbulb,
-  Camera,
-  Upload,
-} from "lucide-react";
+import { Plus, Camera, CheckCircle, Droplet, Image, Info } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { uploadMealPhoto } from "@/lib/mealPhotoService";
 
 interface NutritionData {
   calories: { consumed: number; goal: number };
   protein: { consumed: number; goal: number };
   carbs: { consumed: number; goal: number };
   fat: { consumed: number; goal: number };
-  water: { glasses: number; goal: number };
+  water: { glasses: number; goal: number; ml: number; goalMl: number };
 }
 
 interface MealFoodItem {
@@ -57,12 +45,6 @@ interface Meal {
   logged_at?: string;
 }
 
-interface NutritionInsight {
-  type: "success" | "warning" | "info";
-  message: string;
-  icon: string;
-}
-
 function NutritionDashboardContent() {
   const { user } = useAuth();
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
@@ -73,7 +55,7 @@ function NutritionDashboardContent() {
     protein: { consumed: 0, goal: 150 },
     carbs: { consumed: 0, goal: 250 },
     fat: { consumed: 0, goal: 70 },
-    water: { glasses: 0, goal: 8 },
+    water: { glasses: 0, goal: 8, ml: 0, goalMl: 3000 }, // 8 glasses = 3000ml (375ml per glass)
   });
 
   const [meals, setMeals] = useState<Meal[]>([
@@ -111,8 +93,6 @@ function NutritionDashboardContent() {
     },
   ]);
 
-  const [insights, setInsights] = useState<NutritionInsight[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
   const [uploadingMeal, setUploadingMeal] = useState<string | null>(null);
   const [loadingMeals, setLoadingMeals] = useState(true);
   const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null);
@@ -125,15 +105,6 @@ function NutritionDashboardContent() {
     }
   }, [user]);
 
-  // Generate smart nutrition insights - only when there's an active plan
-  useEffect(() => {
-    if (hasActivePlan === true) {
-      generateInsights();
-    } else {
-      setInsights([]); // Clear insights when no active plan
-    }
-  }, [nutritionData, hasActivePlan]);
-
   const loadTodayMeals = async () => {
     if (!user?.id) return;
 
@@ -141,10 +112,21 @@ function NutritionDashboardContent() {
       setLoadingMeals(true);
       const today = new Date().toISOString().split("T")[0];
 
-      // STEP 1: Get active meal plan assignment
+      // STEP 1: Get active meal plan assignment with meal plan details
       const { data: assignment, error: assignmentError } = await supabase
         .from("meal_plan_assignments")
-        .select("meal_plan_id")
+        .select(
+          `
+          meal_plan_id,
+          meal_plans (
+            id,
+            target_calories,
+            target_protein,
+            target_carbs,
+            target_fat
+          )
+        `
+        )
         .eq("client_id", user.id)
         .eq("is_active", true)
         .maybeSingle();
@@ -155,16 +137,23 @@ function NutritionDashboardContent() {
         setMeals([]);
         setNutritionData((prev) => ({
           ...prev,
-          calories: { ...prev.calories, consumed: 0 },
-          protein: { ...prev.protein, consumed: 0 },
-          carbs: { ...prev.carbs, consumed: 0 },
-          fat: { ...prev.fat, consumed: 0 },
+          calories: { ...prev.calories, consumed: 0, goal: 2200 },
+          protein: { ...prev.protein, consumed: 0, goal: 150 },
+          carbs: { ...prev.carbs, consumed: 0, goal: 250 },
+          fat: { ...prev.fat, consumed: 0, goal: 70 },
         }));
         setLoadingMeals(false);
         return;
       }
 
       setHasActivePlan(true);
+
+      // Extract meal plan targets (use defaults if not set)
+      const mealPlan = assignment.meal_plans as any;
+      const targetCalories = mealPlan?.target_calories || 2200;
+      const targetProtein = mealPlan?.target_protein || 150;
+      const targetCarbs = mealPlan?.target_carbs || 250;
+      const targetFat = mealPlan?.target_fat || 70;
 
       // STEP 2: Get all meals in the active meal plan
       const { data: planMeals, error: mealsError } = await supabase
@@ -177,13 +166,13 @@ function NutritionDashboardContent() {
         console.error("Error fetching meals or no meals in plan:", mealsError);
         setHasMealsInPlan(false);
         setMeals([]);
-        // Active plan but no meals -> zero intake
+        // Active plan but no meals -> zero intake, but keep meal plan targets
         setNutritionData((prev) => ({
           ...prev,
-          calories: { ...prev.calories, consumed: 0 },
-          protein: { ...prev.protein, consumed: 0 },
-          carbs: { ...prev.carbs, consumed: 0 },
-          fat: { ...prev.fat, consumed: 0 },
+          calories: { consumed: 0, goal: targetCalories },
+          protein: { consumed: 0, goal: targetProtein },
+          carbs: { consumed: 0, goal: targetCarbs },
+          fat: { consumed: 0, goal: targetFat },
         }));
         setLoadingMeals(false);
         return;
@@ -259,14 +248,29 @@ function NutritionDashboardContent() {
           }
         }
 
-        // 3c: Get today's completion for this meal
-        const { data: completions } = await supabase
-          .from("meal_completions")
+        // 3c: Get today's photo log for this meal (from meal_photo_logs table)
+        const { data: photoLogs } = await supabase
+          .from("meal_photo_logs")
           .select("*")
           .eq("meal_id", meal.id)
           .eq("client_id", user.id)
-          .gte("completed_at", `${today}T00:00:00`)
-          .lt("completed_at", `${today}T23:59:59`);
+          .eq("log_date", today);
+
+        // Backward compatibility: also check meal_completions if no photo log
+        const { data: completions } =
+          photoLogs && photoLogs.length > 0
+            ? { data: null }
+            : await supabase
+                .from("meal_completions")
+                .select("*")
+                .eq("meal_id", meal.id)
+                .eq("client_id", user.id)
+                .gte("completed_at", `${today}T00:00:00`)
+                .lt("completed_at", `${today}T23:59:59`);
+
+        // Use photo logs first, fall back to completions
+        const hasPhotoLog = photoLogs && photoLogs.length > 0;
+        const hasCompletion = completions && completions.length > 0;
 
         mealsWithData.push({
           id: meal.id,
@@ -281,15 +285,17 @@ function NutritionDashboardContent() {
               ? "🍽️"
               : "🍎",
           items: mappedFoodItems,
-          logged: !!(completions && completions.length > 0),
-          photoUrl:
-            completions && completions.length > 0
-              ? completions[0].photo_url
-              : undefined,
-          logged_at:
-            completions && completions.length > 0
-              ? completions[0].completed_at
-              : undefined,
+          logged: !!(hasPhotoLog || hasCompletion),
+          photoUrl: hasPhotoLog
+            ? photoLogs[0].photo_url
+            : hasCompletion
+            ? completions[0].photo_url
+            : undefined,
+          logged_at: hasPhotoLog
+            ? photoLogs[0].created_at
+            : hasCompletion
+            ? completions[0].completed_at
+            : undefined,
         });
       }
 
@@ -318,10 +324,10 @@ function NutritionDashboardContent() {
 
       setNutritionData((prev) => ({
         ...prev,
-        calories: { ...prev.calories, consumed: totalCalories },
-        protein: { ...prev.protein, consumed: totalProtein },
-        carbs: { ...prev.carbs, consumed: totalCarbs },
-        fat: { ...prev.fat, consumed: totalFat },
+        calories: { consumed: totalCalories, goal: targetCalories },
+        protein: { consumed: totalProtein, goal: targetProtein },
+        carbs: { consumed: totalCarbs, goal: targetCarbs },
+        fat: { consumed: totalFat, goal: targetFat },
       }));
 
       setMeals(mealsWithData);
@@ -332,90 +338,63 @@ function NutritionDashboardContent() {
     }
   };
 
-  const generateInsights = () => {
-    // Don't generate insights if there's no active plan
-    if (hasActivePlan !== true) {
-      setInsights([]);
-      return;
-    }
-
-    const newInsights: NutritionInsight[] = [];
-    const { calories, protein, carbs } = nutritionData;
-
-    // Calorie insight
-    const calorieProgress = (calories.consumed / calories.goal) * 100;
-    if (calorieProgress < 50) {
-      newInsights.push({
-        type: "warning",
-        message: `You are ${
-          calories.goal - calories.consumed
-        } calories below your goal. Make sure to fuel your workouts!`,
-        icon: "⚡",
-      });
-    } else if (calorieProgress >= 90 && calorieProgress <= 110) {
-      newInsights.push({
-        type: "success",
-        message: "Perfect! You are right on track with your calorie target.",
-        icon: "🎯",
-      });
-    }
-
-    // Protein insight
-    const proteinProgress = (protein.consumed / protein.goal) * 100;
-    if (proteinProgress >= 80) {
-      newInsights.push({
-        type: "success",
-        message: "Great protein intake! This will help with muscle recovery.",
-        icon: "💪",
-      });
-    } else if (proteinProgress < 50) {
-      newInsights.push({
-        type: "info",
-        message: `Consider adding ${Math.ceil(
-          (protein.goal - protein.consumed) / 30
-        )} more protein-rich meals today.`,
-        icon: "🥩",
-      });
-    }
-
-    // Hydration insight
-    if (nutritionData.water.glasses >= nutritionData.water.goal) {
-      newInsights.push({
-        type: "success",
-        message: "Excellent hydration! Your body will thank you.",
-        icon: "💧",
-      });
-    }
-
-    setInsights(newInsights);
+  const handleWaterGlassClick = (targetGlasses: number) => {
+    setNutritionData((prev) => {
+      // If clicking the same number of glasses, remove one
+      const newGlasses =
+        targetGlasses === prev.water.glasses
+          ? Math.max(prev.water.glasses - 1, 0)
+          : targetGlasses;
+      const newMl = newGlasses * 375; // 375ml per glass
+      return {
+        ...prev,
+        water: {
+          ...prev.water,
+          glasses: newGlasses,
+          ml: newMl,
+        },
+      };
+    });
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    // Simulate data fetch
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setRefreshing(false);
+  // Helper function to build meal description from food items
+  const getMealDescription = (meal: Meal): string => {
+    if (meal.items.length === 0) return "";
+    return meal.items
+      .map((item) => item.food?.name || "Unknown Food")
+      .join(", ");
   };
 
-  const handleGlassAdded = () => {
-    setNutritionData((prev) => ({
-      ...prev,
-      water: {
-        ...prev.water,
-        glasses: Math.min(prev.water.glasses + 1, prev.water.goal),
-      },
-    }));
+  // Helper function to get meal calories
+  const getMealCalories = (meal: Meal): number => {
+    return meal.items.reduce((sum, item) => sum + item.calories, 0);
   };
 
-  const handleGlassRemoved = () => {
-    setNutritionData((prev) => ({
-      ...prev,
-      water: { ...prev.water, glasses: Math.max(prev.water.glasses - 1, 0) },
-    }));
+  // Helper function to format time from timestamp
+  const formatTime = (timestamp?: string): string => {
+    if (!timestamp) return "";
+    return new Date(timestamp).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  // Helper function to get logged meals count
+  const getLoggedMealsCount = (): number => {
+    return meals.filter((m) => m.logged).length;
   };
 
   const handleMealPhotoUpload = async (mealId: string, mealType: string) => {
     if (!user) return;
+
+    // Check if already logged today for THIS SPECIFIC MEAL
+    const meal = meals.find((m) => m.id === mealId);
+    if (meal?.logged) {
+      alert(
+        `Photo already uploaded for ${meal.name} today. Each meal can have one photo per day.`
+      );
+      return;
+    }
 
     // Create a file input element
     const input = document.createElement("input");
@@ -430,51 +409,43 @@ function NutritionDashboardContent() {
       setUploadingMeal(mealId);
 
       try {
-        // Upload to Supabase storage
-        const fileExt = file.name.split(".").pop();
-        const fileName = `${user.id}/${mealType}_${Date.now()}.${fileExt}`;
-        const filePath = `meal-photos/${fileName}`;
+        // Use mealPhotoService to handle upload with constraint enforcement
+        const today = new Date().toISOString().split("T")[0];
+        const result = await uploadMealPhoto(user.id, mealId, file, today);
 
-        const { error: uploadError } = await supabase.storage
-          .from("meal-photos")
-          .upload(filePath, file, {
-            cacheControl: "3600",
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error("Error uploading meal photo:", uploadError);
-          alert("Failed to upload photo. Please try again.");
+        if (!result.success) {
+          console.error("Upload failed:", result.error);
+          if (
+            result.error?.includes("already logged") ||
+            result.error?.includes("UNIQUE")
+          ) {
+            alert(
+              `Photo already uploaded for ${
+                meal?.name || "this meal"
+              } today. Each meal can have one photo per day.`
+            );
+          } else {
+            alert(result.error || "Failed to upload photo. Please try again.");
+          }
           setUploadingMeal(null);
           return;
         }
 
-        // Get public URL
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("meal-photos").getPublicUrl(filePath);
-
-        // Here you would typically save the meal log to your database
-        // For now, we'll just update the local state
-        setMeals((prev) =>
-          prev.map((meal) =>
-            meal.id === mealId
-              ? {
-                  ...meal,
-                  logged: true,
-                  photoUrl: publicUrl,
-                }
-              : meal
-          )
-        );
-
-        // TODO: Save meal log to database with photo URL
-        // await supabase.from('meal_logs').insert({
-        //   client_id: user.id,
-        //   meal_type: mealType,
-        //   photo_url: publicUrl,
-        //   logged_at: new Date().toISOString(),
-        // });
+        // Update local state with the logged photo
+        if (result.photoLog) {
+          setMeals((prev) =>
+            prev.map((meal) =>
+              meal.id === mealId
+                ? {
+                    ...meal,
+                    logged: true,
+                    photoUrl: result.photoLog!.photo_url,
+                    logged_at: result.photoLog!.created_at,
+                  }
+                : meal
+            )
+          );
+        }
 
         alert("Meal photo uploaded successfully!");
       } catch (error) {
@@ -488,470 +459,677 @@ function NutritionDashboardContent() {
     input.click();
   };
 
+  // Crystal card style helper
+  const crystalCardStyle: React.CSSProperties = {
+    background: isDark
+      ? "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%)"
+      : "linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)",
+    backdropFilter: "blur(20px) saturate(180%)",
+    WebkitBackdropFilter: "blur(20px) saturate(180%)",
+    border: isDark
+      ? "1px solid rgba(255,255,255,0.1)"
+      : "1px solid rgba(0,0,0,0.1)",
+    borderRadius: "24px",
+    position: "relative" as const,
+    overflow: "hidden" as const,
+  };
+
+  // Calculate calorie percentage for ring
+  const caloriePercent =
+    nutritionData.calories.goal > 0
+      ? Math.min(
+          (nutritionData.calories.consumed / nutritionData.calories.goal) * 100,
+          100
+        )
+      : 0;
+  const calorieRemaining = Math.max(
+    0,
+    nutritionData.calories.goal - nutritionData.calories.consumed
+  );
+
+  // Calculate macro percentages
+  const proteinPercent =
+    nutritionData.protein.goal > 0
+      ? Math.min(
+          (nutritionData.protein.consumed / nutritionData.protein.goal) * 100,
+          100
+        )
+      : 0;
+  const carbsPercent =
+    nutritionData.carbs.goal > 0
+      ? Math.min(
+          (nutritionData.carbs.consumed / nutritionData.carbs.goal) * 100,
+          100
+        )
+      : 0;
+  const fatPercent =
+    nutritionData.fat.goal > 0
+      ? Math.min(
+          (nutritionData.fat.consumed / nutritionData.fat.goal) * 100,
+          100
+        )
+      : 0;
+
+  // Format date
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
+      <div className="relative z-10 container mx-auto px-6 md:px-8 py-6 md:py-8 pb-32 max-w-6xl">
         {/* Header Section */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1
-                  className="text-3xl font-bold mb-1"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  Nutrition Tracking
-                </h1>
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
-              <Link href="/client/nutrition/log">
-                <Button
-                  variant="default"
-                  size="lg"
-                  className="flex items-center gap-2"
-                  style={{
-                    background: getSemanticColor("success").gradient,
-                    boxShadow: `0 4px 12px ${
-                      getSemanticColor("success").primary
-                    }30`,
-                  }}
-                >
-                  <Plus className="w-5 h-5" />
-                  <span
-                    className="font-semibold"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
-                    Log Food
-                  </span>
-                </Button>
-              </Link>
-            </div>
-          </GlassCard>
-        </div>
-
-        {/* Smart Insights - only show when there's an active plan */}
-        {!loadingMeals && hasActivePlan === true && insights.length > 0 && (
-          <GlassCard elevation={2} className="p-4 mb-6">
-            <div className="flex items-start gap-3">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{
-                  background: isDark
-                    ? "rgba(255, 167, 38, 0.15)"
-                    : "rgba(255, 167, 38, 0.1)",
-                }}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1
+              className={`text-3xl font-bold tracking-tight ${
+                isDark ? "text-white" : "text-slate-900"
+              }`}
+            >
+              Nutrition Tracking
+            </h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span
+                className={`text-sm font-medium uppercase tracking-widest ${
+                  isDark ? "text-neutral-400" : "text-neutral-600"
+                }`}
               >
-                <Lightbulb
-                  className="w-5 h-5"
-                  style={{ color: getSemanticColor("warning").primary }}
+                {formattedDate}
+              </span>
+              {hasActivePlan && meals.length > 0 && (
+                <>
+                  <span
+                    className={`w-1 h-1 rounded-full ${
+                      isDark ? "bg-neutral-600" : "bg-neutral-400"
+                    }`}
+                  ></span>
+                  <span
+                    className={`text-sm font-semibold ${
+                      isDark ? "text-green-400" : "text-green-600"
+                    }`}
+                  >
+                    {getLoggedMealsCount()} of {meals.length} meals logged
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+          <Link href="/client/nutrition/log">
+            <Button
+              className="h-12 px-8 rounded-xl flex items-center justify-center gap-2 font-semibold bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 text-white shadow-lg shadow-red-500/30 hover:shadow-red-500/40 transition-all"
+              style={{
+                boxShadow: isDark
+                  ? "0 4px 16px rgba(239, 68, 68, 0.3)"
+                  : "0 4px 12px rgba(239, 68, 68, 0.2)",
+              }}
+            >
+              <Plus className="w-5 h-5" />
+              Log Food
+            </Button>
+          </Link>
+        </header>
+
+        {/* No Meal Plan Message */}
+        {!loadingMeals && hasActivePlan === false && (
+          <div style={crystalCardStyle} className="p-6 mb-8">
+            <div className="text-center">
+              <h2
+                className={`text-xl font-semibold mb-2 ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
+                No Meal Plan Assigned
+              </h2>
+              <p
+                className={`text-sm ${
+                  isDark ? "text-neutral-400" : "text-neutral-600"
+                }`}
+              >
+                Contact your coach to get a meal plan assigned to start tracking
+                your nutrition.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Nutrition Summary Grid - only show if there is an active meal plan */}
+        {loadingMeals ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div style={crystalCardStyle} className="p-6">
+              <div className="animate-pulse space-y-3">
+                <div
+                  className={`h-4 rounded w-1/2 ${
+                    isDark ? "bg-white/10" : "bg-slate-200"
+                  }`}
+                />
+                <div
+                  className={`h-24 rounded ${
+                    isDark ? "bg-white/10" : "bg-slate-200"
+                  }`}
                 />
               </div>
-              <div className="flex-1">
-                <h3
-                  className="font-semibold mb-2"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  Smart Insights
-                </h3>
-                <div className="space-y-2">
-                  {insights.map((insight, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-2 p-3 rounded-lg"
-                      style={{
-                        background: isDark
-                          ? "rgba(255,255,255,0.05)"
-                          : "rgba(0,0,0,0.03)",
-                      }}
-                    >
-                      <span className="text-xl flex-shrink-0">
-                        {insight.icon}
-                      </span>
-                      <p
-                        className="text-sm"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.8)"
-                            : "rgba(0,0,0,0.8)",
-                        }}
-                      >
-                        {insight.message}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+            </div>
+            <div style={crystalCardStyle} className="p-6">
+              <div className="animate-pulse space-y-3">
+                <div
+                  className={`h-4 rounded w-1/3 ${
+                    isDark ? "bg-white/10" : "bg-slate-200"
+                  }`}
+                />
+                <div
+                  className={`h-20 rounded ${
+                    isDark ? "bg-white/10" : "bg-slate-200"
+                  }`}
+                />
               </div>
             </div>
-          </GlassCard>
-        )}
-
-        {/* Set Goal Button - show when no active plan */}
-        {!loadingMeals && hasActivePlan === false && (
-          <GlassCard elevation={2} className="p-6 mb-6">
-            <div className="text-center">
-              <div className="mb-4">
-                <h2
-                  className="text-xl font-semibold mb-2"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  No Nutrition Goals Set
-                </h2>
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                  }}
-                >
-                  Set your nutrition goals to start tracking your progress
-                </p>
-              </div>
-              <Link href="/client/goals">
-                <Button
-                  variant="default"
-                  size="lg"
-                  className="flex items-center gap-2 mx-auto"
-                  style={{
-                    background: getSemanticColor("success").gradient,
-                    boxShadow: `0 4px 12px ${
-                      getSemanticColor("success").primary
-                    }30`,
-                  }}
-                >
-                  <TrendingUp className="w-5 h-5" />
-                  <span
-                    className="font-semibold"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
-                    Set Nutrition Goals
-                  </span>
-                </Button>
-              </Link>
-            </div>
-          </GlassCard>
-        )}
-
-        {/* Main Content Grid - only show summary if there is an active meal plan */}
-        {loadingMeals ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <GlassCard elevation={2} className="p-6">
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 bg-slate-200 rounded w-1/2" />
-                <div className="h-24 bg-slate-200 rounded" />
-              </div>
-            </GlassCard>
-            <GlassCard elevation={2} className="p-6 lg:col-span-2">
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 bg-slate-200 rounded w-1/3" />
-                <div className="h-20 bg-slate-200 rounded" />
-              </div>
-            </GlassCard>
           </div>
         ) : hasActivePlan ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            {/* Calorie Ring */}
-            <div className="lg:col-span-1">
-              <GlassCard elevation={2} className="p-6">
-                <h2
-                  className="text-lg font-semibold mb-4"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Calorie Ring Card */}
+            <div
+              style={crystalCardStyle}
+              className="p-6 flex items-center justify-between"
+            >
+              <div className="flex-1">
+                <h3
+                  className={`text-xl font-semibold mb-1 ${
+                    isDark ? "text-white" : "text-slate-900"
+                  }`}
                 >
-                  Today&apos;s Calories
-                </h2>
-                <NutritionRing
-                  consumed={nutritionData.calories.consumed}
-                  goal={nutritionData.calories.goal}
-                />
-              </GlassCard>
+                  Calories
+                </h3>
+                <div className="flex items-baseline gap-2 mb-4">
+                  <span
+                    className={`text-3xl font-bold font-mono ${
+                      isDark ? "text-white" : "text-slate-900"
+                    }`}
+                  >
+                    {Math.round(
+                      nutritionData.calories.consumed
+                    ).toLocaleString()}
+                  </span>
+                  <span
+                    className={`text-sm font-mono ${
+                      isDark ? "text-neutral-500" : "text-neutral-500"
+                    }`}
+                  >
+                    / {nutritionData.calories.goal.toLocaleString()} kcal
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-neutral-400">
+                  <Info className="w-4 h-4" />
+                  {calorieRemaining.toLocaleString()} kcal remaining
+                </div>
+              </div>
+              <div className="relative w-28 h-28 flex-shrink-0">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    fill="none"
+                    stroke={
+                      isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"
+                    }
+                    strokeWidth="10"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    fill="none"
+                    stroke="url(#blueGrad)"
+                    strokeWidth="10"
+                    strokeDasharray={`${264 * (caloriePercent / 100)} 264`}
+                    strokeDashoffset="0"
+                    strokeLinecap="round"
+                    className="transition-all duration-800 ease-in-out"
+                    style={{
+                      transform: "rotate(-90deg)",
+                      transformOrigin: "50% 50%",
+                    }}
+                  />
+                  <defs>
+                    <linearGradient
+                      id="blueGrad"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="100%"
+                    >
+                      <stop offset="0%" style={{ stopColor: "#3B82F6" }} />
+                      <stop offset="100%" style={{ stopColor: "#2DD4BF" }} />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center font-bold text-lg font-mono">
+                  {Math.round(caloriePercent)}%
+                </div>
+              </div>
             </div>
 
-            {/* Macros */}
-            <div className="lg:col-span-2">
-              <GlassCard elevation={2} className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2
-                    className="text-lg font-semibold"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+            {/* Macro Progress Card */}
+            <div style={crystalCardStyle} className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3
+                  className={`text-xl font-semibold ${
+                    isDark ? "text-white" : "text-slate-900"
+                  }`}
+                >
+                  Daily Macros
+                </h3>
+                <button
+                  className={`text-xs font-bold uppercase tracking-widest hover:underline ${
+                    isDark ? "text-blue-400" : "text-blue-600"
+                  }`}
+                >
+                  Adjust Goals
+                </button>
+              </div>
+              <div className="space-y-5">
+                {/* Protein */}
+                <div>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span
+                      className={
+                        isDark ? "text-neutral-300" : "text-neutral-700"
+                      }
+                    >
+                      Protein{" "}
+                      <span
+                        className={
+                          isDark ? "text-neutral-500" : "text-neutral-500"
+                        }
+                      >
+                        ({Math.round(nutritionData.protein.consumed)}g /{" "}
+                        {nutritionData.protein.goal}g)
+                      </span>
+                    </span>
+                    <span
+                      className={`font-bold font-mono ${
+                        isDark ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {Math.round(proteinPercent)}%
+                    </span>
+                  </div>
+                  <div
+                    className={`h-1.5 rounded ${
+                      isDark ? "bg-white/5" : "bg-black/5"
+                    } overflow-hidden`}
                   >
-                    Macros
-                  </h2>
-                  <button
-                    className="text-sm font-medium flex items-center gap-1 hover:underline"
-                    style={{ color: getSemanticColor("trust").primary }}
-                  >
-                    Adjust Goals
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                    <div
+                      className="h-full bg-blue-500 rounded transition-all duration-1000 ease-out"
+                      style={{ width: `${proteinPercent}%` }}
+                    />
+                  </div>
                 </div>
-                <MacroBars
-                  protein={nutritionData.protein}
-                  carbs={nutritionData.carbs}
-                  fat={nutritionData.fat}
-                />
-              </GlassCard>
+                {/* Carbs */}
+                <div>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span
+                      className={
+                        isDark ? "text-neutral-300" : "text-neutral-700"
+                      }
+                    >
+                      Carbs{" "}
+                      <span
+                        className={
+                          isDark ? "text-neutral-500" : "text-neutral-500"
+                        }
+                      >
+                        ({Math.round(nutritionData.carbs.consumed)}g /{" "}
+                        {nutritionData.carbs.goal}g)
+                      </span>
+                    </span>
+                    <span
+                      className={`font-bold font-mono ${
+                        isDark ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {Math.round(carbsPercent)}%
+                    </span>
+                  </div>
+                  <div
+                    className={`h-1.5 rounded ${
+                      isDark ? "bg-white/5" : "bg-black/5"
+                    } overflow-hidden`}
+                  >
+                    <div
+                      className="h-full bg-red-500 rounded transition-all duration-1000 ease-out"
+                      style={{ width: `${carbsPercent}%` }}
+                    />
+                  </div>
+                </div>
+                {/* Fats */}
+                <div>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span
+                      className={
+                        isDark ? "text-neutral-300" : "text-neutral-700"
+                      }
+                    >
+                      Fats{" "}
+                      <span
+                        className={
+                          isDark ? "text-neutral-500" : "text-neutral-500"
+                        }
+                      >
+                        ({Math.round(nutritionData.fat.consumed)}g /{" "}
+                        {nutritionData.fat.goal}g)
+                      </span>
+                    </span>
+                    <span
+                      className={`font-bold font-mono ${
+                        isDark ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {Math.round(fatPercent)}%
+                    </span>
+                  </div>
+                  <div
+                    className={`h-1.5 rounded ${
+                      isDark ? "bg-white/5" : "bg-black/5"
+                    } overflow-hidden`}
+                  >
+                    <div
+                      className="h-full bg-yellow-500 rounded transition-all duration-1000 ease-out"
+                      style={{ width: `${fatPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ) : null}
 
-        {/* Meals Section - Main Element */}
-        <GlassCard elevation={2} className="p-6 mb-6">
-          <h2
-            className="text-2xl font-bold mb-4"
-            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-          >
-            Today&apos;s Meals
-          </h2>
+        {/* Meals Section */}
+        {hasActivePlan && (
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2
+                  className={`text-xl font-semibold ${
+                    isDark ? "text-white" : "text-slate-900"
+                  }`}
+                >
+                  Today&apos;s Meals
+                </h2>
+                <p
+                  className={`text-xs mt-1 uppercase tracking-tighter ${
+                    isDark ? "text-neutral-400" : "text-neutral-500"
+                  }`}
+                >
+                  Upload 1 photo per meal for accountability
+                </p>
+              </div>
+              <Camera
+                className={`w-6 h-6 ${
+                  isDark ? "text-neutral-600" : "text-neutral-400"
+                }`}
+              />
+            </div>
 
-          {/* Empty states */}
-          {!loadingMeals &&
-            (hasActivePlan === false || hasMealsInPlan === false) && (
-              <p
-                className="text-sm mb-2"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.6)",
-                }}
-              >
-                {hasActivePlan === false
-                  ? "No active meal plan assigned. Contact your coach to set one up."
-                  : "Your active meal plan has no meals configured yet."}
-              </p>
+            {/* Empty state */}
+            {!loadingMeals && hasMealsInPlan === false && (
+              <div style={crystalCardStyle} className="p-6">
+                <p
+                  className={`text-sm text-center ${
+                    isDark ? "text-neutral-400" : "text-neutral-600"
+                  }`}
+                >
+                  Your active meal plan has no meals configured yet.
+                </p>
+              </div>
             )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-            {meals.map((meal) => (
-              <div
-                key={meal.id}
-                className="p-4 rounded-lg border transition-all hover:shadow-md"
-                style={{
-                  background: isDark
-                    ? "rgba(255,255,255,0.05)"
-                    : "rgba(0,0,0,0.02)",
-                  borderColor: isDark
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.1)",
-                }}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-3xl">{meal.emoji}</span>
-                  <div className="flex-1">
-                    <h3
-                      className="font-semibold"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.9)"
-                          : "rgba(0,0,0,0.9)",
-                      }}
-                    >
-                      {meal.name}
-                    </h3>
-                    {meal.logged && meal.items.length > 0 && (
-                      <p
-                        className="text-sm"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.5)"
-                            : "rgba(0,0,0,0.5)",
-                        }}
-                      >
-                        {meal.items.reduce(
-                          (sum, item) => sum + item.calories,
-                          0
-                        )}{" "}
-                        cal
-                      </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {meals.map((meal) => {
+                const mealCalories = getMealCalories(meal);
+                const mealDescription = getMealDescription(meal);
+                const mealTime = formatTime(meal.logged_at);
+
+                return (
+                  <div
+                    key={meal.id}
+                    style={crystalCardStyle}
+                    className={`flex flex-col h-full ${
+                      meal.logged && meal.photoUrl ? "" : "justify-between"
+                    }`}
+                  >
+                    {meal.logged && meal.photoUrl ? (
+                      <>
+                        {/* Logged Meal with Photo */}
+                        <div className="p-5 border-b border-white/5">
+                          <div className="flex justify-between items-start mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl">{meal.emoji}</span>
+                              <h3
+                                className={`text-lg font-bold ${
+                                  isDark ? "text-white" : "text-slate-900"
+                                }`}
+                              >
+                                {meal.name}
+                              </h3>
+                            </div>
+                            <span
+                              className={`text-sm font-bold font-mono ${
+                                isDark ? "text-neutral-400" : "text-neutral-500"
+                              }`}
+                            >
+                              {Math.round(mealCalories)} kcal
+                            </span>
+                          </div>
+                          {mealDescription && (
+                            <p
+                              className={`text-xs mt-1 ${
+                                isDark ? "text-neutral-500" : "text-neutral-500"
+                              }`}
+                            >
+                              {mealDescription}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Photo Display */}
+                        <div className="relative h-40 group">
+                          <img
+                            src={meal.photoUrl}
+                            alt={`${meal.name} photo`}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                          <div className="absolute bottom-4 left-4 flex items-center gap-2">
+                            <div
+                              className={`bg-green-500/20 backdrop-blur-md border border-green-500/30 text-green-400 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1`}
+                            >
+                              <CheckCircle className="w-3 h-3" />
+                              {meal.type === "breakfast"
+                                ? "Breakfast"
+                                : meal.type === "lunch"
+                                ? "Lunch"
+                                : meal.type === "dinner"
+                                ? "Dinner"
+                                : "Snack"}{" "}
+                              Logged
+                            </div>
+                            {mealTime && (
+                              <span
+                                className={`text-[10px] font-mono ${
+                                  isDark
+                                    ? "text-neutral-300"
+                                    : "text-neutral-200"
+                                }`}
+                              >
+                                {mealTime}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Unlogged Meal */}
+                        <div className="p-5">
+                          <div className="flex justify-between items-start mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl">{meal.emoji}</span>
+                              <h3
+                                className={`text-lg font-bold ${
+                                  isDark ? "text-neutral-100" : "text-slate-900"
+                                }`}
+                              >
+                                {meal.name}
+                              </h3>
+                            </div>
+                            <span
+                              className={`text-sm font-bold font-mono ${
+                                isDark ? "text-neutral-400" : "text-neutral-500"
+                              }`}
+                            >
+                              Not Logged
+                            </span>
+                          </div>
+                          {mealDescription && (
+                            <p
+                              className={`text-xs mt-1 ${
+                                isDark ? "text-neutral-500" : "text-neutral-500"
+                              }`}
+                            >
+                              {mealDescription}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="mt-8 mb-4 flex flex-col items-center justify-center py-8 bg-white/5 rounded-2xl border border-dashed border-white/10 mx-5">
+                          <Image
+                            className={`w-8 h-8 mb-2 ${
+                              isDark ? "text-neutral-700" : "text-neutral-400"
+                            }`}
+                          />
+                          <p
+                            className={`text-xs italic ${
+                              isDark ? "text-neutral-500" : "text-neutral-500"
+                            }`}
+                          >
+                            No photo uploaded yet
+                          </p>
+                        </div>
+
+                        <div className="px-5 pb-5">
+                          <Button
+                            onClick={() =>
+                              handleMealPhotoUpload(meal.id, meal.type)
+                            }
+                            disabled={uploadingMeal === meal.id}
+                            className="w-full h-12 rounded-xl flex items-center justify-center gap-2 font-semibold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30 hover:shadow-green-500/40 transition-all"
+                            style={{
+                              boxShadow: isDark
+                                ? "0 4px 16px rgba(16, 185, 129, 0.2)"
+                                : "0 4px 12px rgba(16, 185, 129, 0.2)",
+                            }}
+                          >
+                            {uploadingMeal === meal.id ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Camera className="w-5 h-5" />
+                                Upload{" "}
+                                {meal.type === "breakfast"
+                                  ? "Breakfast"
+                                  : meal.type === "lunch"
+                                  ? "Lunch"
+                                  : meal.type === "dinner"
+                                  ? "Dinner"
+                                  : "Snack"}{" "}
+                                Photo
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </>
                     )}
                   </div>
-                </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
-                {meal.photoUrl && (
-                  <div className="mb-3 rounded-lg overflow-hidden">
-                    <img
-                      src={meal.photoUrl}
-                      alt={`${meal.name} photo`}
-                      className="w-full h-32 object-cover"
-                    />
-                  </div>
-                )}
-
-                {meal.logged && meal.items.length > 0 ? (
-                  <div className="space-y-2 mb-3">
-                    {meal.items.map((item, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start justify-between text-sm py-2 border-b"
-                        style={{
-                          borderColor: isDark
-                            ? "rgba(255,255,255,0.1)"
-                            : "rgba(0,0,0,0.1)",
-                        }}
-                      >
-                        <div className="flex-1">
-                          <span
-                            className="font-medium block"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.9)"
-                                : "rgba(0,0,0,0.9)",
-                            }}
-                          >
-                            {item.food?.name || "Unknown Food"}
-                          </span>
-                          <span
-                            className="text-xs mt-1 block"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.6)"
-                                : "rgba(0,0,0,0.6)",
-                            }}
-                          >
-                            {item.quantity}{" "}
-                            {item.food?.serving_unit || "serving"}
-                            {item.quantity !== 1 ? "s" : ""}
-                            {item.food?.serving_size &&
-                              ` (${item.food.serving_size}g per serving)`}
-                          </span>
-                        </div>
-                        <div className="text-right ml-4">
-                          <span
-                            className="font-semibold block"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.9)"
-                                : "rgba(0,0,0,0.9)",
-                            }}
-                          >
-                            {item.calories} cal
-                          </span>
-                          <span
-                            className="text-xs mt-1 block"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.6)"
-                                : "rgba(0,0,0,0.6)",
-                            }}
-                          >
-                            P:{item.protein}g C:{item.carbs}g F:{item.fat}g
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                    <div
-                      className="mt-3 pt-3 text-sm font-semibold flex justify-between items-center"
-                      style={{
-                        borderTop: `2px solid ${
-                          isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"
-                        }`,
-                        color: isDark
-                          ? "rgba(255,255,255,0.9)"
-                          : "rgba(0,0,0,0.9)",
-                      }}
-                    >
-                      <span>Total:</span>
-                      <span>
-                        {meal.items.reduce(
-                          (sum, item) => sum + item.calories,
-                          0
-                        )}{" "}
-                        cal | P:{" "}
-                        {meal.items.reduce(
-                          (sum, item) => sum + item.protein,
-                          0
-                        )}
-                        g | C:{" "}
-                        {meal.items.reduce((sum, item) => sum + item.carbs, 0)}g
-                        | F:{" "}
-                        {meal.items.reduce((sum, item) => sum + item.fat, 0)}g
-                      </span>
-                    </div>
-                  </div>
-                ) : meal.logged && meal.photoUrl ? (
-                  <div className="mb-3">
-                    <p
-                      className="text-sm text-center mb-2"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.7)"
-                          : "rgba(0,0,0,0.7)",
-                      }}
-                    >
-                      Meal photo uploaded - awaiting analysis
-                    </p>
-                  </div>
-                ) : (
-                  <p
-                    className="text-sm mb-3 text-center"
+        {/* Water Tracker */}
+        <section className="mb-12">
+          <div
+            style={crystalCardStyle}
+            className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6"
+          >
+            <div>
+              <h3
+                className={`text-xl font-semibold mb-1 ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
+                Hydration
+              </h3>
+              <p
+                className={`text-sm ${
+                  isDark ? "text-neutral-400" : "text-neutral-500"
+                }`}
+              >
+                Daily Goal: {nutritionData.water.goalMl.toLocaleString()}ml (
+                {nutritionData.water.goal} glasses)
+              </p>
+            </div>
+            <div className="flex gap-2.5 overflow-x-auto pb-2">
+              {/* Interactive glasses - show 10 total (8 goal + 2 extra for tracking beyond) */}
+              {Array.from({ length: 10 }).map((_, index) => {
+                const isActive = index < nutritionData.water.glasses;
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleWaterGlassClick(index + 1)}
+                    className={`p-2 rounded-lg transition-all ${
+                      isActive
+                        ? "bg-blue-500/10 text-blue-400 active:scale-90"
+                        : "bg-white/5 text-neutral-600 hover:bg-white/10"
+                    }`}
                     style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.5)"
-                        : "rgba(0,0,0,0.5)",
+                      transform: isActive
+                        ? "translateY(-4px) scale(1.1)"
+                        : "none",
                     }}
                   >
-                    No food logged yet
-                  </p>
-                )}
-
-                <Button
-                  variant="default"
-                  size="lg"
-                  className="w-full flex items-center justify-center gap-2"
-                  onClick={() => handleMealPhotoUpload(meal.id, meal.type)}
-                  disabled={uploadingMeal === meal.id}
-                  style={{
-                    background: meal.logged
-                      ? isDark
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)"
-                      : getSemanticColor("success").gradient,
-                    color: meal.logged
-                      ? isDark
-                        ? "rgba(255,255,255,0.7)"
-                        : "rgba(0,0,0,0.7)"
-                      : "#fff",
-                  }}
-                >
-                  {uploadingMeal === meal.id ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      <span>Uploading...</span>
-                    </>
-                  ) : meal.logged ? (
-                    <>
-                      <Camera className="w-5 h-5" />
-                      <span>Update Photo</span>
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-5 h-5" />
-                      <span>Log {meal.name} with Photo</span>
-                    </>
-                  )}
-                </Button>
+                    <Droplet className="w-6 h-6" />
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-right">
+              <div
+                className={`text-xl font-bold font-mono ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
+                {nutritionData.water.ml.toLocaleString()}ml
               </div>
-            ))}
+              <div
+                className={`text-[10px] uppercase font-bold tracking-widest ${
+                  isDark ? "text-neutral-500" : "text-neutral-500"
+                }`}
+              >
+                Logged
+              </div>
+            </div>
           </div>
-        </GlassCard>
-
-        {/* Water Tracker - Moved After Meals */}
-        <GlassCard elevation={2} className="p-6">
-          <WaterTracker
-            glasses={nutritionData.water.glasses}
-            goal={nutritionData.water.goal}
-            onGlassAdded={handleGlassAdded}
-            onGlassRemoved={handleGlassRemoved}
-          />
-        </GlassCard>
+        </section>
       </div>
     </AnimatedBackground>
   );

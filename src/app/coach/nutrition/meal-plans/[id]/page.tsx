@@ -12,6 +12,7 @@ import { MealPlanService, MealPlan, Meal } from "@/lib/mealPlanService";
 import MealCreator from "@/components/coach/MealCreator";
 import { ArrowLeft, Plus, ChefHat, Edit } from "lucide-react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 export default function MealPlanDetailPage() {
   const params = useParams();
@@ -52,9 +53,135 @@ export default function MealPlanDetailPage() {
   const loadMeals = async () => {
     try {
       console.log("Loading meals for mealPlanId:", mealPlanId);
-      const loadedMeals = await MealPlanService.getMeals(mealPlanId);
-      console.log("Loaded meals:", loadedMeals);
-      setMeals(loadedMeals);
+      
+      // Load meals from the meals table (new format - proper meal entities)
+      const { data: mealsData, error: mealsError } = await supabase
+        .from('meals')
+        .select(`
+          *,
+          meal_food_items (
+            *,
+            foods (*)
+          )
+        `)
+        .eq('meal_plan_id', mealPlanId)
+        .order('created_at', { ascending: true });
+
+      if (mealsError) {
+        console.error("Error loading meals from meals table:", mealsError);
+      }
+
+      // Also load from meal_plan_items table (old format for backward compatibility)
+      const { data: mealPlanItems, error: itemsError } = await supabase
+        .from('meal_plan_items')
+        .select(`
+          *,
+          foods (*)
+        `)
+        .eq('meal_plan_id', mealPlanId)
+        .order('created_at', { ascending: true });
+
+      if (itemsError) {
+        console.error("Error loading meals from meal_plan_items table:", itemsError);
+      }
+
+      const allMeals: Meal[] = [];
+
+      // Transform meals from meals table (new format)
+      if (mealsData && mealsData.length > 0) {
+        const newFormatMeals: Meal[] = mealsData.map((meal: any) => {
+          const foodItems = (meal.meal_food_items || []).map((item: any) => ({
+            id: item.id,
+            meal_plan_id: mealPlanId,
+            food_id: item.food_id,
+            meal_type: meal.meal_type,
+            quantity: item.quantity,
+            food: item.foods,
+            created_at: item.created_at
+          }));
+
+          // Calculate totals
+          const totals = foodItems.reduce((acc: any, item: any) => {
+            if (!item.food) return acc;
+            const multiplier = item.quantity / (item.food.serving_size || 1);
+            return {
+              total_calories: acc.total_calories + (item.food.calories_per_serving * multiplier),
+              total_protein: acc.total_protein + (item.food.protein * multiplier),
+              total_carbs: acc.total_carbs + (item.food.carbs * multiplier),
+              total_fat: acc.total_fat + (item.food.fat * multiplier),
+              total_fiber: acc.total_fiber + (item.food.fiber * multiplier)
+            };
+          }, {
+            total_calories: 0,
+            total_protein: 0,
+            total_carbs: 0,
+            total_fat: 0,
+            total_fiber: 0
+          });
+
+          return {
+            meal_type: meal.meal_type,
+            day_of_week: undefined,
+            items: foodItems,
+            ...totals,
+            id: meal.id, // Store meal ID for potential future use
+            name: meal.name // Store meal name
+          };
+        });
+        allMeals.push(...newFormatMeals);
+      }
+
+      // Transform meal_plan_items (old format) - group by meal_type
+      if (mealPlanItems && mealPlanItems.length > 0) {
+        // Group items by meal_type
+        const groupedItems = new Map<string, any[]>();
+        mealPlanItems.forEach((item: any) => {
+          const key = item.meal_type;
+          if (!groupedItems.has(key)) {
+            groupedItems.set(key, []);
+          }
+          groupedItems.get(key)!.push({
+            id: item.id,
+            meal_plan_id: mealPlanId,
+            food_id: item.food_id,
+            meal_type: item.meal_type,
+            quantity: item.quantity,
+            food: item.foods,
+            created_at: item.created_at
+          });
+        });
+
+        // Convert grouped items to Meal objects
+        groupedItems.forEach((items, meal_type) => {
+          const totals = items.reduce((acc: any, item: any) => {
+            if (!item.food) return acc;
+            const multiplier = item.quantity / (item.food.serving_size || 1);
+            return {
+              total_calories: acc.total_calories + (item.food.calories_per_serving * multiplier),
+              total_protein: acc.total_protein + (item.food.protein * multiplier),
+              total_carbs: acc.total_carbs + (item.food.carbs * multiplier),
+              total_fat: acc.total_fat + (item.food.fat * multiplier),
+              total_fiber: acc.total_fiber + (item.food.fiber * multiplier)
+            };
+          }, {
+            total_calories: 0,
+            total_protein: 0,
+            total_carbs: 0,
+            total_fat: 0,
+            total_fiber: 0
+          });
+
+          allMeals.push({
+            meal_type: meal_type as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+            day_of_week: undefined,
+            items: items,
+            ...totals
+          });
+        });
+      }
+
+      console.log("Loaded meals:", allMeals);
+      setMeals(allMeals);
     } catch (error) {
       console.error("Error loading meals:", error);
     }
@@ -188,12 +315,17 @@ export default function MealPlanDetailPage() {
 
                     return (
                       <Card
-                        key={index}
+                        key={(meal as any).id || index}
                         className={`${mealGradientClass} ${theme.shadow} rounded-xl border border-slate-200/50 dark:border-slate-700/50 shadow-md hover:shadow-lg transition-shadow duration-200`}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
+                              {(meal as any).name && (
+                                <h3 className={`font-semibold ${theme.text} text-lg mb-2`}>
+                                  {(meal as any).name}
+                                </h3>
+                              )}
                               <div className="flex items-center gap-3 mb-3">
                                 <Badge className="bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700/50">
                                   {meal.meal_type}

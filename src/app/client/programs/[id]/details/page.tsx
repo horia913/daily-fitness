@@ -17,6 +17,10 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
+import WorkoutTemplateService, {
+  ProgramSchedule,
+  WorkoutTemplate,
+} from "@/lib/workoutTemplateService";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface Program {
@@ -56,51 +60,80 @@ function ProgramDetailsContent() {
       setLoading(true);
       setError(null);
 
-      // Get program details
+      // Get program details using direct query (getProgram method doesn't exist, only getPrograms)
       const { data: programData, error: programError } = await supabase
         .from("workout_programs")
         .select("id, name, description, duration_weeks")
         .eq("id", programId)
         .single();
 
-      if (programError) {
+      if (programError || !programData) {
         console.error("Error fetching program:", programError);
         setError("Failed to load program details");
         return;
       }
 
-      setProgram(programData);
+      setProgram({
+        id: programData.id,
+        name: programData.name,
+        description: programData.description || "",
+        duration_weeks: programData.duration_weeks,
+      });
 
-      // Get program weeks and workouts
-      const { data: programWeeks, error: weeksError } = await supabase
-        .from("program_weeks")
-        .select(
-          `
-          week_number,
-          workout_templates!inner (
-            id,
-            name,
-            description,
-            estimated_duration
-          )
-        `
-        )
-        .eq("program_id", programId)
-        .order("week_number", { ascending: true });
+      // Get program schedule using service method (replaces program_weeks query)
+      const schedule = await WorkoutTemplateService.getProgramSchedule(
+        programId
+      );
 
-      if (weeksError) {
-        console.error("Error fetching program weeks:", weeksError);
+      if (!schedule || schedule.length === 0) {
         setWeeks([]);
-      } else {
-        // Transform the data to match our interface
-        const weeksData: ProgramWeek[] =
-          programWeeks?.map((week: any) => ({
-            week_number: week.week_number,
-            workouts: week.workout_templates ? [week.workout_templates] : [],
-          })) || [];
-
-        setWeeks(weeksData);
+        return;
       }
+
+      // Group schedule by week_number and collect template details
+      const weeksMap = new Map<number, ProgramWeek>();
+
+      for (const scheduleItem of schedule) {
+        const weekNum = scheduleItem.week_number || 1;
+
+        if (!weeksMap.has(weekNum)) {
+          weeksMap.set(weekNum, {
+            week_number: weekNum,
+            workouts: [],
+          });
+        }
+
+        // Get template details if template_id exists
+        if (scheduleItem.template_id) {
+          const { data: templateData } = await supabase
+            .from("workout_templates")
+            .select("id, name, description, estimated_duration")
+            .eq("id", scheduleItem.template_id)
+            .single();
+
+          if (templateData) {
+            const week = weeksMap.get(weekNum)!;
+            // Avoid duplicates
+            if (
+              !week.workouts.find((w) => w.id === templateData.id)
+            ) {
+              week.workouts.push({
+                id: templateData.id,
+                name: templateData.name,
+                description: templateData.description || "",
+                estimated_duration: templateData.estimated_duration || 0,
+              });
+            }
+          }
+        }
+      }
+
+      // Convert map to array and sort by week number
+      const weeksData = Array.from(weeksMap.values()).sort(
+        (a, b) => a.week_number - b.week_number
+      );
+
+      setWeeks(weeksData);
     } catch (error) {
       console.error("Error loading program details:", error);
       setError("Failed to load program details");

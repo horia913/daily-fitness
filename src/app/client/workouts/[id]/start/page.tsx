@@ -685,7 +685,6 @@ export default function LiveWorkout() {
         reps_per_set: block.reps_per_set ?? null,
         rest_seconds: block.rest_seconds ?? null,
         duration_seconds: block.duration_seconds ?? null,
-        block_parameters: block.block_parameters ?? null,
         exercises: (block.exercises ?? []).map((ex) => ({
           id: ex.id,
           exercise_id: ex.exercise_id,

@@ -95,15 +95,22 @@ export function DashboardLayout({
               </Card>
             </Link>
 
-            <Link href="/client/messages">
-              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-md transition-shadow cursor-pointer">
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.open('https://wa.me/', '_blank', 'noopener,noreferrer');
+                }
+              }}
+              className="text-left"
+            >
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="p-4 text-center">
-                  <MessageCircle className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-                  <h3 className="font-semibold text-orange-800">Messages</h3>
-                  <p className="text-sm text-orange-600">Chat with coach</p>
+                  <MessageCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                  <h3 className="font-semibold text-green-800">WhatsApp</h3>
+                  <p className="text-sm text-green-600">Chat with coach</p>
                 </CardContent>
               </Card>
-            </Link>
+            </button>
           </div>
 
           {/* Static Content Cards */}

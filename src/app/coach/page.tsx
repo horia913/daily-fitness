@@ -43,9 +43,10 @@ interface DashboardStats {
 
 interface Session {
   id: string;
-  client_name: string;
+  clientName: string;
   time: string;
   type: string;
+  status?: string;
 }
 
 interface ComplianceClient {
@@ -75,50 +76,32 @@ function CoachDashboardContent() {
     if (!user) return;
 
     try {
-      // Load clients
-      const { data: clientsData } = await supabase
-        .from("clients")
-        .select("client_id, status")
-        .eq("coach_id", user.id);
+      // Load dashboard data using service functions
+      const { getCoachStats, getTodaysSessions, getRecentClients } = await import(
+        "@/lib/coachDashboardService"
+      );
 
-      const totalClients = clientsData?.length || 0;
-      const activeClients =
-        clientsData?.filter((c) => c.status === "active").length || 0;
+      const [coachStats, sessions, recentClientsData] = await Promise.all([
+        getCoachStats(user.id),
+        getTodaysSessions(user.id),
+        getRecentClients(user.id, 5),
+      ]);
 
-      // Load recent client profiles
-      if (clientsData && clientsData.length > 0) {
-        const recentClientIds = clientsData.slice(0, 5).map((c) => c.client_id);
-        const { data: profilesData } = await supabase
-          .from("profiles")
-          .select("id, first_name, last_name, avatar_url")
-          .in("id", recentClientIds);
+      setStats(coachStats);
+      setRecentClients(recentClientsData);
 
-        setRecentClients(profilesData || []);
-      }
+      // Map sessions to match existing interface
+      const mappedSessions: Session[] = sessions.map((s) => ({
+        id: s.id,
+        clientName: s.client_name, // Map from service's client_name to interface's clientName
+        time: s.start_time,
+        type: "session",
+        status: s.status || "",
+      }));
 
-      // Load workout templates count
-      const { data: workoutsData } = await supabase
-        .from("workout_templates")
-        .select("id")
-        .eq("coach_id", user.id)
-        .eq("is_active", true);
+      setTodaySessions(mappedSessions);
 
-      // Load meal plans count
-      const { data: mealPlansData } = await supabase
-        .from("meal_plans")
-        .select("id")
-        .eq("coach_id", user.id)
-        .eq("is_active", true);
-
-      setStats({
-        totalClients,
-        activeClients,
-        totalWorkouts: workoutsData?.length || 0,
-        totalMealPlans: mealPlansData?.length || 0,
-      });
-
-      // Mock data for sessions and compliance (replace with real data)
-      setTodaySessions([]);
+      // Mock data for compliance (can be enhanced later)
       setTopCompliant([]);
       setAtRisk([]);
     } catch (error) {
@@ -590,7 +573,7 @@ function CoachDashboardContent() {
                         className="font-semibold"
                         style={{ color: isDark ? "#fff" : "#1A1A1A" }}
                       >
-                        {session.client_name}
+                        {session.clientName}
                       </p>
                       <p
                         className="text-sm"

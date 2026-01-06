@@ -2,14 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Clock, Play } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import {
+  ChevronLeft,
+  MoreHorizontal,
+  Clock,
+  Layers,
+  Dumbbell,
+  Play,
+  ChevronDown,
+  History,
+  TrendingUp,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { BlockCardDisplay } from "@/components/WorkoutBlocks/BlockCardDisplay";
-import type { WorkoutBlockDisplay } from "@/components/WorkoutBlocks/types";
+import { useTheme } from "@/contexts/ThemeContext";
+import { fetchPersonalRecords } from "@/lib/personalRecords";
 
 interface AssignmentInfo {
   id: string;
@@ -18,6 +25,27 @@ interface AssignmentInfo {
   scheduledDate: string | null;
   status: string | null;
   workoutTemplateId: string | null;
+  category?: string | null;
+  estimatedDuration?: number | null;
+  currentWeek?: number | null;
+}
+
+interface PersonalRecord {
+  id: string;
+  exerciseName: string;
+  record: string;
+  date: string;
+  weight: number;
+  reps: number;
+  isRecent: boolean;
+}
+
+interface ExerciseWithPR extends ClientExerciseDisplay {
+  previousBest?: {
+    weight: number;
+    reps: number;
+    record: string;
+  } | null;
 }
 
 interface ClientExerciseDisplay {
@@ -33,6 +61,8 @@ interface ClientExerciseDisplay {
   blockType: string | null;
   exerciseLetter: string | null;
   notes: string | null;
+  tempo: string | null;
+  rir: number | null;
   raw?: ClientBlockExerciseRecord | null;
   meta?: Record<string, any> | null;
 }
@@ -74,7 +104,6 @@ type ClientBlockRecord = {
   reps_per_set: string | null;
   rest_seconds: number | null;
   duration_seconds: number | null;
-  block_parameters?: unknown;
   exercises?: ClientBlockExerciseRecord[] | null;
   [key: string]: any;
 };
@@ -82,12 +111,20 @@ type ClientBlockRecord = {
 const safeParse = (value: unknown) => {
   if (!value) return {};
   if (typeof value === "string") {
+    // Skip parsing if it's clearly not JSON (like "test", "teest", etc.)
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return {};
+    // Only try to parse if it looks like JSON (starts with { or [)
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     try {
       return JSON.parse(value);
     } catch (error) {
       console.warn("Failed to parse JSON value", value, error);
       return {};
     }
+    }
+    // If it's not JSON-like, return empty object
+    return {};
   }
   if (typeof value === "object") {
     return (value as Record<string, any>) || {};
@@ -98,10 +135,15 @@ const safeParse = (value: unknown) => {
 export default function WorkoutDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { isDark } = useTheme();
   const [assignment, setAssignment] = useState<AssignmentInfo | null>(null);
   const [blocks, setBlocks] = useState<StructuredBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
+  const [expandedExercises, setExpandedExercises] = useState<Set<string>>(
+    new Set()
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -179,6 +221,49 @@ export default function WorkoutDetailsPage() {
           assignmentRow = fallbackAssignment;
         }
 
+        // Fetch workout template to get category and estimated_duration
+        let category: string | null = null;
+        let estimatedDuration: number | null = null;
+        if (assignmentRow.workout_template_id) {
+          const { data: template } = await supabase
+            .from("workout_templates")
+            .select("category, estimated_duration")
+            .eq("id", assignmentRow.workout_template_id)
+            .maybeSingle();
+
+          category = template?.category || null;
+          estimatedDuration = template?.estimated_duration || null;
+        }
+
+        // Fetch program assignment progress to get current_week if part of a program
+        let currentWeek: number | null = null;
+        try {
+          const { data: programProgress, error: programError } = await supabase
+            .from("program_assignment_progress")
+            .select("current_week")
+            .eq("client_id", user.id)
+            .eq("is_program_completed", false)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (programError) {
+            // Silently fail - this is optional data
+            console.warn(
+              "Error fetching program assignment progress:",
+              programError
+            );
+          } else {
+            currentWeek = programProgress?.current_week || null;
+          }
+        } catch (programErr) {
+          // Silently fail - this is optional data
+          console.warn(
+            "Error fetching program assignment progress:",
+            programErr
+          );
+        }
+
         setAssignment({
           id: assignmentRow.id,
           name:
@@ -189,6 +274,9 @@ export default function WorkoutDetailsPage() {
           scheduledDate: assignmentRow.scheduled_date,
           status: assignmentRow.status,
           workoutTemplateId: assignmentRow.workout_template_id,
+          category,
+          estimatedDuration,
+          currentWeek,
         });
 
         // Fetch original blocks using workout_template_id from assignment
@@ -197,7 +285,9 @@ export default function WorkoutDetailsPage() {
         }
 
         // Use WorkoutBlockService to fetch blocks (handles RLS properly)
-        const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
+        const { WorkoutBlockService } = await import(
+          "@/lib/workoutBlockService"
+        );
         const workoutBlocks = await WorkoutBlockService.getWorkoutBlocks(
           assignmentRow.workout_template_id
         );
@@ -207,8 +297,44 @@ export default function WorkoutDetailsPage() {
           return;
         }
 
-        // Convert WorkoutBlock[] to ClientBlockRecord[] format
-        const clientBlocks: ClientBlockRecord[] = workoutBlocks.map((block) => ({
+        // Debug: Log what WorkoutBlockService returns
+        if (process.env.NODE_ENV !== "production") {
+          console.log("WorkoutBlockService.getWorkoutBlocks() returned:", {
+            blocksCount: workoutBlocks.length,
+            firstBlock: workoutBlocks[0] ? {
+              id: workoutBlocks[0].id,
+              block_type: workoutBlocks[0].block_type,
+              exercisesCount: workoutBlocks[0].exercises?.length || 0,
+              firstExercise: workoutBlocks[0].exercises?.[0] ? {
+                id: workoutBlocks[0].exercises[0].id,
+                exercise_id: workoutBlocks[0].exercises[0].exercise_id,
+                exercise_order: workoutBlocks[0].exercises[0].exercise_order,
+                hasDropSets: !!workoutBlocks[0].exercises[0].drop_sets,
+                dropSetsLength: workoutBlocks[0].exercises[0].drop_sets?.length || 0,
+                hasClusterSets: !!workoutBlocks[0].exercises[0].cluster_sets,
+                clusterSetsLength: workoutBlocks[0].exercises[0].cluster_sets?.length || 0,
+                hasRestPauseSets: !!workoutBlocks[0].exercises[0].rest_pause_sets,
+                restPauseSetsLength: workoutBlocks[0].exercises[0].rest_pause_sets?.length || 0,
+                allKeys: Object.keys(workoutBlocks[0].exercises[0])
+              } : null,
+              timeProtocolsCount: workoutBlocks[0].time_protocols?.length || 0,
+              timeProtocols: workoutBlocks[0].time_protocols
+            } : null
+          });
+        }
+
+        // Convert WorkoutBlock[] to ClientBlockRecord[] format, preserving special table data
+        const clientBlocks: (ClientBlockRecord & { 
+          time_protocols?: any[];
+          exercises?: Array<any & {
+            drop_sets?: any[];
+            cluster_sets?: any[];
+            rest_pause_sets?: any[];
+            pyramid_sets?: any[];
+            ladder_sets?: any[];
+          }>;
+        })[] = workoutBlocks.map(
+          (block) => ({
           id: block.id,
           block_order: block.block_order,
           block_type: block.block_type,
@@ -218,7 +344,8 @@ export default function WorkoutDetailsPage() {
           reps_per_set: block.reps_per_set ?? null,
           rest_seconds: block.rest_seconds ?? null,
           duration_seconds: block.duration_seconds ?? null,
-          block_parameters: block.block_parameters ?? null,
+          // Preserve special table data
+          time_protocols: block.time_protocols ?? [],
           exercises: (block.exercises ?? []).map((ex) => ({
             id: ex.id,
             exercise_id: ex.exercise_id,
@@ -227,12 +354,20 @@ export default function WorkoutDetailsPage() {
             sets: ex.sets ?? null,
             reps: ex.reps ?? null,
             weight_kg: ex.weight_kg ?? null,
+            load_percentage: ex.load_percentage ?? null,
             rir: ex.rir ?? null,
             tempo: ex.tempo ?? null,
             rest_seconds: ex.rest_seconds ?? null,
             notes: ex.notes ?? null,
+            // Preserve special table data for each exercise
+            drop_sets: ex.drop_sets ?? [],
+            cluster_sets: ex.cluster_sets ?? [],
+            rest_pause_sets: ex.rest_pause_sets ?? [],
+            pyramid_sets: ex.pyramid_sets ?? [],
+            ladder_sets: ex.ladder_sets ?? [],
           })) as any[],
-        }));
+          })
+        );
         if (clientBlocks.length === 0) {
           setBlocks([]);
           return;
@@ -279,6 +414,29 @@ export default function WorkoutDetailsPage() {
           .map((block) => {
             const blockParameters = safeParse(block.block_parameters);
 
+            // Debug: Log block data structure
+            if (process.env.NODE_ENV !== "production") {
+              console.log(`Block ${block.id} (${block.block_type}):`, {
+                blockId: block.id,
+                blockType: block.block_type,
+                exercisesCount: block.exercises?.length || 0,
+                firstExercise: block.exercises?.[0] ? {
+                  id: block.exercises[0].id,
+                  exercise_id: block.exercises[0].exercise_id,
+                  exercise_order: block.exercises[0].exercise_order,
+                  hasDropSets: !!block.exercises[0].drop_sets,
+                  dropSetsLength: block.exercises[0].drop_sets?.length || 0,
+                  hasClusterSets: !!block.exercises[0].cluster_sets,
+                  clusterSetsLength: block.exercises[0].cluster_sets?.length || 0,
+                  hasRestPauseSets: !!block.exercises[0].rest_pause_sets,
+                  restPauseSetsLength: block.exercises[0].rest_pause_sets?.length || 0,
+                  fullExercise: block.exercises[0]
+                } : null,
+                timeProtocolsCount: (block as any).time_protocols?.length || 0,
+                timeProtocols: (block as any).time_protocols
+              });
+            }
+
             const exercises = ((block.exercises ?? []) as any[])
               .map((exercise, index): ClientExerciseDisplay => {
                 const meta = exercise.exercise_id
@@ -293,12 +451,30 @@ export default function WorkoutDetailsPage() {
                     : index + 1) - 1
                 );
 
+                // Helper to filter out "test" values
+                const filterTestValue = (
+                  value: string | null | undefined
+                ): string | null => {
+                  if (!value) return null;
+                  const trimmed = value.trim();
+                  if (
+                    trimmed.toLowerCase() === "test" ||
+                    trimmed.toLowerCase() === "teest"
+                  ) {
+                    return null;
+                  }
+                  return trimmed;
+                };
+
+                // Get exercise name with filtering
+                const exerciseName =
+                  filterTestValue(meta?.name) ||
+                  filterTestValue(exercise.exercise_letter) ||
+                  `Exercise ${orderIndex + 1}`;
+
                 return {
                   id: exercise.id,
-                  name:
-                    meta?.name ||
-                    exercise.exercise_letter ||
-                    `Exercise ${orderIndex + 1}`,
+                  name: exerciseName,
                   description: meta?.description || "",
                   sets: exercise.sets ?? block.total_sets ?? null,
                   reps: exercise.reps ?? block.reps_per_set ?? null,
@@ -313,12 +489,23 @@ export default function WorkoutDetailsPage() {
                   blockName: block.block_name,
                   blockType: block.block_type,
                   exerciseLetter: exercise.exercise_letter,
-                  notes: exercise.notes,
+                  notes: filterTestValue(exercise.notes), // Filter out "test"
+                  tempo: exercise.tempo ?? null,
+                  rir: exercise.rir ?? null,
                   raw: exercise,
                   meta: parsedNotes,
                 };
               })
               .sort((a, b) => a.orderIndex - b.orderIndex);
+
+            // Filter exercises for pre_exhaustion (only 2: isolation + compound)
+            let finalExercises = exercises;
+            if (block.block_type === "pre_exhaustion") {
+              // Pre exhaustion should only have 2 exercises: isolation (order 1) and compound (order 2)
+              finalExercises = exercises
+                .filter((ex) => ex.orderIndex < 2) // Only first 2 exercises
+                .slice(0, 2); // Ensure max 2
+            }
 
             return {
               id: block.id,
@@ -329,9 +516,28 @@ export default function WorkoutDetailsPage() {
                 Number.isFinite(block.block_order)
                   ? block.block_order
                   : Number.MAX_SAFE_INTEGER,
-              notes: block.block_notes,
-              exercises,
-              rawBlock: block,
+              notes: (() => {
+                const filterTestValue = (
+                  value: string | null | undefined
+                ): string | null => {
+                  if (!value) return null;
+                  const trimmed = value.trim();
+                  if (
+                    trimmed.toLowerCase() === "test" ||
+                    trimmed.toLowerCase() === "teest"
+                  ) {
+                    return null;
+                  }
+                  return trimmed;
+                };
+                return filterTestValue(block.block_notes);
+              })(),
+              exercises: finalExercises,
+              rawBlock: {
+                ...block,
+                // Ensure time_protocols are preserved
+                time_protocols: (block as any).time_protocols || [],
+              },
               parameters: blockParameters,
             };
           })
@@ -345,6 +551,15 @@ export default function WorkoutDetailsPage() {
         }
 
         setBlocks(structuredBlocks);
+
+        // Fetch personal records for previous best performance
+        try {
+          const records = await fetchPersonalRecords(user.id);
+          setPersonalRecords(records);
+        } catch (prError) {
+          console.log("Error loading personal records:", prError);
+          setPersonalRecords([]);
+        }
       } catch (loadError: any) {
         console.error("Error loading workout details:", loadError);
         setError(loadError?.message || "Failed to load workout details");
@@ -360,17 +575,64 @@ export default function WorkoutDetailsPage() {
     });
   }, [id]);
 
-  const formattedBlocks: WorkoutBlockDisplay[] = useMemo(() => {
-    return blocks.map((block) => ({
-      ...block,
-      displayType: block.blockType
-        ? block.blockType
-            .split("_")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ")
-        : "Straight Set",
-    })) as WorkoutBlockDisplay[];
+  // Calculate stats
+  const totalSets = useMemo(() => {
+    return blocks.reduce((sum, block) => {
+      return (
+        sum +
+        block.exercises.reduce((blockSum, ex) => blockSum + (ex.sets || 0), 0)
+      );
+    }, 0);
   }, [blocks]);
+
+  const totalExercises = useMemo(() => {
+    return blocks.reduce((sum, block) => sum + block.exercises.length, 0);
+  }, [blocks]);
+
+  // Get previous best for an exercise
+  const getPreviousBest = (exerciseName: string) => {
+    const record = personalRecords.find(
+      (pr) => pr.exerciseName.toLowerCase() === exerciseName.toLowerCase()
+    );
+    if (record && record.weight > 0) {
+      return {
+        weight: record.weight,
+        reps: record.reps,
+        record: `${record.weight}kg × ${record.reps}`,
+      };
+    }
+    return null;
+  };
+
+  // Toggle exercise expansion
+  const toggleExercise = (exerciseId: string) => {
+    setExpandedExercises((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(exerciseId)) {
+        newSet.delete(exerciseId);
+      } else {
+        newSet.add(exerciseId);
+      }
+      return newSet;
+    });
+  };
+
+  // Monolith card style
+  const monolithCardStyle: React.CSSProperties = {
+    background: isDark
+      ? "linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%)"
+      : "linear-gradient(165deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)",
+    backdropFilter: "blur(24px) saturate(180%)",
+    WebkitBackdropFilter: "blur(24px) saturate(180%)",
+    border: `1px solid ${
+      isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)"
+    }`,
+    borderRadius: "24px",
+    boxShadow: isDark
+      ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
+      : "0 10px 30px -5px rgba(0, 0, 0, 0.1)",
+    transition: "all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)",
+  };
 
   if (loading) {
     return (
@@ -398,14 +660,24 @@ export default function WorkoutDetailsPage() {
               <p className="text-base font-semibold text-red-500">
                 {error || "Workout not found"}
               </p>
-              <Button
-                onClick={() => router.push("/client")}
-                variant="outline"
-                className="rounded-full px-4"
+              <button
+                onClick={() => router.push("/client/workouts")}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "999px",
+                  background: isDark
+                    ? "rgba(255,255,255,0.05)"
+                    : "rgba(0,0,0,0.02)",
+                  border: `1px solid ${
+                    isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+                  }`,
+                  color: isDark ? "#FFFFFF" : "#1A1A1A",
+                  cursor: "pointer",
+                }}
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <ChevronLeft className="w-4 h-4 inline mr-2" />
                 Go Back
-              </Button>
+              </button>
             </div>
           </div>
         </div>
@@ -413,81 +685,1532 @@ export default function WorkoutDetailsPage() {
     );
   }
 
+  // Format reps for display
+  const formatReps = (reps: string | null | undefined): string => {
+    if (!reps) return "—";
+    return reps;
+  };
+
+  // Get block type badge color (inline styles)
+  const getBlockTypeBadgeColor = (blockType: string | null) => {
+    if (!blockType) {
+      return {
+        bg: "rgba(59, 130, 246, 0.2)",
+        text: "#3B82F6",
+        border: "rgba(59, 130, 246, 0.2)",
+      };
+    }
+    const type = blockType.toLowerCase();
+    if (type.includes("superset")) {
+      return {
+        bg: "rgba(249, 115, 22, 0.2)",
+        text: "#F97316",
+        border: "rgba(249, 115, 22, 0.2)",
+      };
+    }
+    if (type.includes("drop")) {
+      return {
+        bg: "rgba(168, 85, 247, 0.2)",
+        text: "#A855F7",
+        border: "rgba(168, 85, 247, 0.2)",
+      };
+    }
+    if (type.includes("giant")) {
+      return {
+        bg: "rgba(239, 68, 68, 0.2)",
+        text: "#EF4444",
+        border: "rgba(239, 68, 68, 0.2)",
+      };
+    }
+    if (type.includes("cluster")) {
+      return {
+        bg: "rgba(99, 102, 241, 0.2)",
+        text: "#6366F1",
+        border: "rgba(99, 102, 241, 0.2)",
+      };
+    }
+    if (type.includes("rest_pause")) {
+      return {
+        bg: "rgba(20, 184, 166, 0.2)",
+        text: "#14B8A6",
+        border: "rgba(20, 184, 166, 0.2)",
+      };
+    }
+    if (type.includes("pyramid")) {
+      return {
+        bg: "rgba(34, 197, 94, 0.2)",
+        text: "#22C55E",
+        border: "rgba(34, 197, 94, 0.2)",
+      };
+    }
+    if (
+      type.includes("amrap") ||
+      type.includes("emom") ||
+      type.includes("for_time") ||
+      type.includes("tabata")
+    ) {
+      return {
+        bg: "rgba(234, 179, 8, 0.2)",
+        text: "#EAB308",
+        border: "rgba(234, 179, 8, 0.2)",
+      };
+    }
+    return {
+      bg: "rgba(59, 130, 246, 0.2)",
+      text: "#3B82F6",
+      border: "rgba(59, 130, 246, 0.2)",
+    };
+  };
+
+  // Format block type label
+  const formatBlockTypeLabel = (
+    blockType: string | null,
+    exerciseLetter: string | null
+  ): string => {
+    if (!blockType) return "Straight Set";
+    const formatted = blockType
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+
+    if (
+      exerciseLetter &&
+      (blockType === "superset" || blockType === "giant_set")
+    ) {
+      return `${formatted} ${exerciseLetter}`;
+    }
+    return formatted;
+  };
+
+  // Determine if block type uses Sets/Reps/Rest cards
+  // Get exercise card fields based on block type and special table data
+  // According to BLOCK_STORAGE_SCHEMA.md: Exercise cards show ALL USED fields from the relevant special table
+  const getExerciseCardFields = (
+    block: StructuredBlock,
+    exercise: ClientExerciseDisplay
+  ): { label: string; value: string }[] => {
+    const blockType = (block.blockType || "").toLowerCase();
+    const result: { label: string; value: string }[] = [];
+    const exerciseRaw = exercise.raw;
+    
+    // 1. STRAIGHT SET, SUPERSET, GIANT SET, PRE-EXHAUSTION: from workout_block_exercises
+    if (blockType === "straight_set" || blockType === "superset" || blockType === "giant_set" || blockType === "pre_exhaustion") {
+      // USED: sets, reps
+      // NOTE: rest_seconds is NOT shown on exercise cards for superset/giant_set/pre_exhaustion
+      // because there's no rest between exercises - they're done back-to-back
+      // Rest is shown in the block header (rest AFTER completing all exercises in the set)
+      if (exercise.sets !== null && exercise.sets !== undefined) {
+        result.push({ label: "Sets", value: `${exercise.sets}` });
+      }
+      if (exercise.reps) {
+        result.push({ label: "Reps", value: formatReps(exercise.reps) });
+      }
+      // Only show rest_seconds for straight_set (rest between sets)
+      if (blockType === "straight_set" && exercise.restSeconds !== null && exercise.restSeconds !== undefined) {
+        result.push({ label: "Rest", value: `${exercise.restSeconds}s` });
+      }
+      // OPTIONAL: rir, tempo, notes (only if set)
+      // For SUPERSET: RIR, tempo, notes only for exercise 1 (first exercise, orderIndex === 0)
+      if (blockType === "superset") {
+        if (exercise.orderIndex === 0) {
+          // Only show RIR/tempo/notes for first exercise in superset
+          if (exercise.rir !== null && exercise.rir !== undefined) {
+            result.push({ label: "RIR", value: `${exercise.rir}` });
+          }
+          if (exercise.tempo) {
+            result.push({ label: "Tempo", value: exercise.tempo });
+          }
+          if (exercise.notes) {
+            result.push({ label: "Notes", value: exercise.notes });
+          }
+        }
+      } else {
+        // For all other block types, show RIR/tempo/notes for all exercises
+        if (exercise.rir !== null && exercise.rir !== undefined) {
+          result.push({ label: "RIR", value: `${exercise.rir}` });
+        }
+        if (exercise.tempo) {
+          result.push({ label: "Tempo", value: exercise.tempo });
+        }
+        if (exercise.notes) {
+          result.push({ label: "Notes", value: exercise.notes });
+        }
+      }
+    }
+    // 2. DROP SET: from workout_drop_sets
+    else if (blockType === "drop_set") {
+      // Check if drop_sets data exists
+      if (exerciseRaw?.drop_sets && Array.isArray(exerciseRaw.drop_sets) && exerciseRaw.drop_sets.length > 0) {
+        const dropSet = exerciseRaw.drop_sets[0];
+        // USED: drop_order, weight_kg, reps, rest_seconds
+        if (dropSet.drop_order !== null && dropSet.drop_order !== undefined) {
+          result.push({ label: "Drop order", value: `${dropSet.drop_order}` });
+        }
+        if (dropSet.weight_kg !== null && dropSet.weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${dropSet.weight_kg} kg` });
+        }
+        if (dropSet.reps) {
+          result.push({ label: "Reps", value: formatReps(dropSet.reps) });
+        }
+        if (dropSet.rest_seconds !== null && dropSet.rest_seconds !== undefined) {
+          result.push({ label: "Rest", value: `${dropSet.rest_seconds}s` });
+        }
+      } else {
+        // Debug: log if drop_sets data is missing
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("DROP SET: drop_sets data not found for exercise", {
+            exerciseId: exercise.raw?.exercise_id,
+            exerciseOrder: exercise.orderIndex + 1,
+            blockId: block.id,
+            exerciseRaw: exerciseRaw,
+            exerciseRawKeys: exerciseRaw ? Object.keys(exerciseRaw) : [],
+            hasDropSets: !!exerciseRaw?.drop_sets,
+            dropSetsType: typeof exerciseRaw?.drop_sets,
+            dropSetsValue: exerciseRaw?.drop_sets
+          });
+        }
+      }
+    }
+    // 3. CLUSTER SET: from workout_cluster_sets
+    else if (blockType === "cluster_set") {
+      // Check if cluster_sets data exists
+      if (exerciseRaw?.cluster_sets && Array.isArray(exerciseRaw.cluster_sets) && exerciseRaw.cluster_sets.length > 0) {
+        const clusterSet = exerciseRaw.cluster_sets[0];
+        // USED: reps_per_cluster, clusters_per_set, intra_cluster_rest, inter_set_rest
+        if (clusterSet.reps_per_cluster !== null && clusterSet.reps_per_cluster !== undefined) {
+          result.push({ label: "Reps/cluster", value: `${clusterSet.reps_per_cluster}` });
+        }
+        if (clusterSet.clusters_per_set !== null && clusterSet.clusters_per_set !== undefined) {
+          result.push({ label: "Clusters/set", value: `${clusterSet.clusters_per_set}` });
+        }
+        if (clusterSet.intra_cluster_rest !== null && clusterSet.intra_cluster_rest !== undefined) {
+          result.push({ label: "Intra-cluster rest", value: `${clusterSet.intra_cluster_rest}s` });
+        }
+        if (clusterSet.inter_set_rest !== null && clusterSet.inter_set_rest !== undefined) {
+          result.push({ label: "Inter-set rest", value: `${clusterSet.inter_set_rest}s` });
+        }
+      } else {
+        // Debug: log if cluster_sets data is missing
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("CLUSTER SET: cluster_sets data not found for exercise", {
+            exerciseId: exercise.raw?.exercise_id,
+            exerciseOrder: exercise.orderIndex + 1,
+            blockId: block.id,
+            exerciseRaw: exerciseRaw
+          });
+        }
+      }
+    }
+    // 4. REST-PAUSE: from workout_rest_pause_sets (weight, duration, max_pauses) and workout_blocks (reps)
+    else if (blockType === "rest_pause") {
+      // Check if rest_pause_sets data exists
+      if (exerciseRaw?.rest_pause_sets && Array.isArray(exerciseRaw.rest_pause_sets) && exerciseRaw.rest_pause_sets.length > 0) {
+        const restPauseSet = exerciseRaw.rest_pause_sets[0];
+        // USED: weight_kg (from workout_rest_pause_sets), reps (from workout_blocks.reps_per_set), rest_pause_duration, max_rest_pauses
+        if (restPauseSet.weight_kg !== null && restPauseSet.weight_kg !== undefined) {
+          result.push({ label: "Initial weight", value: `${restPauseSet.weight_kg} kg` });
+        }
+        // Reps are stored in workout_blocks.reps_per_set, not in workout_rest_pause_sets
+        const rawBlock = block.rawBlock;
+        if (rawBlock?.reps_per_set) {
+          result.push({ label: "Initial reps", value: formatReps(rawBlock.reps_per_set) });
+        }
+        if (restPauseSet.rest_pause_duration !== null && restPauseSet.rest_pause_duration !== undefined) {
+          result.push({ label: "Rest-pause", value: `${restPauseSet.rest_pause_duration}s` });
+        }
+        if (restPauseSet.max_rest_pauses !== null && restPauseSet.max_rest_pauses !== undefined) {
+          result.push({ label: "Max pauses", value: `${restPauseSet.max_rest_pauses}` });
+        }
+      } else {
+        // Debug: log if rest_pause_sets data is missing
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("REST PAUSE: rest_pause_sets data not found for exercise", {
+            exerciseId: exercise.raw?.exercise_id,
+            exerciseOrder: exercise.orderIndex + 1,
+            blockId: block.id,
+            exerciseRaw: exerciseRaw
+          });
+        }
+      }
+    }
+    // 5. PYRAMID SET: from workout_pyramid_sets (N rows - show all steps)
+    else if (blockType === "pyramid_set" && exerciseRaw?.pyramid_sets && exerciseRaw.pyramid_sets.length > 0) {
+      const pyramidSets = exerciseRaw.pyramid_sets;
+      // Sort by pyramid_order
+      const sortedSteps = [...pyramidSets].sort((a: any, b: any) => 
+        (a.pyramid_order || 0) - (b.pyramid_order || 0)
+      );
+      // Show all pyramid steps
+      sortedSteps.forEach((pyramidStep: any) => {
+        // USED: pyramid_order, weight_kg, reps, rest_seconds
+        if (pyramidStep.pyramid_order !== null && pyramidStep.pyramid_order !== undefined) {
+          result.push({ label: `Step ${pyramidStep.pyramid_order}`, value: "" });
+        }
+        if (pyramidStep.weight_kg !== null && pyramidStep.weight_kg !== undefined) {
+          result.push({ label: `Weight`, value: `${pyramidStep.weight_kg} kg` });
+        }
+        if (pyramidStep.reps) {
+          result.push({ label: `Reps`, value: formatReps(pyramidStep.reps) });
+        }
+        if (pyramidStep.rest_seconds !== null && pyramidStep.rest_seconds !== undefined) {
+          result.push({ label: `Rest`, value: `${pyramidStep.rest_seconds}s` });
+        }
+      });
+    }
+    // 6. LADDER SET: from workout_ladder_sets (N rows - show all steps)
+    else if (blockType === "ladder" && exerciseRaw?.ladder_sets && exerciseRaw.ladder_sets.length > 0) {
+      const ladderSets = exerciseRaw.ladder_sets;
+      // Sort by ladder_order
+      const sortedSteps = [...ladderSets].sort((a: any, b: any) => 
+        (a.ladder_order || 0) - (b.ladder_order || 0)
+      );
+      // Show all ladder steps
+      sortedSteps.forEach((ladderStep: any) => {
+        // USED: ladder_order, weight_kg, reps, rest_seconds
+        if (ladderStep.ladder_order !== null && ladderStep.ladder_order !== undefined) {
+          result.push({ label: `Step ${ladderStep.ladder_order}`, value: "" });
+        }
+        if (ladderStep.weight_kg !== null && ladderStep.weight_kg !== undefined) {
+          result.push({ label: `Weight`, value: `${ladderStep.weight_kg} kg` });
+        }
+        if (ladderStep.reps) {
+          result.push({ label: `Reps`, value: formatReps(ladderStep.reps) });
+        }
+        if (ladderStep.rest_seconds !== null && ladderStep.rest_seconds !== undefined) {
+          result.push({ label: `Rest`, value: `${ladderStep.rest_seconds}s` });
+        }
+      });
+    }
+    // 7-12. TIME-BASED BLOCKS: from workout_time_protocols (handled by getTimeBasedParameters)
+    // These are handled separately below
+    
+    return result;
+  };
+
+  // Get block-specific parameters for display (shown in block header)
+  // Shows ALL USED fields from workout_blocks ONLY (except relational IDs: id, template_id, block_order)
+  // OPTIONAL fields (block_name, block_notes) only if they have values
+  // According to BLOCK_STORAGE_SCHEMA.md: Block header shows workout_blocks data ONLY
+  const getBlockParameters = (block: StructuredBlock) => {
+    const blockType = (block.blockType || "").toLowerCase();
+    const result: { label: string; value: string }[] = [];
+    const rawBlock = block.rawBlock;
+    
+    // OPTIONAL: block_name (only if set)
+    if (rawBlock?.block_name) {
+      // block_name is displayed in the block title, not in parameters
+    }
+    
+    // OPTIONAL: block_notes (only if set)
+    // block_notes is displayed separately, not in parameters
+    
+    // USED: total_sets - for most blocks (except amrap, emom, for_time)
+    if (rawBlock?.total_sets !== null && rawBlock?.total_sets !== undefined) {
+      if (blockType === "tabata" || blockType === "circuit") {
+        result.push({ label: "Sets", value: `${rawBlock.total_sets}` });
+      } else if (blockType !== "amrap" && blockType !== "emom" && blockType !== "for_time") {
+        result.push({ label: "Sets", value: `${rawBlock.total_sets}` });
+      }
+    }
+    
+    // USED: reps_per_set - for straight_set, drop_set, pyramid_set
+    if (rawBlock?.reps_per_set && (blockType === "straight_set" || blockType === "drop_set" || blockType === "pyramid_set")) {
+      result.push({ label: "Reps", value: formatReps(rawBlock.reps_per_set) });
+    }
+    
+    // USED: rest_seconds - for most blocks (rest AFTER completing the set/block)
+    if (rawBlock?.rest_seconds !== null && rawBlock?.rest_seconds !== undefined) {
+      if (blockType === "superset" || blockType === "giant_set" || blockType === "pre_exhaustion") {
+        result.push({ label: "Rest after set", value: `${rawBlock.rest_seconds}s` });
+      } else if (blockType === "cluster_set" || blockType === "drop_set") {
+        result.push({ label: "Rest after set", value: `${rawBlock.rest_seconds}s` });
+      } else if (blockType === "straight_set" || blockType === "pyramid_set" || blockType === "ladder") {
+        result.push({ label: "Rest between sets", value: `${rawBlock.rest_seconds}s` });
+      } else if (blockType === "circuit") {
+        result.push({ label: "Rest between rounds", value: `${rawBlock.rest_seconds}s` });
+      }
+      // rest_pause: rest_seconds is NOT SET in workout_blocks
+      // amrap, emom, for_time, tabata: rest_seconds is NOT SET in workout_blocks
+    }
+    
+    // USED: duration_seconds - for amrap, emom
+    if (rawBlock?.duration_seconds && (blockType === "amrap" || blockType === "emom")) {
+      const durationMinutes = Math.floor(rawBlock.duration_seconds / 60);
+      result.push({ label: "Duration", value: `${durationMinutes} min` });
+    }
+
+    return result;
+  };
+
+  // Get time-based parameters for display in exercise cards (for time-based blocks)
+  // Reads from exercise-specific workout_time_protocols (one per exercise)
+  // According to BLOCK_STORAGE_SCHEMA.md: Exercise cards show ALL USED fields from workout_time_protocols
+  const getTimeBasedParameters = (
+    block: StructuredBlock,
+    exercise: ClientExerciseDisplay
+  ) => {
+    const params = block.parameters || {};
+    const blockType = (block.blockType || "").toLowerCase();
+    const result: { label: string; value: string }[] = [];
+
+    // Get exercise-specific time protocol from workout_time_protocols
+    const rawBlockWithProtocols = block.rawBlock as any;
+    const allTimeProtocols = rawBlockWithProtocols?.time_protocols || [];
+    
+    // Debug: Log protocol lookup for CIRCUIT/TABATA
+    if (process.env.NODE_ENV !== "production" && (blockType === "circuit" || blockType === "tabata")) {
+      console.log(`TIME PROTOCOL LOOKUP for ${blockType.toUpperCase()}:`, {
+        blockId: block.id,
+        blockType,
+        exerciseId: exercise.raw?.exercise_id,
+        exerciseOrder: exercise.orderIndex + 1,
+        allTimeProtocolsCount: allTimeProtocols.length,
+        allTimeProtocols: allTimeProtocols,
+        rawBlock: rawBlockWithProtocols
+      });
+    }
+    
+    // Find protocol matching exercise_id and exercise_order (1-indexed)
+    const exerciseProtocol = allTimeProtocols.find(
+      (tp: any) => {
+        const matchesType = tp.protocol_type === blockType;
+        const matchesExerciseId = tp.exercise_id === exercise.raw?.exercise_id;
+        // exercise.orderIndex is 0-indexed, but exercise_order in DB is 1-indexed
+        const matchesOrder = tp.exercise_order === (exercise.orderIndex + 1);
+        return matchesType && matchesExerciseId && matchesOrder;
+      }
+    ) || allTimeProtocols.find(
+      // Fallback: try to find by exercise_id only (for blocks with single exercise)
+      (tp: any) => tp.protocol_type === blockType && tp.exercise_id === exercise.raw?.exercise_id
+    ) || allTimeProtocols.find(
+      // Final fallback: first protocol of matching type
+      (tp: any) => tp.protocol_type === blockType
+    );
+    
+    // Debug: Log found protocol
+    if (process.env.NODE_ENV !== "production" && (blockType === "circuit" || blockType === "tabata")) {
+      console.log(`FOUND PROTOCOL for ${blockType.toUpperCase()}:`, {
+        found: !!exerciseProtocol,
+        protocol: exerciseProtocol,
+        work_seconds: exerciseProtocol?.work_seconds,
+        rest_seconds: exerciseProtocol?.rest_seconds
+      });
+    }
+
+    // Fallback for old data in block_parameters
+    if (blockType === "amrap") {
+      // USED: total_duration_minutes
+      // OPTIONAL: target_reps (only if set)
+      const duration = exerciseProtocol?.total_duration_minutes ||
+          (block.rawBlock?.duration_seconds
+            ? Math.floor(block.rawBlock.duration_seconds / 60)
+          : null) ||
+        params.amrap_duration ||
+        params.duration_minutes;
+      if (duration) {
+        result.push({
+          label: "Duration",
+          value: `${duration} min`,
+        });
+      }
+      // OPTIONAL: target_reps
+      const targetReps = exerciseProtocol?.target_reps || params.target_reps;
+      if (targetReps) {
+        result.push({ label: "Target reps", value: `${targetReps}` });
+      }
+    } else if (blockType === "emom") {
+      // USED: total_duration_minutes, work_seconds, rest_seconds
+      // OPTIONAL: reps_per_round (only if set)
+      const duration = exerciseProtocol?.total_duration_minutes ||
+          (block.rawBlock?.duration_seconds
+            ? Math.floor(block.rawBlock.duration_seconds / 60)
+          : null) ||
+        params.emom_duration ||
+        params.duration_minutes;
+      if (duration) {
+        result.push({
+          label: "Duration",
+          value: `${duration} min`,
+        });
+      }
+      // USED: work_seconds
+      const workSeconds = exerciseProtocol?.work_seconds || params.work_seconds;
+      if (workSeconds) {
+        result.push({
+          label: "Work interval",
+          value: `${workSeconds}s`,
+        });
+      }
+      // USED: rest_seconds
+      const restSeconds = exerciseProtocol?.rest_seconds || params.rest_after;
+      if (restSeconds) {
+        result.push({
+          label: "Rest interval",
+          value: `${restSeconds}s`,
+        });
+      }
+      // OPTIONAL: reps_per_round
+      const repsPerRound = exerciseProtocol?.reps_per_round || params.emom_reps;
+      if (repsPerRound) {
+        result.push({ label: "Reps per minute", value: `${repsPerRound}` });
+      }
+    } else if (blockType === "for_time") {
+      // OPTIONAL: time_cap_minutes (only if set)
+      // OPTIONAL: target_reps (only if set)
+      const timeCap = exerciseProtocol?.time_cap_minutes || 
+        params.time_cap || 
+        params.time_cap_minutes;
+      if (timeCap) {
+        result.push({
+          label: "Time cap",
+          value: `${timeCap} min`,
+        });
+      }
+      const targetReps = exerciseProtocol?.target_reps || params.target_reps;
+      if (targetReps) {
+        result.push({ label: "Target reps", value: `${targetReps}` });
+      }
+    } else if (blockType === "tabata") {
+      // USED: work_seconds, rest_seconds, set
+      // NOTE: rounds is NOT shown here - it's the same as total_sets from workout_blocks (shown in header)
+      const workSeconds = exerciseProtocol?.work_seconds || params.work_seconds;
+      if (workSeconds !== null && workSeconds !== undefined) {
+        result.push({
+          label: "Work time",
+          value: `${workSeconds}s`,
+        });
+      }
+      // For Tabata: rest_seconds is rest AFTER each individual exercise (from workout_time_protocols)
+      // rest_after_set is block-level and should NOT be shown here (it's in the header)
+      const restSeconds = exerciseProtocol?.rest_seconds || params.rest_after;
+      if (restSeconds !== null && restSeconds !== undefined) {
+        result.push({
+          label: "Rest time",
+          value: `${restSeconds}s`,
+        });
+      }
+      // USED: set (which set/round this exercise belongs to)
+      const setNumber = exerciseProtocol?.set;
+      if (setNumber !== null && setNumber !== undefined) {
+        result.push({
+          label: "Set",
+          value: `${setNumber}`,
+        });
+      }
+    } else if (blockType === "circuit") {
+      // OPTIONAL: work_seconds (only if set)
+      // OPTIONAL: rest_seconds (only if set)
+      // USED: set
+      // NOTE: rounds is NOT shown here - it's the same as total_sets from workout_blocks (shown in header)
+      const workSeconds = exerciseProtocol?.work_seconds || 
+        params.work_seconds;
+      if (workSeconds !== null && workSeconds !== undefined) {
+        result.push({
+          label: "Work time",
+          value: `${workSeconds}s`,
+        });
+      }
+      const restSeconds = exerciseProtocol?.rest_seconds ||
+        params.rest_after_exercise ||
+        params.rest_after_set ||
+        params.rest_after;
+      if (restSeconds !== null && restSeconds !== undefined) {
+        result.push({
+          label: "Rest time",
+          value: `${restSeconds}s`,
+        });
+      }
+      // USED: set (which set/round this exercise belongs to)
+      const setNumber = exerciseProtocol?.set;
+      if (setNumber !== null && setNumber !== undefined) {
+        result.push({
+          label: "Set",
+          value: `${setNumber}`,
+        });
+      }
+    }
+
+    return result;
+  };
+
   return (
     <AnimatedBackground>
-      <div className="relative z-10 min-h-screen px-5 py-6 pb-32 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-4xl space-y-6">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              onClick={() => router.push("/client")}
-              className="rounded-full px-4"
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        @keyframes shine {
+          to { background-position: 200% center; }
+        }
+        .shimmer-text {
+          background: linear-gradient(90deg, ${
+            isDark ? "#fff" : "#1A1A1A"
+          } 0%, #3B82F6 50%, ${isDark ? "#fff" : "#1A1A1A"} 100%);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: shine 8s linear infinite;
+        }
+        .exercise-item {
+          max-height: 100px;
+          overflow: hidden;
+          transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .exercise-item.active {
+          max-height: 2000px;
+          background: ${
+            isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.02)"
+          };
+        }
+        .rotate-icon {
+          transition: transform 0.3s ease;
+        }
+        .exercise-item.active .rotate-icon {
+          transform: rotate(180deg);
+        }
+      `,
+        }}
+      />
+      <div
+        className="relative z-10 min-h-screen"
+        style={{ paddingBottom: "120px" }}
+      >
+        {/* Navigation */}
+        <nav
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "24px",
+            maxWidth: "1280px",
+            margin: "0 auto",
+          }}
+        >
+          <button
+            onClick={() => router.push("/client/workouts")}
+            style={{
+              width: "40px",
+              height: "40px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "12px",
+              background: isDark
+                ? "rgba(255,255,255,0.05)"
+                : "rgba(0,0,0,0.02)",
+              border: `1px solid ${
+                isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+              }`,
+              color: isDark ? "#FFFFFF" : "#1A1A1A",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = isDark
+                ? "rgba(255,255,255,0.1)"
+                : "rgba(0,0,0,0.05)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = isDark
+                ? "rgba(255,255,255,0.05)"
+                : "rgba(0,0,0,0.02)";
+            }}
+          >
+            <ChevronLeft style={{ width: "24px", height: "24px" }} />
+          </button>
+          <div style={{ textAlign: "center" }}>
+            <span
+              style={{
+                fontSize: "10px",
+                textTransform: "uppercase",
+                letterSpacing: "0.3em",
+                color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                fontWeight: 700,
+              }}
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-            {assignment.scheduledDate && (
-              <Badge
-                variant="outline"
-                className="rounded-full text-sm px-4 py-2 bg-white/70 backdrop-blur-sm dark:bg-slate-800/70"
-              >
-                Scheduled:{" "}
-                {new Date(assignment.scheduledDate).toLocaleDateString()}
-              </Badge>
-            )}
+              Protocol View
+            </span>
           </div>
+          <button
+            style={{
+              width: "40px",
+              height: "40px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "12px",
+              background: isDark
+                ? "rgba(255,255,255,0.05)"
+                : "rgba(0,0,0,0.02)",
+              border: `1px solid ${
+                isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+              }`,
+              color: isDark ? "#FFFFFF" : "#1A1A1A",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = isDark
+                ? "rgba(255,255,255,0.1)"
+                : "rgba(0,0,0,0.05)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = isDark
+                ? "rgba(255,255,255,0.05)"
+                : "rgba(0,0,0,0.02)";
+            }}
+          >
+            <MoreHorizontal style={{ width: "24px", height: "24px" }} />
+          </button>
+        </nav>
 
-          <Card className="border border-white/20 bg-white/90 shadow-lg rounded-3xl dark:bg-slate-800/80 dark:border-slate-700">
-            <CardHeader className="pb-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {assignment.name}
-                </CardTitle>
-                <Badge className="flex items-center gap-2 rounded-full px-4 py-2 bg-purple-100 text-purple-700 border-none">
-                  <Clock className="w-4 h-4" />
-                  {formattedBlocks.reduce(
-                    (acc, block) => acc + block.exercises.length,
-                    0
-                  )}{" "}
-                  exercises
-                </Badge>
-              </div>
-              {assignment.description && (
-                <p className="mt-3 text-slate-600 text-sm leading-6 dark:text-slate-300">
-                  {assignment.description}
-                </p>
+        <main
+          style={{
+            maxWidth: "768px",
+            margin: "0 auto",
+            padding: "0 24px 40px",
+          }}
+        >
+          {/* Header Section */}
+          <header style={{ marginBottom: "40px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                marginBottom: "16px",
+              }}
+            >
+              {assignment.category && (
+                <span
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: "999px",
+                    background: "rgba(59, 130, 246, 0.1)",
+                    color: "#3B82F6",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    border: "1px solid rgba(59, 130, 246, 0.2)",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {assignment.category.toUpperCase()}
+                </span>
               )}
-            </CardHeader>
-          </Card>
+              {assignment.currentWeek && (
+                <span
+                  style={{
+                    color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                    fontSize: "12px",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  WEEK {assignment.currentWeek}
+                </span>
+              )}
+            </div>
+            <h1
+              style={{
+                fontSize: "36px",
+                fontWeight: 800,
+                letterSpacing: "-0.02em",
+                marginBottom: "24px",
+                color: isDark ? "#FFFFFF" : "#1A1A1A",
+                lineHeight: "1.2",
+              }}
+              className="shimmer-text"
+            >
+                  {assignment.name}
+            </h1>
+          </header>
 
-          {formattedBlocks.length === 0 ? (
-            <Card className="border border-white/20 bg-white/80 shadow-lg rounded-3xl dark:bg-slate-800/80 dark:border-slate-700">
-              <CardContent className="py-12 text-center text-slate-600 dark:text-slate-300">
-                No exercises found for this workout yet.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-6">
-              {formattedBlocks.map((block, blockIndex) => (
-                <BlockCardDisplay
-                  key={block.id}
-                  block={block}
-                  index={blockIndex}
-                />
-              ))}
+          {/* Stats Grid */}
+          <section
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
+              gap: "16px",
+              marginBottom: "40px",
+            }}
+            className="md:grid-cols-4"
+          >
+            <div
+              style={{
+                ...monolithCardStyle,
+                padding: "16px",
+                textAlign: "center",
+              }}
+            >
+              <Clock
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  margin: "0 auto 8px",
+                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                }}
+              />
+              <div
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  color: isDark ? "#FFFFFF" : "#1A1A1A",
+                  marginBottom: "4px",
+                }}
+              >
+                ~{assignment.estimatedDuration || 0}
+              </div>
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  fontWeight: 700,
+                }}
+              >
+                Minutes
+              </div>
+            </div>
+            <div
+              style={{
+                ...monolithCardStyle,
+                padding: "16px",
+                textAlign: "center",
+              }}
+            >
+              <Layers
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  margin: "0 auto 8px",
+                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                }}
+              />
+              <div
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  color: isDark ? "#FFFFFF" : "#1A1A1A",
+                  marginBottom: "4px",
+                }}
+              >
+                {totalSets}
+              </div>
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  fontWeight: 700,
+                }}
+              >
+                Total Sets
+              </div>
+            </div>
+            <div
+              style={{
+                ...monolithCardStyle,
+                padding: "16px",
+                textAlign: "center",
+              }}
+            >
+              <Dumbbell
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  margin: "0 auto 8px",
+                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                }}
+              />
+              <div
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  color: isDark ? "#FFFFFF" : "#1A1A1A",
+                  marginBottom: "4px",
+                }}
+              >
+                {totalExercises}
+              </div>
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  fontWeight: 700,
+                }}
+              >
+                Exercises
+              </div>
+            </div>
+          </section>
+
+          {/* Blocks List */}
+          <section>
+            <h3
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.2em",
+                color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                marginBottom: "24px",
+              }}
+            >
+              Workout Content
+            </h3>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+            >
+              {blocks.map((block, blockIndex) => {
+                const isExpanded = expandedExercises.has(block.id);
+                const badgeColor = getBlockTypeBadgeColor(block.blockType);
+                const blockParams = getBlockParameters(block);
+
+                return (
+                  <div
+                    key={block.id}
+                    className={`exercise-item ${isExpanded ? "active" : ""}`}
+                    style={{
+                      ...monolithCardStyle,
+                      borderRadius: "24px",
+                      overflow: "hidden",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => toggleExercise(block.id)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = isDark
+                        ? "rgba(255,255,255,0.2)"
+                        : "rgba(0,0,0,0.2)";
+                      e.currentTarget.style.background = isDark
+                        ? "linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)"
+                        : "linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = isDark
+                        ? "rgba(255,255,255,0.08)"
+                        : "rgba(0,0,0,0.1)";
+                      e.currentTarget.style.background = isDark
+                        ? "linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%)"
+                        : "linear-gradient(165deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)";
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "20px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "16px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "48px",
+                            height: "48px",
+                            borderRadius: "12px",
+                            background: isDark
+                              ? "rgba(255,255,255,0.05)"
+                              : "rgba(0,0,0,0.02)",
+                            border: `1px solid ${
+                              isDark
+                                ? "rgba(255,255,255,0.1)"
+                                : "rgba(0,0,0,0.1)"
+                            }`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 700,
+                            fontFamily: "monospace",
+                            fontSize: "18px",
+                            color: isDark ? "#FFFFFF" : "#1A1A1A",
+                          }}
+                        >
+                          {String(blockIndex + 1).padStart(2, "0")}
+                        </div>
+                        <div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                letterSpacing: "0.1em",
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                                textTransform: "uppercase",
+                                fontWeight: 700,
+                                background: badgeColor.bg,
+                                color: badgeColor.text,
+                                border: `1px solid ${badgeColor.border}`,
+                              }}
+                            >
+                              {formatBlockTypeLabel(block.blockType, null)}
+                            </span>
+                          </div>
+                          <h4
+                            style={{
+                              fontSize: "18px",
+                              fontWeight: 700,
+                              color: isDark ? "#FFFFFF" : "#1A1A1A",
+                              margin: 0,
+                            }}
+                          >
+                            {(() => {
+                              // Helper to filter out "test" values
+                              const isValidName = (
+                                name: string | null | undefined
+                              ): boolean => {
+                                if (!name) return false;
+                                const trimmed = name.trim();
+                                if (trimmed.length === 0) return false;
+                                const lower = trimmed.toLowerCase();
+                                return lower !== "test" && lower !== "teest";
+                              };
+
+                              // Use block name if available and not empty
+                              if (isValidName(block.blockName)) {
+                                return block.blockName!.trim();
+                              }
+                              // If block has exercises, try to construct a meaningful title
+                              if (
+                                block.exercises &&
+                                block.exercises.length > 0
+                              ) {
+                                // Get all unique exercise names (excluding "test")
+                                const exerciseNames = block.exercises
+                                  .map((ex) => ex.name)
+                                  .filter(isValidName);
+
+                                if (exerciseNames.length > 0) {
+                                  // If more than 2 exercises, show first 2 + count
+                                  if (exerciseNames.length > 2) {
+                                    const firstTwo = exerciseNames
+                                      .slice(0, 2)
+                                      .join(" + ");
+                                    const remaining = exerciseNames.length - 2;
+                                    return `${firstTwo} + ${remaining} ${
+                                      remaining === 1 ? "exercise" : "exercises"
+                                    }`;
+                                  }
+                                  // For 2 or fewer exercises, show all names
+                                  return exerciseNames.join(" + ");
+                                }
+                              }
+                              // Final fallback: use block type
+                              return formatBlockTypeLabel(
+                                block.blockType,
+                                null
+                              );
+                            })()}
+                          </h4>
+                        </div>
+                      </div>
+                      <ChevronDown
+                        className="rotate-icon"
+                        style={{
+                          width: "20px",
+                          height: "20px",
+                          color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
+                        }}
+                      />
+                    </div>
+                    {isExpanded && (
+                      <div style={{ padding: "0 20px 24px" }}>
+                        {/* Block Notes */}
+                        {block.notes && (
+                          <div
+                            style={{
+                              padding: "12px 16px",
+                              background: isDark
+                                ? "rgba(59, 130, 246, 0.1)"
+                                : "rgba(59, 130, 246, 0.05)",
+                              borderRadius: "12px",
+                              border: `1px solid ${
+                                isDark
+                                  ? "rgba(59, 130, 246, 0.2)"
+                                  : "rgba(59, 130, 246, 0.1)"
+                              }`,
+                              marginBottom: "20px",
+                            }}
+                          >
+                            <p
+                              style={{
+                                fontSize: "14px",
+                                color: isDark
+                                  ? "rgba(255,255,255,0.8)"
+                                  : "#1A1A1A",
+                                lineHeight: "1.5",
+                                margin: 0,
+                              }}
+                            >
+                              {block.notes}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Block Parameters */}
+                        {blockParams.length > 0 && (
+                          <div
+                            data-block-type={block.blockType}
+                            data-block-id={block.id}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(2, 1fr)",
+                              gap: "12px",
+                              marginBottom: "20px",
+                              // Force visibility for debugging
+                              visibility: "visible",
+                              opacity: 1,
+                              position: "relative",
+                              zIndex: 1,
+                            }}
+                          >
+                            {blockParams.map((param, idx) => (
+                              <div
+                                key={`${block.id}-param-${idx}`}
+                                data-param-label={param.label}
+                                data-param-value={param.value}
+                                style={{
+                                  background: isDark
+                                    ? "rgba(0,0,0,0.4)"
+                                    : "rgba(0,0,0,0.02)",
+                                  borderRadius: "12px",
+                                  padding: "12px",
+                                  border: `1px solid ${
+                                    isDark
+                                      ? "rgba(255,255,255,0.05)"
+                                      : "rgba(0,0,0,0.05)"
+                                  }`,
+                                  // Force visibility
+                                  visibility: "visible",
+                                  opacity: 1,
+                                  display: "block",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: "10px",
+                                    color: isDark
+                                      ? "rgba(255,255,255,0.5)"
+                                      : "#6B7280",
+                                    textTransform: "uppercase",
+                                    fontWeight: 700,
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  {param.label}
+                                </div>
+                                <div
+                                  style={{
+                                    fontFamily: "monospace",
+                                    fontWeight: 700,
+                                    fontSize: "16px",
+                                    color: isDark ? "#FFFFFF" : "#1A1A1A",
+                                  }}
+                                >
+                                  {param.value}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Exercises in Block */}
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "12px",
+                          }}
+                        >
+                          {block.exercises.map((exercise, exerciseIndex) => {
+                            const previousBest = getPreviousBest(exercise.name);
+                            const exerciseBadgeColor = getBlockTypeBadgeColor(
+                              block.blockType
+                            );
+
+                            return (
+                              <div
+                                key={exercise.id}
+                                style={{
+                                  background: isDark
+                                    ? "rgba(0,0,0,0.4)"
+                                    : "rgba(0,0,0,0.02)",
+                                  borderRadius: "16px",
+                                  padding: "16px",
+                                  border: `1px solid ${
+                                    isDark
+                                      ? "rgba(255,255,255,0.05)"
+                                      : "rgba(0,0,0,0.05)"
+                                  }`,
+                                }}
+                              >
+                                <div style={{ marginBottom: "12px" }}>
+                                  {exercise.exerciseLetter && (
+                                    <span
+                                      style={{
+                                        fontSize: "10px",
+                                        letterSpacing: "0.1em",
+                                        padding: "2px 8px",
+                                        borderRadius: "4px",
+                                        textTransform: "uppercase",
+                                        fontWeight: 700,
+                                        background: exerciseBadgeColor.bg,
+                                        color: exerciseBadgeColor.text,
+                                        border: `1px solid ${exerciseBadgeColor.border}`,
+                                        marginRight: "8px",
+                                      }}
+                                    >
+                                      {formatBlockTypeLabel(
+                                        block.blockType,
+                                        exercise.exerciseLetter
+                                      )}
+                                    </span>
+                                  )}
+                                  <h5
+                                    style={{
+                                      fontSize: "16px",
+                                      fontWeight: 700,
+                                      color: isDark ? "#FFFFFF" : "#1A1A1A",
+                                      margin: "4px 0 0 0",
+                                      display: "inline-block",
+                                    }}
+                                  >
+                                    {exercise.name}
+                                  </h5>
+                                </div>
+
+                                {/* Exercise Card Fields - from special tables based on block type */}
+                                {(() => {
+                                  const blockType = (block.blockType || "").toLowerCase();
+                                  const isTimeBased = ["amrap", "emom", "for_time", "tabata", "circuit"].includes(blockType);
+                                  
+                                  // For time-based blocks, use getTimeBasedParameters
+                                  if (isTimeBased) {
+                                    const timeParams = getTimeBasedParameters(block, exercise);
+                                    if (timeParams.length > 0) {
+                                      return (
+                                        <div
+                                          style={{
+                                            display: "grid",
+                                            gridTemplateColumns: `repeat(${Math.min(timeParams.length, 3)}, 1fr)`,
+                                            gap: "12px",
+                                            marginBottom: "0",
+                                          }}
+                                        >
+                                          {timeParams.map((param, idx) => (
+                                            <div key={idx}>
+                                              <div
+                                                style={{
+                                                  fontSize: "10px",
+                                                  color: isDark
+                                                    ? "rgba(255,255,255,0.5)"
+                                                    : "#6B7280",
+                                                  textTransform: "uppercase",
+                                                  fontWeight: 700,
+                                                  marginBottom: "4px",
+                                                }}
+                                              >
+                                                {param.label}
+                                              </div>
+                                              <div
+                                                style={{
+                                                  fontFamily: "monospace",
+                                                  fontWeight: 700,
+                                                  fontSize: "16px",
+                                                  color: isDark
+                                                    ? "#FFFFFF"
+                                                    : "#1A1A1A",
+                                                }}
+                                              >
+                                                {param.value}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }
+                                  
+                                  // For all other blocks, use getExerciseCardFields
+                                  const exerciseFields = getExerciseCardFields(block, exercise);
+                                  if (exerciseFields.length > 0) {
+                                    return (
+                                      <div
+                                        style={{
+                                          display: "grid",
+                                          gridTemplateColumns: `repeat(${Math.min(exerciseFields.length, 3)}, 1fr)`,
+                                          gap: "12px",
+                                          marginBottom: "0",
+                                        }}
+                                      >
+                                        {exerciseFields.map((field, idx) => (
+                                          <div key={idx}>
+                                            <div
+                                              style={{
+                                                fontSize: "10px",
+                                                color: isDark
+                                                  ? "rgba(255,255,255,0.5)"
+                                                  : "#6B7280",
+                                                textTransform: "uppercase",
+                                                fontWeight: 700,
+                                                marginBottom: "4px",
+                                              }}
+                                            >
+                                              {field.label}
+                                            </div>
+                                            <div
+                                              style={{
+                                                fontFamily: "monospace",
+                                                fontWeight: 700,
+                                                fontSize: "16px",
+                                                color: isDark
+                                                  ? "#FFFFFF"
+                                                  : "#1A1A1A",
+                                              }}
+                                            >
+                                              {field.value || "—"}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                                
+                                {/* Optional fields: Weight, Load % (only for blocks that support them) */}
+                                {(() => {
+                                  const blockType = (block.blockType || "").toLowerCase();
+                                  // Only show weight/load% for blocks that use workout_block_exercises
+                                  const supportsWeight = ["straight_set", "superset", "giant_set", "pre_exhaustion"].includes(blockType);
+                                  if (!supportsWeight) return null;
+                                  
+                                  const optionalFields: { label: string; value: string }[] = [];
+                                  
+                                  // Weight (from workout_block_exercises.weight_kg) - OPTIONAL
+                                  if (exercise.raw?.weight_kg !== null && exercise.raw?.weight_kg !== undefined) {
+                                    optionalFields.push({
+                                      label: "Weight",
+                                      value: `${exercise.raw.weight_kg} kg`
+                                    });
+                                  }
+                                  
+                                  // Load Percentage (from workout_block_exercises.load_percentage) - OPTIONAL
+                                  if (exercise.raw?.load_percentage !== null && exercise.raw?.load_percentage !== undefined) {
+                                    optionalFields.push({
+                                      label: "Load %",
+                                      value: `${exercise.raw.load_percentage}%`
+                                    });
+                                  }
+                                  
+                                  if (optionalFields.length > 0) {
+                                    return (
+                                      <div
+                                        style={{
+                                          display: "grid",
+                                          gridTemplateColumns: `repeat(${Math.min(optionalFields.length, 3)}, 1fr)`,
+                                          gap: "12px",
+                                          marginTop: "12px",
+                                          marginBottom: previousBest ? "12px" : "0",
+                                        }}
+                                      >
+                                        {optionalFields.map((field, idx) => (
+                                          <div key={idx}>
+                                            <div
+                                              style={{
+                                                fontSize: "10px",
+                                                color: isDark
+                                                  ? "rgba(255,255,255,0.5)"
+                                                  : "#6B7280",
+                                                textTransform: "uppercase",
+                                                fontWeight: 700,
+                                                marginBottom: "4px",
+                                              }}
+                                            >
+                                              {field.label}
+                                            </div>
+                                            <div
+                                              style={{
+                                                fontFamily: "monospace",
+                                                fontWeight: 700,
+                                                fontSize: "16px",
+                                                color: isDark
+                                                  ? "#FFFFFF"
+                                                  : "#1A1A1A",
+                                              }}
+                                            >
+                                              {field.value}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+
+                                {/* Previous Best */}
+                                {previousBest && (
+                                  <div
+                                    style={{
+                                      padding: "12px",
+                                      background: isDark
+                                        ? "rgba(255,255,255,0.05)"
+                                        : "rgba(0,0,0,0.02)",
+                                      borderRadius: "12px",
+                                      marginTop: "12px",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "8px",
+                                      }}
+                                    >
+                                      <History
+                                        style={{
+                                          width: "14px",
+                                          height: "14px",
+                                          color: isDark
+                                            ? "rgba(255,255,255,0.5)"
+                                            : "#6B7280",
+                                        }}
+                                      />
+                                      <span
+                                        style={{
+                                          fontSize: "13px",
+                                          color: isDark
+                                            ? "rgba(255,255,255,0.6)"
+                                            : "#6B7280",
+                                        }}
+                                      >
+                                        Previous best:{" "}
+                                        <span
+                                          style={{
+                                            color: isDark
+                                              ? "#FFFFFF"
+                                              : "#1A1A1A",
+                                            fontWeight: 700,
+                                            fontFamily: "monospace",
+                                          }}
+                                        >
+                                          {previousBest.record}
+                                        </span>
+                                      </span>
+                                    </div>
+                                    <TrendingUp
+                                      style={{
+                                        width: "14px",
+                                        height: "14px",
+                                        color: "#10B981",
+                                      }}
+                                    />
             </div>
           )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </main>
 
-          <div className="pt-4 text-center">
-            <Button
+        {/* Fixed Bottom Action Bar */}
+        <div
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: "24px",
+            background: isDark
+              ? "linear-gradient(to top, #000000, rgba(0,0,0,0.9), transparent)"
+              : "linear-gradient(to top, #FFFFFF, rgba(255,255,255,0.9), transparent)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "768px",
+              margin: "0 auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <button
               onClick={() =>
                 router.push(`/client/workouts/${assignment.id}/start`)
               }
-              className="rounded-full px-6 py-3 text-base font-semibold shadow-lg"
+              style={{
+                flex: 1,
+                height: "64px",
+                background: "linear-gradient(135deg, #EF4444 0%, #991B1B 100%)",
+                boxShadow: "0 0 30px rgba(239, 68, 68, 0.3)",
+                borderRadius: "18px",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                cursor: "pointer",
+                border: "none",
+                color: "#FFFFFF",
+                fontSize: "18px",
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "12px",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform =
+                  "translateY(-2px) scale(1.02)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 40px rgba(239, 68, 68, 0.5)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0) scale(1)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 30px rgba(239, 68, 68, 0.3)";
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "scale(0.98)";
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform =
+                  "translateY(-2px) scale(1.02)";
+              }}
             >
-              <Play className="w-5 h-5 mr-2" />
-              Start Workout
-            </Button>
+              <Play
+                style={{ width: "24px", height: "24px", fill: "currentColor" }}
+              />
+              Begin Protocol
+            </button>
           </div>
         </div>
       </div>

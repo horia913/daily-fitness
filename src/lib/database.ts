@@ -52,7 +52,7 @@ export interface WorkoutAssignment {
   id: string
   coach_id: string
   client_id: string
-  template_id: string
+  workout_template_id: string // Database column name (not template_id)
   assigned_date: string
   scheduled_date: string
   status: 'assigned' | 'in_progress' | 'completed' | 'skipped'
@@ -194,7 +194,6 @@ export class DatabaseService {
         .from('clients')
         .select('*')
         .eq('coach_id', coachId)
-        .eq('status', 'active')
 
       if (clientsError) {
         console.error('Error fetching clients:', clientsError)

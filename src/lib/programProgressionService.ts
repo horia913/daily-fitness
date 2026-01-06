@@ -593,7 +593,7 @@ export class ProgramProgressionService {
             exercise_id: exercise.exercise_id,
             exercise_order: exercise.exercise_order,
             sets: exercise.sets || undefined,
-            reps: restPauseConfig?.initial_reps?.toString() || exercise.reps || undefined,
+            reps: exercise.reps || undefined,
             rest_pause_duration: restPauseConfig?.rest_pause_duration || undefined,
             max_rest_pauses: restPauseConfig?.max_rest_pauses || undefined,
             rest_seconds: exercise.rest_seconds || undefined,
@@ -625,15 +625,21 @@ export class ProgramProgressionService {
         break
       
       case 'amrap':
-        const amrapTimeProtocol = block.time_protocol
         for (const exercise of block.exercises) {
+          // Find time protocol for this specific exercise
+          const amrapTimeProtocol = block.time_protocols?.find(
+            (tp: any) => tp.protocol_type === 'amrap' && 
+            tp.exercise_id === exercise.exercise_id && 
+            tp.exercise_order === exercise.exercise_order
+          ) || block.time_protocols?.find((tp: any) => tp.protocol_type === 'amrap')
+          
           rules.push({
             ...baseRule,
             exercise_id: exercise.exercise_id,
             exercise_order: exercise.exercise_order,
             duration_minutes: amrapTimeProtocol?.total_duration_minutes || block.duration_seconds ? Math.floor((block.duration_seconds || 0) / 60) : undefined,
             reps: exercise.reps || undefined,
-            target_reps: exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined,
+            target_reps: amrapTimeProtocol?.target_reps || (exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined),
             tempo: exercise.tempo || undefined,
             notes: exercise.notes || undefined,
           })
@@ -641,8 +647,14 @@ export class ProgramProgressionService {
         break
       
       case 'emom':
-        const emomTimeProtocol = block.time_protocol
         for (const exercise of block.exercises) {
+          // Find time protocol for this specific exercise
+          const emomTimeProtocol = block.time_protocols?.find(
+            (tp: any) => tp.protocol_type === 'emom' && 
+            tp.exercise_id === exercise.exercise_id && 
+            tp.exercise_order === exercise.exercise_order
+          ) || block.time_protocols?.find((tp: any) => tp.protocol_type === 'emom')
+          
           rules.push({
             ...baseRule,
             exercise_id: exercise.exercise_id,
@@ -658,8 +670,14 @@ export class ProgramProgressionService {
         break
       
       case 'tabata':
-        const tabataTimeProtocol = block.time_protocol
         for (const exercise of block.exercises) {
+          // Find time protocol for this specific exercise
+          const tabataTimeProtocol = block.time_protocols?.find(
+            (tp: any) => tp.protocol_type === 'tabata' && 
+            tp.exercise_id === exercise.exercise_id && 
+            tp.exercise_order === exercise.exercise_order
+          ) || block.time_protocols?.find((tp: any) => tp.protocol_type === 'tabata')
+          
           rules.push({
             ...baseRule,
             exercise_id: exercise.exercise_id,
@@ -675,14 +693,20 @@ export class ProgramProgressionService {
         break
       
       case 'for_time':
-        const forTimeProtocol = block.time_protocol
         for (const exercise of block.exercises) {
+          // Find time protocol for this specific exercise
+          const forTimeProtocol = block.time_protocols?.find(
+            (tp: any) => tp.protocol_type === 'for_time' && 
+            tp.exercise_id === exercise.exercise_id && 
+            tp.exercise_order === exercise.exercise_order
+          ) || block.time_protocols?.find((tp: any) => tp.protocol_type === 'for_time')
+          
           rules.push({
             ...baseRule,
             exercise_id: exercise.exercise_id,
             exercise_order: exercise.exercise_order,
-            target_reps: exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined,
-            time_cap_minutes: forTimeProtocol?.total_duration_minutes || undefined,
+            target_reps: forTimeProtocol?.target_reps || (exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined),
+            time_cap_minutes: forTimeProtocol?.time_cap_minutes || forTimeProtocol?.total_duration_minutes || undefined,
             tempo: exercise.tempo || undefined,
             notes: exercise.notes || undefined,
           })

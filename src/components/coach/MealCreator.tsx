@@ -8,6 +8,7 @@ import { Search, Plus, Minus, X, ChefHat } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { MealPlanService, Food, MealItem } from '@/lib/mealPlanService'
+import { supabase } from '@/lib/supabase'
 
 interface MealCreatorProps {
   mealPlanId: string
@@ -30,6 +31,7 @@ export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreator
   const [loading, setLoading] = useState(false)
   const [searching, setSearching] = useState(false)
   const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('breakfast')
+  const [mealName, setMealName] = useState('')
 
   // Load available foods on mount
   useEffect(() => {
@@ -121,17 +123,43 @@ export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreator
   const saveMeal = async () => {
     if (selectedFoods.length === 0) return
 
+    // Generate a default meal name if not provided
+    const finalMealName = mealName.trim() || `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} Meal ${new Date().toLocaleDateString()}`
+
     try {
       setLoading(true)
       
-      // Save each food item to the meal plan
-      for (const food of selectedFoods) {
-        await MealPlanService.addMealItem(mealPlanId, {
-          food_id: food.id,
-          meal_type: mealType,
-          quantity: food.quantity,
-          coach_id: user?.id || ''
+      // First, create a meal entity in the meals table
+      const { data: meal, error: mealError } = await supabase
+        .from('meals')
+        .insert({
+          meal_plan_id: mealPlanId,
+          name: finalMealName,
+          meal_type: mealType
         })
+        .select()
+        .single()
+
+      if (mealError) {
+        console.error('Error creating meal:', mealError)
+        throw mealError
+      }
+
+      // Then, create meal food items in meal_food_items table
+      const foodItems = selectedFoods.map(food => ({
+        meal_id: meal.id,
+        food_id: food.id,
+        quantity: food.quantity,
+        unit: food.serving_unit || 'g'
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('meal_food_items')
+        .insert(foodItems)
+
+      if (itemsError) {
+        console.error('Error adding food items:', itemsError)
+        throw itemsError
       }
       
       onSave()
@@ -147,7 +175,18 @@ export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreator
   const totals = calculateMealTotals()
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 pt-20 pb-20 z-[9999]">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 pt-20 pb-20 z-[9999]"
+      onClick={(e) => {
+        // Don't close if clicking on Select dropdown
+        if ((e.target as HTMLElement).closest('[data-slot="select-content"]')) {
+          return
+        }
+        if (e.target === e.currentTarget) {
+          onClose()
+        }
+      }}
+    >
       <Card className={`w-full max-w-4xl h-[87.5vh] flex flex-col overflow-hidden ${theme.card} ${theme.shadow} rounded-2xl`}>
         <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
           <div>
@@ -166,6 +205,20 @@ export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreator
 
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
+            {/* Meal Name Input */}
+            <div className="space-y-2">
+              <label className={`text-sm font-medium ${theme.text}`}>Meal Name</label>
+              <Input
+                value={mealName}
+                onChange={(e) => setMealName(e.target.value)}
+                placeholder={`e.g., ${mealType.charAt(0).toUpperCase() + mealType.slice(1)} Meal`}
+                className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
+              />
+              <p className={`text-xs ${theme.textSecondary}`}>
+                Leave empty to auto-generate a name
+              </p>
+            </div>
+
             {/* Meal Type Selection */}
             <div className="space-y-2">
               <label className={`text-sm font-medium ${theme.text}`}>Meal Type</label>
@@ -173,7 +226,7 @@ export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreator
                 <SelectTrigger className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}>
                   <SelectValue placeholder="Select meal type" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[10000]">
                   <SelectItem value="breakfast">Breakfast</SelectItem>
                   <SelectItem value="lunch">Lunch</SelectItem>
                   <SelectItem value="dinner">Dinner</SelectItem>
@@ -268,7 +321,7 @@ export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreator
                             <div className="flex items-center gap-2">
                               <Input
                                 type="number"
-                                defaultValue={food.quantity}
+                                value={food.quantity}
                                 onChange={(e) => handleQuantityChange(food.id, e.target.value)}
                                 className="w-20 text-center"
                                 min="0"

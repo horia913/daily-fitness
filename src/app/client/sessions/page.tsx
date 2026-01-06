@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { ClientTypeGuard } from '@/components/guards/ClientTypeGuard'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -319,16 +320,44 @@ export default function ClientSessions() {
 
   const cancelSession = async (sessionId: string) => {
     try {
-      const { error } = await supabase
-        .from('booked_sessions')
-        .update({ status: 'cancelled' })
-        .eq('id', sessionId)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-      if (error) throw error
+      // Find the session to check timing
+      const session = sessions.find(s => s.id === sessionId)
+      if (!session) return
 
+      const sessionDateTime = new Date(`${session.time_slot.date}T${session.time_slot.start_time}`)
+      const now = new Date()
+      const hoursUntilSession = (sessionDateTime.getTime() - now.getTime()) / (1000 * 60 * 60)
+
+      let confirmMessage = ''
+      if (hoursUntilSession > 8) {
+        confirmMessage = 'Cancel this session? Your credit will be returned.'
+      } else {
+        confirmMessage = 'Warning: Cancelling less than 8 hours before the session means your credit will be lost. Cancel anyway?'
+      }
+
+      if (!confirm(confirmMessage)) return
+
+      // Call API route
+      const response = await fetch('/api/cancel-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, clientId: user.id }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        alert(result.message)
       loadSessions()
+      } else {
+        alert(result.error || 'Failed to cancel session')
+      }
     } catch (error) {
       console.error('Error cancelling session:', error)
+      alert('Failed to cancel session. Please try again.')
     }
   }
 
@@ -456,6 +485,8 @@ export default function ClientSessions() {
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
       case 'cancelled':
         return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+      case 'cancelled_late':
+        return 'bg-red-200 text-red-900 dark:bg-red-800/40 dark:text-red-200'
       case 'no_show':
         return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
       default:
@@ -669,6 +700,7 @@ export default function ClientSessions() {
 
   return (
     <ProtectedRoute requiredRole="client">
+      <ClientTypeGuard requiredType="in_gym">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen">
@@ -1102,6 +1134,7 @@ export default function ClientSessions() {
         )}
         </div>
       </AnimatedBackground>
+    </ClientTypeGuard>
     </ProtectedRoute>
   )
 }

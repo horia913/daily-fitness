@@ -33,16 +33,13 @@ export interface WorkoutBlock {
   total_sets?: number                 // Total sets for the block
   reps_per_set?: string               // Reps for each set (can be ranges like "10-12")
   
-  // Special parameters (flexible JSON)
-  block_parameters?: Record<string, any>
-  
   // Relations
   exercises?: WorkoutBlockExercise[]
   drop_sets?: WorkoutDropSet[]
   cluster_sets?: WorkoutClusterSet[]
   pyramid_sets?: WorkoutPyramidSet[]
   rest_pause_sets?: WorkoutRestPauseSet[]
-  time_protocol?: WorkoutTimeProtocol
+  time_protocols?: WorkoutTimeProtocol[]  // One per exercise for time-based blocks
   ladder_sets?: WorkoutLadderSet[]
   
   created_at: string
@@ -96,30 +93,37 @@ export interface Exercise {
 // Drop Set Configuration
 export interface WorkoutDropSet {
   id: string
-  block_exercise_id: string
-  drop_order: number                  // 1st drop, 2nd drop, etc.
+  block_id: string                     // Links to workout block
+  exercise_id: string                   // Links to exercise from library
+  exercise_order: number                // Order of exercise within block
+  drop_order: number                    // 1st drop, 2nd drop, etc.
   weight_kg?: number
   reps?: string
-  rest_seconds?: number               // Usually 0 for drop sets
+  drop_percentage?: number              // Percentage reduction from previous weight
+  rest_seconds?: number                 // Usually 0 for drop sets
   created_at: string
 }
 
 // Cluster Set Configuration
 export interface WorkoutClusterSet {
   id: string
-  block_exercise_id: string
+  block_id: string                     // Links to workout block
+  exercise_id: string                   // Links to exercise from library
+  exercise_order: number                // Order of exercise within block
   reps_per_cluster: number
   clusters_per_set: number
-  intra_cluster_rest: number          // Rest between clusters (seconds)
-  inter_set_rest: number              // Rest after full set (seconds)
+  intra_cluster_rest: number            // Rest between clusters (seconds)
+  inter_set_rest: number                // Rest after full set (seconds)
   created_at: string
 }
 
 // Pyramid Set Configuration
 export interface WorkoutPyramidSet {
   id: string
-  block_exercise_id: string
-  pyramid_order: number               // Order in the pyramid
+  block_id: string                     // Links to workout block
+  exercise_id: string                   // Links to exercise from library
+  exercise_order: number                // Order of exercise within block
+  pyramid_order: number                 // Order in the pyramid
   weight_kg?: number
   reps?: string
   rest_seconds?: number
@@ -129,31 +133,43 @@ export interface WorkoutPyramidSet {
 // Rest-Pause Configuration
 export interface WorkoutRestPauseSet {
   id: string
-  block_exercise_id: string
-  initial_weight_kg?: number
-  initial_reps?: number
-  rest_pause_duration: number         // Seconds between efforts
-  max_rest_pauses: number             // Max number of rest-pause attempts
+  block_id: string                     // Links to workout block
+  exercise_id: string                   // Links to exercise from library
+  exercise_order: number                // Order of exercise within block
+  weight_kg?: number                    // Renamed from initial_weight_kg
+  // initial_reps was dropped - reps are tracked in workout_blocks table
+  rest_pause_duration: number          // Seconds between efforts
+  max_rest_pauses: number              // Max number of rest-pause attempts
   created_at: string
 }
 
-// Time Protocol Configuration (AMRAP, EMOM, Tabata, For Time)
+// Time Protocol Configuration (AMRAP, EMOM, Tabata, For Time, Circuit)
 export interface WorkoutTimeProtocol {
   id: string
-  block_id: string
-  protocol_type: 'amrap' | 'emom' | 'for_time' | 'ladder'
-  total_duration_minutes?: number     // For AMRAP, EMOM
-  work_seconds?: number               // For Tabata, EMOM work periods
-  rest_seconds?: number               // For Tabata, EMOM rest periods
-  rounds?: number                     // For Tabata (usually 8)
+  block_id: string                     // Links to workout block
+  exercise_id: string                   // Links to exercise from library
+  exercise_order: number                // Order of exercise within block
+  protocol_type: 'amrap' | 'emom' | 'for_time' | 'tabata' | 'circuit'
+  total_duration_minutes?: number       // For AMRAP, EMOM
+  work_seconds?: number                 // For Tabata, EMOM work periods
+  rest_seconds?: number                 // For Tabata, EMOM rest periods (rest after exercise)
+  rest_after_set?: number               // For Circuit/Tabata: rest after completing all exercises in the set
+  rounds?: number                       // For Tabata (usually 8)
+  target_reps?: number                 // For AMRAP, For Time
+  time_cap_minutes?: number            // For For Time
+  reps_per_round?: number              // For EMOM (reps per minute/round)
+  emom_mode?: string                   // For EMOM (target_reps or target_time)
+  set?: number                          // Set number (for Tabata/Circuit only)
   created_at: string
 }
 
 // Ladder Configuration
 export interface WorkoutLadderSet {
   id: string
-  block_exercise_id: string
-  ladder_order: number                // Order in the ladder
+  block_id: string                     // Links to workout block
+  exercise_id: string                   // Links to exercise from library
+  exercise_order: number                // Order of exercise within block
+  ladder_order: number                  // Order in the ladder
   weight_kg?: number
   reps?: number
   rest_seconds?: number

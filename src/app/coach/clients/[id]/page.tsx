@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { calculateStreak, calculateWeeklyProgress } from "@/lib/clientDashboardService";
 
 interface ClientData {
   id: string;
@@ -121,12 +122,154 @@ function ClientDetailContent() {
     if (!user) return;
 
     try {
-      // TODO: Replace with actual Supabase queries
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setLoading(true);
+
+      // Get client profile
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", clientId)
+        .single();
+
+      if (profileError || !profile) {
+        console.error("Error loading client profile:", profileError);
+        setLoading(false);
+        return;
+      }
+
+      // Calculate real stats
+      const [streak, weeklyProgress] = await Promise.all([
+        calculateStreak(clientId),
+        calculateWeeklyProgress(clientId),
+      ]);
+
+      // Get total completed workouts
+      const { data: completedWorkouts } = await supabase
+        .from("workout_logs")
+        .select("id")
+        .eq("client_id", clientId)
+        .not("completed_at", "is", null);
+
+      const totalWorkouts = completedWorkouts?.length || 0;
+
+      // Calculate compliance (completed / assigned this week)
+      const compliance =
+        weeklyProgress.goal > 0
+          ? Math.round((weeklyProgress.current / weeklyProgress.goal) * 100)
+          : 0;
+
+      // Get last activity
+      const { data: lastLog } = await supabase
+        .from("workout_logs")
+        .select("completed_at")
+        .eq("client_id", clientId)
+        .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const lastActive = lastLog?.completed_at
+        ? getRelativeTime(new Date(lastLog.completed_at))
+        : "Never";
+
+      // Get recent activity (workouts + meal photos)
+      const { data: recentWorkouts } = await supabase
+        .from("workout_logs")
+        .select("completed_at, workout_template:workout_templates(name)")
+        .eq("client_id", clientId)
+        .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false })
+        .limit(5);
+
+      const { data: recentMeals } = await supabase
+        .from("meal_photo_logs")
+        .select("created_at, meal:meals(name, meal_type)")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      const recentActivity: ClientData["recentActivity"] = [];
+
+      // Add workouts
+      (recentWorkouts || []).forEach((log: any) => {
+        const template = Array.isArray(log.workout_template) ? log.workout_template[0] : log.workout_template;
+        recentActivity.push({
+          type: "workout",
+          title: template?.name || "Workout",
+          date: getRelativeTime(new Date(log.completed_at!)),
+          status: "completed",
+        });
+      });
+
+      // Add meals
+      (recentMeals || []).forEach((log: any) => {
+        const meal = Array.isArray(log.meal) ? log.meal[0] : log.meal;
+        recentActivity.push({
+          type: "meal",
+          title: `${meal?.meal_type || "Meal"} logged`,
+          date: getRelativeTime(new Date(log.created_at)),
+          status: "completed",
+        });
+      });
+
+      // Sort by date and take top 10
+      recentActivity.sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      // Determine status
+      let status: ClientData["status"] = "active";
+      if (compliance < 50) {
+        status = "at-risk";
+      } else if (compliance === 0 && weeklyProgress.goal > 0) {
+        status = "inactive";
+      }
+
+      setClient({
+        id: clientId,
+        name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Client",
+        email: profile.email || "",
+        phone: profile.phone || undefined,
+        location: undefined,
+        joinedDate: new Date(profile.created_at).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+        status,
+        stats: {
+          workoutsThisWeek: weeklyProgress.current,
+          workoutGoal: weeklyProgress.goal,
+          compliance,
+          streak,
+          totalWorkouts,
+          lastActive,
+        },
+        recentActivity: recentActivity.slice(0, 10),
+      });
+
       setLoading(false);
     } catch (error) {
       console.error("Error loading client data:", error);
       setLoading(false);
+    }
+  };
+
+  const getRelativeTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) {
+      return `${diffMins} min${diffMins !== 1 ? "s" : ""} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
+    } else {
+      return date.toLocaleDateString();
     }
   };
 

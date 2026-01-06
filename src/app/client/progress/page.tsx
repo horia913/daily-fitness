@@ -21,6 +21,7 @@ import {
   Target,
   FileText,
   Activity,
+  Timer,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -589,6 +590,118 @@ function ProgressHubContent() {
                     style={{ color: getSemanticColor("trust").primary }}
                   >
                     Track all your completed workouts →
+                  </p>
+                </div>
+              </GlassCard>
+            </Link>
+
+            {/* Performance Tests Card */}
+            <Link href="/client/progress/performance">
+              <GlassCard
+                elevation={2}
+                className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer h-full"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #F97316 0%, #EA580C 100%)",
+                      boxShadow: "0 4px 12px rgba(249, 115, 22, 0.3)",
+                    }}
+                  >
+                    <Timer className="w-7 h-7 text-white" />
+                  </div>
+                  <ChevronRight
+                    className="w-6 h-6"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.4)"
+                        : "rgba(0,0,0,0.4)",
+                    }}
+                  />
+                </div>
+
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  Performance Tests
+                </h3>
+
+                <div className="space-y-2">
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.6)"
+                        : "rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    1km Run & Step Test assessments
+                  </p>
+
+                  <p
+                    className="text-xs font-medium"
+                    style={{ color: getSemanticColor("warning").primary }}
+                  >
+                    Track monthly tests →
+                  </p>
+                </div>
+              </GlassCard>
+            </Link>
+
+            {/* Challenges Card */}
+            <Link href="/client/challenges">
+              <GlassCard
+                elevation={2}
+                className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer h-full"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+                      boxShadow: "0 4px 12px rgba(255, 215, 0, 0.3)",
+                    }}
+                  >
+                    <Trophy className="w-7 h-7 text-white" />
+                  </div>
+                  <ChevronRight
+                    className="w-6 h-6"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.4)"
+                        : "rgba(0,0,0,0.4)",
+                    }}
+                  />
+                </div>
+
+                <h3
+                  className="text-xl font-bold mb-2"
+                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                >
+                  Challenges
+                </h3>
+
+                <div className="space-y-2">
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: isDark
+                        ? "rgba(255,255,255,0.6)"
+                        : "rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    Join challenges and compete with others
+                  </p>
+
+                  <p
+                    className="text-xs font-medium"
+                    style={{ color: getSemanticColor("energy").primary }}
+                  >
+                    Browse active challenges →
                   </p>
                 </div>
               </GlassCard>

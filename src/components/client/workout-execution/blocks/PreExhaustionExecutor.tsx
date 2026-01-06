@@ -43,7 +43,7 @@ export function PreExhaustionExecutor({
   const completedSets = block.completedSets || 0;
   const currentSet = completedSets;
 
-  const restBetween = (block.block.block_parameters as any)?.rest_between || 15;
+  const restBetween = block.block.rest_seconds || 15;
 
   const [isolationWeight, setIsolationWeight] = useState("");
   const [isolationReps, setIsolationReps] = useState("");

@@ -40,13 +40,10 @@ export function ClusterSetExecutor({
   const completedSets = block.completedSets || 0;
   const currentSet = completedSets;
 
-  // Cluster set parameters
-  const clustersPerSet =
-    (block.block.block_parameters as any)?.clusters_per_set || 3;
-  const repsPerCluster =
-    (block.block.block_parameters as any)?.reps_per_cluster || 2;
-  const intraClusterRest =
-    (block.block.block_parameters as any)?.intra_cluster_rest || 20;
+  // Cluster set parameters (block_parameters removed - TODO: Get from workout_cluster_sets table)
+  const clustersPerSet: number = 3; // TODO: Get from workout_cluster_sets table
+  const repsPerCluster: number = 2; // TODO: Get from workout_cluster_sets table
+  const intraClusterRest: number = 20; // TODO: Get from workout_cluster_sets table
   const restBetweenSets = block.block.rest_seconds || 90;
 
   const [weight, setWeight] = useState("");
@@ -188,7 +185,7 @@ export function ClusterSetExecutor({
         // Check if rest timer will show - if so, don't clear weight yet
         // For cluster sets, use intra-cluster rest (rest between exercises within cluster)
         // restBetweenSets is only for rest AFTER completing a full set
-        const restSeconds = intraClusterRest || currentExercise?.rest_seconds || block.block.rest_seconds || 0;
+        const restSeconds: number = intraClusterRest || currentExercise?.rest_seconds || block.block.rest_seconds || 0;
         if (restSeconds === 0) {
           // No rest timer, clear weight immediately
           setWeight("");

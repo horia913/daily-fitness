@@ -69,7 +69,7 @@ interface Client {
 }
 
 const metricOptions = [
-  { value: 'body_measurement', label: 'Body Measurements', unit: 'varies', icon: 'scale', autoTrackable: true, source: 'body_measurements table', requiresSelection: 'body_parts' },
+  { value: 'body_measurement', label: 'Body Measurements', unit: 'varies', icon: 'scale', autoTrackable: true, source: 'body_metrics table', requiresSelection: 'body_parts' },
   { value: 'exercise_pr', label: 'Exercise Personal Record', unit: 'kg', icon: 'dumbbell', autoTrackable: true, source: 'workout_logs (max weight)', requiresSelection: 'exercises' },
   { value: 'workout_count', label: 'Total Workouts Completed', unit: 'workouts', icon: 'activity', autoTrackable: true, source: 'workout_logs count', requiresSelection: null },
   { value: 'daily_nutrition', label: 'Daily Nutrition Target', unit: 'g', icon: 'apple', autoTrackable: true, source: 'meal_logs (daily avg)', requiresSelection: 'nutrients' },

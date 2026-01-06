@@ -221,8 +221,8 @@ export const notificationService = {
   },
   
   async sendMessageNotification(senderName: string, message: string): Promise<void> {
-    // This would send a message notification
-    console.log('Sending message notification:', senderName, message)
+    // Deprecated - messaging moved to WhatsApp
+    console.log('Message notifications disabled - use WhatsApp for coach-client communication')
   },
   
   async sendGoalReminder(goalName: string, progress: string): Promise<void> {

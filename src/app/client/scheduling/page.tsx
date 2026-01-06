@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { ClientTypeGuard } from '@/components/guards/ClientTypeGuard'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -428,6 +429,24 @@ export default function ClientScheduling() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // Check 1 session/day limit
+      const { data: existingSessions, error: checkError } = await supabase
+        .from('sessions')
+        .select('id')
+        .eq('client_id', user.id)
+        .eq('scheduled_date', selectedDate)
+        .in('status', ['scheduled', 'confirmed'])
+
+      if (checkError) {
+        console.error('Error checking existing sessions:', checkError)
+      }
+
+      if (existingSessions && existingSessions.length > 0) {
+        alert('You already have a session booked for this date. Only 1 session per day is allowed.')
+        setBooking(false)
+        return
+      }
+
       const { data, error } = await supabase.rpc('book_session_with_clipcard', {
         p_coach_id: selectedCoach,
         p_client_id: user.id,
@@ -529,6 +548,7 @@ export default function ClientScheduling() {
 
   return (
     <ProtectedRoute requiredRole="client">
+      <ClientTypeGuard requiredType="in_gym">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen">
@@ -1037,6 +1057,7 @@ export default function ClientScheduling() {
         </div>
         </div>
       </AnimatedBackground>
+      </ClientTypeGuard>
     </ProtectedRoute>
   )
 }

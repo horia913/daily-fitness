@@ -58,13 +58,17 @@ function ProgramDetailsContent() {
     if (!programId) return;
     setLoading(true);
     try {
+      // Note: WorkoutTemplateService doesn't have getProgram (singular), only getPrograms (plural)
+      // Using direct query is acceptable here since it's a simple fetch
       const { data, error } = await supabase
         .from("workout_programs")
         .select("*")
         .eq("id", programId)
         .single();
 
-      if (!error) setProgram(data as Program);
+      if (!error && data) setProgram(data as Program);
+    } catch (error) {
+      console.error("Error loading program:", error);
     } finally {
       setLoading(false);
     }
@@ -148,7 +152,7 @@ function ProgramDetailsContent() {
     );
   }
 
-  const dayNames = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6"];
+  const dayNames = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"];
   const week1 = (schedule || []).filter((s) => (s.week_number || 1) === 1);
 
   // Difficulty colors

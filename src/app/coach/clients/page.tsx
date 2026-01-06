@@ -28,13 +28,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { DatabaseService } from "@/lib/database";
 
 interface Client {
   id: string;
   name: string;
   email: string;
   avatar?: string;
-  status: "active" | "inactive" | "at-risk";
+  status: "active" | "inactive" | "pending" | "at-risk"; // at-risk is derived from compliance (TODO)
   workoutsThisWeek: number;
   workoutGoal: number;
   compliance: number; // 0-100
@@ -45,66 +46,13 @@ interface Client {
 }
 
 type ViewMode = "grid" | "list";
-type StatusFilter = "all" | "active" | "inactive" | "at-risk";
+type StatusFilter = "all" | "active" | "inactive" | "pending" | "at-risk"; // at-risk is TODO (derived from compliance)
 
 function ClientManagementContent() {
   const { user } = useAuth();
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
 
-  const [clients, setClients] = useState<Client[]>([
-    {
-      id: "1",
-      name: "Sarah Johnson",
-      email: "sarah.j@email.com",
-      status: "active",
-      workoutsThisWeek: 4,
-      workoutGoal: 4,
-      compliance: 100,
-      lastActive: "2 hours ago",
-      totalWorkouts: 87,
-      assignedWorkouts: 95,
-      completedWorkouts: 87,
-    },
-    {
-      id: "2",
-      name: "Mike Chen",
-      email: "mike.chen@email.com",
-      status: "active",
-      workoutsThisWeek: 3,
-      workoutGoal: 5,
-      compliance: 85,
-      lastActive: "1 day ago",
-      totalWorkouts: 124,
-      assignedWorkouts: 145,
-      completedWorkouts: 124,
-    },
-    {
-      id: "3",
-      name: "Emma Davis",
-      email: "emma.d@email.com",
-      status: "at-risk",
-      workoutsThisWeek: 1,
-      workoutGoal: 4,
-      compliance: 45,
-      lastActive: "3 days ago",
-      totalWorkouts: 32,
-      assignedWorkouts: 71,
-      completedWorkouts: 32,
-    },
-    {
-      id: "4",
-      name: "Alex Rodriguez",
-      email: "alex.r@email.com",
-      status: "inactive",
-      workoutsThisWeek: 0,
-      workoutGoal: 3,
-      compliance: 20,
-      lastActive: "1 week ago",
-      totalWorkouts: 18,
-      assignedWorkouts: 90,
-      completedWorkouts: 18,
-    },
-  ]);
+  const [clients, setClients] = useState<Client[]>([]);
 
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
@@ -119,8 +67,38 @@ function ClientManagementContent() {
     if (!user) return;
 
     try {
-      // TODO: Replace with actual Supabase queries
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setLoading(true);
+      // Fetch clients from database
+      const dbClients = await DatabaseService.getClients(user.id);
+      
+      // Map database data to page interface
+      const mappedClients: Client[] = dbClients.map((dbClient) => {
+        const profile = dbClient.profiles;
+        const name = profile 
+          ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Client'
+          : 'Client';
+        
+        return {
+          id: dbClient.client_id,
+          name: name,
+          email: profile?.email || '',
+          avatar: profile?.avatar_url,
+          // Return raw database status only - no mapping
+          status: dbClient.status as "active" | "inactive" | "pending",
+          // TODO: Calculate from workout_assignments and workout_logs tables
+          workoutsThisWeek: 0,
+          workoutGoal: 0,
+          // TODO: Calculate compliance from completedWorkouts / assignedWorkouts
+          // TODO: Derive 'at-risk' status from low compliance (< 50% or similar threshold)
+          compliance: 0,
+          lastActive: '',
+          totalWorkouts: 0,
+          assignedWorkouts: 0,
+          completedWorkouts: 0,
+        };
+      });
+      
+      setClients(mappedClients);
       setLoading(false);
     } catch (error) {
       console.error("Error loading clients:", error);
@@ -132,6 +110,10 @@ function ClientManagementContent() {
     const matchesSearch =
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.email.toLowerCase().includes(searchQuery.toLowerCase());
+    // TODO: at-risk filter requires compliance calculation - return empty until implemented
+    if (statusFilter === "at-risk") {
+      return false; // TODO: Filter by compliance < threshold once compliance is calculated
+    }
     const matchesStatus =
       statusFilter === "all" || client.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -141,9 +123,13 @@ function ClientManagementContent() {
     switch (status) {
       case "active":
         return getSemanticColor("success").primary;
-      case "at-risk":
-        return getSemanticColor("warning").primary;
       case "inactive":
+        return getSemanticColor("neutral").primary;
+      case "pending":
+        return getSemanticColor("neutral").primary;
+      case "at-risk":
+        return getSemanticColor("warning").primary; // TODO: Derived from compliance
+      default:
         return getSemanticColor("neutral").primary;
     }
   };
@@ -152,10 +138,14 @@ function ClientManagementContent() {
     switch (status) {
       case "active":
         return "Active";
-      case "at-risk":
-        return "At Risk";
       case "inactive":
         return "Inactive";
+      case "pending":
+        return "Pending";
+      case "at-risk":
+        return "At Risk"; // TODO: Derived from compliance, not database status
+      default:
+        return status;
     }
   };
 
@@ -166,8 +156,10 @@ function ClientManagementContent() {
   };
 
   const activeCount = clients.filter((c) => c.status === "active").length;
-  const atRiskCount = clients.filter((c) => c.status === "at-risk").length;
   const inactiveCount = clients.filter((c) => c.status === "inactive").length;
+  const pendingCount = clients.filter((c) => c.status === "pending").length;
+  // TODO: at-risk is derived from compliance (< 50% or similar), not database status
+  const atRiskCount = 0; // TODO: Calculate from compliance once implemented
 
   return (
     <AnimatedBackground>

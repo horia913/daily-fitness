@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAllClientGoals } from '@/lib/goalSyncService'
 import { createClient } from '@supabase/supabase-js'
+import { createErrorResponse, handleApiError, createSuccessResponse } from '@/lib/apiErrorHandler'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -33,27 +34,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized - client ID required' }, { status: 401 })
+      return createErrorResponse('Unauthorized - client ID required', undefined, 'UNAUTHORIZED', 401)
     }
 
     // Sync all goals for this client
     const results = await syncAllClientGoals(userId)
 
-    return NextResponse.json({
-      success: true,
+    return createSuccessResponse({
       synced: results.filter(r => r.updated).length,
       total: results.length,
       results
     })
   } catch (error) {
-    console.error('Goal sync error:', error)
-    return NextResponse.json(
-      { 
-        error: 'Failed to sync goals',
-        details: error instanceof Error ? error.message : String(error)
-      },
-      { status: 500 }
-    )
+    return handleApiError(error, 'Failed to sync goals')
   }
 }
 
