@@ -54,17 +54,26 @@ export function RestPauseExecutor({
   const [timerSeconds, setTimerSeconds] = useState(restPauseDuration);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Pre-fill with suggested weight
+  // Pre-fill with suggested weight - recalculate when e1rmMap is populated
   useEffect(() => {
-    if (currentExercise?.load_percentage && !weight) {
-      const suggested = calculateSuggestedWeightUtil(
-        currentExercise.exercise_id,
-        currentExercise.load_percentage,
-        e1rmMap
-      );
-      if (suggested) setWeight(suggested.toString());
+    if (currentExercise?.load_percentage && currentExercise?.exercise_id) {
+      // Check if e1rmMap has data for this exercise
+      const hasE1rm = e1rmMap[currentExercise.exercise_id] && e1rmMap[currentExercise.exercise_id] > 0;
+      // Only set if weight is empty or if e1rmMap was just populated
+      const weightIsEmpty = !weight || weight.trim() === "" || parseFloat(weight) === 0;
+      
+      if (hasE1rm && weightIsEmpty) {
+        const suggested = calculateSuggestedWeightUtil(
+          currentExercise.exercise_id,
+          currentExercise.load_percentage,
+          e1rmMap
+        );
+        if (suggested && suggested > 0) {
+          setWeight(suggested.toString());
+        }
+      }
     }
-  }, [currentExercise, e1rmMap, weight]);
+  }, [currentExercise?.exercise_id, currentExercise?.load_percentage, e1rmMap, weight]);
 
   // Timer logic
   useEffect(() => {
@@ -171,97 +180,110 @@ export function RestPauseExecutor({
       }
     } catch (e) {}
 
-    // Calculate reps after rest pause
-    const repsAfterRestPause = restPauseAttempts.reduce(
-      (sum, r) => sum + parseInt(r || "0"),
-      0
-    );
+    try {
+      // Calculate reps after rest pause
+      const repsAfterRestPause = restPauseAttempts.reduce(
+        (sum, r) => sum + parseInt(r || "0"),
+        0
+      );
 
-    const logData: any = {
-      block_type: 'rest_pause',
-      set_number: completedSets + 1,
-      rest_pause_number: 1, // First rest-pause set
-    };
-    
-    // Only add fields if they're defined
-    if (currentExercise?.exercise_id) logData.exercise_id = currentExercise.exercise_id;
-    if (weightNum !== undefined && weightNum !== null) {
-      logData.weight = weightNum;
-      logData.rest_pause_initial_weight = weightNum;
-    }
-    if (initialRepsNum !== undefined && initialRepsNum !== null) logData.rest_pause_initial_reps = initialRepsNum;
-    if (repsAfterRestPause !== undefined && repsAfterRestPause !== null) logData.rest_pause_reps_after = repsAfterRestPause;
-    
-    const result = await logSetToDatabase(logData);
-
-    if (result.success) {
-      // Calculate total reps: initial reps + reps after rest pause
-      const totalReps = initialRepsNum + repsAfterRestPause;
+      const logData: any = {
+        block_type: 'rest_pause',
+        set_number: completedSets + 1,
+        rest_pause_number: 1, // First rest-pause set
+      };
       
-      const loggedSetsArray: LoggedSet[] = [
-        {
-          id: `temp-${Date.now()}`,
-          exercise_id: currentExercise?.exercise_id || "",
-          block_id: block.block.id,
-          set_number: completedSets + 1,
-          weight_kg: weightNum,
-          reps_completed: totalReps,
-          completed_at: new Date(),
-        } as LoggedSet,
-      ];
-
-      if (result.e1rm && onE1rmUpdate && currentExercise?.exercise_id) {
-        onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
+      // Only add fields if they're defined
+      if (currentExercise?.exercise_id) logData.exercise_id = currentExercise.exercise_id;
+      // Only save rest_pause_initial_weight (not generic weight field)
+      if (weightNum !== undefined && weightNum !== null) {
+        logData.rest_pause_initial_weight = weightNum;
       }
+      if (initialRepsNum !== undefined && initialRepsNum !== null) logData.rest_pause_initial_reps = initialRepsNum;
+      if (repsAfterRestPause !== undefined && repsAfterRestPause !== null) logData.rest_pause_reps_after = repsAfterRestPause;
+      // Add rest_pause_duration and max_rest_pauses (from workout_rest_pause_sets)
+      if (restPauseDuration !== undefined && restPauseDuration !== null) logData.rest_pause_duration = restPauseDuration;
+      if (maxRestPauses !== undefined && maxRestPauses !== null) logData.max_rest_pauses = maxRestPauses;
+      
+      const result = await logSetToDatabase(logData);
 
-      addToast({
-        title: "Rest-Pause Set Logged!",
-        description: `${weightNum}kg × ${totalReps} total reps (${initialRepsNum} + ${restPauseAttempts.length} rest-pause attempts)`,
-        variant: "success",
-        duration: 2000,
-      });
+      if (result.success) {
+        // Calculate total reps: initial reps + reps after rest pause
+        const totalReps = initialRepsNum + repsAfterRestPause;
+        
+        const loggedSetsArray: LoggedSet[] = [
+          {
+            id: `temp-${Date.now()}`,
+            exercise_id: currentExercise?.exercise_id || "",
+            block_id: block.block.id,
+            set_number: completedSets + 1,
+            weight_kg: weightNum,
+            reps_completed: totalReps,
+            completed_at: new Date(),
+          } as LoggedSet,
+        ];
 
-      // Update parent with new completed sets count
-      const newCompletedSets = completedSets + 1;
-      onSetComplete?.(newCompletedSets);
-
-      // Complete block if last set
-      if (newCompletedSets >= totalSets) {
-        onBlockComplete(block.block.id, loggedSetsArray);
-      } else {
-        // Check if rest timer will show - if so, don't clear inputs yet
-        const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-        if (restSeconds === 0) {
-          // No rest timer, clear inputs immediately
-          const suggested = currentExercise?.load_percentage
-            ? calculateSuggestedWeightUtil(
-                currentExercise.exercise_id,
-                currentExercise.load_percentage,
-                e1rmMap
-              )
-            : null;
-          if (suggested) {
-            setWeight(suggested.toString());
-          } else {
-            setWeight("");
-          }
-          setInitialReps("");
-          setRestPauseAttempts([]);
-          setShowTimer(false);
+        if (result.e1rm && onE1rmUpdate && currentExercise?.exercise_id) {
+          onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
         }
-        // If restSeconds > 0, rest timer will show and inputs will be cleared
-        // when the timer completes and completedSets updates
+
+        addToast({
+          title: "Rest-Pause Set Logged!",
+          description: `${weightNum}kg × ${totalReps} total reps (${initialRepsNum} + ${restPauseAttempts.length} rest-pause attempts)`,
+          variant: "success",
+          duration: 2000,
+        });
+
+        // Update parent with new completed sets count
+        const newCompletedSets = completedSets + 1;
+        onSetComplete?.(newCompletedSets);
+
+        // Complete block if last set
+        if (newCompletedSets >= totalSets) {
+          onBlockComplete(block.block.id, loggedSetsArray);
+        } else {
+          // Check if rest timer will show - if so, don't clear inputs yet
+          const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
+          if (restSeconds === 0) {
+            // No rest timer, clear inputs immediately
+            const suggested = currentExercise?.load_percentage
+              ? calculateSuggestedWeightUtil(
+                  currentExercise.exercise_id,
+                  currentExercise.load_percentage,
+                  e1rmMap
+                )
+              : null;
+            if (suggested) {
+              setWeight(suggested.toString());
+            } else {
+              setWeight("");
+            }
+            setInitialReps("");
+            setRestPauseAttempts([]);
+            setShowTimer(false);
+          }
+          // If restSeconds > 0, rest timer will show and inputs will be cleared
+          // when the timer completes and completedSets updates
+        }
+      } else {
+        addToast({
+          title: "Failed to Save",
+          description: result.error || "Failed to save set. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
       }
-    } else {
+    } catch (error) {
+      console.error("Error logging rest-pause set:", error);
       addToast({
-        title: "Failed to Save",
-        description: "Failed to save set. Please try again.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
         variant: "destructive",
         duration: 5000,
       });
+    } finally {
+      setIsLoggingSet(false);
     }
-
-    setIsLoggingSet(false);
   };
 
   const loggingInputs = (

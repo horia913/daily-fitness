@@ -295,6 +295,8 @@ export default function ExerciseBlockCard({
               ` • ${exercise.cluster_reps} reps per cluster`}
             {exercise.clusters_per_set &&
               ` • ${exercise.clusters_per_set} clusters per set`}
+            {exercise.intra_cluster_rest &&
+              ` • Intra-cluster rest: ${exercise.intra_cluster_rest}s`}
             {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
             {exercise.load_percentage &&
               ` • Load: ${exercise.load_percentage}%`}
@@ -317,9 +319,15 @@ export default function ExerciseBlockCard({
         return (
           <>
             {exercise.sets} sets × {exercise.reps || "N/A"} reps
-            {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
+            {/* NO rest_seconds for superset exercises (they're done back-to-back) */}
             {exercise.load_percentage &&
               ` • Load: ${exercise.load_percentage}%`}
+            {(exercise as any).superset_load_percentage &&
+              exercise.load_percentage !==
+                (exercise as any).superset_load_percentage &&
+              ` • Superset load: ${
+                (exercise as any).superset_load_percentage
+              }%`}
           </>
         );
       case "giant_set":
@@ -329,8 +337,7 @@ export default function ExerciseBlockCard({
             {exercise.giant_set_exercises?.length &&
               ` • ${exercise.giant_set_exercises.length} exercises`}
             {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
-            {exercise.load_percentage &&
-              ` • Load: ${exercise.load_percentage}%`}
+            {/* Don't show load in summary - each exercise has its own load shown in nested exercises */}
           </>
         );
       case "pre_exhaustion":
@@ -343,7 +350,11 @@ export default function ExerciseBlockCard({
               ` • Compound: ${exercise.compound_reps} reps`}
             {exercise.rest_seconds && ` • Rest: ${exercise.rest_seconds}s`}
             {exercise.load_percentage &&
-              ` • Load: ${exercise.load_percentage}%`}
+              ` • Isolation load: ${exercise.load_percentage}%`}
+            {(exercise as any).compound_load_percentage &&
+              ` • Compound load: ${
+                (exercise as any).compound_load_percentage
+              }%`}
           </>
         );
       case "drop_set":
@@ -423,6 +434,7 @@ export default function ExerciseBlockCard({
         rir: ex.rir,
         rpe: ex.rpe,
         notes: ex.notes,
+        load_percentage: ex.load_percentage?.toString() || "",
       }));
     }
 
@@ -447,6 +459,7 @@ export default function ExerciseBlockCard({
                   exercise: ex.exercise,
                   work_seconds: ex.work_seconds,
                   rest_after: ex.rest_after || set.rest_between_sets,
+                  load_percentage: ex.load_percentage?.toString() || "",
                   exercise_letter: String.fromCharCode(65 + exIndex), // A, B, C, etc.
                 });
               });
@@ -478,6 +491,7 @@ export default function ExerciseBlockCard({
                     ex.rest_after ||
                     set.rest_between_sets ||
                     exercise.rest_after,
+                  load_percentage: ex.load_percentage?.toString() || "",
                   exercise_letter: String.fromCharCode(65 + exIndex), // A, B, C, etc.
                 });
               });
@@ -487,7 +501,10 @@ export default function ExerciseBlockCard({
         }
         return [];
       case "giant_set":
-        return exercise.giant_set_exercises || [];
+        return (exercise.giant_set_exercises || []).map((ex: any) => ({
+          ...ex,
+          load_percentage: ex.load_percentage?.toString() || "",
+        }));
       case "superset":
         // Superset has main exercise and secondary exercise
         return [
@@ -501,6 +518,7 @@ export default function ExerciseBlockCard({
             tempo: exercise.tempo,
             rir: exercise.rir,
             rpe: exercise.rpe,
+            load_percentage: exercise.load_percentage?.toString() || "",
           },
           {
             exercise_id: exercise.superset_exercise_id,
@@ -512,6 +530,8 @@ export default function ExerciseBlockCard({
             tempo: exercise.superset_tempo,
             rir: exercise.superset_rir,
             rpe: exercise.superset_rpe,
+            load_percentage:
+              (exercise as any).superset_load_percentage?.toString() || "",
           },
         ].filter((e) => e.exercise_id);
       case "pre_exhaustion":
@@ -527,6 +547,7 @@ export default function ExerciseBlockCard({
             tempo: exercise.tempo,
             rir: exercise.rir,
             rpe: exercise.rpe,
+            load_percentage: exercise.load_percentage?.toString() || "",
           },
           {
             exercise_id: exercise.compound_exercise_id,
@@ -539,6 +560,8 @@ export default function ExerciseBlockCard({
             tempo: exercise.compound_tempo,
             rir: exercise.compound_rir,
             rpe: exercise.compound_rpe,
+            load_percentage:
+              (exercise as any).compound_load_percentage?.toString() || "",
           },
         ].filter((e) => e.exercise_id);
       case "amrap":
@@ -676,12 +699,15 @@ export default function ExerciseBlockCard({
               ).map((set: any, setIndex: number) => (
                 <div key={setIndex} className="space-y-2">
                   {/* Set header with rest after set time */}
-                  {set.rest_between_sets && (
+                  {((exercise as any).rest_after_set ||
+                    set.rest_between_sets) && (
                     <div
                       className={`text-xs font-medium ${theme.textSecondary} mb-1`}
                     >
-                      Set {setIndex + 1} • {set.rest_between_sets}s rest after
-                      set
+                      Set {setIndex + 1} •{" "}
+                      {(exercise as any).rest_after_set ||
+                        set.rest_between_sets}
+                      s rest after set
                     </div>
                   )}
                   {/* Exercises in this set */}

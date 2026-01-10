@@ -45,7 +45,7 @@ export interface ProgramProgressionRule {
   rest_between_pairs?: number | null
   exercise_reps?: string | null
   drop_set_reps?: string | null
-  weight_reduction_percentage?: number | null
+  drop_percentage?: number | null
   reps_per_cluster?: number | null
   clusters_per_set?: number | null
   intra_cluster_rest?: number | null
@@ -153,7 +153,7 @@ export class ProgramProgressionService {
         // Ensure INTEGER fields are actually integers (not strings or ranges)
         // These fields should only contain numbers
         const integerFields = ['sets', 'rest_seconds', 'rir', 'exercise_order', 'block_order', 'week_number', 
-          'weight_reduction_percentage', 'reps_per_cluster', 'clusters_per_set', 'intra_cluster_rest',
+          'drop_percentage', 'reps_per_cluster', 'clusters_per_set', 'intra_cluster_rest',
           'rest_pause_duration', 'max_rest_pauses', 'duration_minutes', 'target_reps', 'work_seconds', 
           'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise', 'pyramid_order', 'ladder_order',
           'rest_between_pairs']
@@ -223,7 +223,7 @@ export class ProgramProgressionService {
         // Final validation: ensure no integer field has a string rep range
         for (const rule of sanitizedProgressionRules) {
           const integerFields = ['sets', 'rest_seconds', 'rir', 'exercise_order', 'block_order', 'week_number', 
-            'rest_between_pairs', 'weight_reduction_percentage', 'reps_per_cluster', 'clusters_per_set', 
+            'rest_between_pairs', 'drop_percentage', 'reps_per_cluster', 'clusters_per_set', 
             'intra_cluster_rest', 'rest_pause_duration', 'max_rest_pauses', 'duration_minutes', 'target_reps', 
             'work_seconds', 'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise', 
             'pyramid_order', 'ladder_order']
@@ -499,6 +499,7 @@ export class ProgramProgressionService {
             tempo: exercise.tempo || undefined,
             rir: exercise.rir || undefined,
             weight_kg: exercise.weight_kg || undefined,
+            load_percentage: exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
           })
         }
@@ -518,24 +519,35 @@ export class ProgramProgressionService {
             rest_between_pairs: block.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
             rir: exercise.rir || undefined,
+            weight_kg: exercise.weight_kg || undefined,
+            load_percentage: exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
           })
         }
         break
       
       case 'giant_set':
-        // 3+ exercises with exercise_order
-        for (const exercise of block.exercises) {
+        // 3+ exercises with exercise_letter (A, B, C, D, etc.)
+        // Sort by exercise_letter to ensure consistent order
+        const sortedGiantExercises = [...(block.exercises || [])].sort((a, b) => {
+          const letterA = a.exercise_letter || "A"
+          const letterB = b.exercise_letter || "A"
+          return letterA.localeCompare(letterB)
+        })
+        
+        for (const exercise of sortedGiantExercises) {
           rules.push({
             ...baseRule,
             exercise_id: exercise.exercise_id,
-            exercise_order: exercise.exercise_order,
+            exercise_order: exercise.exercise_order || 1,
             exercise_letter: exercise.exercise_letter || undefined,
             sets: exercise.sets || block.total_sets || undefined,
             reps: exercise.reps || undefined,
             rest_between_pairs: block.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
             rir: exercise.rir || undefined,
+            weight_kg: exercise.weight_kg || undefined,
+            load_percentage: exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
           })
         }
@@ -545,18 +557,25 @@ export class ProgramProgressionService {
         for (const exercise of block.exercises) {
           // Check if there are drop sets defined
           const dropSets = exercise.drop_sets || []
+          // Get initial weight/load from first drop set (drop_order = 1) or exercise
+          const initialDropSet = dropSets.find((ds: any) => ds.drop_order === 1) || dropSets[0]
+          // Get drop_percentage from first drop set
+          const dropPercentage = (initialDropSet as any)?.drop_percentage || undefined
           
           rules.push({
             ...baseRule,
             exercise_id: exercise.exercise_id,
             exercise_order: exercise.exercise_order,
-            sets: exercise.sets || undefined,
-            exercise_reps: exercise.reps || undefined,
+            sets: exercise.sets || block.total_sets || undefined,
+            // Main reps come from block.reps_per_set (initial/main set reps)
+            exercise_reps: block.reps_per_set || exercise.reps || undefined,
             drop_set_reps: dropSets.length > 0 ? dropSets[0].reps : undefined,
-            weight_reduction_percentage: 20, // Default, can be customized
-            rest_seconds: exercise.rest_seconds || undefined,
+            drop_percentage: dropPercentage || 20, // Use stored value or default
+            rest_seconds: block.rest_seconds || exercise.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
             rir: exercise.rir || undefined,
+            weight_kg: (initialDropSet as any)?.weight_kg || exercise.weight_kg || undefined,
+            load_percentage: (initialDropSet as any)?.load_percentage || exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
           })
         }
@@ -578,6 +597,8 @@ export class ProgramProgressionService {
             rest_seconds: clusterConfig?.inter_set_rest || exercise.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
             rir: exercise.rir || undefined,
+            weight_kg: (clusterConfig as any)?.weight_kg || exercise.weight_kg || undefined,
+            load_percentage: (clusterConfig as any)?.load_percentage || exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
           })
         }
@@ -598,27 +619,35 @@ export class ProgramProgressionService {
             max_rest_pauses: restPauseConfig?.max_rest_pauses || undefined,
             rest_seconds: exercise.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
+            weight_kg: (restPauseConfig as any)?.weight_kg || exercise.weight_kg || undefined,
+            load_percentage: (restPauseConfig as any)?.load_percentage || exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
           })
         }
         break
       
       case 'pre_exhaustion':
-        // Two exercises: isolation then compound
+        // Two exercises: isolation (letter A) then compound (letter B)
         for (const exercise of block.exercises) {
-          const isIsolation = exercise.exercise_order === 1
+          const isIsolation = exercise.exercise_letter === "A" || exercise.exercise_order === 1
           
           rules.push({
             ...baseRule,
             exercise_id: exercise.exercise_id,
             exercise_order: exercise.exercise_order,
+            exercise_letter: exercise.exercise_letter || (isIsolation ? "A" : "B"),
             sets: exercise.sets || undefined,
+            // Isolation reps go into reps field for first exercise
             isolation_reps: isIsolation ? exercise.reps : undefined,
+            // Compound reps go into reps field for second exercise
             compound_reps: !isIsolation ? exercise.reps : undefined,
             compound_exercise_id: !isIsolation ? exercise.exercise_id : undefined,
             rest_between_pairs: block.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
             rir: exercise.rir || undefined,
+            // Both exercises use same columns, so copy them for each
+            weight_kg: exercise.weight_kg || undefined,
+            load_percentage: exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
           })
         }
@@ -641,6 +670,8 @@ export class ProgramProgressionService {
             reps: exercise.reps || undefined,
             target_reps: amrapTimeProtocol?.target_reps || (exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined),
             tempo: exercise.tempo || undefined,
+            weight_kg: (amrapTimeProtocol as any)?.weight_kg || exercise.weight_kg || undefined,
+            load_percentage: (amrapTimeProtocol as any)?.load_percentage || exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
           })
         }
@@ -664,6 +695,8 @@ export class ProgramProgressionService {
             target_reps: exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined,
             work_seconds: emomTimeProtocol?.work_seconds || undefined,
             tempo: exercise.tempo || undefined,
+            weight_kg: (emomTimeProtocol as any)?.weight_kg || exercise.weight_kg || undefined,
+            load_percentage: (emomTimeProtocol as any)?.load_percentage || exercise.load_percentage || undefined,
             notes: exercise.notes || undefined,
           })
         }
@@ -693,23 +726,45 @@ export class ProgramProgressionService {
         break
       
       case 'for_time':
-        for (const exercise of block.exercises) {
-          // Find time protocol for this specific exercise
-          const forTimeProtocol = block.time_protocols?.find(
-            (tp: any) => tp.protocol_type === 'for_time' && 
-            tp.exercise_id === exercise.exercise_id && 
-            tp.exercise_order === exercise.exercise_order
-          ) || block.time_protocols?.find((tp: any) => tp.protocol_type === 'for_time')
-          
-          rules.push({
-            ...baseRule,
-            exercise_id: exercise.exercise_id,
-            exercise_order: exercise.exercise_order,
-            target_reps: forTimeProtocol?.target_reps || (exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined),
-            time_cap_minutes: forTimeProtocol?.time_cap_minutes || forTimeProtocol?.total_duration_minutes || undefined,
-            tempo: exercise.tempo || undefined,
-            notes: exercise.notes || undefined,
-          })
+        // For time-based blocks, exercises come from time_protocols if block.exercises is empty
+        if (!block.exercises || block.exercises.length === 0) {
+          // Fallback: create rules from time_protocols directly
+          const forTimeProtocols = (block.time_protocols || []).filter((tp: any) => tp.protocol_type === 'for_time')
+          for (const tp of forTimeProtocols) {
+            rules.push({
+              ...baseRule,
+              exercise_id: tp.exercise_id,
+              exercise_order: tp.exercise_order || 1,
+              target_reps: tp.target_reps || undefined,
+              time_cap_minutes: tp.time_cap_minutes || tp.total_duration_minutes || undefined,
+              tempo: undefined, // Time protocols don't have tempo
+              weight_kg: (tp as any)?.weight_kg || undefined,
+              load_percentage: (tp as any)?.load_percentage || undefined,
+              notes: undefined, // Time protocols don't have notes
+            })
+          }
+        } else {
+          // Normal path: exercises exist, match with time protocols
+          for (const exercise of block.exercises) {
+            // Find time protocol for this specific exercise
+            const forTimeProtocol = block.time_protocols?.find(
+              (tp: any) => tp.protocol_type === 'for_time' && 
+              tp.exercise_id === exercise.exercise_id && 
+              (tp.exercise_order === exercise.exercise_order || tp.exercise_order === exercise.exercise_order)
+            ) || block.time_protocols?.find((tp: any) => tp.protocol_type === 'for_time')
+            
+            rules.push({
+              ...baseRule,
+              exercise_id: exercise.exercise_id,
+              exercise_order: exercise.exercise_order,
+              target_reps: forTimeProtocol?.target_reps || (exercise.reps ? (parseInt(String(exercise.reps), 10) || undefined) : undefined),
+              time_cap_minutes: forTimeProtocol?.time_cap_minutes || forTimeProtocol?.total_duration_minutes || undefined,
+              tempo: exercise.tempo || undefined,
+              weight_kg: (forTimeProtocol as any)?.weight_kg || exercise.weight_kg || undefined,
+              load_percentage: (forTimeProtocol as any)?.load_percentage || exercise.load_percentage || undefined,
+              notes: exercise.notes || undefined,
+            })
+          }
         }
         break
       

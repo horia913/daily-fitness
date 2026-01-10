@@ -353,76 +353,86 @@ export function ForTimeExecutor({
       }
     } catch (e) {}
 
-    // Use the completion time from when timer was stopped, or current elapsed time
-    const completionTimeToLog = completionTime !== null ? completionTime : elapsedSeconds;
+    try {
+      // Use the completion time from when timer was stopped, or current elapsed time
+      const completionTimeToLog = completionTime !== null ? completionTime : elapsedSeconds;
 
-    // Build the log data - exercise_id is optional for fortime blocks
-    const logData: any = {
-      block_type: 'fortime',
-      fortime_total_reps: repsNum,
-      fortime_time_taken_sec: completionTimeToLog,
-      fortime_time_cap_sec: timeCapMinutes * 60,
-      fortime_target_reps: targetReps || null,
-    };
+      // Build the log data - exercise_id is optional for fortime blocks
+      const logData: any = {
+        block_type: 'fortime',
+        fortime_total_reps: repsNum,
+        fortime_time_taken_sec: completionTimeToLog,
+        fortime_time_cap_sec: timeCapMinutes * 60,
+        fortime_target_reps: targetReps || null,
+      };
 
-    // Include exercise_id if available (optional for fortime blocks)
-    if (exerciseIdToUse) {
-      logData.exercise_id = String(exerciseIdToUse).trim();
-    }
-
-    // Include weight if provided (optional for for_time blocks)
-    if (weightNum > 0) {
-      logData.weight = weightNum;
-    }
-
-    console.log("ForTimeExecutor: Logging set with:", logData);
-
-    const result = await logSetToDatabase(logData);
-
-    if (result.success) {
-      const loggedSetsArray: LoggedSet[] = [
-        {
-          id: `temp-${Date.now()}`,
-          exercise_id: exerciseIdToUse || "",
-          block_id: block.block.id,
-          set_number: 1,
-          weight_kg: weightNum > 0 ? weightNum : 0,
-          reps_completed: repsNum,
-          completed_at: new Date(),
-        } as LoggedSet,
-      ];
-
-      // Update e1RM if available and exercise_id exists
-      if (result.e1rm && onE1rmUpdate && exerciseIdToUse) {
-        onE1rmUpdate(exerciseIdToUse, result.e1rm);
+      // Include exercise_id if available (optional for fortime blocks)
+      if (exerciseIdToUse) {
+        logData.exercise_id = String(exerciseIdToUse).trim();
       }
 
-      addToast({
-        title: "For Time Logged!",
-        description: weightNum > 0
-          ? `${weightNum}kg × ${repsNum} reps completed in ${formatTime(completionTimeToLog)}`
-          : `${repsNum} reps completed in ${formatTime(completionTimeToLog)}`,
-        variant: "success",
-        duration: 2000,
-      });
+      // Include weight if provided (optional for for_time blocks)
+      if (weightNum > 0) {
+        logData.weight = weightNum;
+      }
 
-      // Reset timer state after logging
-      setTimerStopped(false);
-      setCompletionTime(null);
-      setElapsedSeconds(0);
+      console.log("ForTimeExecutor: Logging set with:", logData);
 
-      // Complete block
-      onBlockComplete(block.block.id, loggedSetsArray);
-    } else {
+      const result = await logSetToDatabase(logData);
+
+      if (result.success) {
+        const loggedSetsArray: LoggedSet[] = [
+          {
+            id: `temp-${Date.now()}`,
+            exercise_id: exerciseIdToUse || "",
+            block_id: block.block.id,
+            set_number: 1,
+            weight_kg: weightNum > 0 ? weightNum : 0,
+            reps_completed: repsNum,
+            completed_at: new Date(),
+          } as LoggedSet,
+        ];
+
+        // Update e1RM if available and exercise_id exists
+        if (result.e1rm && onE1rmUpdate && exerciseIdToUse) {
+          onE1rmUpdate(exerciseIdToUse, result.e1rm);
+        }
+
+        addToast({
+          title: "For Time Logged!",
+          description: weightNum > 0
+            ? `${weightNum}kg × ${repsNum} reps completed in ${formatTime(completionTimeToLog)}`
+            : `${repsNum} reps completed in ${formatTime(completionTimeToLog)}`,
+          variant: "success",
+          duration: 2000,
+        });
+
+        // Reset timer state after logging
+        setTimerStopped(false);
+        setCompletionTime(null);
+        setElapsedSeconds(0);
+
+        // Complete block
+        onBlockComplete(block.block.id, loggedSetsArray);
+      } else {
+        addToast({
+          title: "Failed to Save",
+          description: result.error || "Failed to save completion. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error("Error logging for time set:", error);
       addToast({
-        title: "Failed to Save",
-        description: "Failed to save completion. Please try again.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
         variant: "destructive",
         duration: 5000,
       });
+    } finally {
+      setIsLoggingSet(false);
     }
-
-    setIsLoggingSet(false);
   };
 
   const loggingInputs = (

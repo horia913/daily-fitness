@@ -483,12 +483,15 @@ export async function POST(req: NextRequest) {
         case 'rest_pause': {
           const exerciseId = body.exercise_id as string | undefined
           insertData.exercise_id = exerciseId
-          insertData.weight = parseNumber(body.weight)
+          // Only save rest_pause_initial_weight, not the generic weight field
           insertData.rest_pause_initial_weight = parseNumber(body.rest_pause_initial_weight)
           insertData.rest_pause_initial_reps = parseIntNumber(body.rest_pause_initial_reps)
           insertData.rest_pause_reps_after = parseIntNumber(body.rest_pause_reps_after)
           insertData.rest_pause_number = body.rest_pause_number || 1
           insertData.set_number = body.set_number || 1
+          // Add rest_pause_duration and max_rest_pauses (from workout_rest_pause_sets)
+          insertData.rest_pause_duration = parseIntNumber(body.rest_pause_duration)
+          insertData.max_rest_pauses = parseIntNumber(body.max_rest_pauses)
 
           primaryExerciseId = exerciseId || null
           primaryWeight = parseNumber(body.rest_pause_initial_weight)

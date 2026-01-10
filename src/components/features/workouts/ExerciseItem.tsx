@@ -56,18 +56,28 @@ export default function ExerciseItem({
       ) {
         details.push(`${exercise.rest_seconds}s rest`);
       }
+      // Load percentage for individual exercises
+      if (exercise.load_percentage) {
+        details.push(`Load: ${exercise.load_percentage}%`);
+      }
     } else if (blockType === "giant_set") {
       if (exercise.sets) details.push(`${exercise.sets} sets`);
       if (exercise.reps) details.push(`${exercise.reps} reps`);
-      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
+      // NO rest_seconds for giant_set exercises (they're done back-to-back)
+      if (exercise.load_percentage)
+        details.push(`Load: ${exercise.load_percentage}%`);
     } else if (blockType === "superset") {
       if (exercise.sets) details.push(`${exercise.sets} sets`);
       if (exercise.reps) details.push(`${exercise.reps} reps`);
-      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
+      // NO rest_seconds for superset exercises (they're done back-to-back)
+      if (exercise.load_percentage)
+        details.push(`Load: ${exercise.load_percentage}%`);
     } else if (blockType === "pre_exhaustion") {
       if (exercise.reps) details.push(`${exercise.reps} reps`);
       if (exercise.type) details.push(`(${exercise.type})`);
-      if (exercise.rest_seconds) details.push(`${exercise.rest_seconds}s rest`);
+      // NO rest_seconds for pre_exhaustion exercises (they're done back-to-back)
+      if (exercise.load_percentage)
+        details.push(`Load: ${exercise.load_percentage}%`);
     } else if (blockType === "amrap") {
       if (exercise.reps) details.push(`${exercise.reps} reps`);
       if (exercise.duration_seconds)
@@ -103,9 +113,19 @@ export default function ExerciseItem({
     }
 
     // Common fields that should always be shown if present
+    // Note: load_percentage is already handled in block-type specific sections above
+    // Only add it here for block types that don't have specific handling
     if (exercise.weight) details.push(`${exercise.weight} kg`);
-    if (exercise.load_percentage)
+    if (
+      exercise.load_percentage &&
+      blockType !== "giant_set" &&
+      blockType !== "superset" &&
+      blockType !== "pre_exhaustion" &&
+      blockType !== "circuit" &&
+      blockType !== "tabata"
+    ) {
       details.push(`${exercise.load_percentage}% load`);
+    }
     if (exercise.tempo) details.push(`Tempo: ${exercise.tempo}`);
     if (exercise.rir) details.push(`RIR: ${exercise.rir}`);
     if (exercise.rpe) details.push(`RPE: ${exercise.rpe}`);

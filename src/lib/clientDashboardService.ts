@@ -284,10 +284,16 @@ export async function getTodaysWorkout(clientId: string): Promise<TodaysWorkout 
       .from('workout_templates')
       .select('id, name, description, estimated_duration')
       .eq('id', workoutAssignment.workout_template_id)
-      .single();
+      .maybeSingle();
 
-    if (templateError || !template) {
+    if (templateError) {
       console.error('Error fetching template:', templateError);
+      return null;
+    }
+
+    if (!template) {
+      // Template not found (may have been deleted or RLS prevents access)
+      console.warn('Template not found or not accessible:', workoutAssignment.workout_template_id);
       return null;
     }
 

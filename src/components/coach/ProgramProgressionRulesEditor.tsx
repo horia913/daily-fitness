@@ -159,10 +159,41 @@ export default function ProgramProgressionRulesEditor({
 
       setIsPlaceholder(isPlaceholderData);
 
+      // Debug: Log what we received
+      console.log("[ProgressionRulesEditor] Loaded rules:", {
+        count: rules.length,
+        sample: rules.slice(0, 2).map((r) => ({
+          id: r.id,
+          block_type: r.block_type,
+          exercise_id: r.exercise_id,
+          load_percentage: r.load_percentage,
+          weight_kg: r.weight_kg,
+          sets: r.sets,
+          reps: r.reps,
+          tempo: r.tempo,
+          rir: r.rir,
+          notes: r.notes,
+        })),
+      });
+
       // Group rules by block
       const grouped = groupRulesByBlock(rules);
       const blockState = grouped.map((group) => {
         const formValue = createFormValueForGroup(group);
+        
+        // Debug: Log what we're creating
+        console.log(`[ProgressionRulesEditor] Created formValue for ${group.blockType}:`, {
+          blockOrder: group.blockOrder,
+          exercise_id: formValue.exercise_id,
+          load_percentage: formValue.load_percentage,
+          weight_kg: formValue.weight_kg,
+          sets: formValue.sets,
+          reps: formValue.reps,
+          tempo: formValue.tempo,
+          rir: formValue.rir,
+          notes: formValue.notes,
+        });
+        
         return {
           key: `block-${group.blockOrder}-${group.blockType}-${
             group.rules[0]?.exercise_order || 0
@@ -215,8 +246,10 @@ export default function ProgramProgressionRulesEditor({
     );
   };
 
-  const numberToString = (value?: number | null) =>
-    value === undefined || value === null ? "" : String(value);
+  const numberToString = (value?: number | null) => {
+    if (value === undefined || value === null) return "";
+    return String(value);
+  };
 
   const toNumberOrNull = (value: unknown): number | null => {
     if (value === null || value === undefined || value === "") return null;
@@ -277,13 +310,35 @@ export default function ProgramProgressionRulesEditor({
       exercise:
         primaryRule?.exercise || findExerciseMeta(primaryRule?.exercise_id),
       sets: numberToString(primaryRule?.sets ?? null),
-      reps: primaryRule?.reps || "",
+      reps: primaryRule?.reps || primaryRule?.first_exercise_reps || primaryRule?.isolation_reps || "",
       rest_seconds: numberToString(primaryRule?.rest_seconds ?? null),
       tempo: primaryRule?.tempo || "",
       rir: numberToString(primaryRule?.rir ?? null),
       load_percentage: numberToString(primaryRule?.load_percentage ?? null),
+      weight_kg: numberToString(primaryRule?.weight_kg ?? null),
       notes: primaryRule?.notes || "",
     };
+    
+    // Debug log for baseForm
+    console.log(`[createFormValueForGroup] baseForm for ${blockType}:`, {
+      exercise_id: baseForm.exercise_id,
+      sets: baseForm.sets,
+      reps: baseForm.reps,
+      load_percentage: baseForm.load_percentage,
+      weight_kg: baseForm.weight_kg,
+      tempo: baseForm.tempo,
+      rir: baseForm.rir,
+      notes: baseForm.notes,
+      primaryRuleData: {
+        sets: primaryRule?.sets,
+        reps: primaryRule?.reps,
+        load_percentage: primaryRule?.load_percentage,
+        weight_kg: primaryRule?.weight_kg,
+        tempo: primaryRule?.tempo,
+        rir: primaryRule?.rir,
+        notes: primaryRule?.notes,
+      },
+    });
 
     switch (blockType) {
       case "superset": {
@@ -305,19 +360,30 @@ export default function ProgramProgressionRulesEditor({
           rest_seconds: numberToString(
             ruleA?.rest_between_pairs ?? ruleB?.rest_between_pairs ?? null
           ),
-          tempo: ruleA?.tempo || "",
+          tempo: ruleA?.tempo || baseForm.tempo || "",
           superset_tempo: ruleB?.tempo || "",
           rir: numberToString(ruleA?.rir ?? null),
           superset_rir: numberToString(ruleB?.rir ?? null),
+          load_percentage: numberToString(ruleA?.load_percentage ?? null),
+          weight_kg: numberToString(ruleA?.weight_kg ?? null),
+          superset_load_percentage: numberToString(ruleB?.load_percentage ?? null),
+          superset_weight_kg: numberToString(ruleB?.weight_kg ?? null),
+          notes: ruleA?.notes || baseForm.notes || "",
         };
       }
       case "giant_set": {
-        const restBetween = rulesSorted[0]?.rest_between_pairs ?? null;
+        // Sort by exercise_letter to ensure consistent order (A, B, C, D)
+        const sortedRules = [...rulesSorted].sort((a, b) => {
+          const letterA = a.exercise_letter || "A"
+          const letterB = b.exercise_letter || "A"
+          return letterA.localeCompare(letterB)
+        });
+        const restBetween = sortedRules[0]?.rest_between_pairs ?? null;
         return {
           ...baseForm,
-          sets: numberToString(rulesSorted[0]?.sets ?? null),
+          sets: numberToString(sortedRules[0]?.sets ?? null),
           rest_seconds: numberToString(restBetween),
-          giant_set_exercises: rulesSorted.map((rule) => ({
+          giant_set_exercises: sortedRules.map((rule) => ({
             exercise_id: rule.exercise_id || "",
             exercise: rule.exercise || findExerciseMeta(rule.exercise_id),
             reps: rule.reps || "",
@@ -325,17 +391,26 @@ export default function ProgramProgressionRulesEditor({
             rest_seconds: numberToString(rule.rest_seconds ?? null),
             tempo: rule.tempo || "",
             rir: numberToString(rule.rir ?? null),
+            load_percentage: numberToString(rule.load_percentage ?? null),
+            weight_kg: numberToString(rule.weight_kg ?? null),
+            notes: rule.notes || "",
           })),
         };
       }
       case "drop_set": {
         return {
           ...baseForm,
-          exercise_reps: primaryRule?.exercise_reps || "",
+          exercise_reps: primaryRule?.exercise_reps || primaryRule?.reps || "",
           drop_set_reps: primaryRule?.drop_set_reps || "",
           drop_percentage: numberToString(
-            primaryRule?.weight_reduction_percentage ?? null
+            primaryRule?.drop_percentage ?? null
           ),
+          rest_seconds: numberToString(primaryRule?.rest_seconds ?? null),
+          tempo: primaryRule?.tempo || baseForm.tempo || "",
+          rir: numberToString(primaryRule?.rir ?? null),
+          load_percentage: numberToString(primaryRule?.load_percentage ?? null),
+          weight_kg: numberToString(primaryRule?.weight_kg ?? null),
+          notes: primaryRule?.notes || baseForm.notes || "",
         };
       }
       case "cluster_set": {
@@ -348,20 +423,33 @@ export default function ProgramProgressionRulesEditor({
           intra_cluster_rest: numberToString(
             primaryRule?.intra_cluster_rest ?? null
           ),
+          rest_seconds: numberToString(primaryRule?.rest_seconds ?? null),
+          tempo: primaryRule?.tempo || baseForm.tempo || "",
+          rir: numberToString(primaryRule?.rir ?? null),
+          load_percentage: numberToString(primaryRule?.load_percentage ?? null),
+          weight_kg: numberToString(primaryRule?.weight_kg ?? null),
+          notes: primaryRule?.notes || baseForm.notes || "",
         };
       }
       case "rest_pause": {
         return {
           ...baseForm,
+          reps: primaryRule?.reps || baseForm.reps || "",
           rest_pause_duration: numberToString(
             primaryRule?.rest_pause_duration ?? null
           ),
           max_rest_pauses: numberToString(primaryRule?.max_rest_pauses ?? null),
+          rest_seconds: numberToString(primaryRule?.rest_seconds ?? null),
+          tempo: primaryRule?.tempo || baseForm.tempo || "",
+          load_percentage: numberToString(primaryRule?.load_percentage ?? null),
+          weight_kg: numberToString(primaryRule?.weight_kg ?? null),
+          notes: primaryRule?.notes || baseForm.notes || "",
         };
       }
       case "pre_exhaustion": {
-        const isolationRule = rulesSorted[0];
-        const compoundRule = rulesSorted[1] || rulesSorted[0];
+        // Find isolation (letter A) and compound (letter B) exercises
+        const isolationRule = rulesSorted.find((r) => r.exercise_letter === "A") || rulesSorted.find((r) => (r.exercise_order || 0) === 1) || rulesSorted[0];
+        const compoundRule = rulesSorted.find((r) => r.exercise_letter === "B") || rulesSorted.find((r) => (r.exercise_order || 0) === 2) || rulesSorted[1] || rulesSorted[0];
         return {
           ...baseForm,
           exercise_id: isolationRule?.exercise_id || "",
@@ -384,13 +472,27 @@ export default function ProgramProgressionRulesEditor({
               compoundRule?.rest_between_pairs ??
               null
           ),
+          tempo: isolationRule?.tempo || baseForm.tempo || "",
+          compound_tempo: compoundRule?.tempo || "",
+          rir: numberToString(isolationRule?.rir ?? null),
+          compound_rir: numberToString(compoundRule?.rir ?? null),
+          load_percentage: numberToString(isolationRule?.load_percentage ?? null),
+          weight_kg: numberToString(isolationRule?.weight_kg ?? null),
+          compound_load_percentage: numberToString(compoundRule?.load_percentage ?? null),
+          compound_weight_kg: numberToString(compoundRule?.weight_kg ?? null),
+          notes: isolationRule?.notes || baseForm.notes || "",
         };
       }
       case "amrap": {
         return {
           ...baseForm,
+          reps: primaryRule?.reps || baseForm.reps || "",
           amrap_duration: numberToString(primaryRule?.duration_minutes ?? null),
           target_reps: numberToString(primaryRule?.target_reps ?? null),
+          tempo: primaryRule?.tempo || baseForm.tempo || "",
+          load_percentage: numberToString(primaryRule?.load_percentage ?? null),
+          weight_kg: numberToString(primaryRule?.weight_kg ?? null),
+          notes: primaryRule?.notes || baseForm.notes || "",
         };
       }
       case "emom": {
@@ -400,6 +502,11 @@ export default function ProgramProgressionRulesEditor({
           emom_duration: numberToString(primaryRule?.duration_minutes ?? null),
           emom_reps: numberToString(primaryRule?.target_reps ?? null),
           work_seconds: numberToString(primaryRule?.work_seconds ?? null),
+          rest_seconds: numberToString(primaryRule?.rest_seconds ?? null),
+          tempo: primaryRule?.tempo || baseForm.tempo || "",
+          load_percentage: numberToString(primaryRule?.load_percentage ?? null),
+          weight_kg: numberToString(primaryRule?.weight_kg ?? null),
+          notes: primaryRule?.notes || baseForm.notes || "",
         };
       }
       case "tabata": {
@@ -409,6 +516,8 @@ export default function ProgramProgressionRulesEditor({
           rest_seconds: numberToString(primaryRule?.rest_seconds ?? null),
           rounds: numberToString(primaryRule?.rounds ?? null),
           rest_after: numberToString(primaryRule?.rest_after_set ?? null),
+          tempo: primaryRule?.tempo || baseForm.tempo || "",
+          notes: primaryRule?.notes || baseForm.notes || "",
         };
       }
       case "for_time": {
@@ -416,6 +525,10 @@ export default function ProgramProgressionRulesEditor({
           ...baseForm,
           target_reps: numberToString(primaryRule?.target_reps ?? null),
           time_cap: numberToString(primaryRule?.time_cap_minutes ?? null),
+          tempo: primaryRule?.tempo || baseForm.tempo || "",
+          load_percentage: numberToString(primaryRule?.load_percentage ?? null),
+          weight_kg: numberToString(primaryRule?.weight_kg ?? null),
+          notes: primaryRule?.notes || baseForm.notes || "",
         };
       }
       case "pyramid_set": {
@@ -545,11 +658,12 @@ export default function ProgramProgressionRulesEditor({
           sets: toNumberOrNull(form.sets),
           exercise_reps: toStringOrNull(form.exercise_reps),
           drop_set_reps: toStringOrNull(form.drop_set_reps),
-          weight_reduction_percentage: toNumberOrNull(form.drop_percentage),
+          drop_percentage: toNumberOrNull(form.drop_percentage),
           rest_seconds: toNumberOrNull(form.rest_seconds),
           tempo: toStringOrNull(form.tempo),
           rir: toNumberOrNull(form.rir),
           load_percentage: toNumberOrNull(form.load_percentage),
+          weight_kg: toNumberOrNull(form.weight_kg),
           notes: toStringOrNull(form.notes),
         });
         break;
@@ -840,6 +954,51 @@ export default function ProgramProgressionRulesEditor({
     }
   };
 
+  const handleRefreshFromTemplate = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Get the current template_id from the schedule
+      const { data: scheduleData } = await supabase
+        .from("program_schedule")
+        .select("template_id")
+        .eq("id", programScheduleId)
+        .single();
+
+      if (!scheduleData?.template_id) {
+        setError("No template assigned to this schedule");
+        return;
+      }
+
+      // Delete existing progression rules
+      await ProgramProgressionService.deleteProgressionRules(
+        programScheduleId,
+        weekNumber
+      );
+
+      // Re-copy workout data with updated fields
+      const success = await ProgramProgressionService.copyWorkoutToProgram(
+        programId,
+        programScheduleId,
+        scheduleData.template_id,
+        weekNumber
+      );
+
+      if (success) {
+        await loadRules();
+        onUpdate?.();
+      } else {
+        setError("Failed to refresh from template");
+      }
+    } catch (err: any) {
+      console.error("Error refreshing from template:", err);
+      setError(err?.message || "Failed to refresh from template");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -908,14 +1067,25 @@ export default function ProgramProgressionRulesEditor({
             </div>
           </div>
         )}
-        <Button
-          variant="outline"
-          onClick={() => setShowReplaceWorkout(true)}
-          className="flex-shrink-0"
-        >
-          <Replace className="w-4 h-4 mr-2" />
-          Replace Workout
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleRefreshFromTemplate}
+            className="flex-shrink-0"
+            disabled={loading}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh from Template
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowReplaceWorkout(true)}
+            className="flex-shrink-0"
+          >
+            <Replace className="w-4 h-4 mr-2" />
+            Replace Workout
+          </Button>
+        </div>
       </div>
 
       {blockForms.length === 0 ? (
@@ -938,8 +1108,21 @@ export default function ProgramProgressionRulesEditor({
                 renderMode="form"
               >
                 <ExerciseDetailForm
-                  exercise={block.formValue}
-                  onChange={(updated) => handleBlockChange(block.key, updated)}
+                  exercise={{
+                    ...block.formValue,
+                    // Ensure all fields are properly passed
+                    load_percentage: block.formValue.load_percentage || undefined,
+                    weight_kg: block.formValue.weight_kg || undefined,
+                  }}
+                  onChange={(updated) => {
+                    console.log(`[ProgressionRulesEditor] Form changed for ${block.blockType}:`, {
+                      load_percentage: updated.load_percentage,
+                      weight_kg: updated.weight_kg,
+                      sets: updated.sets,
+                      reps: updated.reps,
+                    });
+                    handleBlockChange(block.key, updated);
+                  }}
                   availableExercises={exercises}
                   mode="inline"
                   allowTypeChange={false}

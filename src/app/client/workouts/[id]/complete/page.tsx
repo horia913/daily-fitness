@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationTriggers from "@/lib/notificationTriggers";
+import { WorkoutBlockService } from "@/lib/workoutBlockService";
 
 interface WorkoutAssignment {
   id: string;
@@ -73,6 +74,9 @@ interface WorkoutSetLog {
   rest_pause_initial_reps?: number | null;
   rest_pause_reps_after?: number | null;
   rest_pause_number?: number | null;
+  cluster_number?: number | null;
+  tabata_rounds_completed?: number | null;
+  tabata_total_duration_sec?: number | null;
 
   preexhaust_isolation_exercise_id?: string | null;
   preexhaust_isolation_weight?: number | null;
@@ -101,6 +105,7 @@ interface BlockGroup {
   block_order: number;
   sets: WorkoutSetLog[];
   exerciseNames: Map<string, string>;
+  templateBlock?: any; // Store full template block data for blocks with no sets
 }
 
 export default function WorkoutComplete() {
@@ -300,15 +305,12 @@ export default function WorkoutComplete() {
         "template_id:",
         templateId
       );
-      // Get all blocks from template
-      const { data: templateBlocks, error: blocksError } = await supabase
-        .from("workout_blocks")
-        .select("id, block_type, block_name, block_order")
-        .eq("template_id", templateId)
-        .order("block_order", { ascending: true });
+      // Get all blocks from template with full exercise data
+      // Use WorkoutBlockService to get complete block data including exercises
+      const templateBlocks = await WorkoutBlockService.getWorkoutBlocks(templateId);
 
-      if (blocksError) {
-        console.error("Error loading blocks:", blocksError);
+      if (!templateBlocks || templateBlocks.length === 0) {
+        console.error("Error: No blocks found for template");
         return;
       }
 
@@ -352,6 +354,9 @@ export default function WorkoutComplete() {
           rest_pause_initial_reps,
           rest_pause_reps_after,
           rest_pause_number,
+          cluster_number,
+          tabata_rounds_completed,
+          tabata_total_duration_sec,
           preexhaust_isolation_exercise_id,
           preexhaust_isolation_weight,
           preexhaust_isolation_reps,
@@ -402,17 +407,32 @@ export default function WorkoutComplete() {
         exerciseMap.set(ex.id, ex.name);
       });
 
-      // Group sets by block
+      // Group sets by block and populate exercise names from template
       const blocksMap = new Map<string, BlockGroup>();
 
       templateBlocks?.forEach((block) => {
+        // Initialize exercise names map from template exercises
+        const templateExerciseNames = new Map<string, string>();
+        
+        // Add exercise names from template block exercises (for all block types)
+        if (block.exercises && Array.isArray(block.exercises)) {
+          block.exercises.forEach((ex: any) => {
+            if (ex.exercise_id && ex.exercise?.name) {
+              templateExerciseNames.set(ex.exercise_id, ex.exercise.name);
+            }
+            // For giant_set, superset, pre_exhaustion - each exercise has exercise_letter
+            // For time-based blocks (tabata, amrap, etc.) - exercises come from time_protocols
+          });
+        }
+        
         blocksMap.set(block.id, {
           block_id: block.id,
           block_type: block.block_type || "straight_set",
           block_name: block.block_name || `Block ${block.block_order}`,
           block_order: block.block_order || 0,
           sets: [],
-          exerciseNames: new Map(),
+          exerciseNames: templateExerciseNames, // Initialize with template exercise names
+          templateBlock: block, // Store full template block data for displaying exercises when no sets logged
         });
       });
 
@@ -422,9 +442,21 @@ export default function WorkoutComplete() {
         if (!blockGroup) return;
 
         blockGroup.sets.push(set as WorkoutSetLog);
-        if (set.exercise_id && set.exercises?.name) {
-          blockGroup.exerciseNames.set(set.exercise_id, set.exercises.name);
+        
+        // Add main exercise_id to exerciseNames (from join or exerciseMap)
+        // Don't override if already set from template
+        if (set.exercise_id) {
+          if (set.exercises?.name) {
+            blockGroup.exerciseNames.set(set.exercise_id, set.exercises.name);
+          } else if (exerciseMap.has(set.exercise_id) && !blockGroup.exerciseNames.has(set.exercise_id)) {
+            blockGroup.exerciseNames.set(
+              set.exercise_id,
+              exerciseMap.get(set.exercise_id)!
+            );
+          }
         }
+        
+        // Add superset exercise names
         if (
           set.superset_exercise_a_id &&
           exerciseMap.has(set.superset_exercise_a_id)
@@ -443,6 +475,8 @@ export default function WorkoutComplete() {
             exerciseMap.get(set.superset_exercise_b_id)!
           );
         }
+        
+        // Add pre-exhaustion exercise names
         if (
           set.preexhaust_isolation_exercise_id &&
           exerciseMap.has(set.preexhaust_isolation_exercise_id)
@@ -461,10 +495,23 @@ export default function WorkoutComplete() {
             exerciseMap.get(set.preexhaust_compound_exercise_id)!
           );
         }
+        
+        // Add giant set exercise names
+        if (set.giant_set_exercises && Array.isArray(set.giant_set_exercises)) {
+          set.giant_set_exercises.forEach((ex: any) => {
+            if (ex.exercise_id && exerciseMap.has(ex.exercise_id)) {
+              blockGroup.exerciseNames.set(
+                ex.exercise_id,
+                exerciseMap.get(ex.exercise_id)!
+              );
+            }
+          });
+        }
       });
 
+      // Show all blocks from template, even if they have no sets logged
+      // This ensures blocks like Tabata (which may not log sets) are still displayed
       const blocksArray = Array.from(blocksMap.values())
-        .filter((block) => block.sets.length > 0)
         .sort((a, b) => a.block_order - b.block_order);
 
       console.log("✅ Loaded blocks and sets:", {
@@ -474,6 +521,9 @@ export default function WorkoutComplete() {
           block_type: b.block_type,
           block_order: b.block_order,
           setCount: b.sets.length,
+          exerciseCount: b.exerciseNames.size,
+          hasTemplateBlock: !!b.templateBlock,
+          templateExercisesCount: b.templateBlock?.exercises?.length || 0,
         })),
       });
 
@@ -593,12 +643,20 @@ export default function WorkoutComplete() {
   ) => {
     switch (blockType) {
       case "amrap":
+        const amrapExerciseName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
         return (
           <div className="text-sm">
             <span className="font-semibold">
-              • Set {set.set_number || 1}: {set.weight || 0} kg ×{" "}
+              • {amrapExerciseName} - Set {set.set_number || 1}: {set.weight || 0} kg ×{" "}
               {set.amrap_total_reps || set.reps || 0} reps
             </span>
+            {set.amrap_target_reps && (
+              <span className="text-gray-600 ml-2">
+                (target: {set.amrap_target_reps} reps)
+              </span>
+            )}
             {set.amrap_duration_seconds !== null &&
               set.amrap_duration_seconds !== undefined && (
                 <span className="text-gray-600 ml-2">
@@ -609,18 +667,26 @@ export default function WorkoutComplete() {
         );
 
       case "for_time":
+        const fortimeExerciseName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
         return (
           <div className="text-sm">
             <span className="font-semibold">
-              • Set {set.set_number || 1}: {set.weight || 0} kg ×{" "}
+              • {fortimeExerciseName} - Set {set.set_number || 1}: {set.weight || 0} kg ×{" "}
               {set.fortime_total_reps || set.reps || 0} reps
             </span>
+            {set.fortime_target_reps && (
+              <span className="text-gray-600 ml-2">
+                (target: {set.fortime_target_reps} reps)
+              </span>
+            )}
             {set.fortime_time_taken_sec !== null &&
               set.fortime_time_taken_sec !== undefined && (
                 <span className="text-gray-600 ml-2">
-                  (completed in {set.fortime_time_taken_sec} sec
+                  (completed in {Math.floor(set.fortime_time_taken_sec / 60)}:{(set.fortime_time_taken_sec % 60).toString().padStart(2, '0')}
                   {set.fortime_time_cap_sec
-                    ? ` / ${set.fortime_time_cap_sec} sec cap`
+                    ? ` / cap: ${Math.floor(set.fortime_time_cap_sec / 60)}:${(set.fortime_time_cap_sec % 60).toString().padStart(2, '0')}`
                     : ""}
                   )
                 </span>
@@ -629,10 +695,13 @@ export default function WorkoutComplete() {
         );
 
       case "drop_set":
+        const dropsetExerciseName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
         return (
           <div className="text-sm">
             <span className="font-semibold">
-              • Set {set.set_number || 1}:{" "}
+              • {dropsetExerciseName} - Set {set.set_number || 1}:{" "}
               {set.dropset_initial_weight || set.weight || 0} kg ×{" "}
               {set.dropset_initial_reps || set.reps || 0}
             </span>
@@ -655,10 +724,13 @@ export default function WorkoutComplete() {
         );
 
       case "straight_set":
+        const straightExerciseName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
         return (
           <div className="text-sm">
             <span className="font-semibold">
-              • Set {set.set_number || 1}: {set.weight || 0} kg ×{" "}
+              • {straightExerciseName} - Set {set.set_number || 1}: {set.weight || 0} kg ×{" "}
               {set.reps || 0} reps
             </span>
           </div>
@@ -694,29 +766,41 @@ export default function WorkoutComplete() {
         let giantSetDisplay = `• Round ${set.set_number || 1}: `;
         if (set.giant_set_exercises && Array.isArray(set.giant_set_exercises)) {
           const exercises = set.giant_set_exercises.map((ex: any) => {
-            return `${ex.weight || 0}kg×${ex.reps || 0}`;
+            const exerciseName = ex.exercise_id
+              ? exerciseNames.get(ex.exercise_id) || "Exercise"
+              : "Exercise";
+            return `${exerciseName} ${ex.weight || 0}kg×${ex.reps || 0}`;
           });
-          giantSetDisplay += `[${exercises.join(", ")}]`;
+          giantSetDisplay += exercises.join(" + ");
         } else {
-          giantSetDisplay += `${set.weight || 0} kg × ${set.reps || 0} reps`;
+          const exerciseName = set.exercise_id
+            ? exerciseNames.get(set.exercise_id) || "Exercise"
+            : "Exercise";
+          giantSetDisplay += `${exerciseName}: ${set.weight || 0} kg × ${set.reps || 0} reps`;
         }
         return <div className="text-sm font-semibold">{giantSetDisplay}</div>;
 
       case "cluster_set":
+        const clusterExerciseName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
         return (
           <div className="text-sm">
             <span className="font-semibold">
-              • Cluster {set.rest_pause_number || 1}, Set {set.set_number || 1}:{" "}
+              • {clusterExerciseName} - Cluster {set.cluster_number || 1}, Set {set.set_number || 1}:{" "}
               {set.weight || 0} kg × {set.reps || 0} reps
             </span>
           </div>
         );
 
       case "rest_pause":
+        const restPauseExerciseName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
         return (
           <div className="text-sm">
             <span className="font-semibold">
-              • Set {set.set_number || 1}:{" "}
+              • {restPauseExerciseName} - Set {set.set_number || 1}:{" "}
               {set.rest_pause_initial_weight || set.weight || 0} kg ×{" "}
               {set.rest_pause_initial_reps || set.reps || 0} reps
             </span>
@@ -728,7 +812,7 @@ export default function WorkoutComplete() {
                     {set.rest_pause_initial_weight || set.weight || 0} kg ×{" "}
                     {set.rest_pause_reps_after} reps
                   </span>
-                  <span className="text-gray-600 ml-2">(after rest)</span>
+                  <span className="text-gray-600 ml-2">(after rest-pause #{set.rest_pause_number || 1})</span>
                 </>
               )}
           </div>
@@ -757,12 +841,42 @@ export default function WorkoutComplete() {
         );
 
       case "emom":
+        const emomExerciseName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
         return (
           <div className="text-sm">
             <span className="font-semibold">
-              • Minute {set.emom_minute_number || set.set_number || 1}:{" "}
+              • {emomExerciseName} - Minute {set.emom_minute_number || set.set_number || 1}:{" "}
               {set.emom_total_reps_this_min || set.reps || 0} reps
             </span>
+            {set.emom_total_duration_sec && (
+              <span className="text-gray-600 ml-2">
+                (duration: {Math.floor(set.emom_total_duration_sec / 60)}:{(set.emom_total_duration_sec % 60).toString().padStart(2, '0')})
+              </span>
+            )}
+          </div>
+        );
+
+      case "tabata":
+        const tabataExerciseName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
+        return (
+          <div className="text-sm">
+            <span className="font-semibold">
+              • {tabataExerciseName} - Round {set.set_number || 1}
+            </span>
+            {set.tabata_rounds_completed && (
+              <span className="text-gray-600 ml-2">
+                ({set.tabata_rounds_completed} rounds completed)
+              </span>
+            )}
+            {set.tabata_total_duration_sec && (
+              <span className="text-gray-600 ml-2">
+                (duration: {Math.floor(set.tabata_total_duration_sec / 60)}:{(set.tabata_total_duration_sec % 60).toString().padStart(2, '0')})
+              </span>
+            )}
           </div>
         );
 
@@ -776,6 +890,201 @@ export default function WorkoutComplete() {
           </div>
         );
     }
+  };
+
+  const renderTemplateExercises = (
+    block: BlockGroup,
+    exerciseNames: Map<string, string>
+  ) => {
+    if (!block.templateBlock) {
+      return (
+        <div className="pl-4 border-l-2 border-slate-200 text-sm text-slate-500 italic">
+          No template data available for this block.
+        </div>
+      );
+    }
+
+    const templateBlock = block.templateBlock;
+    const blockType = templateBlock.block_type;
+
+    // For Tabata, show exercises with their time protocol data
+    // Use exerciseNames as primary source since it's guaranteed to be populated (header shows it)
+    if (blockType === "tabata") {
+      const exercises = templateBlock.exercises || [];
+      const timeProtocols = templateBlock.time_protocols || [];
+      const rounds = templateBlock.total_sets || 8;
+      
+      // Get rest_after_set from any time protocol (it's block-level, same for all exercises in tabata)
+      // It might also be stored in block.rest_seconds
+      const restAfterSet = timeProtocols.find((tp: any) => 
+        tp.rest_after_set !== null && tp.rest_after_set !== undefined && tp.rest_after_set > 0
+      )?.rest_after_set || templateBlock.rest_seconds || null;
+
+      // Always use exerciseNames as primary source - it's populated from template and shows in header
+      if (exerciseNames.size > 0) {
+        // Group exercises by set number (Tabata organizes exercises into sets/rounds)
+        const setsMap = new Map<number, Array<{exerciseId: string, exerciseName: string, work_seconds: number, rest_seconds: number, exercise_order: number}>>();
+        
+        // First, get all unique set numbers
+        const allSetNumbers = new Set<number>();
+        timeProtocols.forEach((tp: any) => {
+          if (tp.set !== null && tp.set !== undefined) {
+            allSetNumbers.add(tp.set);
+          }
+        });
+        
+        // If no set numbers found, treat all exercises as set 1
+        const setNumbers = allSetNumbers.size > 0 ? Array.from(allSetNumbers).sort((a, b) => a - b) : [1];
+        
+        // Group exercises by their set number
+        setNumbers.forEach((setNum) => {
+          if (!setsMap.has(setNum)) {
+            setsMap.set(setNum, []);
+          }
+          
+          // Find all exercises that belong to this set
+          timeProtocols.forEach((tp: any) => {
+            const tpSet = tp.set !== null && tp.set !== undefined ? tp.set : 1;
+            if (tpSet === setNum) {
+              const exerciseName = exerciseNames.get(tp.exercise_id) || "Exercise";
+              const existingInSet = setsMap.get(setNum)!.find(e => e.exerciseId === tp.exercise_id);
+              
+              if (!existingInSet) {
+                setsMap.get(setNum)!.push({
+                  exerciseId: tp.exercise_id,
+                  exerciseName,
+                  work_seconds: tp.work_seconds ?? 20,
+                  rest_seconds: tp.rest_seconds ?? 10,
+                  exercise_order: tp.exercise_order ?? 1,
+                });
+              }
+            }
+          });
+        });
+        
+        // Sort exercises within each set by exercise_order
+        setsMap.forEach((exercises, setNum) => {
+          exercises.sort((a, b) => a.exercise_order - b.exercise_order);
+        });
+
+        // If we have sets, display them grouped by set
+        if (setsMap.size > 0) {
+          return (
+            <div className="space-y-3">
+              <div className="text-sm font-semibold text-slate-700 mb-2">
+                Rounds: {rounds}
+              </div>
+              {Array.from(setsMap.entries()).map(([setNum, setExercises]) => (
+                <div key={setNum} className="pl-4 border-l-2 border-slate-200">
+                  <div className="text-xs font-semibold text-slate-500 mb-1">
+                    Set {setNum}:
+                  </div>
+                  {setExercises.map((ex, idx) => (
+                    <div key={ex.exerciseId || idx} className="text-sm ml-2 mb-1">
+                      <span className="font-medium">{ex.exerciseName}</span>
+                      <span className="ml-2 text-slate-600">
+                        Work: {ex.work_seconds}s • Rest: {ex.rest_seconds}s
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {restAfterSet && (
+                <div className="text-xs text-slate-500 mt-2">
+                  Rest after set: {restAfterSet}s
+                </div>
+              )}
+              <div className="text-xs text-slate-500 italic mt-2">
+                (No sets logged for this block)
+              </div>
+            </div>
+          );
+        }
+        
+        // Fallback: If no sets found, display all exercises in a single group
+        const allExercises = Array.from(exerciseNames.entries()).map(([exerciseId, exerciseName]) => {
+          const tp = timeProtocols.find((t: any) => t.exercise_id === exerciseId);
+          return {
+            exerciseId,
+            exerciseName,
+            work_seconds: tp?.work_seconds ?? 20,
+            rest_seconds: tp?.rest_seconds ?? 10,
+            exercise_order: tp?.exercise_order ?? 1,
+          };
+        }).sort((a, b) => a.exercise_order - b.exercise_order);
+
+        return (
+          <div className="space-y-3">
+            <div className="text-sm font-semibold text-slate-700 mb-2">
+              Rounds: {rounds}
+            </div>
+            <div className="pl-4 border-l-2 border-slate-200">
+              <div className="text-xs font-semibold text-slate-500 mb-1">
+                Exercises:
+              </div>
+              {allExercises.map((ex, idx) => (
+                <div key={ex.exerciseId || idx} className="text-sm ml-2 mb-1">
+                  <span className="font-medium">{ex.exerciseName}</span>
+                  <span className="ml-2 text-slate-600">
+                    Work: {ex.work_seconds}s • Rest: {ex.rest_seconds}s
+                  </span>
+                </div>
+              ))}
+            </div>
+            {restAfterSet && (
+              <div className="text-xs text-slate-500 mt-2">
+                Rest after set: {restAfterSet}s
+              </div>
+            )}
+            <div className="text-xs text-slate-500 italic mt-2">
+              (No sets logged for this block)
+            </div>
+          </div>
+        );
+      }
+
+      // Fallback if no exercise names found
+      return (
+        <div className="pl-4 border-l-2 border-slate-200 text-sm text-slate-500 italic">
+          No exercises configured for this Tabata block.
+        </div>
+      );
+    }
+
+    // For other block types, show basic exercise information
+    const exercises = templateBlock.exercises || [];
+    if (exercises.length === 0) {
+      return (
+        <div className="pl-4 border-l-2 border-slate-200 text-sm text-slate-500 italic">
+          No exercises configured for this block.
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {exercises.map((ex: any, idx: number) => {
+          const exerciseName = exerciseNames.get(ex.exercise_id) || "Exercise";
+          return (
+            <div key={idx} className="pl-4 border-l-2 border-slate-200 text-sm">
+              <span className="font-semibold">{exerciseName}</span>
+              {ex.reps && (
+                <span className="text-slate-600 ml-2">• Reps: {ex.reps}</span>
+              )}
+              {ex.load_percentage && (
+                <span className="text-slate-600 ml-2">• Load: {ex.load_percentage}%</span>
+              )}
+              {ex.weight_kg && (
+                <span className="text-slate-600 ml-2">• Weight: {ex.weight_kg} kg</span>
+              )}
+            </div>
+          );
+        })}
+        <div className="pl-4 border-l-2 border-slate-200 text-xs text-slate-500 italic mt-2">
+          (No sets logged for this block)
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -937,8 +1246,10 @@ export default function WorkoutComplete() {
                                 Block {block.block_order} -{" "}
                                 {formatBlockType(
                                   block.block_type
-                                ).toUpperCase()}{" "}
-                                ({setCount} {setCount === 1 ? "set" : "sets"})
+                                ).toUpperCase()}
+                                {setCount > 0 && (
+                                  <> ({setCount} {setCount === 1 ? "set" : "sets"})</>
+                                )}
                               </h3>
                             </div>
                             <p className="text-sm text-gray-600 ml-8">
@@ -950,31 +1261,36 @@ export default function WorkoutComplete() {
                       {isExpanded && (
                         <div className="px-6 pb-6 pt-0 border-t border-slate-200">
                           <div className="mt-4 space-y-2">
-                            {block.sets
-                              .sort((a, b) => {
-                                // Sort by set_number first, then by completed_at
-                                if (a.set_number && b.set_number) {
-                                  return a.set_number - b.set_number;
-                                }
-                                if (a.set_number) return -1;
-                                if (b.set_number) return 1;
-                                return (
-                                  new Date(a.completed_at).getTime() -
-                                  new Date(b.completed_at).getTime()
-                                );
-                              })
-                              .map((set, setIndex) => (
-                                <div
-                                  key={set.id}
-                                  className="pl-4 border-l-2 border-slate-200"
-                                >
-                                  {renderSetDisplay(
-                                    set,
-                                    block.block_type,
-                                    block.exerciseNames
-                                  )}
-                                </div>
-                              ))}
+                            {block.sets.length === 0 ? (
+                              // Display template exercise data when no sets are logged
+                              renderTemplateExercises(block, block.exerciseNames)
+                            ) : (
+                              block.sets
+                                .sort((a, b) => {
+                                  // Sort by set_number first, then by completed_at
+                                  if (a.set_number && b.set_number) {
+                                    return a.set_number - b.set_number;
+                                  }
+                                  if (a.set_number) return -1;
+                                  if (b.set_number) return 1;
+                                  return (
+                                    new Date(a.completed_at).getTime() -
+                                    new Date(b.completed_at).getTime()
+                                  );
+                                })
+                                .map((set, setIndex) => (
+                                  <div
+                                    key={set.id}
+                                    className="pl-4 border-l-2 border-slate-200"
+                                  >
+                                    {renderSetDisplay(
+                                      set,
+                                      block.block_type,
+                                      block.exerciseNames
+                                    )}
+                                  </div>
+                                ))
+                            )}
                           </div>
                         </div>
                       )}

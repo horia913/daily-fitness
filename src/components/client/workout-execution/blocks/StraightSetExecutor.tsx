@@ -166,77 +166,87 @@ export function StraightSetExecutor({
       }
     } catch (e) {}
 
-    // Log the current set
-    const logData: any = {
-      block_type: "straight_set",
-      set_number: currentSetNumber,
-    };
-
-    // Only add fields if they're defined
-    if (currentExercise?.exercise_id)
-      logData.exercise_id = currentExercise.exercise_id;
-    if (weightNum !== undefined && weightNum !== null && !isNaN(weightNum))
-      logData.weight = weightNum;
-    if (repsNum !== undefined && repsNum !== null && !isNaN(repsNum))
-      logData.reps = repsNum;
-
-    const result = await logSetToDatabase(logData);
-
-    if (result.success) {
-      const loggedSet: LoggedSet = {
-        id: `temp-${currentSetNumber}-${Date.now()}`,
-        exercise_id: currentExercise.exercise_id,
-        block_id: block.block.id,
+    try {
+      // Log the current set
+      const logData: any = {
+        block_type: "straight_set",
         set_number: currentSetNumber,
-        weight_kg: weightNum,
-        reps_completed: repsNum,
-        completed_at: new Date(),
-      } as LoggedSet;
+      };
 
-      const updatedLoggedSets = [...loggedSetsArray, loggedSet];
-      setLoggedSetsArray(updatedLoggedSets);
+      // Only add fields if they're defined
+      if (currentExercise?.exercise_id)
+        logData.exercise_id = currentExercise.exercise_id;
+      if (weightNum !== undefined && weightNum !== null && !isNaN(weightNum))
+        logData.weight = weightNum;
+      if (repsNum !== undefined && repsNum !== null && !isNaN(repsNum))
+        logData.reps = repsNum;
 
-      if (result.e1rm && onE1rmUpdate) {
-        onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
-      }
+      const result = await logSetToDatabase(logData);
 
-      addToast({
-        title: "Set Logged!",
-        description: `Set ${currentSetNumber} of ${totalSets}: ${weightNum}kg × ${repsNum} reps`,
-        variant: "success",
-        duration: 2000,
-      });
+      if (result.success) {
+        const loggedSet: LoggedSet = {
+          id: `temp-${currentSetNumber}-${Date.now()}`,
+          exercise_id: currentExercise.exercise_id,
+          block_id: block.block.id,
+          set_number: currentSetNumber,
+          weight_kg: weightNum,
+          reps_completed: repsNum,
+          completed_at: new Date(),
+        } as LoggedSet;
 
-      // Update parent with new completed sets count
-      const newCompletedSets = currentSetNumber;
-      onSetComplete?.(newCompletedSets);
+        const updatedLoggedSets = [...loggedSetsArray, loggedSet];
+        setLoggedSetsArray(updatedLoggedSets);
 
-      // Check if this was the last set
-      if (currentSetNumber >= totalSets) {
-        // Complete the block
-        onBlockComplete(block.block.id, updatedLoggedSets);
-      } else {
-        // Check if rest timer will show - if so, don't clear inputs yet
-        const restSeconds =
-          currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-        if (restSeconds === 0) {
-          // No rest timer, clear inputs immediately (will be pre-filled by useEffect)
-          setWeight("");
-          setReps("");
+        if (result.e1rm && onE1rmUpdate) {
+          onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
         }
-        // If restSeconds > 0, rest timer will show and inputs will be cleared
-        // when the timer completes and completedSets updates (via useEffect)
+
+        addToast({
+          title: "Set Logged!",
+          description: `Set ${currentSetNumber} of ${totalSets}: ${weightNum}kg × ${repsNum} reps`,
+          variant: "success",
+          duration: 2000,
+        });
+
+        // Update parent with new completed sets count
+        const newCompletedSets = currentSetNumber;
+        onSetComplete?.(newCompletedSets);
+
+        // Check if this was the last set
+        if (currentSetNumber >= totalSets) {
+          // Complete the block
+          onBlockComplete(block.block.id, updatedLoggedSets);
+        } else {
+          // Check if rest timer will show - if so, don't clear inputs yet
+          const restSeconds =
+            currentExercise?.rest_seconds || block.block.rest_seconds || 0;
+          if (restSeconds === 0) {
+            // No rest timer, clear inputs immediately (will be pre-filled by useEffect)
+            setWeight("");
+            setReps("");
+          }
+          // If restSeconds > 0, rest timer will show and inputs will be cleared
+          // when the timer completes and completedSets updates (via useEffect)
+        }
+      } else {
+        addToast({
+          title: "Failed to Save",
+          description: result.error || "Failed to save set. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
       }
-    } else {
+    } catch (error) {
+      console.error("Error logging set:", error);
       addToast({
-        title: "Failed to Save",
-        description: "Failed to save set. Please try again.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
         variant: "destructive",
         duration: 5000,
       });
+    } finally {
+      setIsLoggingSet(false);
     }
-
-    setIsLoggingSet(false);
   };
 
   // Logging inputs - show only current set

@@ -47,6 +47,7 @@ export default function WorkoutTemplateDetailsPage() {
 
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null);
   const [workoutBlocks, setWorkoutBlocks] = useState<WorkoutBlock[]>([]);
+  const [exerciseCount, setExerciseCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,6 +103,8 @@ export default function WorkoutTemplateDetailsPage() {
       const found = templates.find((t) => t.id === templateId);
       if (found) {
         setTemplate(found);
+        // Use exercise_count from template (calculated using same logic)
+        setExerciseCount(found.exercise_count || 0);
       } else {
         setError("Template not found");
       }
@@ -117,6 +120,9 @@ export default function WorkoutTemplateDetailsPage() {
     try {
       const blocks = await WorkoutBlockService.getWorkoutBlocks(templateId);
       setWorkoutBlocks(blocks || []);
+      // Also update exercise count using the same counting logic as getWorkoutTemplates
+      const count = await WorkoutTemplateService.countExercisesForTemplate(templateId);
+      setExerciseCount(count);
     } catch (error: any) {
       console.error("Error loading workout blocks:", error);
       setWorkoutBlocks([]);
@@ -409,10 +415,7 @@ export default function WorkoutTemplateDetailsPage() {
                 </div>
                 <div>
                   <AnimatedNumber
-                    value={workoutBlocks.reduce(
-                      (total, block) => total + (block.exercises?.length || 0),
-                      0
-                    )}
+                    value={exerciseCount}
                     className="text-2xl font-bold"
                     color={isDark ? "#fff" : "#1A1A1A"}
                   />
@@ -641,27 +644,46 @@ export default function WorkoutTemplateDetailsPage() {
                     time_cap: timeProtocol?.time_cap_minutes
                       ? String(timeProtocol.time_cap_minutes)
                       : undefined,
+                    // Load percentage from first exercise
+                    load_percentage: firstExercise?.load_percentage?.toString() || "",
                   };
 
                   // Handle complex block types with nested exercises
                   const blockType = block.block_type as string;
                   if (blockType === "circuit" || blockType === "tabata") {
+                    // Get time protocols for each exercise (for individual work_seconds, rest_after)
+                    const exerciseProtocols =
+                      block.time_protocols?.filter(
+                        (tp: any) => tp.protocol_type === blockType
+                      ) || [];
+
                     const exercisesArray =
-                      block.exercises?.map((ex, idx) => ({
-                        exercise_id: ex.exercise_id,
-                        sets:
-                          ex.sets?.toString() ||
-                          block.total_sets?.toString() ||
-                          "",
-                        reps: ex.reps || block.reps_per_set || "",
-                        rest_seconds:
-                          ex.rest_seconds?.toString() ||
-                          block.rest_seconds?.toString() ||
-                          "",
-                        work_seconds: (ex as any).work_seconds?.toString(),
-                        rest_after: (ex as any).rest_after?.toString(),
-                        exercise: ex.exercise,
-                      })) || [];
+                      block.exercises?.map((ex, idx) => {
+                        // Find protocol for this specific exercise
+                        const exProtocol = exerciseProtocols.find(
+                          (tp: any) =>
+                            tp.exercise_id === ex.exercise_id &&
+                            tp.exercise_order === (idx + 1)
+                        );
+                        
+                        return {
+                          exercise_id: ex.exercise_id,
+                          sets:
+                            ex.sets?.toString() ||
+                            block.total_sets?.toString() ||
+                            "",
+                          reps: ex.reps || block.reps_per_set || "",
+                          // Use individual exercise rest_seconds, not block rest
+                          rest_seconds: ex.rest_seconds?.toString() || "",
+                          // Get work_seconds from time protocol for this exercise
+                          work_seconds: exProtocol?.work_seconds?.toString() || "",
+                          // Get rest_after from time protocol for this exercise
+                          rest_after: exProtocol?.rest_seconds?.toString() || "",
+                          // Load individual load_percentage for each exercise
+                          load_percentage: ex.load_percentage?.toString() || "",
+                          exercise: ex.exercise,
+                        };
+                      }) || [];
 
                     if (blockType === "tabata") {
                       // Read from workout_time_protocols (one per exercise)
@@ -673,27 +695,49 @@ export default function WorkoutTemplateDetailsPage() {
                         block.rest_seconds?.toString() ||
                         "10";
                       exercise.rest_after = String(restAfter);
+                      
+                      // Load rest_after_set from time_protocols (block-level field)
+                      const restAfterSet =
+                        tabataProtocol?.rest_after_set?.toString() || "10";
+                      (exercise as any).rest_after_set = String(restAfterSet);
+                      
                       exercise.rounds = tabataProtocol?.rounds?.toString() ||
                         block.total_sets?.toString() ||
                         "8";
                       exercise.work_seconds = tabataProtocol?.work_seconds?.toString() || "20";
 
-                      // tabata_sets should come from relational tables, not block_parameters
-                      // TODO: Check if tabata_sets data exists in relational tables
-                      const numSets = block.total_sets || 1;
-                      exercise.tabata_sets = Array.from(
-                        { length: numSets },
-                        (_, setIdx) => ({
-                          exercises: exercisesArray.map((ex: any) => ({
-                            ...ex,
-                          })),
+                      // Build tabata_sets from exercises and their time protocols
+                      // Group exercises by set number from time_protocols
+                      const setsMap = new Map<number, any[]>();
+                      exercisesArray.forEach((ex: any, exIdx: number) => {
+                        const exProtocol = exerciseProtocols.find(
+                          (tp: any) =>
+                            tp.exercise_id === ex.exercise_id &&
+                            tp.exercise_order === exIdx + 1
+                        );
+                        const setNumber = exProtocol?.set || 1; // Default to set 1 if not found
+                        if (!setsMap.has(setNumber)) {
+                          setsMap.set(setNumber, []);
+                        }
+                        setsMap.get(setNumber)!.push({
+                          ...ex,
+                          work_seconds:
+                            exProtocol?.work_seconds?.toString() ||
+                            exercise.work_seconds,
+                          rest_after: exProtocol?.rest_seconds?.toString() || restAfter,
+                        });
+                      });
+
+                      // Convert map to array of sets
+                      exercise.tabata_sets = Array.from(setsMap.entries())
+                        .sort(([a], [b]) => a - b)
+                        .map(([setNum, exercises]) => ({
+                          exercises,
                           rest_between_sets: String(restAfter),
-                        })
-                      );
+                        }));
                       exercise.circuit_sets = exercise.tabata_sets;
                     } else {
                       // circuit_sets should come from relational tables, not block_parameters
-                      // TODO: Check if circuit_sets data exists in relational tables
                       const numSets = block.total_sets || 1;
                       exercise.circuit_sets = Array.from(
                         { length: numSets },
@@ -715,6 +759,8 @@ export default function WorkoutTemplateDetailsPage() {
                           block.total_sets?.toString() ||
                           "",
                         reps: ex.reps || block.reps_per_set || "",
+                        // Load individual load_percentage for each exercise
+                        load_percentage: ex.load_percentage?.toString() || "",
                         exercise: ex.exercise,
                       })) || [];
                   } else if (block.block_type === "superset") {
@@ -723,6 +769,10 @@ export default function WorkoutTemplateDetailsPage() {
                         block.exercises[1].exercise_id;
                       exercise.superset_reps =
                         block.exercises[1].reps || block.reps_per_set || "";
+                      // Load percentage for first exercise (already loaded at line 487)
+                      // Load percentage for second exercise (individual for each exercise in superset)
+                      (exercise as any).superset_load_percentage =
+                        block.exercises[1].load_percentage?.toString() || "";
                     }
                   } else if (block.block_type === "pre_exhaustion") {
                     if (block.exercises && block.exercises.length >= 2) {
@@ -730,6 +780,12 @@ export default function WorkoutTemplateDetailsPage() {
                         block.exercises[1].exercise_id;
                       exercise.isolation_reps = block.exercises[0].reps || "";
                       exercise.compound_reps = block.exercises[1].reps || "";
+                      // Load percentage for isolation exercise (first exercise)
+                      exercise.load_percentage =
+                        block.exercises[0].load_percentage?.toString() || "";
+                      // Load percentage for compound exercise (second exercise)
+                      (exercise as any).compound_load_percentage =
+                        block.exercises[1].load_percentage?.toString() || "";
                     }
                   }
 

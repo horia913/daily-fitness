@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { LoadPercentageWeightToggle } from "@/components/ui/LoadPercentageWeightToggle";
 import {
   Select,
   SelectContent,
@@ -24,8 +25,6 @@ import {
   Flame,
   PauseCircle,
   Activity,
-  BarChart3,
-  TrendingUp,
   Dumbbell,
   Link,
   X,
@@ -43,7 +42,6 @@ interface ExerciseDetailFormProps {
 const complexGroupLabels: Record<string, string> = {
   superset: "Superset Configuration",
   giant_set: "Giant Set Configuration",
-  circuit: "Circuit Configuration",
   tabata: "Tabata Circuit Configuration",
   amrap: "AMRAP Configuration",
   emom: "EMOM Configuration",
@@ -53,8 +51,6 @@ const complexGroupLabels: Record<string, string> = {
   drop_set: "Drop Set Configuration",
   pre_exhaustion: "Pre-Exhaustion Configuration",
   for_time: "For Time Configuration",
-  ladder: "Ladder Configuration",
-  pyramid_set: "Pyramid Set Configuration",
 };
 
 export default function ExerciseDetailForm({
@@ -67,6 +63,64 @@ export default function ExerciseDetailForm({
 }: ExerciseDetailFormProps) {
   const { isDark, getThemeStyles } = useTheme();
   const theme = getThemeStyles();
+
+  // Helper function to ensure value is an array
+  const ensureArray = <T,>(value: T[] | undefined | null): T[] =>
+    Array.isArray(value) ? value : [];
+
+  // Toggle state for Load % / Weight (defaults to "load", UI-only, not persisted)
+  // Use a key-based approach to support multiple toggles per form (e.g., superset has 2 exercises)
+  const getInitialToggleState = (
+    loadValue: any,
+    weightValue: any
+  ): "load" | "weight" => {
+    const hasWeight =
+      weightValue !== null && weightValue !== undefined && weightValue !== "";
+    const hasLoad =
+      loadValue !== null && loadValue !== undefined && loadValue !== "";
+    return hasWeight && !hasLoad ? "weight" : "load";
+  };
+
+  // Main exercise toggle (for most block types)
+  const [mainToggleMode, setMainToggleMode] = useState<"load" | "weight">(() =>
+    getInitialToggleState(exercise.load_percentage, exercise.weight_kg)
+  );
+
+  // Superset second exercise toggle
+  const [supersetSecondToggleMode, setSupersetSecondToggleMode] = useState<
+    "load" | "weight"
+  >(() =>
+    getInitialToggleState(
+      exercise.superset_load_percentage,
+      exercise.superset_weight_kg
+    )
+  );
+
+  // Pre-exhaustion compound exercise toggle
+  const [compoundToggleMode, setCompoundToggleMode] = useState<
+    "load" | "weight"
+  >(() =>
+    getInitialToggleState(
+      exercise.compound_load_percentage,
+      exercise.compound_weight_kg
+    )
+  );
+
+  // Giant set exercises toggle states (keyed by index)
+  const [giantSetToggleModes, setGiantSetToggleModes] = useState<
+    Record<number, "load" | "weight">
+  >(() => {
+    const modes: Record<number, "load" | "weight"> = {};
+    ensureArray(exercise.giant_set_exercises).forEach(
+      (gsEx: any, idx: number) => {
+        modes[idx] = getInitialToggleState(
+          gsEx.load_percentage,
+          gsEx.weight_kg
+        );
+      }
+    );
+    return modes;
+  });
 
   const handleNumberChange = (value: string, defaultValue: number = 0) => {
     if (value === "") return "";
@@ -85,10 +139,87 @@ export default function ExerciseDetailForm({
     });
   };
 
-  const ensureArray = <T,>(value: T[] | undefined | null): T[] =>
-    Array.isArray(value) ? value : [];
-
   const exerciseType = exercise.exercise_type || "straight_set";
+
+  // Helper function to render Load % / Weight field with toggle
+  const renderLoadWeightField = (
+    loadValue: string | number | null | undefined,
+    weightValue: string | number | null | undefined,
+    onLoadChange: (value: string) => void,
+    onWeightChange: (value: string) => void,
+    toggleMode: "load" | "weight",
+    setToggleMode: (mode: "load" | "weight") => void,
+    label: string = "Load % / Weight",
+    loadPlaceholder: string = "e.g., 70",
+    weightPlaceholder: string = "e.g., 50",
+    className?: string
+  ) => {
+    const handleToggle = (mode: "load" | "weight") => {
+      setToggleMode(mode);
+      // Clear the unused field when toggling
+      if (mode === "load") {
+        onWeightChange("");
+      } else {
+        onLoadChange("");
+      }
+    };
+
+    return (
+      <div className={className}>
+        <div className="flex items-center justify-between mb-2">
+          <Label className={`text-sm font-medium ${theme.text}`}>{label}</Label>
+          <LoadPercentageWeightToggle
+            value={toggleMode}
+            onValueChange={handleToggle}
+          />
+        </div>
+        {toggleMode === "load" ? (
+          <>
+            <Input
+              type="number"
+              value={
+                loadValue === "" ||
+                loadValue === null ||
+                loadValue === undefined
+                  ? ""
+                  : String(loadValue)
+              }
+              onChange={(e) => onLoadChange(e.target.value)}
+              placeholder={loadPlaceholder}
+              min="0"
+              max="200"
+              step="1"
+              className="mt-1 rounded-xl"
+            />
+            <p className={`text-xs ${theme.textSecondary} mt-1`}>
+              Percentage of estimated 1RM (e.g., 70 = 70% of 1RM)
+            </p>
+          </>
+        ) : (
+          <>
+            <Input
+              type="number"
+              value={
+                weightValue === "" ||
+                weightValue === null ||
+                weightValue === undefined
+                  ? ""
+                  : String(weightValue)
+              }
+              onChange={(e) => onWeightChange(e.target.value)}
+              placeholder={weightPlaceholder}
+              min="0"
+              step="0.1"
+              className="mt-1 rounded-xl"
+            />
+            <p className={`text-xs ${theme.textSecondary} mt-1`}>
+              Specific weight in kilograms
+            </p>
+          </>
+        )}
+      </div>
+    );
+  };
 
   const exerciseLabel = useMemo(() => {
     switch (exerciseType) {
@@ -157,20 +288,11 @@ export default function ExerciseDetailForm({
               <SelectItem value="for_time" className="rounded-lg">
                 For Time
               </SelectItem>
-              <SelectItem value="circuit" className="rounded-lg">
-                Circuit
-              </SelectItem>
-              <SelectItem value="ladder" className="rounded-lg">
-                Ladder
-              </SelectItem>
-              <SelectItem value="pyramid_set" className="rounded-lg">
-                Pyramid Set
-              </SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {!["tabata", "circuit", "giant_set"].includes(exerciseType) && (
+        {!["tabata", "giant_set"].includes(exerciseType) && (
           <div>
             <Label className={`text-sm font-medium ${theme.text}`}>
               {exerciseLabel}
@@ -272,6 +394,18 @@ export default function ExerciseDetailForm({
               Format: eccentric-pause-concentric-pause
             </p>
           </div>
+
+          {renderLoadWeightField(
+            exercise.load_percentage,
+            exercise.weight_kg,
+            (value) =>
+              updateExercise({ load_percentage: value, weight_kg: "" }),
+            (value) =>
+              updateExercise({ weight_kg: value, load_percentage: "" }),
+            mainToggleMode,
+            setMainToggleMode,
+            "Load % / Weight"
+          )}
         </div>
       )}
 
@@ -372,6 +506,37 @@ export default function ExerciseDetailForm({
                 />
               </div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+              {renderLoadWeightField(
+                exercise.load_percentage,
+                exercise.weight_kg,
+                (value) =>
+                  updateExercise({ load_percentage: value, weight_kg: "" }),
+                (value) =>
+                  updateExercise({ weight_kg: value, load_percentage: "" }),
+                mainToggleMode,
+                setMainToggleMode,
+                "First Exercise Load % / Weight"
+              )}
+              {renderLoadWeightField(
+                exercise.superset_load_percentage,
+                exercise.superset_weight_kg,
+                (value) =>
+                  updateExercise({
+                    superset_load_percentage: value,
+                    superset_weight_kg: "",
+                  }),
+                (value) =>
+                  updateExercise({
+                    superset_weight_kg: value,
+                    superset_load_percentage: "",
+                  }),
+                supersetSecondToggleMode,
+                setSupersetSecondToggleMode,
+                "Second Exercise Load % / Weight"
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -409,6 +574,18 @@ export default function ExerciseDetailForm({
                 className="mt-2 rounded-xl"
               />
             </div>
+
+            {renderLoadWeightField(
+              exercise.load_percentage,
+              exercise.weight_kg,
+              (value) =>
+                updateExercise({ load_percentage: value, weight_kg: "" }),
+              (value) =>
+                updateExercise({ weight_kg: value, load_percentage: "" }),
+              mainToggleMode,
+              setMainToggleMode,
+              "Load % / Weight"
+            )}
           </div>
         </div>
       )}
@@ -536,6 +713,18 @@ export default function ExerciseDetailForm({
                   />
                 </div>
               </div>
+            )}
+
+            {renderLoadWeightField(
+              exercise.load_percentage,
+              exercise.weight_kg,
+              (value) =>
+                updateExercise({ load_percentage: value, weight_kg: "" }),
+              (value) =>
+                updateExercise({ weight_kg: value, load_percentage: "" }),
+              mainToggleMode,
+              setMainToggleMode,
+              "Load % / Weight"
             )}
           </div>
         </div>
@@ -775,6 +964,120 @@ export default function ExerciseDetailForm({
                                 </Button>
                               )}
                             </div>
+                            {/* Individual exercise fields */}
+                            <div className="ml-6 grid grid-cols-2 gap-2 mt-2">
+                              <div>
+                                <Label
+                                  className={`text-xs font-medium ${theme.text}`}
+                                >
+                                  Work (s)
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={setExercise.work_seconds || ""}
+                                  onChange={(e) =>
+                                    updateExercise((current: any) => {
+                                      const tabataSets = ensureArray(
+                                        current.tabata_sets
+                                      );
+                                      const setsCopy = tabataSets.map(
+                                        (tabataSet: any, idx: number) =>
+                                          idx === setIndex
+                                            ? {
+                                                ...tabataSet,
+                                                exercises: ensureArray(
+                                                  tabataSet.exercises
+                                                ).map(
+                                                  (
+                                                    item: any,
+                                                    innerIdx: number
+                                                  ) =>
+                                                    innerIdx === exerciseIndex
+                                                      ? {
+                                                          ...item,
+                                                          work_seconds:
+                                                            handleNumberChange(
+                                                              e.target.value,
+                                                              0
+                                                            ),
+                                                        }
+                                                      : item
+                                                ),
+                                              }
+                                            : tabataSet
+                                      );
+                                      return {
+                                        ...current,
+                                        tabata_sets: setsCopy,
+                                      };
+                                    })
+                                  }
+                                  placeholder="45"
+                                  min="0"
+                                  className="mt-1 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <Label
+                                  className={`text-xs font-medium ${theme.text}`}
+                                >
+                                  Rest (s)
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={
+                                    setExercise.rest_after ||
+                                    setExercise.rest_seconds ||
+                                    ""
+                                  }
+                                  onChange={(e) =>
+                                    updateExercise((current: any) => {
+                                      const tabataSets = ensureArray(
+                                        current.tabata_sets
+                                      );
+                                      const setsCopy = tabataSets.map(
+                                        (tabataSet: any, idx: number) =>
+                                          idx === setIndex
+                                            ? {
+                                                ...tabataSet,
+                                                exercises: ensureArray(
+                                                  tabataSet.exercises
+                                                ).map(
+                                                  (
+                                                    item: any,
+                                                    innerIdx: number
+                                                  ) =>
+                                                    innerIdx === exerciseIndex
+                                                      ? {
+                                                          ...item,
+                                                          rest_after:
+                                                            handleNumberChange(
+                                                              e.target.value,
+                                                              0
+                                                            ),
+                                                          rest_seconds:
+                                                            handleNumberChange(
+                                                              e.target.value,
+                                                              0
+                                                            ),
+                                                        }
+                                                      : item
+                                                ),
+                                              }
+                                            : tabataSet
+                                      );
+                                      return {
+                                        ...current,
+                                        tabata_sets: setsCopy,
+                                      };
+                                    })
+                                  }
+                                  placeholder="10"
+                                  min="0"
+                                  className="mt-1 rounded-lg text-xs"
+                                />
+                              </div>
+                            </div>
                           </div>
                         )
                       )}
@@ -945,6 +1248,18 @@ export default function ExerciseDetailForm({
                 />
               </div>
             </div>
+
+            {renderLoadWeightField(
+              exercise.load_percentage,
+              exercise.weight_kg,
+              (value) =>
+                updateExercise({ load_percentage: value, weight_kg: "" }),
+              (value) =>
+                updateExercise({ weight_kg: value, load_percentage: "" }),
+              mainToggleMode,
+              setMainToggleMode,
+              "Initial Load % / Weight"
+            )}
           </div>
         </div>
       )}
@@ -1030,33 +1345,96 @@ export default function ExerciseDetailForm({
                         </Button>
                       )}
                     </div>
-                    <div className="ml-10">
-                      <Label className={`text-xs font-medium ${theme.text}`}>
-                        Reps
-                      </Label>
-                      <Input
-                        type="text"
-                        value={gsExercise.reps || ""}
-                        onChange={(e) =>
-                          updateExercise((current: any) => {
-                            const exercisesArr = ensureArray(
-                              current.giant_set_exercises
-                            );
-                            const updated = exercisesArr.map(
-                              (item: any, idx: number) =>
-                                idx === index
-                                  ? { ...item, reps: e.target.value }
-                                  : item
-                            );
-                            return {
-                              ...current,
-                              giant_set_exercises: updated,
-                            };
-                          })
-                        }
-                        placeholder="e.g., 10-12"
-                        className="mt-1 rounded-lg text-sm"
-                      />
+                    <div className="ml-10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label className={`text-xs font-medium ${theme.text}`}>
+                          Reps
+                        </Label>
+                        <Input
+                          type="text"
+                          value={gsExercise.reps || ""}
+                          onChange={(e) =>
+                            updateExercise((current: any) => {
+                              const exercisesArr = ensureArray(
+                                current.giant_set_exercises
+                              );
+                              const updated = exercisesArr.map(
+                                (item: any, idx: number) =>
+                                  idx === index
+                                    ? { ...item, reps: e.target.value }
+                                    : item
+                              );
+                              return {
+                                ...current,
+                                giant_set_exercises: updated,
+                              };
+                            })
+                          }
+                          placeholder="e.g., 10-12"
+                          className="mt-1 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        {renderLoadWeightField(
+                          gsExercise.load_percentage,
+                          gsExercise.weight_kg,
+                          (value) => {
+                            updateExercise((current: any) => {
+                              const exercisesArr = ensureArray(
+                                current.giant_set_exercises
+                              );
+                              const updated = exercisesArr.map(
+                                (item: any, idx: number) =>
+                                  idx === index
+                                    ? {
+                                        ...item,
+                                        load_percentage: value,
+                                        weight_kg: "",
+                                      }
+                                    : item
+                              );
+                              return {
+                                ...current,
+                                giant_set_exercises: updated,
+                              };
+                            });
+                          },
+                          (value) => {
+                            updateExercise((current: any) => {
+                              const exercisesArr = ensureArray(
+                                current.giant_set_exercises
+                              );
+                              const updated = exercisesArr.map(
+                                (item: any, idx: number) =>
+                                  idx === index
+                                    ? {
+                                        ...item,
+                                        weight_kg: value,
+                                        load_percentage: "",
+                                      }
+                                    : item
+                              );
+                              return {
+                                ...current,
+                                giant_set_exercises: updated,
+                              };
+                            });
+                          },
+                          giantSetToggleModes[index] ||
+                            getInitialToggleState(
+                              gsExercise.load_percentage,
+                              gsExercise.weight_kg
+                            ),
+                          (mode) =>
+                            setGiantSetToggleModes((prev) => ({
+                              ...prev,
+                              [index]: mode,
+                            })),
+                          "Load % / Weight",
+                          "e.g., 85",
+                          "e.g., 50"
+                        )}
+                      </div>
                     </div>
                   </div>
                 )
@@ -1078,6 +1456,7 @@ export default function ExerciseDetailForm({
                           {
                             exercise_id: "",
                             reps: "",
+                            load_percentage: "",
                           },
                         ],
                       };
@@ -1224,6 +1603,18 @@ export default function ExerciseDetailForm({
                 />
               </div>
             </div>
+
+            {renderLoadWeightField(
+              exercise.load_percentage,
+              exercise.weight_kg,
+              (value) =>
+                updateExercise({ load_percentage: value, weight_kg: "" }),
+              (value) =>
+                updateExercise({ weight_kg: value, load_percentage: "" }),
+              mainToggleMode,
+              setMainToggleMode,
+              "Load % / Weight"
+            )}
           </div>
         </div>
       )}
@@ -1286,6 +1677,18 @@ export default function ExerciseDetailForm({
                 />
               </div>
             </div>
+
+            {renderLoadWeightField(
+              exercise.load_percentage,
+              exercise.weight_kg,
+              (value) =>
+                updateExercise({ load_percentage: value, weight_kg: "" }),
+              (value) =>
+                updateExercise({ weight_kg: value, load_percentage: "" }),
+              mainToggleMode,
+              setMainToggleMode,
+              "Initial Load % / Weight"
+            )}
           </div>
         </div>
       )}
@@ -1380,476 +1783,35 @@ export default function ExerciseDetailForm({
                 />
               </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Circuit */}
-      {exerciseType === "circuit" && (
-        <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <Activity className="w-4 h-4 text-purple-600" />
-              Circuit Configuration
-            </h4>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
-              Circuit training with variable timing per exercise - flexible work
-              and rest periods
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  Rounds
-                </Label>
-                <Input
-                  type="number"
-                  value={exercise.sets === "" ? "" : exercise.sets || ""}
-                  onChange={(e) =>
-                    updateExercise({
-                      sets: handleNumberChange(e.target.value, 0),
-                    })
-                  }
-                  min="1"
-                  className="mt-2 rounded-xl"
-                />
-              </div>
-              <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  Reps
-                </Label>
-                <Input
-                  value={exercise.reps || ""}
-                  onChange={(e) => updateExercise({ reps: e.target.value })}
-                  className="mt-2 rounded-xl"
-                />
-              </div>
-              <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  Rest (seconds)
-                </Label>
-                <Input
-                  type="number"
-                  value={
-                    exercise.rest_seconds === ""
-                      ? ""
-                      : exercise.rest_seconds || ""
-                  }
-                  onChange={(e) =>
-                    updateExercise({
-                      rest_seconds: handleNumberChange(e.target.value, 0),
-                    })
-                  }
-                  min="0"
-                  className="mt-2 rounded-xl"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  Circuit Sets
-                </Label>
-                {allowStructureEditing && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      updateExercise((current: any) => {
-                        const circuitSets = ensureArray(current.circuit_sets);
-                        return {
-                          ...current,
-                          circuit_sets: [
-                            ...circuitSets,
-                            {
-                              exercises: [],
-                              rest_between_sets: "",
-                            },
-                          ],
-                        };
-                      })
-                    }
-                    className="border-dashed border-purple-300 dark:border-purple-600 text-purple-600 dark:text-purple-400"
-                  >
-                    <Plus className="w-3 h-3 mr-1" />
-                    Add Set
-                  </Button>
-                )}
-              </div>
-
-              {ensureArray(exercise.circuit_sets).map(
-                (set: any, setIndex: number) => (
-                  <div
-                    key={setIndex}
-                    className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <h5 className={`font-medium ${theme.text}`}>
-                        Set {setIndex + 1}
-                      </h5>
-                      {allowStructureEditing && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            updateExercise((current: any) => {
-                              const circuitSets = ensureArray(
-                                current.circuit_sets
-                              );
-                              const updated = circuitSets.filter(
-                                (_: any, idx: number) => idx !== setIndex
-                              );
-                              return {
-                                ...current,
-                                circuit_sets: updated,
-                              };
-                            })
-                          }
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 mb-3">
-                      {ensureArray(set?.exercises).map(
-                        (setExercise: any, exerciseIndex: number) => (
-                          <div
-                            key={exerciseIndex}
-                            className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600"
-                          >
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <span className="text-xs text-slate-500 w-6">
-                                {exerciseIndex + 1}.
-                              </span>
-                              <div className="flex-1">
-                                <SearchableSelect
-                                  value={setExercise.exercise_id || ""}
-                                  onValueChange={(value) =>
-                                    updateExercise((current: any) => {
-                                      const circuitSets = ensureArray(
-                                        current.circuit_sets
-                                      );
-                                      const setsCopy = circuitSets.map(
-                                        (circuitSet: any, idx: number) =>
-                                          idx === setIndex
-                                            ? {
-                                                ...circuitSet,
-                                                exercises: ensureArray(
-                                                  circuitSet.exercises
-                                                ).map(
-                                                  (
-                                                    item: any,
-                                                    innerIdx: number
-                                                  ) =>
-                                                    innerIdx === exerciseIndex
-                                                      ? {
-                                                          ...item,
-                                                          exercise_id: value,
-                                                        }
-                                                      : item
-                                                ),
-                                              }
-                                            : circuitSet
-                                      );
-                                      return {
-                                        ...current,
-                                        circuit_sets: setsCopy,
-                                      };
-                                    })
-                                  }
-                                  placeholder="Search exercise..."
-                                  items={availableExercises.map((ex) => ({
-                                    id: ex.id,
-                                    name: ex.name,
-                                    description: ex.description,
-                                  }))}
-                                />
-                              </div>
-                              {allowStructureEditing && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    updateExercise((current: any) => {
-                                      const circuitSets = ensureArray(
-                                        current.circuit_sets
-                                      );
-                                      const setsCopy = circuitSets.map(
-                                        (circuitSet: any, idx: number) =>
-                                          idx === setIndex
-                                            ? {
-                                                ...circuitSet,
-                                                exercises: ensureArray(
-                                                  circuitSet.exercises
-                                                ).filter(
-                                                  (_: any, innerIdx: number) =>
-                                                    innerIdx !== exerciseIndex
-                                                ),
-                                              }
-                                            : circuitSet
-                                      );
-                                      return {
-                                        ...current,
-                                        circuit_sets: setsCopy,
-                                      };
-                                    })
-                                  }
-                                  className="text-red-500 hover:text-red-700 p-1"
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-3">
-                              <div>
-                                <Label
-                                  className={`text-xs font-medium ${theme.text}`}
-                                >
-                                  Sets
-                                </Label>
-                                <Input
-                                  type="number"
-                                  value={
-                                    setExercise.sets === ""
-                                      ? ""
-                                      : setExercise.sets || ""
-                                  }
-                                  onChange={(e) =>
-                                    updateExercise((current: any) => {
-                                      const circuitSets = ensureArray(
-                                        current.circuit_sets
-                                      );
-                                      const setsCopy = circuitSets.map(
-                                        (circuitSet: any, idx: number) =>
-                                          idx === setIndex
-                                            ? {
-                                                ...circuitSet,
-                                                exercises: ensureArray(
-                                                  circuitSet.exercises
-                                                ).map(
-                                                  (
-                                                    item: any,
-                                                    innerIdx: number
-                                                  ) =>
-                                                    innerIdx === exerciseIndex
-                                                      ? {
-                                                          ...item,
-                                                          sets: handleNumberChange(
-                                                            e.target.value,
-                                                            0
-                                                          ),
-                                                        }
-                                                      : item
-                                                ),
-                                              }
-                                            : circuitSet
-                                      );
-                                      return {
-                                        ...current,
-                                        circuit_sets: setsCopy,
-                                      };
-                                    })
-                                  }
-                                  min="1"
-                                  className="mt-1 rounded-lg text-sm"
-                                />
-                              </div>
-                              <div>
-                                <Label
-                                  className={`text-xs font-medium ${theme.text}`}
-                                >
-                                  Reps
-                                </Label>
-                                <Input
-                                  value={setExercise.reps || ""}
-                                  onChange={(e) =>
-                                    updateExercise((current: any) => {
-                                      const circuitSets = ensureArray(
-                                        current.circuit_sets
-                                      );
-                                      const setsCopy = circuitSets.map(
-                                        (circuitSet: any, idx: number) =>
-                                          idx === setIndex
-                                            ? {
-                                                ...circuitSet,
-                                                exercises: ensureArray(
-                                                  circuitSet.exercises
-                                                ).map(
-                                                  (
-                                                    item: any,
-                                                    innerIdx: number
-                                                  ) =>
-                                                    innerIdx === exerciseIndex
-                                                      ? {
-                                                          ...item,
-                                                          reps: e.target.value,
-                                                        }
-                                                      : item
-                                                ),
-                                              }
-                                            : circuitSet
-                                      );
-                                      return {
-                                        ...current,
-                                        circuit_sets: setsCopy,
-                                      };
-                                    })
-                                  }
-                                  className="mt-1 rounded-lg text-sm"
-                                />
-                              </div>
-                              <div>
-                                <Label
-                                  className={`text-xs font-medium ${theme.text}`}
-                                >
-                                  Rest (seconds)
-                                </Label>
-                                <Input
-                                  type="number"
-                                  value={
-                                    setExercise.rest_seconds === ""
-                                      ? ""
-                                      : setExercise.rest_seconds || ""
-                                  }
-                                  onChange={(e) =>
-                                    updateExercise((current: any) => {
-                                      const circuitSets = ensureArray(
-                                        current.circuit_sets
-                                      );
-                                      const setsCopy = circuitSets.map(
-                                        (circuitSet: any, idx: number) =>
-                                          idx === setIndex
-                                            ? {
-                                                ...circuitSet,
-                                                exercises: ensureArray(
-                                                  circuitSet.exercises
-                                                ).map(
-                                                  (
-                                                    item: any,
-                                                    innerIdx: number
-                                                  ) =>
-                                                    innerIdx === exerciseIndex
-                                                      ? {
-                                                          ...item,
-                                                          rest_seconds:
-                                                            handleNumberChange(
-                                                              e.target.value,
-                                                              0
-                                                            ),
-                                                        }
-                                                      : item
-                                                ),
-                                              }
-                                            : circuitSet
-                                      );
-                                      return {
-                                        ...current,
-                                        circuit_sets: setsCopy,
-                                      };
-                                    })
-                                  }
-                                  min="0"
-                                  className="mt-1 rounded-lg text-sm"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      )}
-
-                      {allowStructureEditing && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            updateExercise((current: any) => {
-                              const circuitSets = ensureArray(
-                                current.circuit_sets
-                              );
-                              const setsCopy = circuitSets.map(
-                                (circuitSet: any, idx: number) =>
-                                  idx === setIndex
-                                    ? {
-                                        ...circuitSet,
-                                        exercises: [
-                                          ...ensureArray(circuitSet.exercises),
-                                          {
-                                            exercise_id: "",
-                                            sets: "",
-                                            reps: "",
-                                            rest_seconds: "",
-                                          },
-                                        ],
-                                      }
-                                    : circuitSet
-                              );
-                              return {
-                                ...current,
-                                circuit_sets: setsCopy,
-                              };
-                            })
-                          }
-                          className="w-full border-dashed text-xs"
-                        >
-                          <Plus className="w-3 h-3 mr-1" />
-                          Add Exercise
-                        </Button>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label className={`text-xs font-medium ${theme.text}`}>
-                        Rest After Set (seconds)
-                      </Label>
-                      <Input
-                        type="number"
-                        value={
-                          set?.rest_between_sets === ""
-                            ? ""
-                            : set?.rest_between_sets || ""
-                        }
-                        onChange={(e) =>
-                          updateExercise((current: any) => {
-                            const circuitSets = ensureArray(
-                              current.circuit_sets
-                            );
-                            const setsCopy = circuitSets.map(
-                              (circuitSet: any, idx: number) =>
-                                idx === setIndex
-                                  ? {
-                                      ...circuitSet,
-                                      rest_between_sets: handleNumberChange(
-                                        e.target.value,
-                                        0
-                                      ),
-                                    }
-                                  : circuitSet
-                            );
-                            return {
-                              ...current,
-                              circuit_sets: setsCopy,
-                            };
-                          })
-                        }
-                        min="0"
-                        placeholder="Rest time after completing this set"
-                        className="mt-1 rounded-lg text-sm"
-                      />
-                      <p className={`text-xs ${theme.textSecondary} mt-1`}>
-                        Time to rest after completing all exercises in this set
-                      </p>
-                    </div>
-                  </div>
-                )
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+              {renderLoadWeightField(
+                exercise.load_percentage,
+                exercise.weight_kg,
+                (value) =>
+                  updateExercise({ load_percentage: value, weight_kg: "" }),
+                (value) =>
+                  updateExercise({ weight_kg: value, load_percentage: "" }),
+                mainToggleMode,
+                setMainToggleMode,
+                "Isolation Load % / Weight"
+              )}
+              {renderLoadWeightField(
+                exercise.compound_load_percentage,
+                exercise.compound_weight_kg,
+                (value) =>
+                  updateExercise({
+                    compound_load_percentage: value,
+                    compound_weight_kg: "",
+                  }),
+                (value) =>
+                  updateExercise({
+                    compound_weight_kg: value,
+                    compound_load_percentage: "",
+                  }),
+                compoundToggleMode,
+                setCompoundToggleMode,
+                "Compound Load % / Weight"
               )}
             </div>
           </div>
@@ -1909,175 +1871,21 @@ export default function ExerciseDetailForm({
                 />
               </div>
             </div>
+
+            {renderLoadWeightField(
+              exercise.load_percentage,
+              exercise.weight_kg,
+              (value) =>
+                updateExercise({ load_percentage: value, weight_kg: "" }),
+              (value) =>
+                updateExercise({ weight_kg: value, load_percentage: "" }),
+              mainToggleMode,
+              setMainToggleMode,
+              "Load % / Weight"
+            )}
           </div>
         </div>
       )}
-
-      {/* Ladder */}
-      {exerciseType === "ladder" && (
-        <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <TrendingUp className="w-4 h-4 text-purple-600" />
-              Ladder Configuration
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  Rounds
-                </Label>
-                <Input
-                  type="number"
-                  value={exercise.rounds === "" ? "" : exercise.rounds || ""}
-                  onChange={(e) =>
-                    updateExercise({
-                      rounds: handleNumberChange(e.target.value, 0),
-                    })
-                  }
-                  min="1"
-                  className="mt-2 rounded-xl"
-                />
-              </div>
-              <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  Start Reps
-                </Label>
-                <Input
-                  type="number"
-                  value={
-                    exercise.start_reps === "" ? "" : exercise.start_reps || ""
-                  }
-                  onChange={(e) =>
-                    updateExercise({
-                      start_reps: handleNumberChange(e.target.value, 0),
-                    })
-                  }
-                  min="0"
-                  className="mt-2 rounded-xl"
-                />
-              </div>
-              <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  Increment per Round
-                </Label>
-                <Input
-                  type="number"
-                  value={
-                    exercise.increment === "" ? "" : exercise.increment || ""
-                  }
-                  onChange={(e) =>
-                    updateExercise({
-                      increment: handleNumberChange(e.target.value, 0),
-                    })
-                  }
-                  min="0"
-                  className="mt-2 rounded-xl"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pyramid Set */}
-      {exerciseType === "pyramid_set" && (
-        <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
-            <h4
-              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
-            >
-              <BarChart3 className="w-4 h-4 text-purple-600" />
-              Pyramid Set Configuration
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  Sets
-                </Label>
-                <Input
-                  type="number"
-                  value={exercise.sets === "" ? "" : exercise.sets || ""}
-                  onChange={(e) =>
-                    updateExercise({
-                      sets: handleNumberChange(e.target.value, 0),
-                    })
-                  }
-                  min="1"
-                  className="mt-2 rounded-xl"
-                />
-              </div>
-              <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  Start Reps
-                </Label>
-                <Input
-                  type="number"
-                  value={
-                    exercise.start_reps === "" ? "" : exercise.start_reps || ""
-                  }
-                  onChange={(e) =>
-                    updateExercise({
-                      start_reps: handleNumberChange(e.target.value, 0),
-                    })
-                  }
-                  min="0"
-                  className="mt-2 rounded-xl"
-                />
-              </div>
-              <div>
-                <Label className={`text-sm font-medium ${theme.text}`}>
-                  End Reps
-                </Label>
-                <Input
-                  type="number"
-                  value={
-                    exercise.end_reps === "" ? "" : exercise.end_reps || ""
-                  }
-                  onChange={(e) =>
-                    updateExercise({
-                      end_reps: handleNumberChange(e.target.value, 0),
-                    })
-                  }
-                  min="0"
-                  className="mt-2 rounded-xl"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Load Percentage - Common field for all block types */}
-      <div>
-        <Label className={`text-sm font-medium ${theme.text}`}>
-          Load (% of 1RM)
-        </Label>
-        <Input
-          type="number"
-          value={
-            exercise.load_percentage === ""
-              ? ""
-              : exercise.load_percentage || ""
-          }
-          onChange={(e) =>
-            updateExercise({
-              load_percentage: e.target.value === "" ? "" : e.target.value,
-            })
-          }
-          placeholder="e.g., 70"
-          min="0"
-          max="200"
-          step="1"
-          className="mt-2 rounded-xl"
-        />
-        <p className={`text-xs ${theme.textSecondary} mt-1`}>
-          Percentage of estimated 1RM to use for suggested weight (e.g., 70 =
-          70% of 1RM)
-        </p>
-      </div>
-
       <div>
         <Label className={`text-sm font-medium ${theme.text}`}>Notes</Label>
         <Textarea

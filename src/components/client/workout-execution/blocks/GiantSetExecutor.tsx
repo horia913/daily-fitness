@@ -45,24 +45,35 @@ export function GiantSetExecutor({
   const [reps, setReps] = useState<string[]>([]);
   const [isLoggingSet, setIsLoggingSet] = useState(false);
 
-  // Initialize arrays
+  // Initialize arrays and recalculate suggested weights when exercises or e1rmMap changes
   useEffect(() => {
-    if (exercises.length > 0 && weights.length !== exercises.length) {
-      const initialWeights = exercises.map((ex) => {
-        if (ex.load_percentage) {
+    if (exercises.length > 0) {
+      const initialWeights = exercises.map((ex, idx) => {
+        const currentWeight = weights[idx];
+        // Only set suggested weight if current weight is empty AND e1rmMap has data
+        const weightIsEmpty = !currentWeight || currentWeight.trim() === "" || parseFloat(currentWeight) === 0;
+        const hasE1rm = ex.exercise_id && e1rmMap[ex.exercise_id] && e1rmMap[ex.exercise_id] > 0;
+        
+        if (weightIsEmpty && hasE1rm && ex.load_percentage) {
           const suggested = calculateSuggestedWeightUtil(
             ex.exercise_id,
             ex.load_percentage,
             e1rmMap
           );
-          return suggested ? suggested.toString() : "";
+          if (suggested && suggested > 0) {
+            return suggested.toString();
+          }
         }
-        return "";
+        // Keep existing weight if it has a value
+        return currentWeight || "";
       });
       setWeights(initialWeights);
-      setReps(new Array(exercises.length).fill(""));
+      // Only initialize reps array if it's empty or length doesn't match
+      if (reps.length !== exercises.length) {
+        setReps(new Array(exercises.length).fill(""));
+      }
     }
-  }, [exercises.length, e1rmMap]);
+  }, [exercises, e1rmMap, weights]);
 
   // Block details
   const blockDetails: BlockDetail[] = [

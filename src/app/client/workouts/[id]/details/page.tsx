@@ -56,6 +56,8 @@ interface ClientExerciseDisplay {
   reps: string | null;
   restSeconds: number | null;
   weightGuidance: string | null;
+  loadPercentage: number | null;
+  weight: number | null;
   orderIndex: number;
   blockName: string | null;
   blockType: string | null;
@@ -344,8 +346,8 @@ export default function WorkoutDetailsPage() {
           reps_per_set: block.reps_per_set ?? null,
           rest_seconds: block.rest_seconds ?? null,
           duration_seconds: block.duration_seconds ?? null,
-          // Preserve special table data
-          time_protocols: block.time_protocols ?? [],
+          // Preserve special table data - ensure time_protocols is preserved
+          time_protocols: (block as any).time_protocols ?? [],
           exercises: (block.exercises ?? []).map((ex) => ({
             id: ex.id,
             exercise_id: ex.exercise_id,
@@ -359,6 +361,11 @@ export default function WorkoutDetailsPage() {
             tempo: ex.tempo ?? null,
             rest_seconds: ex.rest_seconds ?? null,
             notes: ex.notes ?? null,
+            // Superset and pre-exhaustion specific fields
+            superset_reps: (ex as any).superset_reps ?? null,
+            superset_load_percentage: (ex as any).superset_load_percentage ?? null,
+            compound_reps: (ex as any).compound_reps ?? null,
+            compound_load_percentage: (ex as any).compound_load_percentage ?? null,
             // Preserve special table data for each exercise
             drop_sets: ex.drop_sets ?? [],
             cluster_sets: ex.cluster_sets ?? [],
@@ -414,29 +421,24 @@ export default function WorkoutDetailsPage() {
           .map((block) => {
             const blockParameters = safeParse(block.block_parameters);
 
-            // Debug: Log block data structure
-            if (process.env.NODE_ENV !== "production") {
-              console.log(`Block ${block.id} (${block.block_type}):`, {
-                blockId: block.id,
-                blockType: block.block_type,
-                exercisesCount: block.exercises?.length || 0,
-                firstExercise: block.exercises?.[0] ? {
-                  id: block.exercises[0].id,
-                  exercise_id: block.exercises[0].exercise_id,
-                  exercise_order: block.exercises[0].exercise_order,
-                  hasDropSets: !!block.exercises[0].drop_sets,
-                  dropSetsLength: block.exercises[0].drop_sets?.length || 0,
-                  hasClusterSets: !!block.exercises[0].cluster_sets,
-                  clusterSetsLength: block.exercises[0].cluster_sets?.length || 0,
-                  hasRestPauseSets: !!block.exercises[0].rest_pause_sets,
-                  restPauseSetsLength: block.exercises[0].rest_pause_sets?.length || 0,
-                  fullExercise: block.exercises[0]
-                } : null,
-                timeProtocolsCount: (block as any).time_protocols?.length || 0,
-                timeProtocols: (block as any).time_protocols
-              });
-            }
 
+            // Helper to filter out "test" values
+            const filterTestValue = (
+              value: string | null | undefined
+            ): string | null => {
+              if (!value) return null;
+              const trimmed = value.trim();
+              if (
+                trimmed.toLowerCase() === "test" ||
+                trimmed.toLowerCase() === "teest"
+              ) {
+                return null;
+              }
+              return trimmed;
+            };
+
+            // getWorkoutBlocks already creates exercises from time_protocols for time-based blocks
+            // So we can use block.exercises for ALL block types
             const exercises = ((block.exercises ?? []) as any[])
               .map((exercise, index): ClientExerciseDisplay => {
                 const meta = exercise.exercise_id
@@ -450,21 +452,6 @@ export default function WorkoutDetailsPage() {
                     ? exercise.exercise_order
                     : index + 1) - 1
                 );
-
-                // Helper to filter out "test" values
-                const filterTestValue = (
-                  value: string | null | undefined
-                ): string | null => {
-                  if (!value) return null;
-                  const trimmed = value.trim();
-                  if (
-                    trimmed.toLowerCase() === "test" ||
-                    trimmed.toLowerCase() === "teest"
-                  ) {
-                    return null;
-                  }
-                  return trimmed;
-                };
 
                 // Get exercise name with filtering
                 const exerciseName =
@@ -484,7 +471,12 @@ export default function WorkoutDetailsPage() {
                     exercise.weight_kg !== null &&
                     exercise.weight_kg !== undefined
                       ? `${exercise.weight_kg} kg`
+                      : exercise.load_percentage !== null &&
+                        exercise.load_percentage !== undefined
+                      ? `${exercise.load_percentage}%`
                       : null,
+                  loadPercentage: exercise.load_percentage ?? null,
+                  weight: exercise.weight_kg ?? null,
                   orderIndex,
                   blockName: block.block_name,
                   blockType: block.block_type,
@@ -809,6 +801,65 @@ export default function WorkoutDetailsPage() {
       if (blockType === "straight_set" && exercise.restSeconds !== null && exercise.restSeconds !== undefined) {
         result.push({ label: "Rest", value: `${exercise.restSeconds}s` });
       }
+      
+      // Show load_percentage or weight_kg
+      // For SUPERSET/GIANT_SET/PRE_EXHAUSTION: Only show for FIRST exercise (orderIndex 0)
+      // For second exercise, we show the specific load (superset_load_percentage/compound_load_percentage) below
+      if (blockType === "straight_set" || 
+          (blockType === "superset" && exercise.orderIndex === 0) ||
+          (blockType === "giant_set" && exercise.orderIndex === 0) ||
+          (blockType === "pre_exhaustion" && exercise.orderIndex === 0)) {
+        if (exercise.loadPercentage !== null && exercise.loadPercentage !== undefined) {
+          result.push({ label: "Load %", value: `${exercise.loadPercentage}%` });
+        } else if (exercise.weight !== null && exercise.weight !== undefined) {
+          result.push({ label: "Weight", value: `${exercise.weight} kg` });
+        } else if (exerciseRaw?.load_percentage !== null && exerciseRaw?.load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${exerciseRaw.load_percentage}%` });
+        } else if (exerciseRaw?.weight_kg !== null && exerciseRaw?.weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${exerciseRaw.weight_kg} kg` });
+        }
+      }
+      
+      // For SUPERSET: Show second exercise reps and load % (NOT the main load_percentage/weight_kg)
+      if (blockType === "superset" && exercise.orderIndex === 1) {
+        // Second exercise in superset
+        if (exerciseRaw?.superset_reps) {
+          result.push({ label: "Reps", value: formatReps(exerciseRaw.superset_reps) });
+        }
+        if (exerciseRaw?.superset_load_percentage !== null && exerciseRaw?.superset_load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${exerciseRaw.superset_load_percentage}%` });
+        } else if (exerciseRaw?.superset_weight_kg !== null && exerciseRaw?.superset_weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${exerciseRaw.superset_weight_kg} kg` });
+        }
+      }
+      
+      // For GIANT_SET: Show load for each exercise (each has its own load_percentage/weight_kg)
+      if (blockType === "giant_set" && exercise.orderIndex > 0) {
+        // For exercises after the first one, show their individual load
+        if (exercise.loadPercentage !== null && exercise.loadPercentage !== undefined) {
+          result.push({ label: "Load %", value: `${exercise.loadPercentage}%` });
+        } else if (exercise.weight !== null && exercise.weight !== undefined) {
+          result.push({ label: "Weight", value: `${exercise.weight} kg` });
+        } else if (exerciseRaw?.load_percentage !== null && exerciseRaw?.load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${exerciseRaw.load_percentage}%` });
+        } else if (exerciseRaw?.weight_kg !== null && exerciseRaw?.weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${exerciseRaw.weight_kg} kg` });
+        }
+      }
+      
+      // For PRE_EXHAUSTION: Show compound exercise reps and load % (NOT the main load_percentage/weight_kg)
+      if (blockType === "pre_exhaustion" && exercise.orderIndex === 1) {
+        // Compound exercise (second exercise)
+        if (exerciseRaw?.compound_reps) {
+          result.push({ label: "Reps", value: formatReps(exerciseRaw.compound_reps) });
+        }
+        if (exerciseRaw?.compound_load_percentage !== null && exerciseRaw?.compound_load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${exerciseRaw.compound_load_percentage}%` });
+        } else if (exerciseRaw?.compound_weight_kg !== null && exerciseRaw?.compound_weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${exerciseRaw.compound_weight_kg} kg` });
+        }
+      }
+      
       // OPTIONAL: rir, tempo, notes (only if set)
       // For SUPERSET: RIR, tempo, notes only for exercise 1 (first exercise, orderIndex === 0)
       if (blockType === "superset") {
@@ -839,44 +890,60 @@ export default function WorkoutDetailsPage() {
     }
     // 2. DROP SET: from workout_drop_sets
     else if (blockType === "drop_set") {
-      // Check if drop_sets data exists
-      if (exerciseRaw?.drop_sets && Array.isArray(exerciseRaw.drop_sets) && exerciseRaw.drop_sets.length > 0) {
-        const dropSet = exerciseRaw.drop_sets[0];
-        // USED: drop_order, weight_kg, reps, rest_seconds
-        if (dropSet.drop_order !== null && dropSet.drop_order !== undefined) {
-          result.push({ label: "Drop order", value: `${dropSet.drop_order}` });
+      // Show main exercise sets/reps first
+      if (exercise.sets !== null && exercise.sets !== undefined) {
+        result.push({ label: "Sets", value: `${exercise.sets}` });
+      }
+      if (exercise.reps) {
+        result.push({ label: "Reps", value: formatReps(exercise.reps) });
+      }
+      
+      // Check if drop_sets data exists (must be array with at least one item)
+      const dropSets = exerciseRaw?.drop_sets;
+      if (Array.isArray(dropSets) && dropSets.length > 0) {
+        const dropSet = dropSets[0];
+        // Calculate drop percentage from initial weight vs drop weight
+        const initialWeight = exerciseRaw?.weight_kg || 0;
+        const dropWeight = dropSet.weight_kg || 0;
+        if (initialWeight > 0 && dropWeight > 0) {
+          const dropPercentage = Math.round(((initialWeight - dropWeight) / initialWeight) * 100);
+          result.push({ label: "Drop %", value: `${dropPercentage}%` });
         }
-        if (dropSet.weight_kg !== null && dropSet.weight_kg !== undefined) {
-          result.push({ label: "Weight", value: `${dropSet.weight_kg} kg` });
-        }
+        // Drop set reps
         if (dropSet.reps) {
-          result.push({ label: "Reps", value: formatReps(dropSet.reps) });
+          result.push({ label: "Drop reps", value: formatReps(dropSet.reps) });
         }
         if (dropSet.rest_seconds !== null && dropSet.rest_seconds !== undefined) {
           result.push({ label: "Rest", value: `${dropSet.rest_seconds}s` });
         }
-      } else {
-        // Debug: log if drop_sets data is missing
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("DROP SET: drop_sets data not found for exercise", {
-            exerciseId: exercise.raw?.exercise_id,
-            exerciseOrder: exercise.orderIndex + 1,
-            blockId: block.id,
-            exerciseRaw: exerciseRaw,
-            exerciseRawKeys: exerciseRaw ? Object.keys(exerciseRaw) : [],
-            hasDropSets: !!exerciseRaw?.drop_sets,
-            dropSetsType: typeof exerciseRaw?.drop_sets,
-            dropSetsValue: exerciseRaw?.drop_sets
-          });
+      }
+      
+      // Show load_percentage or weight_kg from workout_drop_sets (initial weight in drop_order=1)
+      const firstDropSet = dropSets && dropSets.length > 0 
+        ? dropSets.find((ds: any) => ds.drop_order === 1) || dropSets[0]
+        : null;
+      if (firstDropSet) {
+        if (firstDropSet.load_percentage !== null && firstDropSet.load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${firstDropSet.load_percentage}%` });
+        } else if (exerciseRaw?.weight_kg !== null && exerciseRaw?.weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${exerciseRaw.weight_kg} kg` });
         }
       }
+      
+      // If drop_sets is empty array or missing, just show the main sets/reps (no warning needed)
     }
     // 3. CLUSTER SET: from workout_cluster_sets
     else if (blockType === "cluster_set") {
-      // Check if cluster_sets data exists
-      if (exerciseRaw?.cluster_sets && Array.isArray(exerciseRaw.cluster_sets) && exerciseRaw.cluster_sets.length > 0) {
-        const clusterSet = exerciseRaw.cluster_sets[0];
-        // USED: reps_per_cluster, clusters_per_set, intra_cluster_rest, inter_set_rest
+      // Show main sets first
+      if (exercise.sets !== null && exercise.sets !== undefined) {
+        result.push({ label: "Sets", value: `${exercise.sets}` });
+      }
+      
+      // Check if cluster_sets data exists (must be array with at least one item)
+      const clusterSets = exerciseRaw?.cluster_sets;
+      if (Array.isArray(clusterSets) && clusterSets.length > 0) {
+        const clusterSet = clusterSets[0];
+        // USED: reps_per_cluster, clusters_per_set, intra_cluster_rest
         if (clusterSet.reps_per_cluster !== null && clusterSet.reps_per_cluster !== undefined) {
           result.push({ label: "Reps/cluster", value: `${clusterSet.reps_per_cluster}` });
         }
@@ -886,26 +953,27 @@ export default function WorkoutDetailsPage() {
         if (clusterSet.intra_cluster_rest !== null && clusterSet.intra_cluster_rest !== undefined) {
           result.push({ label: "Intra-cluster rest", value: `${clusterSet.intra_cluster_rest}s` });
         }
-        if (clusterSet.inter_set_rest !== null && clusterSet.inter_set_rest !== undefined) {
-          result.push({ label: "Inter-set rest", value: `${clusterSet.inter_set_rest}s` });
-        }
-      } else {
-        // Debug: log if cluster_sets data is missing
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("CLUSTER SET: cluster_sets data not found for exercise", {
-            exerciseId: exercise.raw?.exercise_id,
-            exerciseOrder: exercise.orderIndex + 1,
-            blockId: block.id,
-            exerciseRaw: exerciseRaw
-          });
+        // Rest after set is shown in block header, not here
+      }
+      
+      // Show load_percentage or weight_kg from workout_cluster_sets
+      if (Array.isArray(clusterSets) && clusterSets.length > 0) {
+        const clusterSet = clusterSets[0];
+        if (clusterSet.load_percentage !== null && clusterSet.load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${clusterSet.load_percentage}%` });
+        } else if (clusterSet.weight_kg !== null && clusterSet.weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${clusterSet.weight_kg} kg` });
         }
       }
+      
+      // If cluster_sets is empty array or missing, just show the main sets (no warning needed)
     }
     // 4. REST-PAUSE: from workout_rest_pause_sets (weight, duration, max_pauses) and workout_blocks (reps)
     else if (blockType === "rest_pause") {
-      // Check if rest_pause_sets data exists
-      if (exerciseRaw?.rest_pause_sets && Array.isArray(exerciseRaw.rest_pause_sets) && exerciseRaw.rest_pause_sets.length > 0) {
-        const restPauseSet = exerciseRaw.rest_pause_sets[0];
+      // Check if rest_pause_sets data exists (must be array with at least one item)
+      const restPauseSets = exerciseRaw?.rest_pause_sets;
+      if (Array.isArray(restPauseSets) && restPauseSets.length > 0) {
+        const restPauseSet = restPauseSets[0];
         // USED: weight_kg (from workout_rest_pause_sets), reps (from workout_blocks.reps_per_set), rest_pause_duration, max_rest_pauses
         if (restPauseSet.weight_kg !== null && restPauseSet.weight_kg !== undefined) {
           result.push({ label: "Initial weight", value: `${restPauseSet.weight_kg} kg` });
@@ -921,17 +989,15 @@ export default function WorkoutDetailsPage() {
         if (restPauseSet.max_rest_pauses !== null && restPauseSet.max_rest_pauses !== undefined) {
           result.push({ label: "Max pauses", value: `${restPauseSet.max_rest_pauses}` });
         }
-      } else {
-        // Debug: log if rest_pause_sets data is missing
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("REST PAUSE: rest_pause_sets data not found for exercise", {
-            exerciseId: exercise.raw?.exercise_id,
-            exerciseOrder: exercise.orderIndex + 1,
-            blockId: block.id,
-            exerciseRaw: exerciseRaw
-          });
+        
+        // Show load_percentage or weight_kg from workout_rest_pause_sets
+        if (restPauseSet.load_percentage !== null && restPauseSet.load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${restPauseSet.load_percentage}%` });
+        } else if (restPauseSet.weight_kg !== null && restPauseSet.weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${restPauseSet.weight_kg} kg` });
         }
       }
+      // If rest_pause_sets is empty array or missing, show basic info from block (no warning needed)
     }
     // 5. PYRAMID SET: from workout_pyramid_sets (N rows - show all steps)
     else if (blockType === "pyramid_set" && exerciseRaw?.pyramid_sets && exerciseRaw.pyramid_sets.length > 0) {
@@ -1006,8 +1072,11 @@ export default function WorkoutDetailsPage() {
     
     // USED: total_sets - for most blocks (except amrap, emom, for_time)
     if (rawBlock?.total_sets !== null && rawBlock?.total_sets !== undefined) {
-      if (blockType === "tabata" || blockType === "circuit") {
-        result.push({ label: "Sets", value: `${rawBlock.total_sets}` });
+      if (blockType === "tabata") {
+        // For tabata, total_sets represents rounds
+        result.push({ label: "Rounds", value: `${rawBlock.total_sets}` });
+      } else if (blockType === "circuit") {
+        result.push({ label: "Rounds", value: `${rawBlock.total_sets}` });
       } else if (blockType !== "amrap" && blockType !== "emom" && blockType !== "for_time") {
         result.push({ label: "Sets", value: `${rawBlock.total_sets}` });
       }
@@ -1030,7 +1099,19 @@ export default function WorkoutDetailsPage() {
         result.push({ label: "Rest between rounds", value: `${rawBlock.rest_seconds}s` });
       }
       // rest_pause: rest_seconds is NOT SET in workout_blocks
-      // amrap, emom, for_time, tabata: rest_seconds is NOT SET in workout_blocks
+      // amrap, emom, for_time: rest_seconds is NOT SET in workout_blocks
+    }
+    
+    // For TABATA: Show rest_after_set from time_protocols (block-level field)
+    if (blockType === "tabata") {
+      const rawBlockWithProtocols = rawBlock as any;
+      const tabataProtocol = rawBlockWithProtocols?.time_protocols?.find(
+        (tp: any) => tp.protocol_type === 'tabata'
+      );
+      const restAfterSet = tabataProtocol?.rest_after_set;
+      if (restAfterSet !== null && restAfterSet !== undefined) {
+        result.push({ label: "Rest after set", value: `${restAfterSet}s` });
+      }
     }
     
     // USED: duration_seconds - for amrap, emom
@@ -1057,19 +1138,6 @@ export default function WorkoutDetailsPage() {
     const rawBlockWithProtocols = block.rawBlock as any;
     const allTimeProtocols = rawBlockWithProtocols?.time_protocols || [];
     
-    // Debug: Log protocol lookup for CIRCUIT/TABATA
-    if (process.env.NODE_ENV !== "production" && (blockType === "circuit" || blockType === "tabata")) {
-      console.log(`TIME PROTOCOL LOOKUP for ${blockType.toUpperCase()}:`, {
-        blockId: block.id,
-        blockType,
-        exerciseId: exercise.raw?.exercise_id,
-        exerciseOrder: exercise.orderIndex + 1,
-        allTimeProtocolsCount: allTimeProtocols.length,
-        allTimeProtocols: allTimeProtocols,
-        rawBlock: rawBlockWithProtocols
-      });
-    }
-    
     // Find protocol matching exercise_id and exercise_order (1-indexed)
     const exerciseProtocol = allTimeProtocols.find(
       (tp: any) => {
@@ -1086,16 +1154,6 @@ export default function WorkoutDetailsPage() {
       // Final fallback: first protocol of matching type
       (tp: any) => tp.protocol_type === blockType
     );
-    
-    // Debug: Log found protocol
-    if (process.env.NODE_ENV !== "production" && (blockType === "circuit" || blockType === "tabata")) {
-      console.log(`FOUND PROTOCOL for ${blockType.toUpperCase()}:`, {
-        found: !!exerciseProtocol,
-        protocol: exerciseProtocol,
-        work_seconds: exerciseProtocol?.work_seconds,
-        rest_seconds: exerciseProtocol?.rest_seconds
-      });
-    }
 
     // Fallback for old data in block_parameters
     if (blockType === "amrap") {
@@ -1118,8 +1176,17 @@ export default function WorkoutDetailsPage() {
       if (targetReps) {
         result.push({ label: "Target reps", value: `${targetReps}` });
       }
+      
+      // Show load_percentage or weight_kg from workout_time_protocols (for amrap)
+      if (exerciseProtocol) {
+        if (exerciseProtocol.load_percentage !== null && exerciseProtocol.load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${exerciseProtocol.load_percentage}%` });
+        } else if (exerciseProtocol.weight_kg !== null && exerciseProtocol.weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${exerciseProtocol.weight_kg} kg` });
+        }
+      }
     } else if (blockType === "emom") {
-      // USED: total_duration_minutes, work_seconds, rest_seconds
+      // USED: total_duration_minutes, work_seconds, rest_seconds, emom_mode
       // OPTIONAL: reps_per_round (only if set)
       const duration = exerciseProtocol?.total_duration_minutes ||
           (block.rawBlock?.duration_seconds
@@ -1133,7 +1200,15 @@ export default function WorkoutDetailsPage() {
           value: `${duration} min`,
         });
       }
-      // USED: work_seconds
+      
+      // USED: emom_mode (time_based or rep_based)
+      const emomMode = exerciseProtocol?.emom_mode;
+      if (emomMode) {
+        const modeLabel = emomMode === "rep_based" ? "Rep-based" : "Time-based";
+        result.push({ label: "Mode", value: modeLabel });
+      }
+      
+      // USED: work_seconds (for time-based EMOM)
       const workSeconds = exerciseProtocol?.work_seconds || params.work_seconds;
       if (workSeconds) {
         result.push({
@@ -1149,10 +1224,19 @@ export default function WorkoutDetailsPage() {
           value: `${restSeconds}s`,
         });
       }
-      // OPTIONAL: reps_per_round
+      // OPTIONAL: reps_per_round (for rep-based EMOM)
       const repsPerRound = exerciseProtocol?.reps_per_round || params.emom_reps;
       if (repsPerRound) {
         result.push({ label: "Reps per minute", value: `${repsPerRound}` });
+      }
+      
+      // Show load_percentage or weight_kg from workout_time_protocols (for emom)
+      if (exerciseProtocol) {
+        if (exerciseProtocol.load_percentage !== null && exerciseProtocol.load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${exerciseProtocol.load_percentage}%` });
+        } else if (exerciseProtocol.weight_kg !== null && exerciseProtocol.weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${exerciseProtocol.weight_kg} kg` });
+        }
       }
     } else if (blockType === "for_time") {
       // OPTIONAL: time_cap_minutes (only if set)
@@ -1170,9 +1254,18 @@ export default function WorkoutDetailsPage() {
       if (targetReps) {
         result.push({ label: "Target reps", value: `${targetReps}` });
       }
+      
+      // Show load_percentage or weight_kg from workout_time_protocols (for for_time)
+      if (exerciseProtocol) {
+        if (exerciseProtocol.load_percentage !== null && exerciseProtocol.load_percentage !== undefined) {
+          result.push({ label: "Load %", value: `${exerciseProtocol.load_percentage}%` });
+        } else if (exerciseProtocol.weight_kg !== null && exerciseProtocol.weight_kg !== undefined) {
+          result.push({ label: "Weight", value: `${exerciseProtocol.weight_kg} kg` });
+        }
+      }
     } else if (blockType === "tabata") {
-      // USED: work_seconds, rest_seconds, set
-      // NOTE: rounds is NOT shown here - it's the same as total_sets from workout_blocks (shown in header)
+      // USED: work_seconds, rest_seconds, set, rounds
+      // NOTE: rounds is shown here per exercise, rest_after_set is shown in block header
       const workSeconds = exerciseProtocol?.work_seconds || params.work_seconds;
       if (workSeconds !== null && workSeconds !== undefined) {
         result.push({
@@ -1181,12 +1274,19 @@ export default function WorkoutDetailsPage() {
         });
       }
       // For Tabata: rest_seconds is rest AFTER each individual exercise (from workout_time_protocols)
-      // rest_after_set is block-level and should NOT be shown here (it's in the header)
       const restSeconds = exerciseProtocol?.rest_seconds || params.rest_after;
       if (restSeconds !== null && restSeconds !== undefined) {
         result.push({
           label: "Rest time",
           value: `${restSeconds}s`,
+        });
+      }
+      // USED: rounds (from time_protocols)
+      const rounds = exerciseProtocol?.rounds;
+      if (rounds !== null && rounds !== undefined) {
+        result.push({
+          label: "Rounds",
+          value: `${rounds}`,
         });
       }
       // USED: set (which set/round this exercise belongs to)
@@ -1201,7 +1301,7 @@ export default function WorkoutDetailsPage() {
       // OPTIONAL: work_seconds (only if set)
       // OPTIONAL: rest_seconds (only if set)
       // USED: set
-      // NOTE: rounds is NOT shown here - it's the same as total_sets from workout_blocks (shown in header)
+      // NOTE: rounds is shown in block header as total_sets
       const workSeconds = exerciseProtocol?.work_seconds || 
         params.work_seconds;
       if (workSeconds !== null && workSeconds !== undefined) {
@@ -1996,8 +2096,8 @@ export default function WorkoutDetailsPage() {
                                 {/* Optional fields: Weight, Load % (only for blocks that support them) */}
                                 {(() => {
                                   const blockType = (block.blockType || "").toLowerCase();
-                                  // Only show weight/load% for blocks that use workout_block_exercises
-                                  const supportsWeight = ["straight_set", "superset", "giant_set", "pre_exhaustion"].includes(blockType);
+                                  // Show weight/load% for blocks that support them
+                                  const supportsWeight = ["straight_set", "superset", "giant_set", "pre_exhaustion", "tabata", "circuit"].includes(blockType);
                                   if (!supportsWeight) return null;
                                   
                                   const optionalFields: { label: string; value: string }[] = [];
@@ -2011,11 +2111,24 @@ export default function WorkoutDetailsPage() {
                                   }
                                   
                                   // Load Percentage (from workout_block_exercises.load_percentage) - OPTIONAL
-                                  if (exercise.raw?.load_percentage !== null && exercise.raw?.load_percentage !== undefined) {
-                                    optionalFields.push({
-                                      label: "Load %",
-                                      value: `${exercise.raw.load_percentage}%`
-                                    });
+                                  // Show for: giant_set, tabata, circuit (individual per exercise)
+                                  // For superset: shown in getExerciseCardFields for second exercise
+                                  // For pre_exhaustion: shown in getExerciseCardFields for compound exercise
+                                  if (blockType === "giant_set" || blockType === "tabata" || blockType === "circuit") {
+                                    if (exercise.raw?.load_percentage !== null && exercise.raw?.load_percentage !== undefined) {
+                                      optionalFields.push({
+                                        label: "Load %",
+                                        value: `${exercise.raw.load_percentage}%`
+                                      });
+                                    }
+                                  } else if (blockType === "straight_set" || blockType === "superset" || blockType === "pre_exhaustion") {
+                                    // For straight_set, superset (first exercise), pre_exhaustion (isolation exercise)
+                                    if (exercise.raw?.load_percentage !== null && exercise.raw?.load_percentage !== undefined) {
+                                      optionalFields.push({
+                                        label: "Load %",
+                                        value: `${exercise.raw.load_percentage}%`
+                                      });
+                                    }
                                   }
                                   
                                   if (optionalFields.length > 0) {

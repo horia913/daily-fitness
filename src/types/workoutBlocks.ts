@@ -69,6 +69,7 @@ export interface WorkoutBlockExercise {
   cluster_sets?: WorkoutClusterSet[]
   pyramid_sets?: WorkoutPyramidSet[]
   rest_pause_sets?: WorkoutRestPauseSet[]
+  time_protocols?: WorkoutTimeProtocol[]  // For time-based blocks (amrap, emom, for_time, tabata)
   ladder_sets?: WorkoutLadderSet[]
   
   created_at: string
@@ -160,6 +161,8 @@ export interface WorkoutTimeProtocol {
   reps_per_round?: number              // For EMOM (reps per minute/round)
   emom_mode?: string                   // For EMOM (target_reps or target_time)
   set?: number                          // Set number (for Tabata/Circuit only)
+  weight_kg?: number | null            // Weight for time-based blocks (amrap, emom, for_time)
+  load_percentage?: number | null      // Load percentage for time-based blocks (amrap, emom, for_time, NOT tabata)
   created_at: string
 }
 

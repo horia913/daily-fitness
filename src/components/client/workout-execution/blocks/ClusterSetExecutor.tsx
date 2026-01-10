@@ -49,17 +49,26 @@ export function ClusterSetExecutor({
   const [weight, setWeight] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
 
-  // Pre-fill with suggested weight
+  // Pre-fill with suggested weight - recalculate when e1rmMap is populated
   useEffect(() => {
-    if (currentExercise?.load_percentage && !weight) {
-      const suggested = calculateSuggestedWeightUtil(
-        currentExercise.exercise_id,
-        currentExercise.load_percentage,
-        e1rmMap
-      );
-      if (suggested) setWeight(suggested.toString());
+    if (currentExercise?.load_percentage && currentExercise?.exercise_id) {
+      // Check if e1rmMap has data for this exercise
+      const hasE1rm = e1rmMap[currentExercise.exercise_id] && e1rmMap[currentExercise.exercise_id] > 0;
+      // Only set if weight is empty or if e1rmMap was just populated
+      const weightIsEmpty = !weight || weight.trim() === "" || parseFloat(weight) === 0;
+      
+      if (hasE1rm && weightIsEmpty) {
+        const suggested = calculateSuggestedWeightUtil(
+          currentExercise.exercise_id,
+          currentExercise.load_percentage,
+          e1rmMap
+        );
+        if (suggested && suggested > 0) {
+          setWeight(suggested.toString());
+        }
+      }
     }
-  }, [currentExercise, e1rmMap, weight]);
+  }, [currentExercise?.exercise_id, currentExercise?.load_percentage, e1rmMap, weight]);
 
   // Block details
   const blockDetails: BlockDetail[] = [
@@ -130,79 +139,89 @@ export function ClusterSetExecutor({
       }
     } catch (e) {}
 
-    // Log cluster set
-    // Note: For cluster sets, we log each cluster separately
-    // This logs the first cluster - subsequent clusters would be logged with cluster_number incremented
-    const logData: any = {
-      block_type: 'cluster_set',
-      set_number: completedSets + 1,
-      cluster_number: 1, // First cluster in the set
-    };
-    
-    // Only add fields if they're defined
-    if (currentExercise?.exercise_id) logData.exercise_id = currentExercise.exercise_id;
-    if (weightNum !== undefined && weightNum !== null) logData.weight = weightNum;
-    if (repsPerCluster !== undefined && repsPerCluster !== null) logData.reps = repsPerCluster;
-    
-    const result = await logSetToDatabase(logData);
-
-    if (result.success) {
-      // Calculate total reps: reps per cluster × clusters per set
-      const totalReps = repsPerCluster * clustersPerSet;
+    try {
+      // Log cluster set
+      // Note: For cluster sets, we log each cluster separately
+      // This logs the first cluster - subsequent clusters would be logged with cluster_number incremented
+      const logData: any = {
+        block_type: 'cluster_set',
+        set_number: completedSets + 1,
+        cluster_number: 1, // First cluster in the set
+      };
       
-      const loggedSetsArray: LoggedSet[] = [
-        {
-          id: `temp-${Date.now()}`,
-          exercise_id: currentExercise?.exercise_id || "",
-          block_id: block.block.id,
-          set_number: completedSets + 1,
-          weight_kg: weightNum,
-          reps_completed: totalReps,
-          completed_at: new Date(),
-        } as LoggedSet,
-      ];
+      // Only add fields if they're defined
+      if (currentExercise?.exercise_id) logData.exercise_id = currentExercise.exercise_id;
+      if (weightNum !== undefined && weightNum !== null) logData.weight = weightNum;
+      if (repsPerCluster !== undefined && repsPerCluster !== null) logData.reps = repsPerCluster;
+      
+      const result = await logSetToDatabase(logData);
 
-      if (result.e1rm && onE1rmUpdate) {
-        onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
-      }
+      if (result.success) {
+        // Calculate total reps: reps per cluster × clusters per set
+        const totalReps = repsPerCluster * clustersPerSet;
+        
+        const loggedSetsArray: LoggedSet[] = [
+          {
+            id: `temp-${Date.now()}`,
+            exercise_id: currentExercise?.exercise_id || "",
+            block_id: block.block.id,
+            set_number: completedSets + 1,
+            weight_kg: weightNum,
+            reps_completed: totalReps,
+            completed_at: new Date(),
+          } as LoggedSet,
+        ];
 
-      addToast({
-        title: "Cluster Set Logged!",
-        description: `${weightNum}kg × ${repsPerCluster} reps × ${clustersPerSet} clusters`,
-        variant: "success",
-        duration: 2000,
-      });
-
-      // Update parent with new completed sets count
-      const newCompletedSets = completedSets + 1;
-      onSetComplete?.(newCompletedSets);
-
-      // Complete block if last set
-      if (newCompletedSets >= totalSets) {
-        setWeight("");
-        onBlockComplete(block.block.id, loggedSetsArray);
-      } else {
-        // Check if rest timer will show - if so, don't clear weight yet
-        // For cluster sets, use intra-cluster rest (rest between exercises within cluster)
-        // restBetweenSets is only for rest AFTER completing a full set
-        const restSeconds: number = intraClusterRest || currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-        if (restSeconds === 0) {
-          // No rest timer, clear weight immediately
-          setWeight("");
+        if (result.e1rm && onE1rmUpdate) {
+          onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
         }
-        // If restSeconds > 0, rest timer will show and weight will be cleared
-        // when the timer completes and completedSets updates
+
+        addToast({
+          title: "Cluster Set Logged!",
+          description: `${weightNum}kg × ${repsPerCluster} reps × ${clustersPerSet} clusters`,
+          variant: "success",
+          duration: 2000,
+        });
+
+        // Update parent with new completed sets count
+        const newCompletedSets = completedSets + 1;
+        onSetComplete?.(newCompletedSets);
+
+        // Complete block if last set
+        if (newCompletedSets >= totalSets) {
+          setWeight("");
+          onBlockComplete(block.block.id, loggedSetsArray);
+        } else {
+          // Check if rest timer will show - if so, don't clear weight yet
+          // For cluster sets, use intra-cluster rest (rest between exercises within cluster)
+          // restBetweenSets is only for rest AFTER completing a full set
+          const restSeconds: number = intraClusterRest || currentExercise?.rest_seconds || block.block.rest_seconds || 0;
+          if (restSeconds === 0) {
+            // No rest timer, clear weight immediately
+            setWeight("");
+          }
+          // If restSeconds > 0, rest timer will show and weight will be cleared
+          // when the timer completes and completedSets updates
+        }
+      } else {
+        addToast({
+          title: "Failed to Save",
+          description: result.error || "Failed to save set. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
       }
-    } else {
+    } catch (error) {
+      console.error("Error logging cluster set:", error);
       addToast({
-        title: "Failed to Save",
-        description: "Failed to save set. Please try again.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
         variant: "destructive",
         duration: 5000,
       });
+    } finally {
+      setIsLoggingSet(false);
     }
-
-    setIsLoggingSet(false);
   };
 
   const loggingInputs = (

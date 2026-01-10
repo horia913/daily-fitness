@@ -41,7 +41,22 @@ export const initOneSignal = async () => {
       allowLocalhostAsSecureOrigin: true, // For development
       serviceWorkerParam: { scope: '/' },
       serviceWorkerPath: '/OneSignalSDKWorker.js',
+      // Suppress session tracking errors when user hasn't subscribed
+      autoResubscribe: false,
     })
+
+    // Suppress OneSignal "No subscription" errors in console
+    if (typeof window !== 'undefined') {
+      const originalError = console.error
+      console.error = (...args: any[]) => {
+        const errorMessage = args[0]?.toString() || ''
+        // Filter out OneSignal session tracking errors
+        if (errorMessage.includes('No subscription') && errorMessage.includes('SessionManager')) {
+          return // Suppress this error
+        }
+        originalError.apply(console, args)
+      }
+    }
 
     initialized = true
     console.log('✅ OneSignal initialized successfully')

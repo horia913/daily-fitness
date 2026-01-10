@@ -263,21 +263,140 @@ export class WorkoutTemplateService {
 
       const templateIds = templates.map((t: any) => t.id)
 
-      const { data: exerciseRows, error: exerciseError } = await supabase
-        .from('workout_block_exercises')
-        .select('id, workout_blocks!inner(template_id)')
-        .in('workout_blocks.template_id', templateIds)
+      // Get all blocks for these templates to determine block types
+      const { data: blocks, error: blocksError } = await supabase
+        .from('workout_blocks')
+        .select('id, template_id, block_type')
+        .in('template_id', templateIds)
 
+      if (blocksError) {
+        console.warn('Unable to load blocks for exercise counting:', blocksError.message)
+      }
+
+      // Group blocks by template_id and block_type
+      const blocksByTemplate = new Map<string, any[]>()
+      const blockIdsByType = {
+        usesBlockExercises: [] as string[],
+        usesDropSets: [] as string[],
+        usesClusterSets: [] as string[],
+        usesRestPause: [] as string[],
+        usesTimeProtocols: [] as string[],
+      }
+
+      ;(blocks || []).forEach((block: any) => {
+        const templateId = block.template_id
+        if (!blocksByTemplate.has(templateId)) {
+          blocksByTemplate.set(templateId, [])
+        }
+        blocksByTemplate.get(templateId)!.push(block)
+
+        const blockType = block.block_type
+        // Categorize blocks by which table they use for exercises
+        if (['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(blockType)) {
+          blockIdsByType.usesBlockExercises.push(block.id)
+        } else if (blockType === 'drop_set') {
+          blockIdsByType.usesDropSets.push(block.id)
+        } else if (blockType === 'cluster_set') {
+          blockIdsByType.usesClusterSets.push(block.id)
+        } else if (blockType === 'rest_pause') {
+          blockIdsByType.usesRestPause.push(block.id)
+        } else if (['amrap', 'emom', 'for_time', 'tabata'].includes(blockType)) {
+          blockIdsByType.usesTimeProtocols.push(block.id)
+        }
+      })
+
+      // Count exercises from each table
       const counts: Record<string, number> = {}
-      if (!exerciseError && exerciseRows) {
-        exerciseRows.forEach((row: any) => {
-          const templateId = row.workout_blocks?.template_id
-          if (templateId) {
-            counts[templateId] = (counts[templateId] || 0) + 1
-          }
-        })
-      } else if (exerciseError) {
-        console.warn('Unable to load exercise counts for templates:', exerciseError.message)
+      
+      // Count from workout_block_exercises (for straight_set, superset, giant_set, pre_exhaustion)
+      if (blockIdsByType.usesBlockExercises.length > 0) {
+        const { data: exerciseRows } = await supabase
+          .from('workout_block_exercises')
+          .select('id, block_id, workout_blocks!inner(template_id)')
+          .in('block_id', blockIdsByType.usesBlockExercises)
+
+        if (exerciseRows) {
+          exerciseRows.forEach((row: any) => {
+            const templateId = row.workout_blocks?.template_id
+            if (templateId) {
+              counts[templateId] = (counts[templateId] || 0) + 1
+            }
+          })
+        }
+      }
+
+      // Count from workout_drop_sets (for drop_set) - count unique exercises per block
+      if (blockIdsByType.usesDropSets.length > 0) {
+        const { data: dropSets } = await supabase
+          .from('workout_drop_sets')
+          .select('exercise_id, exercise_order, workout_blocks!inner(template_id)')
+          .in('block_id', blockIdsByType.usesDropSets)
+
+        if (dropSets) {
+          const uniqueExercises = new Set<string>()
+          dropSets.forEach((row: any) => {
+            const templateId = row.workout_blocks?.template_id
+            const key = `${templateId}:${row.exercise_id}:${row.exercise_order}`
+            if (templateId && !uniqueExercises.has(key)) {
+              uniqueExercises.add(key)
+              counts[templateId] = (counts[templateId] || 0) + 1
+            }
+          })
+        }
+      }
+
+      // Count from workout_cluster_sets (for cluster_set)
+      if (blockIdsByType.usesClusterSets.length > 0) {
+        const { data: clusterSets } = await supabase
+          .from('workout_cluster_sets')
+          .select('exercise_id, exercise_order, workout_blocks!inner(template_id)')
+          .in('block_id', blockIdsByType.usesClusterSets)
+
+        if (clusterSets) {
+          clusterSets.forEach((row: any) => {
+            const templateId = row.workout_blocks?.template_id
+            if (templateId) {
+              counts[templateId] = (counts[templateId] || 0) + 1
+            }
+          })
+        }
+      }
+
+      // Count from workout_rest_pause_sets (for rest_pause)
+      if (blockIdsByType.usesRestPause.length > 0) {
+        const { data: restPauseSets } = await supabase
+          .from('workout_rest_pause_sets')
+          .select('exercise_id, exercise_order, workout_blocks!inner(template_id)')
+          .in('block_id', blockIdsByType.usesRestPause)
+
+        if (restPauseSets) {
+          restPauseSets.forEach((row: any) => {
+            const templateId = row.workout_blocks?.template_id
+            if (templateId) {
+              counts[templateId] = (counts[templateId] || 0) + 1
+            }
+          })
+        }
+      }
+
+      // Count from workout_time_protocols (for amrap, emom, for_time, tabata) - count unique exercises per block
+      if (blockIdsByType.usesTimeProtocols.length > 0) {
+        const { data: timeProtocols } = await supabase
+          .from('workout_time_protocols')
+          .select('exercise_id, exercise_order, workout_blocks!inner(template_id)')
+          .in('block_id', blockIdsByType.usesTimeProtocols)
+
+        if (timeProtocols) {
+          const uniqueExercises = new Set<string>()
+          timeProtocols.forEach((row: any) => {
+            const templateId = row.workout_blocks?.template_id
+            const key = `${templateId}:${row.exercise_id}:${row.exercise_order}`
+            if (templateId && !uniqueExercises.has(key)) {
+              uniqueExercises.add(key)
+              counts[templateId] = (counts[templateId] || 0) + 1
+            }
+          })
+        }
       }
 
       return templates.map((template: any) => ({
@@ -287,6 +406,129 @@ export class WorkoutTemplateService {
     } catch (error) {
       console.error('Error fetching workout templates:', error)
       return []
+    }
+  }
+
+  // Count exercises for a single template (uses same logic as getWorkoutTemplates)
+  static async countExercisesForTemplate(templateId: string): Promise<number> {
+    try {
+      // Get all blocks for this template
+      const { data: blocks, error: blocksError } = await supabase
+        .from('workout_blocks')
+        .select('id, template_id, block_type')
+        .eq('template_id', templateId)
+
+      if (blocksError) {
+        console.warn('Unable to load blocks for exercise counting:', blocksError.message)
+        return 0
+      }
+
+      if (!blocks || blocks.length === 0) return 0
+
+      // Categorize blocks by which table they use for exercises
+      const blockIdsByType = {
+        usesBlockExercises: [] as string[],
+        usesDropSets: [] as string[],
+        usesClusterSets: [] as string[],
+        usesRestPause: [] as string[],
+        usesTimeProtocols: [] as string[],
+      }
+
+      blocks.forEach((block: any) => {
+        const blockType = block.block_type
+        if (['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(blockType)) {
+          blockIdsByType.usesBlockExercises.push(block.id)
+        } else if (blockType === 'drop_set') {
+          blockIdsByType.usesDropSets.push(block.id)
+        } else if (blockType === 'cluster_set') {
+          blockIdsByType.usesClusterSets.push(block.id)
+        } else if (blockType === 'rest_pause') {
+          blockIdsByType.usesRestPause.push(block.id)
+        } else if (['amrap', 'emom', 'for_time', 'tabata'].includes(blockType)) {
+          blockIdsByType.usesTimeProtocols.push(block.id)
+        }
+      })
+
+      let count = 0
+
+      // Count from workout_block_exercises
+      if (blockIdsByType.usesBlockExercises.length > 0) {
+        const { data: exerciseRows } = await supabase
+          .from('workout_block_exercises')
+          .select('id')
+          .in('block_id', blockIdsByType.usesBlockExercises)
+
+        if (exerciseRows) {
+          count += exerciseRows.length
+        }
+      }
+
+      // Count from workout_drop_sets - count unique exercises per block
+      if (blockIdsByType.usesDropSets.length > 0) {
+        const { data: dropSets } = await supabase
+          .from('workout_drop_sets')
+          .select('exercise_id, exercise_order')
+          .in('block_id', blockIdsByType.usesDropSets)
+
+        if (dropSets) {
+          const uniqueExercises = new Set<string>()
+          dropSets.forEach((row: any) => {
+            const key = `${row.exercise_id}:${row.exercise_order}`
+            if (!uniqueExercises.has(key)) {
+              uniqueExercises.add(key)
+              count += 1
+            }
+          })
+        }
+      }
+
+      // Count from workout_cluster_sets
+      if (blockIdsByType.usesClusterSets.length > 0) {
+        const { data: clusterSets } = await supabase
+          .from('workout_cluster_sets')
+          .select('id')
+          .in('block_id', blockIdsByType.usesClusterSets)
+
+        if (clusterSets) {
+          count += clusterSets.length
+        }
+      }
+
+      // Count from workout_rest_pause_sets
+      if (blockIdsByType.usesRestPause.length > 0) {
+        const { data: restPauseSets } = await supabase
+          .from('workout_rest_pause_sets')
+          .select('id')
+          .in('block_id', blockIdsByType.usesRestPause)
+
+        if (restPauseSets) {
+          count += restPauseSets.length
+        }
+      }
+
+      // Count from workout_time_protocols - count unique exercises per block
+      if (blockIdsByType.usesTimeProtocols.length > 0) {
+        const { data: timeProtocols } = await supabase
+          .from('workout_time_protocols')
+          .select('exercise_id, exercise_order')
+          .in('block_id', blockIdsByType.usesTimeProtocols)
+
+        if (timeProtocols) {
+          const uniqueExercises = new Set<string>()
+          timeProtocols.forEach((row: any) => {
+            const key = `${row.exercise_id}:${row.exercise_order}`
+            if (!uniqueExercises.has(key)) {
+              uniqueExercises.add(key)
+              count += 1
+            }
+          })
+        }
+      }
+
+      return count
+    } catch (error) {
+      console.error('Error counting exercises for template:', error)
+      return 0
     }
   }
 
@@ -1031,6 +1273,31 @@ export class WorkoutTemplateService {
       if (error) {
         console.error('Supabase error details:', error)
         throw error
+      }
+      
+      // REQUIREMENT: Copy workout data to program_progression_rules when schedule is set
+      if (templateId && templateId !== "rest" && data?.id) {
+        try {
+          // Delete existing progression rules for this schedule/week first
+          await ProgramProgressionService.deleteProgressionRules(data.id, weekNumber);
+          
+          // Copy workout data to progression rules
+          const copySuccess = await ProgramProgressionService.copyWorkoutToProgram(
+            programId,
+            data.id,
+            templateId,
+            weekNumber
+          );
+          
+          if (copySuccess) {
+            console.log(`✅ [setProgramSchedule] Copied workout ${templateId} to progression rules for Week ${weekNumber}, Day ${programDay}`);
+          } else {
+            console.warn(`⚠️ [setProgramSchedule] Failed to copy workout ${templateId} to progression rules`);
+          }
+        } catch (copyError) {
+          console.error(`❌ [setProgramSchedule] Error copying workout to progression rules:`, copyError);
+          // Don't throw - schedule was saved successfully, copy can be retried
+        }
       }
       
       // Map to ProgramSchedule interface, setting is_optional to false by default

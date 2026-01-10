@@ -32,14 +32,11 @@ import { GiantSetExecutor } from "./workout-execution/blocks/GiantSetExecutor";
 import { DropSetExecutor } from "./workout-execution/blocks/DropSetExecutor";
 import { ClusterSetExecutor } from "./workout-execution/blocks/ClusterSetExecutor";
 import { RestPauseExecutor } from "./workout-execution/blocks/RestPauseExecutor";
-import { PyramidSetExecutor } from "./workout-execution/blocks/PyramidSetExecutor";
 import { PreExhaustionExecutor } from "./workout-execution/blocks/PreExhaustionExecutor";
 import { AmrapExecutor } from "./workout-execution/blocks/AmrapExecutor";
 import { EmomExecutor } from "./workout-execution/blocks/EmomExecutor";
 import { TabataExecutor } from "./workout-execution/blocks/TabataExecutor";
-import { CircuitExecutor } from "./workout-execution/blocks/CircuitExecutor";
 import { ForTimeExecutor } from "./workout-execution/blocks/ForTimeExecutor";
-import { LadderExecutor } from "./workout-execution/blocks/LadderExecutor";
 
 interface LiveWorkoutBlockExecutorProps {
   block: LiveWorkoutBlock;
@@ -507,12 +504,10 @@ export default function LiveWorkoutBlockExecutor({
           console.log("Executor: RestPauseExecutor");
         } catch {}
         return <RestPauseExecutor {...commonProps} />;
-      case "pyramid_set":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: PyramidSetExecutor");
-        } catch {}
-        return <PyramidSetExecutor {...commonProps} />;
+      // DEPRECATED: pyramid_set, ladder, and circuit block types have been removed
+      // case "pyramid_set": - REMOVED
+      // case "ladder": - REMOVED
+      // case "circuit": - REMOVED
       case "pre_exhaustion":
         try {
           // eslint-disable-next-line no-console
@@ -537,24 +532,16 @@ export default function LiveWorkoutBlockExecutor({
           console.log("Executor: TabataExecutor");
         } catch {}
         return <TabataExecutor {...commonProps} />;
-      case "circuit":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: CircuitExecutor");
-        } catch {}
-        return <CircuitExecutor {...commonProps} />;
+      // DEPRECATED: circuit block type has been removed
+      // case "circuit": - REMOVED
       case "for_time":
         try {
           // eslint-disable-next-line no-console
           console.log("Executor: ForTimeExecutor");
         } catch {}
         return <ForTimeExecutor {...commonProps} />;
-      case "ladder":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: LadderExecutor");
-        } catch {}
-        return <LadderExecutor {...commonProps} />;
+      // DEPRECATED: ladder block type has been removed
+      // case "ladder": - REMOVED
       default:
         // Fallback to straight set if unknown type
         try {

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Badge } from "@/components/ui/badge";
+import { LoadPercentageWeightToggle } from "@/components/ui/LoadPercentageWeightToggle";
 import {
   X,
   Clock,
@@ -177,9 +178,165 @@ export default function WorkoutTemplateForm({
     emom_reps: "",
     // Tabata specific
     tabata_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
-    // Load percentage
+    // Load percentage / Weight toggle
     load_percentage: "",
+    weight_kg: "",
+    superset_weight_kg: "", // Weight for second exercise in superset
+    compound_weight_kg: "", // Weight for compound exercise in pre-exhaustion
   });
+
+  // Toggle state for Load % / Weight (defaults to "load", UI-only, not persisted)
+  const getInitialToggleState = (
+    loadValue: any,
+    weightValue: any
+  ): "load" | "weight" => {
+    const hasWeight =
+      weightValue !== null && weightValue !== undefined && weightValue !== "";
+    const hasLoad =
+      loadValue !== null && loadValue !== undefined && loadValue !== "";
+    return hasWeight && !hasLoad ? "weight" : "load";
+  };
+
+  // Toggle states for exercises (keyed by exercise index in block)
+  const [exerciseToggleModes, setExerciseToggleModes] = useState<
+    Record<string, "load" | "weight">
+  >({});
+
+  // Helper function to render Load % / Weight field with toggle
+  const renderLoadWeightField = (
+    loadValue: string | number | null | undefined,
+    weightValue: string | number | null | undefined,
+    onLoadChange: (value: string) => void,
+    onWeightChange: (value: string) => void,
+    toggleKey: string, // Unique key for this exercise (e.g., "block-0-exercise-1")
+    label: string = "Load % / Weight",
+    loadPlaceholder: string = "e.g., 70",
+    weightPlaceholder: string = "e.g., 50",
+    className?: string
+  ) => {
+    const currentMode =
+      exerciseToggleModes[toggleKey] ||
+      getInitialToggleState(loadValue, weightValue);
+
+    const handleToggle = (mode: "load" | "weight") => {
+      setExerciseToggleModes((prev) => ({ ...prev, [toggleKey]: mode }));
+      // Clear the unused field when toggling
+      if (mode === "load") {
+        onWeightChange("");
+      } else {
+        onLoadChange("");
+      }
+    };
+
+    return (
+      <div className={className}>
+        <div className="flex items-center justify-between mb-2">
+          <Label className={`text-sm font-medium ${theme.text}`}>{label}</Label>
+          <LoadPercentageWeightToggle
+            value={currentMode}
+            onValueChange={handleToggle}
+          />
+        </div>
+        {currentMode === "load" ? (
+          <>
+            <Input
+              type="number"
+              value={
+                loadValue === "" ||
+                loadValue === null ||
+                loadValue === undefined
+                  ? ""
+                  : String(loadValue)
+              }
+              onChange={(e) => onLoadChange(e.target.value)}
+              placeholder={loadPlaceholder}
+              min="0"
+              max="200"
+              step="1"
+              className="mt-1 rounded-xl"
+            />
+            <p className={`text-xs ${theme.textSecondary} mt-1`}>
+              Percentage of estimated 1RM (e.g., 70 = 70% of 1RM)
+            </p>
+          </>
+        ) : (
+          <>
+            <Input
+              type="number"
+              value={
+                weightValue === "" ||
+                weightValue === null ||
+                weightValue === undefined
+                  ? ""
+                  : String(weightValue)
+              }
+              onChange={(e) => onWeightChange(e.target.value)}
+              placeholder={weightPlaceholder}
+              min="0"
+              step="0.1"
+              className="mt-1 rounded-xl"
+            />
+            <p className={`text-xs ${theme.textSecondary} mt-1`}>
+              Specific weight in kilograms
+            </p>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Helper function to generate block name from exercise names
+  const generateBlockName = (
+    exerciseIds: string[],
+    exerciseType: string
+  ): string => {
+    if (exerciseIds.length === 0) {
+      console.warn("generateBlockName: No exercise IDs provided");
+      return "";
+    }
+
+    if (availableExercises.length === 0) {
+      console.warn(
+        "generateBlockName: availableExercises is empty, cannot generate block name"
+      );
+      return "";
+    }
+
+    // Get exercise names from availableExercises
+    const exerciseNames = exerciseIds
+      .map((id) => {
+        const exercise = availableExercises.find((ex) => ex.id === id);
+        if (!exercise) {
+          console.warn(
+            `generateBlockName: Exercise with ID ${id} not found in availableExercises`
+          );
+        }
+        return exercise?.name || "";
+      })
+      .filter((name) => name !== "");
+
+    if (exerciseNames.length === 0) {
+      console.warn(
+        `generateBlockName: No exercise names found for IDs: ${exerciseIds.join(
+          ", "
+        )}`
+      );
+      return "";
+    }
+
+    // Format based on number of exercises
+    if (exerciseNames.length === 1) {
+      return exerciseNames[0];
+    } else if (exerciseNames.length === 2) {
+      return `${exerciseNames[0]} + ${exerciseNames[1]}`;
+    } else {
+      // For 3+ exercises, show first 2 + "N others"
+      const othersCount = exerciseNames.length - 2;
+      return `${exerciseNames[0]} + ${exerciseNames[1]} + ${othersCount} other${
+        othersCount > 1 ? "s" : ""
+      }`;
+    }
+  };
 
   // Workout Block System (integrated with exercises)
   const [workoutBlocks, setWorkoutBlocks] = useState<WorkoutBlock[]>([]);
@@ -432,24 +589,71 @@ export default function WorkoutTemplateForm({
 
         blocks.forEach((block, blockIndex) => {
           // Get first exercise and its special table data
-          const firstExercise = block.exercises?.[0];
-          const firstExerciseId = firstExercise?.exercise_id;
-          const firstExerciseOrder = firstExercise?.exercise_order || 1;
+          // For time-based blocks, exercises might be in time_protocols instead of block.exercises
+          const isTimeBasedBlock = [
+            "amrap",
+            "emom",
+            "for_time",
+            "tabata",
+          ].includes(block.block_type);
+          let firstExercise = block.exercises?.[0];
+          let firstExerciseId = firstExercise?.exercise_id;
+          let firstExerciseOrder = firstExercise?.exercise_order || 1;
+
+          // For time-based blocks, exercises are created from time_protocols in workoutBlockService
+          // So block.exercises should have the exercise data, but if it's empty or missing exercise_id, get from time_protocols
+          if (isTimeBasedBlock) {
+            console.log(`🔍 Loading time-based block ${block.block_type}:`, {
+              hasExercises: !!block.exercises && block.exercises.length > 0,
+              exercisesCount: block.exercises?.length || 0,
+              firstExerciseId: block.exercises?.[0]?.exercise_id,
+              timeProtocolsCount: block.time_protocols?.length || 0,
+              firstTimeProtocol: block.time_protocols?.[0],
+            });
+
+            if (
+              block.exercises &&
+              block.exercises.length > 0 &&
+              block.exercises[0]?.exercise_id
+            ) {
+              // Exercises are loaded, use the first one
+              firstExercise = block.exercises[0];
+              firstExerciseId = firstExercise.exercise_id;
+              firstExerciseOrder = firstExercise.exercise_order || 1;
+              console.log(
+                `✅ Using exercise from block.exercises: ${firstExerciseId}`
+              );
+            } else {
+              // No exercises loaded or missing exercise_id, get from time_protocols
+              const timeProtocol = block.time_protocols?.[0];
+              if (timeProtocol) {
+                firstExerciseId = timeProtocol.exercise_id;
+                firstExerciseOrder = timeProtocol.exercise_order || 1;
+                console.log(
+                  `✅ Using exercise from time_protocols: ${firstExerciseId}`
+                );
+              } else {
+                console.warn(
+                  `⚠️ No exercises or time_protocols found for ${block.block_type} block ${block.id}`
+                );
+              }
+            }
+          }
 
           // Get time protocol for this block/exercise (for time-based blocks)
-          const timeProtocol =
-            block.time_protocols?.find(
-              (tp: any) =>
-                tp.exercise_id === firstExerciseId &&
-                tp.exercise_order === firstExerciseOrder
-            ) || block.time_protocols?.[0]; // Fallback to first if not found
+          const timeProtocol = isTimeBasedBlock
+            ? block.time_protocols?.find(
+                (tp: any) =>
+                  tp.exercise_id === firstExerciseId &&
+                  tp.exercise_order === firstExerciseOrder
+              ) || block.time_protocols?.[0] // Fallback to first if not found
+            : null;
 
           // Get special table data from first exercise
           const dropSet = firstExercise?.drop_sets?.[0];
           const clusterSet = firstExercise?.cluster_sets?.[0];
           const restPauseSet = firstExercise?.rest_pause_sets?.[0];
-          const pyramidSets = firstExercise?.pyramid_sets || [];
-          const ladderSets = firstExercise?.ladder_sets || [];
+          // Deprecated: pyramid_set and ladder block types removed
 
           // Create exercise object from block
           // IMPORTANT: Preserve block.id so we can update existing blocks instead of deleting/recreating
@@ -457,7 +661,11 @@ export default function WorkoutTemplateForm({
             id: block.id, // Preserve original block ID for smart updates
             originalBlockId: block.id, // Keep reference to original block ID
             exercise_type: block.block_type,
-            exercise_id: firstExerciseId,
+            exercise_id: isTimeBasedBlock
+              ? firstExerciseId ||
+                timeProtocol?.exercise_id ||
+                block.time_protocols?.[0]?.exercise_id
+              : firstExerciseId,
             order_index: blockIndex + 1, // Add order_index for uniqueness
             sets: block.total_sets?.toString() || "",
             reps: block.reps_per_set || "",
@@ -466,7 +674,9 @@ export default function WorkoutTemplateForm({
             block_name: block.block_name,
             // RIR, Tempo, Notes from first exercise (for blocks that support these)
             rir: firstExercise?.rir?.toString() || "",
-            tempo: firstExercise?.tempo || "",
+            // Tempo: for time-based blocks, not stored in time_protocols (not in schema)
+            // For other blocks, get from first exercise
+            tempo: (!isTimeBasedBlock && firstExercise?.tempo) || "",
             // Time protocol data (from special table)
             rounds: timeProtocol?.rounds?.toString() || undefined,
             work_seconds: timeProtocol?.work_seconds?.toString() || undefined,
@@ -477,33 +687,63 @@ export default function WorkoutTemplateForm({
               timeProtocol?.total_duration_minutes?.toString() || undefined,
             emom_reps: timeProtocol?.reps_per_round?.toString() || undefined,
             emom_mode: timeProtocol?.emom_mode || "",
-            target_reps: timeProtocol?.target_reps?.toString() || undefined,
-            time_cap: timeProtocol?.time_cap_minutes?.toString() || undefined,
+            target_reps: timeProtocol?.target_reps?.toString() || "",
+            time_cap: timeProtocol?.time_cap_minutes?.toString() || "",
             // Drop set specific (from special table)
             drop_percentage:
               (dropSet as any)?.drop_percentage?.toString() || "",
             drop_set_reps: dropSet?.reps || "",
-            // Load percentage (from exercise data)
-            load_percentage: firstExercise?.load_percentage?.toString() || "",
+            // Load percentage and weight from time protocol or exercise (for time-based blocks, use time protocol)
+            load_percentage:
+              (timeProtocol as any)?.load_percentage?.toString() ||
+              firstExercise?.load_percentage?.toString() ||
+              "",
+            weight_kg:
+              (timeProtocol as any)?.weight_kg?.toString() ||
+              firstExercise?.weight_kg?.toString() ||
+              "",
           };
 
           // Handle complex block types with nested exercises
           const blockType = block.block_type as string;
-          if (blockType === "circuit" || blockType === "tabata") {
+
+          // Handle time-based blocks (amrap, emom, for_time) - ensure exercise_id is loaded from time_protocols if missing
+          if (isTimeBasedBlock && timeProtocol && !exercise.exercise_id) {
+            exercise.exercise_id = timeProtocol.exercise_id;
+          }
+          if (blockType === "tabata") {
             // Convert exercises to proper set structure
             // Each exercise in the block becomes an exercise in the sets
+            // Get time protocols for each exercise (for individual work_seconds, rest_after)
+            const exerciseProtocols =
+              block.time_protocols?.filter(
+                (tp: any) => tp.protocol_type === blockType
+              ) || [];
+
             const exercisesArray =
-              block.exercises?.map((ex, idx) => ({
-                exercise_id: ex.exercise_id,
-                // For circuit/tabata: don't set individual sets - rounds are in block.total_sets
-                sets: ex.sets?.toString() || "",
-                reps: ex.reps || block.reps_per_set || "",
-                rest_seconds:
-                  ex.rest_seconds?.toString() ||
-                  block.rest_seconds?.toString() ||
-                  "",
-                load_percentage: ex.load_percentage?.toString() || "",
-              })) || [];
+              block.exercises?.map((ex, idx) => {
+                // Find protocol for this specific exercise
+                const exProtocol = exerciseProtocols.find(
+                  (tp: any) =>
+                    tp.exercise_id === ex.exercise_id &&
+                    tp.exercise_order === idx + 1
+                );
+
+                return {
+                  exercise_id: ex.exercise_id,
+                  // For circuit/tabata: don't set individual sets - rounds are in block.total_sets
+                  sets: ex.sets?.toString() || "",
+                  reps: ex.reps || block.reps_per_set || "",
+                  // Use individual exercise rest_seconds, not block rest
+                  rest_seconds: ex.rest_seconds?.toString() || "",
+                  // Get work_seconds from time protocol for this exercise
+                  work_seconds: exProtocol?.work_seconds?.toString() || "",
+                  // Get rest_after from time protocol for this exercise
+                  rest_after: exProtocol?.rest_seconds?.toString() || "",
+                  // Load individual load_percentage for each exercise
+                  load_percentage: ex.load_percentage?.toString() || "",
+                };
+              }) || [];
 
             if (blockType === "tabata") {
               // Tabata uses tabata_sets - structure: [{ exercises: [...], rest_between_sets: "..." }]
@@ -568,25 +808,31 @@ export default function WorkoutTemplateForm({
                   rest_between_sets: String(restAfter),
                 }));
 
-              // Also set circuit_sets for compatibility
-              exercise.circuit_sets = exercise.tabata_sets;
+              // Circuit block type removed - no longer needed
             }
             // Circuit removed - skip loading circuit blocks
           } else if (block.block_type === "drop_set") {
-            // For dropset, main reps come from first exercise, not block.reps_per_set
-            exercise.reps = firstExercise?.reps || block.reps_per_set || "";
-            // Load drop set data from special table (fallback to block_parameters for old data)
+            // For dropset, main reps come from block.reps_per_set (initial/main set reps)
+            // Form expects exercise.exercise_reps for "Main Reps" field
+            exercise.reps = block.reps_per_set || "";
+            exercise.exercise_reps = block.reps_per_set || "";
+            // Load drop set data from special table
             if (dropSet) {
-              // Calculate drop percentage from first drop if needed
-              const initialWeight = firstExercise?.weight_kg || 0;
-              const dropWeight = dropSet.weight_kg || 0;
-              if (initialWeight > 0 && dropWeight > 0) {
-                const calculatedPercentage = Math.round(
-                  ((initialWeight - dropWeight) / initialWeight) * 100
-                );
-                exercise.drop_percentage = String(calculatedPercentage);
-              }
+              // drop_percentage is stored directly in workout_drop_sets.drop_percentage
+              exercise.drop_percentage =
+                (dropSet as any)?.drop_percentage?.toString() || "";
               exercise.drop_set_reps = dropSet.reps || "";
+            }
+            // Load weight_kg and load_percentage from first drop set (drop_order = 1)
+            const initialDropSet =
+              firstExercise?.drop_sets?.find(
+                (ds: any) => ds.drop_order === 1
+              ) || dropSet;
+            if (initialDropSet) {
+              exercise.weight_kg =
+                (initialDropSet as any)?.weight_kg?.toString() || "";
+              exercise.load_percentage =
+                (initialDropSet as any)?.load_percentage?.toString() || "";
             }
           } else if (block.block_type === "cluster_set") {
             // Load cluster set data from special table
@@ -606,49 +852,84 @@ export default function WorkoutTemplateForm({
               exercise.max_rest_pauses =
                 restPauseSet.max_rest_pauses?.toString() || "3";
             }
-          } else if (block.block_type === "pyramid_set") {
-            // Load pyramid set data from special table
-            if (pyramidSets.length > 0) {
-              // Use first pyramid step as base
-              exercise.weight_kg = pyramidSets[0]?.weight_kg?.toString() || "";
-              exercise.reps = pyramidSets[0]?.reps || "";
-            }
-          } else if (block.block_type === "ladder") {
-            // Load ladder set data from special table
-            if (ladderSets.length > 0) {
-              // Use first ladder step as base
-              exercise.weight_kg = ladderSets[0]?.weight_kg?.toString() || "";
-              exercise.reps = ladderSets[0]?.reps?.toString() || "";
-            }
           } else if (block.block_type === "giant_set") {
+            // Sort exercises by exercise_letter (A, B, C, D) to ensure correct order
+            const sortedExercises = [...(block.exercises || [])].sort(
+              (a, b) => {
+                const letterA = a.exercise_letter || "A";
+                const letterB = b.exercise_letter || "A";
+                return letterA.localeCompare(letterB);
+              }
+            );
             exercise.giant_set_exercises =
-              block.exercises?.map((ex) => ({
+              sortedExercises.map((ex) => ({
                 exercise_id: ex.exercise_id,
                 sets: ex.sets?.toString() || block.total_sets?.toString() || "",
-                reps: ex.reps || block.reps_per_set || "",
+                // reps is stored in ex.reps (workout_block_exercises.reps column)
+                reps: ex.reps || "",
                 load_percentage: ex.load_percentage?.toString() || "",
+                weight_kg: ex.weight_kg?.toString() || "",
+                tempo: ex.tempo || "",
+                rir: ex.rir?.toString() || "",
+                notes: ex.notes || "",
               })) || [];
           } else if (block.block_type === "superset") {
-            if (block.exercises && block.exercises.length >= 2) {
-              exercise.superset_exercise_id = block.exercises[1].exercise_id;
-              exercise.superset_reps =
-                block.exercises[1].reps || block.reps_per_set || "";
-              // Load percentage for first exercise (already loaded at line 425)
-              // Load percentage for second exercise (individual for each exercise in superset)
+            // Find exercises by exercise_letter (A = first, B = second)
+            const firstEx =
+              block.exercises?.find((ex) => ex.exercise_letter === "A") ||
+              block.exercises?.[0];
+            const secondEx =
+              block.exercises?.find((ex) => ex.exercise_letter === "B") ||
+              block.exercises?.[1];
+
+            if (firstEx) {
+              // First exercise data is already loaded above, but ensure load_percentage and weight_kg are correct
+              exercise.load_percentage =
+                firstEx.load_percentage?.toString() || "";
+              exercise.weight_kg = firstEx.weight_kg?.toString() || "";
+            }
+
+            if (secondEx) {
+              exercise.superset_exercise_id = secondEx.exercise_id;
+              exercise.superset_reps = secondEx.reps || "";
+              // Load percentage and weight for second exercise (uses SAME columns but stored in separate row)
               (exercise as any).superset_load_percentage =
-                block.exercises[1].load_percentage?.toString() || "";
+                secondEx.load_percentage?.toString() || "";
+              (exercise as any).superset_weight_kg =
+                secondEx.weight_kg?.toString() || "";
+              (exercise as any).superset_tempo = secondEx.tempo || "";
+              (exercise as any).superset_rir = secondEx.rir?.toString() || "";
             }
           } else if (block.block_type === "pre_exhaustion") {
-            if (block.exercises && block.exercises.length >= 2) {
-              exercise.compound_exercise_id = block.exercises[1].exercise_id;
-              exercise.isolation_reps = block.exercises[0].reps || "";
-              exercise.compound_reps = block.exercises[1].reps || "";
-              // Load percentage for isolation exercise (first exercise)
+            // Find isolation (letter A) and compound (letter B) exercises
+            const isolationExercise =
+              block.exercises?.find((ex) => ex.exercise_letter === "A") ||
+              block.exercises?.[0];
+            const compoundExercise =
+              block.exercises?.find((ex) => ex.exercise_letter === "B") ||
+              block.exercises?.[1];
+
+            if (isolationExercise) {
+              exercise.isolation_reps = isolationExercise.reps || "";
               exercise.load_percentage =
-                block.exercises[0].load_percentage?.toString() || "";
-              // Load percentage for compound exercise (second exercise)
+                isolationExercise.load_percentage?.toString() || "";
+              exercise.weight_kg =
+                isolationExercise.weight_kg?.toString() || "";
+              exercise.tempo = isolationExercise.tempo || "";
+              exercise.rir = isolationExercise.rir?.toString() || "";
+              exercise.notes = isolationExercise.notes || "";
+            }
+
+            if (compoundExercise) {
+              exercise.compound_exercise_id = compoundExercise.exercise_id;
+              exercise.compound_reps = compoundExercise.reps || "";
               (exercise as any).compound_load_percentage =
-                block.exercises[1].load_percentage?.toString() || "";
+                compoundExercise.load_percentage?.toString() || "";
+              (exercise as any).compound_weight_kg =
+                compoundExercise.weight_kg?.toString() || "";
+              (exercise as any).compound_tempo = compoundExercise.tempo || "";
+              (exercise as any).compound_rir =
+                compoundExercise.rir?.toString() || "";
             }
           }
 
@@ -789,14 +1070,67 @@ export default function WorkoutTemplateForm({
                 // Delete special table data first (will be recreated below)
                 await WorkoutBlockService.deleteBlockSpecialData(exercise.id);
 
+                // Collect exercise IDs for block name generation
+                const exerciseIds: string[] = [];
+                if (exerciseType === "superset") {
+                  if (exercise.exercise_id)
+                    exerciseIds.push(exercise.exercise_id);
+                  if (exercise.superset_exercise_id)
+                    exerciseIds.push(exercise.superset_exercise_id);
+                } else if (exerciseType === "giant_set") {
+                  if (
+                    exercise.giant_set_exercises &&
+                    Array.isArray(exercise.giant_set_exercises)
+                  ) {
+                    exercise.giant_set_exercises.forEach((gsEx: any) => {
+                      if (gsEx.exercise_id) exerciseIds.push(gsEx.exercise_id);
+                    });
+                  }
+                } else if (exerciseType === "pre_exhaustion") {
+                  if (exercise.exercise_id)
+                    exerciseIds.push(exercise.exercise_id);
+                  if (exercise.compound_exercise_id)
+                    exerciseIds.push(exercise.compound_exercise_id);
+                } else if (exerciseType === "tabata") {
+                  if (
+                    exercise.tabata_sets &&
+                    Array.isArray(exercise.tabata_sets)
+                  ) {
+                    exercise.tabata_sets.forEach((set: any) => {
+                      if (set.exercises && Array.isArray(set.exercises)) {
+                        set.exercises.forEach((ex: any) => {
+                          if (
+                            ex.exercise_id &&
+                            !exerciseIds.includes(ex.exercise_id)
+                          ) {
+                            exerciseIds.push(ex.exercise_id);
+                          }
+                        });
+                      }
+                    });
+                  }
+                } else {
+                  // For all other block types (straight_set, drop_set, cluster_set, rest_pause, amrap, emom, for_time)
+                  if (exercise.exercise_id)
+                    exerciseIds.push(exercise.exercise_id);
+                }
+
+                // Generate block name from exercise names
+                const generatedBlockName = generateBlockName(
+                  exerciseIds,
+                  exerciseType
+                );
+                console.log(
+                  `🔍 Generated block name for ${exerciseType}: "${generatedBlockName}" from ${exerciseIds.length} exercise IDs`
+                );
+
                 // Update the block itself
                 block = await WorkoutBlockService.updateWorkoutBlock(
                   exercise.id,
                   {
                     block_type: exerciseType as any,
                     block_order: i + 1,
-                    block_name:
-                      exercise.block_name || exercise.notes || undefined,
+                    block_name: generatedBlockName || undefined,
                     block_notes: exercise.notes || undefined,
                     total_sets: exercise.sets
                       ? parseInt(exercise.sets)
@@ -815,13 +1149,67 @@ export default function WorkoutTemplateForm({
               } else {
                 // CREATE new block
                 console.log(`➕ Creating new block for exercise ${i + 1}`);
+
+                // Collect exercise IDs for block name generation
+                const exerciseIds: string[] = [];
+                if (exerciseType === "superset") {
+                  if (exercise.exercise_id)
+                    exerciseIds.push(exercise.exercise_id);
+                  if (exercise.superset_exercise_id)
+                    exerciseIds.push(exercise.superset_exercise_id);
+                } else if (exerciseType === "giant_set") {
+                  if (
+                    exercise.giant_set_exercises &&
+                    Array.isArray(exercise.giant_set_exercises)
+                  ) {
+                    exercise.giant_set_exercises.forEach((gsEx: any) => {
+                      if (gsEx.exercise_id) exerciseIds.push(gsEx.exercise_id);
+                    });
+                  }
+                } else if (exerciseType === "pre_exhaustion") {
+                  if (exercise.exercise_id)
+                    exerciseIds.push(exercise.exercise_id);
+                  if (exercise.compound_exercise_id)
+                    exerciseIds.push(exercise.compound_exercise_id);
+                } else if (exerciseType === "tabata") {
+                  if (
+                    exercise.tabata_sets &&
+                    Array.isArray(exercise.tabata_sets)
+                  ) {
+                    exercise.tabata_sets.forEach((set: any) => {
+                      if (set.exercises && Array.isArray(set.exercises)) {
+                        set.exercises.forEach((ex: any) => {
+                          if (
+                            ex.exercise_id &&
+                            !exerciseIds.includes(ex.exercise_id)
+                          ) {
+                            exerciseIds.push(ex.exercise_id);
+                          }
+                        });
+                      }
+                    });
+                  }
+                } else {
+                  // For all other block types (straight_set, drop_set, cluster_set, rest_pause, amrap, emom, for_time)
+                  if (exercise.exercise_id)
+                    exerciseIds.push(exercise.exercise_id);
+                }
+
+                // Generate block name from exercise names
+                const generatedBlockName = generateBlockName(
+                  exerciseIds,
+                  exerciseType
+                );
+                console.log(
+                  `🔍 Generated block name for ${exerciseType}: "${generatedBlockName}" from ${exerciseIds.length} exercise IDs`
+                );
+
                 block = await WorkoutBlockService.createWorkoutBlock(
                   savedTemplateId,
                   exerciseType as any,
                   i + 1, // block_order
                   {
-                    block_name:
-                      exercise.block_name || exercise.notes || undefined,
+                    block_name: generatedBlockName || undefined,
                     block_notes: exercise.notes || undefined,
                     total_sets: exercise.sets
                       ? parseInt(exercise.sets)
@@ -844,35 +1232,72 @@ export default function WorkoutTemplateForm({
                 let mainExerciseId: string | null = null;
                 let mainExerciseOrder = 1;
 
+                // For giant_set, don't add main exercise here - it will be added from giant_set_exercises array
+                // For time-based blocks (amrap, emom, for_time, tabata), they don't use workout_block_exercises,
+                // only workout_time_protocols, so we just set mainExerciseId directly
                 if (exercise.exercise_id) {
-                  const addedExercise =
-                    await WorkoutBlockService.addExerciseToBlock(
-                      block.id,
-                      exercise.exercise_id,
-                      1,
-                      {
-                        sets: exercise.sets
-                          ? parseInt(exercise.sets)
-                          : undefined,
-                        reps: exercise.reps || undefined,
-                        // For superset: NO rest_seconds for exercises (they're done back-to-back)
-                        // rest_seconds in workout_blocks is for rest AFTER completing the superset
-                        rest_seconds:
-                          exerciseType === "superset"
-                            ? undefined
-                            : exercise.rest_seconds
-                            ? Math.round(parseFloat(exercise.rest_seconds))
-                            : undefined,
-                        rir: exercise.rir ? parseInt(exercise.rir) : undefined,
-                        tempo: exercise.tempo || undefined,
-                        notes: exercise.notes || undefined,
-                        load_percentage: exercise.load_percentage
-                          ? parseFloat(exercise.load_percentage)
-                          : undefined,
-                      }
-                    );
-                  if (addedExercise) {
+                  if (exerciseType === "giant_set") {
+                    // Giant set exercises are added from giant_set_exercises array below
+                    // mainExerciseId will be set there
+                  } else if (
+                    exerciseType === "amrap" ||
+                    exerciseType === "emom" ||
+                    exerciseType === "for_time" ||
+                    exerciseType === "tabata"
+                  ) {
+                    // Time-based blocks don't use workout_block_exercises, only workout_time_protocols
+                    // Set mainExerciseId directly for time protocol creation
                     mainExerciseId = exercise.exercise_id;
+                  } else {
+                    // For all other block types, add exercise to workout_block_exercises
+                    const addedExercise =
+                      await WorkoutBlockService.addExerciseToBlock(
+                        block.id,
+                        exercise.exercise_id,
+                        1, // exercise_order (block number)
+                        {
+                          exercise_letter:
+                            exerciseType === "superset" ||
+                            exerciseType === "pre_exhaustion"
+                              ? "A"
+                              : undefined,
+                          sets: exercise.sets
+                            ? parseInt(exercise.sets)
+                            : undefined,
+                          // For pre-exhaustion, use isolation_reps for the isolation exercise (exercise_letter "A")
+                          reps:
+                            exerciseType === "pre_exhaustion" &&
+                            exercise.isolation_reps &&
+                            exercise.isolation_reps.trim() !== ""
+                              ? exercise.isolation_reps
+                              : exercise.reps && exercise.reps.trim() !== ""
+                              ? exercise.reps
+                              : undefined,
+                          // For superset and pre_exhaustion: NO rest_seconds for exercises (they're done back-to-back)
+                          // rest_seconds in workout_blocks is for rest AFTER completing the superset/pre-exhaustion
+                          rest_seconds:
+                            exerciseType === "superset" ||
+                            exerciseType === "pre_exhaustion"
+                              ? undefined
+                              : exercise.rest_seconds
+                              ? Math.round(parseFloat(exercise.rest_seconds))
+                              : undefined,
+                          rir: exercise.rir
+                            ? parseInt(exercise.rir)
+                            : undefined,
+                          tempo: exercise.tempo || undefined,
+                          notes: exercise.notes || undefined,
+                          load_percentage: exercise.load_percentage
+                            ? parseFloat(exercise.load_percentage)
+                            : undefined,
+                          weight_kg: exercise.weight_kg
+                            ? parseFloat(exercise.weight_kg)
+                            : undefined,
+                        }
+                      );
+                    if (addedExercise) {
+                      mainExerciseId = exercise.exercise_id;
+                    }
                   }
                 }
 
@@ -883,21 +1308,40 @@ export default function WorkoutTemplateForm({
                 ) {
                   // Superset exercises have NO rest between them (like giant set)
                   // rest_seconds in workout_blocks is for rest AFTER completing the superset
+                  // Second exercise uses SAME columns (reps, load_percentage, weight_kg) but exercise_letter = "B"
                   await WorkoutBlockService.addExerciseToBlock(
                     block.id,
                     exercise.superset_exercise_id,
-                    2,
+                    1, // Same exercise_order as first exercise
                     {
+                      exercise_letter: "B",
                       sets: exercise.sets ? parseInt(exercise.sets) : undefined,
                       reps:
                         exercise.superset_reps || exercise.reps || undefined,
                       // NO rest_seconds for superset exercises (they're done back-to-back)
                       rest_seconds: undefined,
-                      // Load percentage for second exercise (individual for each exercise in superset)
+                      // Load percentage for second exercise - uses SAME column as first exercise
                       load_percentage: (exercise as any)
                         .superset_load_percentage
                         ? parseFloat((exercise as any).superset_load_percentage)
                         : undefined,
+                      weight_kg: (exercise as any).superset_weight_kg
+                        ? parseFloat((exercise as any).superset_weight_kg)
+                        : undefined,
+                      tempo:
+                        (exercise as any).superset_tempo ||
+                        exercise.tempo ||
+                        undefined,
+                      rir:
+                        (exercise as any).superset_rir || exercise.rir
+                          ? parseInt(
+                              (exercise as any).superset_rir || exercise.rir
+                            )
+                          : undefined,
+                      notes:
+                        (exercise as any).superset_notes ||
+                        exercise.notes ||
+                        undefined,
                     }
                   );
                 }
@@ -907,6 +1351,8 @@ export default function WorkoutTemplateForm({
                   exercise.giant_set_exercises &&
                   Array.isArray(exercise.giant_set_exercises)
                 ) {
+                  // For giant_set, add ALL exercises from giant_set_exercises array
+                  // Set mainExerciseId to first exercise for time protocol creation
                   for (
                     let j = 0;
                     j < exercise.giant_set_exercises.length;
@@ -914,61 +1360,138 @@ export default function WorkoutTemplateForm({
                   ) {
                     const giantEx = exercise.giant_set_exercises[j];
                     if (giantEx.exercise_id) {
-                      await WorkoutBlockService.addExerciseToBlock(
-                        block.id,
-                        giantEx.exercise_id,
-                        j + 1,
-                        {
-                          sets:
-                            giantEx.sets || exercise.sets
-                              ? parseInt(giantEx.sets || exercise.sets)
+                      // Each exercise in giant set gets exercise_letter A, B, C, D, etc.
+                      const exerciseLetter = String.fromCharCode(65 + j); // A=65, B=66, C=67, etc.
+                      const addedExercise =
+                        await WorkoutBlockService.addExerciseToBlock(
+                          block.id,
+                          giantEx.exercise_id,
+                          1, // Same exercise_order for all exercises in the block
+                          {
+                            exercise_letter: exerciseLetter,
+                            sets:
+                              giantEx.sets || exercise.sets
+                                ? parseInt(giantEx.sets || exercise.sets)
+                                : undefined,
+                            reps:
+                              giantEx.reps && giantEx.reps.trim() !== ""
+                                ? giantEx.reps
+                                : exercise.reps && exercise.reps.trim() !== ""
+                                ? exercise.reps
+                                : undefined,
+                            rest_seconds: exercise.rest_seconds
+                              ? parseInt(exercise.rest_seconds)
                               : undefined,
-                          reps: giantEx.reps || exercise.reps || undefined,
-                          rest_seconds: exercise.rest_seconds
-                            ? parseInt(exercise.rest_seconds)
-                            : undefined,
-                          // Load percentage can be set individually for each exercise in giant set
-                          load_percentage: giantEx.load_percentage
-                            ? parseFloat(giantEx.load_percentage)
-                            : exercise.load_percentage
-                            ? parseFloat(exercise.load_percentage)
-                            : undefined,
-                        }
-                      );
+                            // Load percentage can be set individually for each exercise in giant set
+                            load_percentage: giantEx.load_percentage
+                              ? parseFloat(giantEx.load_percentage)
+                              : exercise.load_percentage
+                              ? parseFloat(exercise.load_percentage)
+                              : undefined,
+                            weight_kg: giantEx.weight_kg
+                              ? parseFloat(giantEx.weight_kg)
+                              : exercise.weight_kg
+                              ? parseFloat(exercise.weight_kg)
+                              : undefined,
+                            tempo: giantEx.tempo || exercise.tempo || undefined,
+                            rir:
+                              giantEx.rir || exercise.rir
+                                ? parseInt(giantEx.rir || exercise.rir)
+                                : undefined,
+                            notes: giantEx.notes || exercise.notes || undefined,
+                          }
+                        );
+                      // Set mainExerciseId to first exercise (j=0) for time protocol creation
+                      if (j === 0 && addedExercise) {
+                        mainExerciseId = giantEx.exercise_id;
+                      }
                     }
                   }
                 }
 
                 if (exerciseType === "pre_exhaustion") {
+                  // Isolation exercise (first) - exercise_letter = "A"
                   if (exercise.exercise_id) {
                     await WorkoutBlockService.addExerciseToBlock(
                       block.id,
                       exercise.exercise_id,
-                      1,
+                      1, // exercise_order (block number)
                       {
+                        exercise_letter: "A",
                         sets: exercise.sets
                           ? parseInt(exercise.sets)
                           : undefined,
-                        reps: exercise.isolation_reps || undefined,
+                        reps:
+                          exercise.isolation_reps &&
+                          exercise.isolation_reps.trim() !== ""
+                            ? exercise.isolation_reps
+                            : exercise.reps && exercise.reps.trim() !== ""
+                            ? exercise.reps
+                            : undefined,
+                        // NO rest_seconds for pre-exhaustion exercises (they're done back-to-back)
+                        // rest_seconds in workout_blocks is for rest AFTER completing the pre-exhaustion
+                        rest_seconds: undefined,
                         load_percentage: exercise.load_percentage
                           ? parseFloat(exercise.load_percentage)
                           : undefined,
+                        weight_kg: exercise.weight_kg
+                          ? parseFloat(exercise.weight_kg)
+                          : undefined,
+                        tempo: exercise.tempo || undefined,
+                        rir: exercise.rir ? parseInt(exercise.rir) : undefined,
+                        notes: exercise.notes || undefined,
                       }
                     );
                   }
+                  // Compound exercise (second) - exercise_letter = "B"
                   if (exercise.compound_exercise_id) {
                     await WorkoutBlockService.addExerciseToBlock(
                       block.id,
                       exercise.compound_exercise_id,
-                      2,
+                      1, // Same exercise_order as isolation exercise
                       {
+                        exercise_letter: "B",
                         sets: exercise.sets
                           ? parseInt(exercise.sets)
                           : undefined,
-                        reps: exercise.compound_reps || undefined,
-                        load_percentage: exercise.load_percentage
+                        reps:
+                          exercise.compound_reps &&
+                          exercise.compound_reps.trim() !== ""
+                            ? exercise.compound_reps
+                            : exercise.reps && exercise.reps.trim() !== ""
+                            ? exercise.reps
+                            : undefined,
+                        // NO rest_seconds for pre-exhaustion exercises (they're done back-to-back)
+                        rest_seconds: undefined,
+                        // Uses SAME column as isolation exercise
+                        load_percentage: (exercise as any)
+                          .compound_load_percentage
+                          ? parseFloat(
+                              (exercise as any).compound_load_percentage
+                            )
+                          : exercise.load_percentage
                           ? parseFloat(exercise.load_percentage)
                           : undefined,
+                        // Uses SAME column as isolation exercise
+                        weight_kg: (exercise as any).compound_weight_kg
+                          ? parseFloat((exercise as any).compound_weight_kg)
+                          : exercise.weight_kg
+                          ? parseFloat(exercise.weight_kg)
+                          : undefined,
+                        tempo:
+                          (exercise as any).compound_tempo ||
+                          exercise.tempo ||
+                          undefined,
+                        rir:
+                          (exercise as any).compound_rir || exercise.rir
+                            ? parseInt(
+                                (exercise as any).compound_rir || exercise.rir
+                              )
+                            : undefined,
+                        notes:
+                          (exercise as any).compound_notes ||
+                          exercise.notes ||
+                          undefined,
                       }
                     );
                   }
@@ -977,29 +1500,55 @@ export default function WorkoutTemplateForm({
                 // Create special table records for block types that need them
                 if (mainExerciseId && exerciseType === "drop_set") {
                   // Create drop set records
+                  // For drop_set, the initial weight/load_percentage is stored in the first drop_set record (drop_order=1)
                   const initialWeight = exercise.weight_kg
                     ? parseFloat(exercise.weight_kg)
-                    : 0;
+                    : null;
+                  const initialLoadPercentage = exercise.load_percentage
+                    ? parseFloat(exercise.load_percentage)
+                    : null;
                   const dropPercentage = exercise.drop_percentage
                     ? parseInt(exercise.drop_percentage)
                     : 20;
 
-                  // First drop (initial weight reduced)
-                  const firstDropWeight =
-                    initialWeight * (1 - dropPercentage / 100);
+                  // First drop record stores the INITIAL weight/load_percentage (drop_order=1)
                   await WorkoutBlockService.createDropSet(
                     block.id,
                     mainExerciseId,
                     mainExerciseOrder,
                     1, // drop_order
-                    firstDropWeight,
-                    exercise.drop_set_reps || exercise.reps || "8-10"
+                    initialWeight, // Initial weight (not the drop weight)
+                    exercise.drop_set_reps || exercise.reps || "8-10",
+                    initialLoadPercentage, // Initial load_percentage
+                    dropPercentage // drop_percentage - percentage to reduce weight
                     // rest_seconds removed - rest is stored in workout_blocks.rest_seconds
                   );
+
+                  // If there's a drop percentage, create a second drop record with the reduced weight
+                  if (initialWeight && dropPercentage > 0) {
+                    const firstDropWeight =
+                      initialWeight * (1 - dropPercentage / 100);
+                    await WorkoutBlockService.createDropSet(
+                      block.id,
+                      mainExerciseId,
+                      mainExerciseOrder,
+                      2, // drop_order
+                      firstDropWeight, // Drop weight
+                      exercise.drop_set_reps || exercise.reps || "8-10",
+                      null, // No load_percentage for drop weight (it's calculated from initial)
+                      dropPercentage // drop_percentage - percentage to reduce weight
+                    );
+                  }
                 }
 
                 if (mainExerciseId && exerciseType === "cluster_set") {
                   // Create cluster set record
+                  const clusterWeight = exercise.weight_kg
+                    ? parseFloat(exercise.weight_kg)
+                    : null;
+                  const clusterLoadPercentage = exercise.load_percentage
+                    ? parseFloat(exercise.load_percentage)
+                    : null;
                   await WorkoutBlockService.createClusterSet(
                     block.id,
                     mainExerciseId,
@@ -1015,24 +1564,33 @@ export default function WorkoutTemplateForm({
                       : 15,
                     exercise.rest_seconds
                       ? Math.round(parseFloat(exercise.rest_seconds))
-                      : 120
+                      : 120,
+                    clusterWeight,
+                    clusterLoadPercentage
                   );
                 }
 
                 if (mainExerciseId && exerciseType === "rest_pause") {
                   // Create rest pause record
+                  const restPauseWeight = exercise.weight_kg
+                    ? parseFloat(exercise.weight_kg)
+                    : null;
+                  const restPauseLoadPercentage = exercise.load_percentage
+                    ? parseFloat(exercise.load_percentage)
+                    : null;
                   await WorkoutBlockService.createRestPauseSet(
                     block.id,
                     mainExerciseId,
                     mainExerciseOrder,
-                    exercise.weight_kg ? parseFloat(exercise.weight_kg) : 0,
+                    restPauseWeight,
                     // initialReps removed - reps are tracked in workout_blocks table
                     exercise.rest_pause_duration
                       ? parseInt(exercise.rest_pause_duration)
                       : 15,
                     exercise.max_rest_pauses
                       ? parseInt(exercise.max_rest_pauses)
-                      : 3
+                      : 3,
+                    restPauseLoadPercentage
                   );
                 }
 
@@ -1047,11 +1605,20 @@ export default function WorkoutTemplateForm({
 
                 // Time-based protocols (AMRAP, EMOM, FOR_TIME)
                 if (
-                  mainExerciseId &&
                   (exerciseType === "amrap" ||
                     exerciseType === "emom" ||
                     exerciseType === "for_time")
                 ) {
+                  if (!mainExerciseId) {
+                    throw new Error(`Exercise ID is required for ${exerciseType} blocks`);
+                  }
+                  const timeProtocolWeight = exercise.weight_kg
+                    ? parseFloat(exercise.weight_kg)
+                    : null;
+                  const timeProtocolLoadPercentage = exercise.load_percentage
+                    ? parseFloat(exercise.load_percentage)
+                    : null;
+                  
                   await WorkoutBlockService.createTimeProtocol(
                     block.id,
                     mainExerciseId,
@@ -1084,13 +1651,22 @@ export default function WorkoutTemplateForm({
                         exerciseType === "emom" && exercise.emom_reps
                           ? parseInt(exercise.emom_reps)
                           : undefined,
-                      target_reps: exercise.target_reps
-                        ? parseInt(exercise.target_reps)
-                        : undefined,
+                      emom_mode: exercise.emom_mode || undefined,
+                      target_reps:
+                        exercise.target_reps &&
+                        exercise.target_reps !== "" &&
+                        !isNaN(parseInt(exercise.target_reps))
+                          ? parseInt(exercise.target_reps)
+                          : undefined,
                       time_cap_minutes:
-                        exerciseType === "for_time" && exercise.time_cap
+                        exerciseType === "for_time" &&
+                        exercise.time_cap &&
+                        exercise.time_cap !== "" &&
+                        !isNaN(parseInt(exercise.time_cap))
                           ? parseInt(exercise.time_cap)
                           : undefined,
+                      weight_kg: timeProtocolWeight,
+                      load_percentage: timeProtocolLoadPercentage,
                     }
                   );
                 }
@@ -1148,60 +1724,14 @@ export default function WorkoutTemplateForm({
                           const setEx = exercisesInSet[exIdx];
                           if (setEx.exercise_id) {
                             const currentExerciseOrder = exerciseOrder++;
-                            const addedExercise =
-                              await WorkoutBlockService.addExerciseToBlock(
-                                block.id,
-                                setEx.exercise_id,
-                                currentExerciseOrder,
-                                {
-                                  sets:
-                                    setEx.sets || exercise.sets
-                                      ? parseInt(setEx.sets || exercise.sets)
-                                      : undefined,
-                                  reps:
-                                    setEx.reps || exercise.reps || undefined,
-                                  // rest_seconds in workout_block_exercises = rest after THIS exercise (per exercise)
-                                  rest_seconds:
-                                    exerciseType === "tabata"
-                                      ? 10 // Tabata: short rest between exercises (typically 10s)
-                                      : setEx.rest_after
-                                      ? Math.round(
-                                          parseFloat(String(setEx.rest_after))
-                                        )
-                                      : exercise.rest_seconds
-                                      ? Math.round(
-                                          parseFloat(
-                                            String(exercise.rest_seconds)
-                                          )
-                                        )
-                                      : undefined,
-                                  // Load percentage can be set individually for each exercise
-                                  load_percentage: setEx.load_percentage
-                                    ? parseFloat(String(setEx.load_percentage))
-                                    : exercise.load_percentage
-                                    ? parseFloat(
-                                        String(exercise.load_percentage)
-                                      )
-                                    : undefined,
-                                }
-                              );
 
-                            if (!addedExercise) {
-                              console.error(
-                                `❌ Failed to add exercise to block:`,
-                                {
-                                  blockId: block.id,
-                                  exerciseId: setEx.exercise_id,
-                                  exerciseOrder: currentExerciseOrder,
-                                  setIndex: setIdx + 1,
-                                }
-                              );
-                              throw new Error(
-                                `Failed to add exercise ${setEx.exercise_id} to circuit block`
-                              );
-                            }
-
-                            // Create time protocol for this exercise
+                            // For tabata, we should NOT add to workout_block_exercises
+                            // Tabata uses ONLY workout_time_protocols (no workout_block_exercises)
+                            // Create time protocol for this exercise directly
+                            const tabataWeight = setEx.weight_kg
+                              ? parseFloat(String(setEx.weight_kg))
+                              : null;
+                            // Tabata does NOT use load_percentage (removed from this block type)
                             const timeProtocolResult =
                               await WorkoutBlockService.createTimeProtocol(
                                 block.id,
@@ -1222,7 +1752,9 @@ export default function WorkoutTemplateForm({
                                   // rest_seconds = rest after THIS exercise (per exercise)
                                   rest_seconds:
                                     exerciseType === "tabata"
-                                      ? 10 // Tabata: short rest between exercises (typically 10s)
+                                      ? setEx.rest_after
+                                        ? parseInt(setEx.rest_after)
+                                        : 10 // Tabata: short rest between exercises (typically 10s)
                                       : setEx.rest_after
                                       ? Math.round(
                                           parseFloat(String(setEx.rest_after))
@@ -1246,6 +1778,9 @@ export default function WorkoutTemplateForm({
                                         : 8
                                       : undefined,
                                   set: setIdx + 1, // Store set number (1-indexed)
+                                  // Tabata does NOT use load_percentage, but can use weight_kg
+                                  weight_kg: tabataWeight,
+                                  load_percentage: null, // Tabata does NOT use load_percentage
                                 }
                               );
 
@@ -1624,6 +2159,9 @@ export default function WorkoutTemplateForm({
           rest_between_sets: string;
         }>,
         load_percentage: "",
+        weight_kg: "",
+        superset_weight_kg: "",
+        compound_weight_kg: "",
       });
       setShowAddExercise(false);
       setEditingExerciseId(null);
@@ -1820,6 +2358,11 @@ export default function WorkoutTemplateForm({
       rest_between_rungs: exercise.rest_between_rungs,
       // Load percentage
       load_percentage: exercise.load_percentage?.toString() || "",
+      weight_kg: exercise.weight_kg?.toString() || "",
+      superset_weight_kg:
+        (exercise as any).superset_weight_kg?.toString() || "",
+      compound_weight_kg:
+        (exercise as any).compound_weight_kg?.toString() || "",
     });
     setShowAddExercise(true);
   };
@@ -2994,66 +3537,44 @@ export default function WorkoutTemplateForm({
                             </div>
                           </div>
 
-                          {/* Load Percentage Fields */}
+                          {/* Load % / Weight Toggle Fields */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                            <div>
-                              <Label
-                                className={`text-sm font-medium ${theme.text}`}
-                              >
-                                First Exercise Load %
-                              </Label>
-                              <Input
-                                type="number"
-                                value={
-                                  newExercise.load_percentage === ""
-                                    ? ""
-                                    : newExercise.load_percentage
-                                }
-                                onChange={(e) =>
-                                  setNewExercise({
-                                    ...newExercise,
-                                    load_percentage: handleNumberChange(
-                                      e.target.value,
-                                      0
-                                    ),
-                                  })
-                                }
-                                placeholder="e.g., 85"
-                                min="0"
-                                max="100"
-                                step="1"
-                                className="mt-2 rounded-xl"
-                              />
-                            </div>
-                            <div>
-                              <Label
-                                className={`text-sm font-medium ${theme.text}`}
-                              >
-                                Second Exercise Load %
-                              </Label>
-                              <Input
-                                type="number"
-                                value={
-                                  (newExercise as any)
-                                    .superset_load_percentage === ""
-                                    ? ""
-                                    : (newExercise as any)
-                                        .superset_load_percentage
-                                }
-                                onChange={(e) =>
-                                  setNewExercise({
-                                    ...newExercise,
-                                    superset_load_percentage:
-                                      handleNumberChange(e.target.value, 0),
-                                  })
-                                }
-                                placeholder="e.g., 85"
-                                min="0"
-                                max="100"
-                                step="1"
-                                className="mt-2 rounded-xl"
-                              />
-                            </div>
+                            {renderLoadWeightField(
+                              newExercise.load_percentage,
+                              newExercise.weight_kg,
+                              (value) =>
+                                setNewExercise({
+                                  ...newExercise,
+                                  load_percentage: value,
+                                  weight_kg: "",
+                                }),
+                              (value) =>
+                                setNewExercise({
+                                  ...newExercise,
+                                  weight_kg: value,
+                                  load_percentage: "",
+                                }),
+                              "superset-first",
+                              "First Exercise Load % / Weight"
+                            )}
+                            {renderLoadWeightField(
+                              (newExercise as any).superset_load_percentage,
+                              (newExercise as any).superset_weight_kg,
+                              (value) =>
+                                setNewExercise({
+                                  ...newExercise,
+                                  superset_load_percentage: value,
+                                  superset_weight_kg: "",
+                                }),
+                              (value) =>
+                                setNewExercise({
+                                  ...newExercise,
+                                  superset_weight_kg: value,
+                                  superset_load_percentage: "",
+                                }),
+                              "superset-second",
+                              "Second Exercise Load % / Weight"
+                            )}
                           </div>
                         </div>
                       </div>
@@ -3548,36 +4069,6 @@ export default function WorkoutTemplateForm({
                                       Add Exercise
                                     </Button>
                                   </div>
-
-                                  {/* Rest between sets */}
-                                  <div>
-                                    <Label
-                                      className={`text-xs font-medium ${theme.text}`}
-                                    >
-                                      Rest After Set (seconds)
-                                    </Label>
-                                    <Input
-                                      type="number"
-                                      value={
-                                        set.rest_between_sets === ""
-                                          ? ""
-                                          : set.rest_between_sets
-                                      }
-                                      onChange={(e) => {
-                                        const updated = [
-                                          ...(newExercise.tabata_sets || []),
-                                        ];
-                                        updated[setIndex].rest_between_sets =
-                                          handleNumberChange(e.target.value, 0);
-                                        setNewExercise({
-                                          ...newExercise,
-                                          tabata_sets: updated,
-                                        });
-                                      }}
-                                      min="0"
-                                      className="mt-1 rounded-lg text-sm"
-                                    />
-                                  </div>
                                 </div>
                               )
                             )}
@@ -3795,35 +4286,45 @@ export default function WorkoutTemplateForm({
                                       />
                                     </div>
                                     <div>
-                                      <Label
-                                        className={`text-xs font-medium ${theme.text}`}
-                                      >
-                                        Load %
-                                      </Label>
-                                      <Input
-                                        type="number"
-                                        value={exercise.load_percentage || ""}
-                                        onChange={(e) => {
+                                      {renderLoadWeightField(
+                                        exercise.load_percentage,
+                                        exercise.weight_kg,
+                                        (value) => {
                                           const updated = [
                                             ...(newExercise.giant_set_exercises ||
                                               []),
                                           ];
-                                          updated[index].load_percentage =
-                                            handleNumberChange(
-                                              e.target.value,
-                                              0
-                                            );
+                                          updated[index] = {
+                                            ...updated[index],
+                                            load_percentage: value,
+                                            weight_kg: "",
+                                          };
                                           setNewExercise({
                                             ...newExercise,
                                             giant_set_exercises: updated,
                                           });
-                                        }}
-                                        placeholder="e.g., 85"
-                                        min="0"
-                                        max="100"
-                                        step="1"
-                                        className="mt-1 rounded-lg text-sm"
-                                      />
+                                        },
+                                        (value) => {
+                                          const updated = [
+                                            ...(newExercise.giant_set_exercises ||
+                                              []),
+                                          ];
+                                          updated[index] = {
+                                            ...updated[index],
+                                            weight_kg: value,
+                                            load_percentage: "",
+                                          };
+                                          setNewExercise({
+                                            ...newExercise,
+                                            giant_set_exercises: updated,
+                                          });
+                                        },
+                                        `giant-set-exercise-${index}`,
+                                        "Load % / Weight",
+                                        "e.g., 85",
+                                        "e.g., 50",
+                                        "sm:col-span-2"
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -3842,6 +4343,7 @@ export default function WorkoutTemplateForm({
                                     sets: "",
                                     reps: "",
                                     load_percentage: "",
+                                    weight_kg: "",
                                   },
                                 ];
                                 setNewExercise({
@@ -4327,66 +4829,44 @@ export default function WorkoutTemplateForm({
                               </div>
                             </div>
 
-                            {/* Load Percentage Fields */}
+                            {/* Load % / Weight Toggle Fields */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                              <div>
-                                <Label
-                                  className={`text-sm font-medium ${theme.text}`}
-                                >
-                                  Isolation Exercise Load %
-                                </Label>
-                                <Input
-                                  type="number"
-                                  value={
-                                    newExercise.load_percentage === ""
-                                      ? ""
-                                      : newExercise.load_percentage
-                                  }
-                                  onChange={(e) =>
-                                    setNewExercise({
-                                      ...newExercise,
-                                      load_percentage: handleNumberChange(
-                                        e.target.value,
-                                        0
-                                      ),
-                                    })
-                                  }
-                                  placeholder="e.g., 85"
-                                  min="0"
-                                  max="100"
-                                  step="1"
-                                  className="mt-2 rounded-xl"
-                                />
-                              </div>
-                              <div>
-                                <Label
-                                  className={`text-sm font-medium ${theme.text}`}
-                                >
-                                  Compound Exercise Load %
-                                </Label>
-                                <Input
-                                  type="number"
-                                  value={
-                                    (newExercise as any)
-                                      .compound_load_percentage === ""
-                                      ? ""
-                                      : (newExercise as any)
-                                          .compound_load_percentage
-                                  }
-                                  onChange={(e) =>
-                                    setNewExercise({
-                                      ...newExercise,
-                                      compound_load_percentage:
-                                        handleNumberChange(e.target.value, 0),
-                                    })
-                                  }
-                                  placeholder="e.g., 85"
-                                  min="0"
-                                  max="100"
-                                  step="1"
-                                  className="mt-2 rounded-xl"
-                                />
-                              </div>
+                              {renderLoadWeightField(
+                                newExercise.load_percentage,
+                                newExercise.weight_kg,
+                                (value) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    load_percentage: value,
+                                    weight_kg: "",
+                                  }),
+                                (value) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    weight_kg: value,
+                                    load_percentage: "",
+                                  }),
+                                "pre-exhaustion-isolation",
+                                "Isolation Load % / Weight"
+                              )}
+                              {renderLoadWeightField(
+                                (newExercise as any).compound_load_percentage,
+                                (newExercise as any).compound_weight_kg,
+                                (value) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    compound_load_percentage: value,
+                                    compound_weight_kg: "",
+                                  }),
+                                (value) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    compound_weight_kg: value,
+                                    compound_load_percentage: "",
+                                  }),
+                                "pre-exhaustion-compound",
+                                "Compound Load % / Weight"
+                              )}
                             </div>
                           </div>
                         </div>
@@ -4464,48 +4944,32 @@ export default function WorkoutTemplateForm({
                     )}
 
                     {/* Common fields for all types */}
-                    {/* Hide general load percentage for blocks with individual load percentage fields (superset, giant_set, pre_exhaustion) and time-based blocks (tabata, emom) */}
-                    {![
-                      "superset",
-                      "giant_set",
-                      "pre_exhaustion",
-                      "tabata",
-                      "emom",
-                    ].includes(newExercise.exercise_type) && (
-                      <div>
-                        <Label
-                          htmlFor="load_percentage"
-                          className={`text-sm font-medium ${theme.text}`}
-                        >
-                          Load (% of 1RM)
-                        </Label>
-                        <Input
-                          id="load_percentage"
-                          type="number"
-                          value={
-                            newExercise.load_percentage === ""
-                              ? ""
-                              : newExercise.load_percentage || ""
-                          }
-                          onChange={(e) =>
-                            setNewExercise({
-                              ...newExercise,
-                              load_percentage:
-                                e.target.value === "" ? "" : e.target.value,
-                            })
-                          }
-                          placeholder="e.g., 70"
-                          min="0"
-                          max="200"
-                          step="1"
-                          className="mt-2 rounded-xl"
-                        />
-                        <p className={`text-xs ${theme.textSecondary} mt-1`}>
-                          Percentage of estimated 1RM to use for suggested
-                          weight (e.g., 70 = 70% of 1RM)
-                        </p>
-                      </div>
-                    )}
+                    {/* Load % / Weight Toggle - Only show for block types that support it (all except tabata, superset, giant_set, pre_exhaustion which have their own fields) */}
+                    {newExercise.exercise_type &&
+                      ![
+                        "superset",
+                        "giant_set",
+                        "pre_exhaustion",
+                        "tabata",
+                      ].includes(newExercise.exercise_type) &&
+                      renderLoadWeightField(
+                        newExercise.load_percentage,
+                        newExercise.weight_kg,
+                        (value) =>
+                          setNewExercise({
+                            ...newExercise,
+                            load_percentage: value,
+                            weight_kg: "",
+                          }),
+                        (value) =>
+                          setNewExercise({
+                            ...newExercise,
+                            weight_kg: value,
+                            load_percentage: "",
+                          }),
+                        "new-exercise-main",
+                        "Load % / Weight"
+                      )}
 
                     <div>
                       <Label

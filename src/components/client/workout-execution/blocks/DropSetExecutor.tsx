@@ -52,24 +52,31 @@ export function DropSetExecutor({
   const exerciseReps = currentExercise?.reps || block.block.reps_per_set || "";
   const dropSetReps = exerciseReps; // TODO: Get from workout_drop_sets table
 
-  // Pre-fill with suggested weight
+  // Pre-fill with suggested weight - recalculate when e1rmMap is populated
   useEffect(() => {
-    if (currentExercise?.load_percentage && !initialWeight) {
-      const suggested = calculateSuggestedWeightUtil(
-        currentExercise.exercise_id,
-        currentExercise.load_percentage,
-        e1rmMap
-      );
-      if (suggested) {
-        setInitialWeight(suggested.toString());
-        // Calculate drop weight (reduce by drop percentage)
-        const dropWeightValue = suggested * (1 - dropPercentage / 100);
-        const roundedDropWeight = Math.round(dropWeightValue * 2) / 2;
-        setDropWeight(roundedDropWeight.toString());
-        isManuallyEditingDropWeight.current = false;
+    if (currentExercise?.load_percentage && currentExercise?.exercise_id) {
+      // Check if e1rmMap has data for this exercise
+      const hasE1rm = e1rmMap[currentExercise.exercise_id] && e1rmMap[currentExercise.exercise_id] > 0;
+      // Only set if weight is empty or if e1rmMap was just populated
+      const weightIsEmpty = !initialWeight || initialWeight.trim() === "" || parseFloat(initialWeight) === 0;
+      
+      if (hasE1rm && weightIsEmpty) {
+        const suggested = calculateSuggestedWeightUtil(
+          currentExercise.exercise_id,
+          currentExercise.load_percentage,
+          e1rmMap
+        );
+        if (suggested && suggested > 0) {
+          setInitialWeight(suggested.toString());
+          // Calculate drop weight (reduce by drop percentage)
+          const dropWeightValue = suggested * (1 - dropPercentage / 100);
+          const roundedDropWeight = Math.round(dropWeightValue * 2) / 2;
+          setDropWeight(roundedDropWeight.toString());
+          isManuallyEditingDropWeight.current = false;
+        }
       }
     }
-  }, [currentExercise, e1rmMap, dropPercentage, initialWeight]);
+  }, [currentExercise?.exercise_id, currentExercise?.load_percentage, e1rmMap, dropPercentage, initialWeight]);
 
   // Auto-calculate drop weight when initial weight changes
   // Always recalculate when initial weight changes (unless user is actively editing drop weight)
@@ -173,97 +180,107 @@ export function DropSetExecutor({
       }
     } catch (e) {}
 
-    // Calculate drop percentage
-    const dropPercentage = initialWeightNum > 0 
-      ? ((initialWeightNum - dropWeightNum) / initialWeightNum) * 100 
-      : 0;
+    try {
+      // Calculate drop percentage
+      const dropPercentage = initialWeightNum > 0 
+        ? ((initialWeightNum - dropWeightNum) / initialWeightNum) * 100 
+        : 0;
 
-    // Log dropset
-    const logData: any = {
-      block_type: 'dropset',
-      set_number: completedSets + 1,
-    };
-    
-    // Only add fields if they're defined
-    if (currentExercise?.exercise_id) logData.exercise_id = currentExercise.exercise_id;
-    if (initialWeightNum !== undefined && initialWeightNum !== null) logData.dropset_initial_weight = initialWeightNum;
-    if (initialRepsNum !== undefined && initialRepsNum !== null) logData.dropset_initial_reps = initialRepsNum;
-    if (dropWeightNum !== undefined && dropWeightNum !== null) logData.dropset_final_weight = dropWeightNum;
-    if (dropRepsNum !== undefined && dropRepsNum !== null) logData.dropset_final_reps = dropRepsNum;
-    if (dropPercentage !== undefined && dropPercentage !== null) logData.dropset_percentage = dropPercentage;
-    
-    const result = await logSetToDatabase(logData);
+      // Log dropset
+      const logData: any = {
+        block_type: 'dropset',
+        set_number: completedSets + 1,
+      };
+      
+      // Only add fields if they're defined
+      if (currentExercise?.exercise_id) logData.exercise_id = currentExercise.exercise_id;
+      if (initialWeightNum !== undefined && initialWeightNum !== null) logData.dropset_initial_weight = initialWeightNum;
+      if (initialRepsNum !== undefined && initialRepsNum !== null) logData.dropset_initial_reps = initialRepsNum;
+      if (dropWeightNum !== undefined && dropWeightNum !== null) logData.dropset_final_weight = dropWeightNum;
+      if (dropRepsNum !== undefined && dropRepsNum !== null) logData.dropset_final_reps = dropRepsNum;
+      if (dropPercentage !== undefined && dropPercentage !== null) logData.dropset_percentage = dropPercentage;
+      
+      const result = await logSetToDatabase(logData);
 
-    if (result.success) {
-      const loggedSetsArray: LoggedSet[] = [
-        {
-          id: `temp-initial-${Date.now()}`,
-          exercise_id: currentExercise.exercise_id,
-          block_id: block.block.id,
-          set_number: completedSets + 1,
-          weight_kg: initialWeightNum,
-          reps_completed: initialRepsNum,
-          completed_at: new Date(),
-        } as LoggedSet,
-      ];
+      if (result.success) {
+        const loggedSetsArray: LoggedSet[] = [
+          {
+            id: `temp-initial-${Date.now()}`,
+            exercise_id: currentExercise.exercise_id,
+            block_id: block.block.id,
+            set_number: completedSets + 1,
+            weight_kg: initialWeightNum,
+            reps_completed: initialRepsNum,
+            completed_at: new Date(),
+          } as LoggedSet,
+        ];
 
-      if (result.e1rm && onE1rmUpdate) {
-        onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
-      }
-
-      addToast({
-        title: "Drop Set Logged!",
-        description: `${initialWeightNum}kg × ${initialRepsNum} reps → ${dropWeightNum}kg × ${dropRepsNum} reps`,
-        variant: "success",
-        duration: 2000,
-      });
-
-      // Update parent with new completed sets count
-      const newCompletedSets = completedSets + 1;
-      onSetComplete?.(newCompletedSets);
-
-      // Complete block if last set
-      if (newCompletedSets >= totalSets) {
-        onBlockComplete(block.block.id, loggedSetsArray);
-      } else {
-        // Check if rest timer will show - if so, don't clear inputs yet
-        const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-        if (restSeconds === 0) {
-          // No rest timer, clear inputs immediately
-          const suggested = currentExercise?.load_percentage
-            ? calculateSuggestedWeightUtil(
-                currentExercise.exercise_id,
-                currentExercise.load_percentage,
-                e1rmMap
-              )
-            : null;
-          if (suggested) {
-            setInitialWeight(suggested.toString());
-            const dropWeightValue = suggested * (1 - dropPercentage / 100);
-            const roundedDropWeight = Math.round(dropWeightValue * 2) / 2;
-            setDropWeight(roundedDropWeight.toString());
-            isManuallyEditingDropWeight.current = false;
-          } else {
-            setInitialWeight("");
-            setDropWeight("");
-            isManuallyEditingDropWeight.current = false;
-          }
-          setInitialReps("");
-          setDropReps("");
+        if (result.e1rm && onE1rmUpdate) {
+          onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
         }
-        // If restSeconds > 0, rest timer will show and inputs will be cleared
-        // when the timer completes and completedSets updates
+
+        addToast({
+          title: "Drop Set Logged!",
+          description: `${initialWeightNum}kg × ${initialRepsNum} reps → ${dropWeightNum}kg × ${dropRepsNum} reps`,
+          variant: "success",
+          duration: 2000,
+        });
+
+        // Update parent with new completed sets count
+        const newCompletedSets = completedSets + 1;
+        onSetComplete?.(newCompletedSets);
+
+        // Complete block if last set
+        if (newCompletedSets >= totalSets) {
+          onBlockComplete(block.block.id, loggedSetsArray);
+        } else {
+          // Check if rest timer will show - if so, don't clear inputs yet
+          const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
+          if (restSeconds === 0) {
+            // No rest timer, clear inputs immediately
+            const suggested = currentExercise?.load_percentage
+              ? calculateSuggestedWeightUtil(
+                  currentExercise.exercise_id,
+                  currentExercise.load_percentage,
+                  e1rmMap
+                )
+              : null;
+            if (suggested) {
+              setInitialWeight(suggested.toString());
+              const dropWeightValue = suggested * (1 - dropPercentage / 100);
+              const roundedDropWeight = Math.round(dropWeightValue * 2) / 2;
+              setDropWeight(roundedDropWeight.toString());
+              isManuallyEditingDropWeight.current = false;
+            } else {
+              setInitialWeight("");
+              setDropWeight("");
+              isManuallyEditingDropWeight.current = false;
+            }
+            setInitialReps("");
+            setDropReps("");
+          }
+          // If restSeconds > 0, rest timer will show and inputs will be cleared
+          // when the timer completes and completedSets updates
+        }
+      } else {
+        addToast({
+          title: "Failed to Save",
+          description: result.error || "Failed to save set. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
       }
-    } else {
+    } catch (error) {
+      console.error("Error logging drop set:", error);
       addToast({
-        title: "Failed to Save",
-        description: "Failed to save set. Please try again.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
         variant: "destructive",
         duration: 5000,
       });
+    } finally {
+      setIsLoggingSet(false);
     }
-
-    setIsLoggingSet(false);
   };
 
   const loggingInputs = (
