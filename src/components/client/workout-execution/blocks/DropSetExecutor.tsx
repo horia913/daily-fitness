@@ -12,6 +12,7 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 export function DropSetExecutor({
   block,
@@ -286,7 +287,7 @@ export function DropSetExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {/* Initial Set */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-700">
+      <GlassCard elevation={1} className="p-4">
         <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-4 text-lg">
           Initial (100%)
         </h4>
@@ -307,10 +308,10 @@ export function DropSetExecutor({
             step="1"
           />
         </div>
-      </div>
+      </GlassCard>
 
       {/* Drop Set */}
-      <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-200 dark:border-red-700">
+      <GlassCard elevation={1} className="p-4">
         <h4 className="font-semibold text-red-800 dark:text-red-200 mb-4 text-lg">
           After Drop ({100 - dropPercentage}%)
         </h4>
@@ -338,7 +339,7 @@ export function DropSetExecutor({
             step="1"
           />
         </div>
-      </div>
+      </GlassCard>
     </div>
   );
 

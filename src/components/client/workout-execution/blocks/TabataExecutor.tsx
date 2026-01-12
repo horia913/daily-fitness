@@ -7,6 +7,7 @@ import { BaseBlockExecutorLayout } from "../BaseBlockExecutor";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { TabataCircuitTimerModal } from "../ui/TabataCircuitTimerModal";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 export function TabataExecutor({
   block,
@@ -127,9 +128,10 @@ export function TabataExecutor({
       {tabataSets.length > 0 ? (
         <div className="space-y-4">
           {tabataSets.map((set: any, setIndex: number) => (
-            <div
+            <GlassCard
               key={setIndex}
-              className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700"
+              elevation={1}
+              className="p-4"
             >
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -168,7 +170,7 @@ export function TabataExecutor({
                   </div>
                 ))}
               </div>
-            </div>
+            </GlassCard>
           ))}
         </div>
       ) : (

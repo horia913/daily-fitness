@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { useTheme } from "@/contexts/ThemeContext";
 import { GlassCard } from "@/components/ui/GlassCard";
 import {
   ArrowLeft,
@@ -14,10 +16,14 @@ import {
   BarChart3,
   Calendar as CalendarIcon,
   TrendingUp,
+  Star,
+  Home,
+  Share2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationTriggers from "@/lib/notificationTriggers";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
+import { PersonalRecordsService } from "@/lib/progressTrackingService";
 
 interface WorkoutAssignment {
   id: string;
@@ -111,6 +117,7 @@ interface BlockGroup {
 export default function WorkoutComplete() {
   const params = useParams();
   const router = useRouter();
+  const { isDark } = useTheme();
   const assignmentId = params.id as string;
 
   const [assignment, setAssignment] = useState<WorkoutAssignment | null>(null);
@@ -128,6 +135,8 @@ export default function WorkoutComplete() {
   const [workoutLogIdForSummary, setWorkoutLogIdForSummary] = useState<
     string | null
   >(null);
+  const [personalRecords, setPersonalRecords] = useState<any[]>([]);
+  const [nextWorkout, setNextWorkout] = useState<any | null>(null);
 
   useEffect(() => {
     if (assignmentId) {
@@ -279,6 +288,55 @@ export default function WorkoutComplete() {
                 assignment?.workout_template_id || null,
                 user.id
               );
+
+              // Fetch personal records for this workout (optional)
+              try {
+                if (workoutLogId) {
+                  const { data: prs } = await supabase
+                    .from('personal_records')
+                    .select(`
+                      *,
+                      exercise:exercises(id, name)
+                    `)
+                    .eq('client_id', user.id)
+                    .eq('workout_log_id', workoutLogId)
+                    .order('achieved_date', { ascending: false });
+                  
+                  if (prs && prs.length > 0) {
+                    setPersonalRecords(prs);
+                  }
+                }
+              } catch (err) {
+                // Silently fail - this is optional data
+                console.log('Could not fetch personal records:', err);
+              }
+
+              // Try to fetch next workout (optional - don't block if it fails)
+              try {
+                const today = new Date().toISOString().split('T')[0];
+                const { data: nextAssignment } = await supabase
+                  .from('workout_assignments')
+                  .select(`
+                    id,
+                    name,
+                    scheduled_date,
+                    workout_template_id,
+                    template:workout_templates(name, description)
+                  `)
+                  .eq('client_id', user.id)
+                  .in('status', ['assigned', 'active'])
+                  .gte('scheduled_date', today)
+                  .order('scheduled_date', { ascending: true })
+                  .limit(1)
+                  .maybeSingle();
+                
+                if (nextAssignment) {
+                  setNextWorkout(nextAssignment);
+                }
+              } catch (err) {
+                // Silently fail - this is optional data
+                console.log('Could not fetch next workout:', err);
+              }
             }
           }
         }
@@ -1131,87 +1189,376 @@ export default function WorkoutComplete() {
   }
 
   const completedDate = workoutLog?.completed_at || workoutLog?.started_at;
-  const completedDateFormatted = completedDate ? formatDate(completedDate) : "";
+  
+  // Format duration as MM:SS
+  const formatDuration = (minutes: number): string => {
+    const mins = Math.floor(minutes);
+    const secs = Math.round((minutes - mins) * 60);
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Format volume with comma separator
+  const formatVolume = (kg: number): string => {
+    return kg.toLocaleString();
+  };
+
+
+  // Format scheduled date to show weekday
+  const formatScheduledDate = (dateString: string | null): string => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+  };
 
   return (
     <ProtectedRoute requiredRole="client">
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <div className="p-4">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Back Button */}
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push("/client/workouts")}
-                className="rounded-2xl"
+      <AnimatedBackground>
+        <div
+          className="relative z-10 min-h-screen"
+          style={{ padding: "64px 32px", paddingBottom: "120px" }}
+        >
+          <div
+            style={{
+              maxWidth: "900px",
+              margin: "0 auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: "40px",
+            }}
+          >
+            {/* Header */}
+            <header style={{ textAlign: "center", marginBottom: "32px" }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  padding: "8px 19.2px",
+                  background: isDark
+                    ? "rgba(255, 255, 255, 0.1)"
+                    : "rgba(255, 255, 255, 0.4)",
+                  backdropFilter: "blur(10px)",
+                  WebkitBackdropFilter: "blur(10px)",
+                  border: `1px solid ${
+                    isDark ? "rgba(255, 255, 255, 0.125)" : "rgba(255, 255, 255, 0.2)"
+                  }`,
+                  borderRadius: "100px",
+                  fontFamily: "monospace",
+                  fontSize: "12px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  marginBottom: "24px",
+                  color: isDark ? "#FFFFFF" : "#1A1A1A",
+                }}
               >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-            </div>
+                Session Verified • Complete
+              </span>
+              <h1
+                style={{
+                  fontSize: "clamp(48px, 10vw, 80px)",
+                  fontWeight: 900,
+                  letterSpacing: "-0.04em",
+                  lineHeight: 0.9,
+                  background: "linear-gradient(180deg, #FFFFFF 0%, rgba(255,255,255,0.4) 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  margin: 0,
+                  color: isDark ? "#FFFFFF" : "#1A1A1A",
+                }}
+              >
+                {assignment.name || "Workout"}<br />Complete.
+              </h1>
+            </header>
 
-            {/* Header Card */}
-            <GlassCard
-              elevation={2}
-              className="p-8 bg-gradient-to-br from-green-500 via-emerald-600 to-teal-700 border-0"
+            {/* Stats Grid */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "24px",
+              }}
             >
-              <div className="text-center text-white">
-                <h1 className="text-3xl font-bold mb-2">
-                  {assignment.name || "Workout"}
-                </h1>
-                <div className="flex items-center justify-center gap-2 mb-4">
-                  <CheckCircle className="w-5 h-5" />
-                  <span className="text-lg">
-                    Completed - {completedDateFormatted}
-                  </span>
-                </div>
-                <div className="text-lg">
-                  Duration: {workoutStats.duration} minutes
-                </div>
-              </div>
-            </GlassCard>
+              {/* Total Duration */}
+              <GlassCard elevation={1} className="p-8 flex flex-col gap-2">
+                <span
+                  style={{
+                    fontSize: "12px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                    fontWeight: 700,
+                  }}
+                >
+                  Total Duration
+                </span>
+                <span
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: "36px",
+                    fontWeight: 500,
+                    color: isDark ? "#3dffec" : "#0891B2",
+                  }}
+                >
+                  {formatDuration(workoutStats.duration)}
+                </span>
+              </GlassCard>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <GlassCard elevation={2} className="p-6 text-center">
-                <div className="text-3xl font-bold text-slate-800 mb-1">
+              {/* Sets Crushed */}
+              <GlassCard elevation={1} className="p-8 flex flex-col gap-2">
+                <span
+                  style={{
+                    fontSize: "12px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                    fontWeight: 700,
+                  }}
+                >
+                  Sets Crushed
+                </span>
+                <span
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: "36px",
+                    fontWeight: 500,
+                    color: isDark ? "#3dffec" : "#0891B2",
+                  }}
+                >
                   {workoutStats.totalSets}
-                </div>
-                <div className="text-sm text-slate-500">SETS</div>
+                </span>
               </GlassCard>
-              <GlassCard elevation={2} className="p-6 text-center">
-                <div className="text-3xl font-bold text-slate-800 mb-1">
-                  {workoutStats.totalReps}
-                </div>
-                <div className="text-sm text-slate-500">REPS</div>
-              </GlassCard>
-              <GlassCard elevation={2} className="p-6 text-center">
-                <div className="text-3xl font-bold text-slate-800 mb-1">
-                  {workoutStats.totalWeight}
-                </div>
-                <div className="text-sm text-slate-500">WEIGHT (kg)</div>
-              </GlassCard>
-              <GlassCard elevation={2} className="p-6 text-center">
-                <div className="text-3xl font-bold text-slate-800 mb-1">
-                  {workoutStats.duration}
-                </div>
-                <div className="text-sm text-slate-500">MINUTES</div>
+
+              {/* Volume Lifted */}
+              <GlassCard elevation={1} className="p-8 flex flex-col gap-2">
+                <span
+                  style={{
+                    fontSize: "12px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                    fontWeight: 700,
+                  }}
+                >
+                  Volume Lifted
+                </span>
+                <span
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: "36px",
+                    fontWeight: 500,
+                    color: isDark ? "#3dffec" : "#0891B2",
+                  }}
+                >
+                  {formatVolume(workoutStats.totalWeight)}
+                  <small style={{ fontSize: "0.4em", marginLeft: "4px" }}>KG</small>
+                </span>
               </GlassCard>
             </div>
 
-            {/* Blocks Section */}
-            <div className="space-y-4">
-              <h2 className="text-2xl font-bold text-slate-800 mb-4">
-                Workout Blocks
-              </h2>
-              {blockGroups.length === 0 ? (
-                <GlassCard elevation={2} className="p-8 text-center">
-                  <p className="text-slate-500">
-                    No sets logged for this workout.
+            {/* Personal Records Section */}
+            {personalRecords.length > 0 && (
+              <section
+                style={{
+                  background: "linear-gradient(135deg, rgba(255, 61, 252, 0.1), rgba(61, 255, 236, 0.05))",
+                  border: `1px solid ${
+                    isDark ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.3)"
+                  }`,
+                  borderRadius: "32px",
+                  padding: "40px",
+                  position: "relative",
+                  overflow: "hidden",
+                  backdropFilter: "blur(30px)",
+                  WebkitBackdropFilter: "blur(30px)",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    width: "60%",
+                    height: "60%",
+                    background: "radial-gradient(circle at top right, rgba(61, 255, 236, 0.2), transparent 60%)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <div style={{ position: "relative", zIndex: 1 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "16px",
+                      marginBottom: "32px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "48px",
+                        height: "48px",
+                        background: "#ff3dfc",
+                        borderRadius: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 0 30px rgba(255, 61, 252, 0.4)",
+                      }}
+                    >
+                      <Star
+                        style={{
+                          width: "24px",
+                          height: "24px",
+                          stroke: "#000000",
+                          strokeWidth: 2.5,
+                          fill: "none",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <h2
+                        style={{
+                          fontSize: "24px",
+                          fontWeight: 700,
+                          letterSpacing: "-0.02em",
+                          margin: 0,
+                          color: isDark ? "#FFFFFF" : "#1A1A1A",
+                        }}
+                      >
+                        Personal Records Achieved
+                      </h2>
+                      <p
+                        style={{
+                          color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                          fontSize: "14px",
+                          margin: "4px 0 0 0",
+                        }}
+                      >
+                        You are stronger than you were {workoutStats.duration} minutes ago.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "16px",
+                    }}
+                  >
+                    {personalRecords.slice(0, 5).map((pr: any) => {
+                      const exerciseName =
+                        pr.exercise?.name || pr.exerciseName || "Exercise";
+                      const recordType =
+                        pr.record_type === "max_weight"
+                          ? "1RM Strength Bloom"
+                          : pr.record_type === "max_reps"
+                          ? "Peak Volume Capacity"
+                          : "Record";
+                      const deltaValue =
+                        pr.record_type === "max_weight"
+                          ? `+${pr.weight_kg || pr.value || 0} kg`
+                          : pr.record_type === "max_reps"
+                          ? `+${pr.reps || pr.value || 0} Reps`
+                          : `+${pr.value || 0}`;
+
+                      return (
+                        <div
+                          key={pr.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "16px",
+                            background: "rgba(255, 255, 255, 0.03)",
+                            borderRadius: "16px",
+                            borderLeft: "3px solid #ff3dfc",
+                          }}
+                        >
+                          <div>
+                            <h4
+                              style={{
+                                fontSize: "18px",
+                                fontWeight: 600,
+                                margin: 0,
+                                marginBottom: "4px",
+                                color: isDark ? "#FFFFFF" : "#1A1A1A",
+                              }}
+                            >
+                              {exerciseName}
+                            </h4>
+                            <p
+                              style={{
+                                fontSize: "14px",
+                                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                                margin: 0,
+                              }}
+                            >
+                              {recordType}
+                            </p>
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: "monospace",
+                              color: "#3dffec",
+                              fontSize: "16px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {deltaValue}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Next Workout Box */}
+            {nextWorkout && (
+              <GlassCard elevation={2} className="p-6 flex items-center justify-between gap-4">
+                <div>
+                  <p
+                    style={{
+                      fontSize: "14px",
+                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                      marginBottom: "4px",
+                      margin: 0,
+                    }}
+                  >
+                    Up Next in Schedule
                   </p>
-                </GlassCard>
-              ) : (
-                blockGroups.map((block, index) => {
+                  <h3
+                    style={{
+                      fontSize: "20px",
+                      fontWeight: 700,
+                      margin: 0,
+                      color: isDark ? "#FFFFFF" : "#1A1A1A",
+                    }}
+                  >
+                    {nextWorkout.name ||
+                      (nextWorkout.template as any)?.name ||
+                      "Workout"}
+                  </h3>
+                </div>
+                {nextWorkout.scheduled_date && (
+                  <div
+                    style={{
+                      fontFamily: "monospace",
+                      fontSize: "13px",
+                      color: isDark ? "#3dffec" : "#0891B2",
+                    }}
+                  >
+                    Scheduled for {formatScheduledDate(nextWorkout.scheduled_date)}
+                  </div>
+                )}
+              </GlassCard>
+            )}
+
+            {/* Blocks Section - Keep existing structure with glass styling */}
+            {blockGroups.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {blockGroups.map((block, index) => {
                   const isExpanded = expandedBlocks.has(block.block_id);
                   const setCount = block.sets.length;
                   const exerciseNamesList = Array.from(
@@ -1225,49 +1572,80 @@ export default function WorkoutComplete() {
                       : "Exercise";
 
                   return (
-                    <GlassCard
+                    <div
                       key={block.block_id}
-                      elevation={2}
-                      className="overflow-hidden"
+                      onClick={() => toggleBlock(block.block_id)}
+                      className="cursor-pointer"
                     >
-                      <div
-                        className="p-6 cursor-pointer hover:bg-slate-50/50 transition-colors"
-                        onClick={() => toggleBlock(block.block_id)}
+                      <GlassCard
+                        elevation={2}
+                        className="overflow-hidden"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              {isExpanded ? (
-                                <ChevronDown className="w-5 h-5 text-slate-500" />
-                              ) : (
-                                <ChevronUp className="w-5 h-5 text-slate-500 rotate-180" />
-                              )}
-                              <h3 className="text-lg font-bold text-slate-800">
-                                Block {block.block_order} -{" "}
-                                {formatBlockType(
-                                  block.block_type
-                                ).toUpperCase()}
-                                {setCount > 0 && (
-                                  <> ({setCount} {setCount === 1 ? "set" : "sets"})</>
-                                )}
-                              </h3>
-                            </div>
-                            <p className="text-sm text-gray-600 ml-8">
+                      <div
+                        style={{
+                          padding: "24px 32px",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          {isExpanded ? (
+                            <ChevronDown
+                              style={{
+                                width: "20px",
+                                height: "20px",
+                                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
+                              }}
+                            />
+                          ) : (
+                            <ChevronUp
+                              style={{
+                                width: "20px",
+                                height: "20px",
+                                transform: "rotate(180deg)",
+                                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
+                              }}
+                            />
+                          )}
+                          <div style={{ flex: 1 }}>
+                            <h3
+                              style={{
+                                fontSize: "18px",
+                                fontWeight: 700,
+                                margin: 0,
+                                marginBottom: "8px",
+                                color: isDark ? "#FFFFFF" : "#1A1A1A",
+                              }}
+                            >
+                              Block {block.block_order} - {formatBlockType(block.block_type).toUpperCase()}
+                              {setCount > 0 && ` (${setCount} ${setCount === 1 ? "set" : "sets"})`}
+                            </h3>
+                            <p
+                              style={{
+                                fontSize: "14px",
+                                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                                margin: 0,
+                              }}
+                            >
                               {exerciseNamesDisplay}
                             </p>
                           </div>
                         </div>
                       </div>
                       {isExpanded && (
-                        <div className="px-6 pb-6 pt-0 border-t border-slate-200">
-                          <div className="mt-4 space-y-2">
+                        <div
+                          style={{
+                            padding: "0 32px 24px 32px",
+                            borderTop: `1px solid ${
+                              isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+                            }`,
+                            marginTop: "0",
+                          }}
+                        >
+                          <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
                             {block.sets.length === 0 ? (
-                              // Display template exercise data when no sets are logged
                               renderTemplateExercises(block, block.exerciseNames)
                             ) : (
                               block.sets
                                 .sort((a, b) => {
-                                  // Sort by set_number first, then by completed_at
                                   if (a.set_number && b.set_number) {
                                     return a.set_number - b.set_number;
                                   }
@@ -1281,13 +1659,14 @@ export default function WorkoutComplete() {
                                 .map((set, setIndex) => (
                                   <div
                                     key={set.id}
-                                    className="pl-4 border-l-2 border-slate-200"
+                                    style={{
+                                      paddingLeft: "16px",
+                                      borderLeft: `2px solid ${
+                                        isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+                                      }`,
+                                    }}
                                   >
-                                    {renderSetDisplay(
-                                      set,
-                                      block.block_type,
-                                      block.exerciseNames
-                                    )}
+                                    {renderSetDisplay(set, block.block_type, block.exerciseNames)}
                                   </div>
                                 ))
                             )}
@@ -1295,48 +1674,121 @@ export default function WorkoutComplete() {
                         </div>
                       )}
                     </GlassCard>
+                    </div>
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )}
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
-              <Button
-                onClick={() => {
-                  const logId = workoutLogIdForSummary;
-                  if (logId) {
-                    router.push(`/client/progress/workout-logs/${logId}`);
-                  } else {
-                    router.push("/client/progress");
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto",
+                gap: "16px",
+                marginTop: "16px",
+              }}
+            >
+              <button
+                onClick={markWorkoutComplete}
+                disabled={completing}
+                style={{
+                  padding: "20px 40px",
+                  borderRadius: "16px",
+                  fontWeight: 700,
+                  fontSize: "16px",
+                  background: "#FFFFFF",
+                  color: "#050505",
+                  border: "none",
+                  position: "relative",
+                  overflow: "hidden",
+                  cursor: completing ? "not-allowed" : "pointer",
+                  opacity: completing ? 0.6 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "12px",
+                  transition: "all 0.3s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (!completing) {
+                    e.currentTarget.style.transform = "scale(1.02)";
+                    e.currentTarget.style.boxShadow = "0 10px 40px rgba(255, 255, 255, 0.2)";
                   }
                 }}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl h-14 text-lg font-semibold shadow-lg"
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
               >
-                <div className="flex items-center gap-3">
-                  <BarChart3 className="w-6 h-6" />
-                  View Workout Log
-                </div>
-              </Button>
-
-              <Button
-                onClick={markWorkoutComplete}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl h-14 text-lg font-semibold shadow-lg disabled:opacity-50"
-                disabled={completing}
+                {completing ? (
+                  <div
+                    className="animate-spin"
+                    style={{
+                      width: "24px",
+                      height: "24px",
+                      border: "2px solid #050505",
+                      borderTopColor: "transparent",
+                      borderRadius: "50%",
+                    }}
+                  />
+                ) : (
+                  <>
+                    <span
+                      style={{
+                        fontFamily: "monospace",
+                        fontWeight: 700,
+                        letterSpacing: "0.1em",
+                      }}
+                    >
+                      Return to Dashboard
+                    </span>
+                    <Home style={{ width: "18px", height: "18px" }} />
+                  </>
+                )}
+              </button>
+              <button
+                style={{
+                  padding: "20px",
+                  borderRadius: "16px",
+                  background: isDark
+                    ? "rgba(255, 255, 255, 0.03)"
+                    : "rgba(255, 255, 255, 0.4)",
+                  backdropFilter: "blur(10px)",
+                  WebkitBackdropFilter: "blur(10px)",
+                  border: `1px solid ${
+                    isDark ? "rgba(255, 255, 255, 0.125)" : "rgba(255, 255, 255, 0.2)"
+                  }`,
+                  color: isDark ? "#FFFFFF" : "#1A1A1A",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.3s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = isDark
+                    ? "rgba(255, 255, 255, 0.1)"
+                    : "rgba(255, 255, 255, 0.5)";
+                  e.currentTarget.style.borderColor = isDark
+                    ? "rgba(255, 255, 255, 0.3)"
+                    : "rgba(255, 255, 255, 0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = isDark
+                    ? "rgba(255, 255, 255, 0.03)"
+                    : "rgba(255, 255, 255, 0.4)";
+                  e.currentTarget.style.borderColor = isDark
+                    ? "rgba(255, 255, 255, 0.1)"
+                    : "rgba(255, 255, 255, 0.2)";
+                }}
               >
-                <div className="flex items-center gap-3">
-                  {completing ? (
-                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-6 h-6" />
-                  )}
-                  {completing ? "Updating..." : "Back to Dashboard"}
-                </div>
-              </Button>
+                <Share2 style={{ width: "18px", height: "18px" }} />
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { LargeInput } from "../ui/LargeInput";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import {
   BaseBlockExecutorLayout,
@@ -252,7 +253,7 @@ export function StraightSetExecutor({
   // Logging inputs - show only current set
   const loggingInputs = (
     <div className="space-y-4">
-      <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 space-y-4">
+      <GlassCard elevation={1} className="p-4 space-y-4">
         <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
           Set {currentSetNumber} of {totalSets}
         </div>
@@ -273,7 +274,7 @@ export function StraightSetExecutor({
             step="1"
           />
         </div>
-      </div>
+      </GlassCard>
     </div>
   );
 

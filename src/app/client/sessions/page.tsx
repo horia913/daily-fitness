@@ -5,7 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { ClientTypeGuard } from '@/components/guards/ClientTypeGuard'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -732,68 +732,60 @@ export default function ClientSessions() {
 
             {/* Session Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                      <CheckCircle className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Completed</p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.completed}</p>
-                    </div>
+              <GlassCard elevation={1} className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                    <CheckCircle className="w-6 h-6 text-white" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Completed</p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.completed}</p>
+                  </div>
+                </div>
+              </GlassCard>
 
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                      <Clock className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Scheduled</p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.scheduled}</p>
-                    </div>
+              <GlassCard elevation={1} className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                    <Clock className="w-6 h-6 text-white" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Scheduled</p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.scheduled}</p>
+                  </div>
+                </div>
+              </GlassCard>
 
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
-                      <Star className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Avg Rating</p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-                        {stats.avgRating > 0 ? stats.avgRating.toFixed(1) : 'N/A'}
-                      </p>
-                    </div>
+              <GlassCard elevation={1} className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
+                    <Star className="w-6 h-6 text-white" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Avg Rating</p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+                      {stats.avgRating > 0 ? stats.avgRating.toFixed(1) : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </GlassCard>
 
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                      <Trophy className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Total</p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.total}</p>
-                    </div>
+              <GlassCard elevation={1} className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <Trophy className="w-6 h-6 text-white" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Total</p>
+                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.total}</p>
+                  </div>
+                </div>
+              </GlassCard>
             </div>
 
             {/* Filters and Sorting */}
-            <Card className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg border-0">
-              <CardContent className="p-0">
+            <GlassCard elevation={1} className="p-4">
+              <div className="p-0">
                 <div className="flex flex-col lg:flex-row gap-4">
                   <div className="flex-1">
                     <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Status Filter</label>
@@ -823,14 +815,14 @@ export default function ClientSessions() {
                     </select>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
             {/* Sessions List */}
             <div className="space-y-4 pb-24">
               {filteredAndSortedSessions().map((session) => (
-                <Card key={session.id} className={`bg-gradient-to-r ${getSessionGradient(session)} rounded-2xl p-6 shadow-lg border-0 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]`}>
-                  <CardContent className="p-0">
+                <GlassCard key={session.id} elevation={2} className={`bg-gradient-to-r ${getSessionGradient(session)} rounded-2xl p-6 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]`}>
+                  <div className="p-0">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                       {/* Left Section - Icon and Info */}
                       <div className="flex items-start gap-4 flex-1">
@@ -916,13 +908,13 @@ export default function ClientSessions() {
                         </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </GlassCard>
               ))}
 
               {filteredAndSortedSessions().length === 0 && (
-                <Card className="bg-white dark:bg-slate-800 rounded-2xl p-12 shadow-lg border-0">
-                  <CardContent className="text-center">
+                <GlassCard elevation={2} className="p-12">
+                  <div className="text-center">
                     <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-3xl flex items-center justify-center mx-auto mb-6">
                       <Calendar className="w-12 h-12 text-slate-400" />
                     </div>
@@ -957,8 +949,8 @@ export default function ClientSessions() {
                         View All Sessions
                       </Button>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </GlassCard>
               )}
             </div>
           </div>

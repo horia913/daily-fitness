@@ -9,7 +9,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -396,6 +396,13 @@ export default function CoachMealsPage() {
         notes: assignmentForm.notes || null,
       });
 
+      // Enforce single active meal plan: Deactivate existing active meal plans for this client
+      await supabase
+        .from("meal_plan_assignments")
+        .update({ is_active: false })
+        .eq("client_id", assignmentForm.client_id)
+        .eq("is_active", true);
+
       // Try meal_plan_assignments first, then assigned_meal_plans
       let { data, error } = await supabase
         .from("meal_plan_assignments")
@@ -406,6 +413,7 @@ export default function CoachMealsPage() {
           start_date: assignmentForm.start_date,
           end_date: assignmentForm.end_date || null,
           notes: assignmentForm.notes || null,
+          is_active: true, // Explicitly set to active
         })
         .select();
 
@@ -709,16 +717,14 @@ export default function CoachMealsPage() {
             <TabsContent value="meal-plans" className="space-y-6">
               {selectedMealPlan ? (
                 <div className="space-y-4">
-                  <Card className={`${theme.card} ${theme.shadow} rounded-2xl`}>
-                    <CardHeader>
+                  <GlassCard elevation={2}>
+                    <div className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle
-                            className={`flex items-center gap-2 ${theme.text}`}
-                          >
+                          <h2 className={`flex items-center gap-2 text-xl font-bold ${theme.text}`}>
                             <ChefHat className="h-5 w-5" />
                             Building: {selectedMealPlan.name}
-                          </CardTitle>
+                          </h2>
                           <p className={`${theme.textSecondary}`}>
                             Create detailed meals with specific foods and macro
                             calculations
@@ -732,8 +738,8 @@ export default function CoachMealsPage() {
                           Back to Meal Plans
                         </Button>
                       </div>
-                    </CardHeader>
-                  </Card>
+                    </div>
+                  </GlassCard>
 
                   <MealPlanBuilder
                     mealPlanId={selectedMealPlan.id}
@@ -769,11 +775,12 @@ export default function CoachMealsPage() {
                     {filteredMealPlans.map((mealPlan) => {
                       const difficulty = getMealPlanDifficulty(mealPlan);
                       return (
-                        <Card
+                        <GlassCard
                           key={mealPlan.id}
-                          className={`${theme.card} ${theme.shadow} hover:scale-105 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group`}
+                          elevation={2}
+                          className="overflow-hidden group cursor-pointer hover:scale-105 transition-all duration-300"
                         >
-                          <CardHeader className="pb-4">
+                          <div className="p-6">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-3">
@@ -783,11 +790,11 @@ export default function CoachMealsPage() {
                                     <ChefHat className="w-5 h-5 text-white" />
                                   </div>
                                   <div className="flex-1">
-                                    <CardTitle
+                                    <h3
                                       className={`text-xl font-bold ${theme.text} group-hover:text-purple-600 transition-colors`}
                                     >
                                       {mealPlan.name}
-                                    </CardTitle>
+                                    </h3>
                                     <div
                                       className={`${theme.textSecondary} text-sm mt-1`}
                                     >
@@ -878,9 +885,9 @@ export default function CoachMealsPage() {
                                 </Button>
                               </div>
                             </div>
-                          </CardHeader>
+                          </div>
 
-                          <CardContent className="pt-0">
+                          <div className="px-6 pb-6 pt-0">
                             <div className="flex gap-2">
                               <Button
                                 variant="outline"
@@ -912,17 +919,15 @@ export default function CoachMealsPage() {
                                 <Trash className="w-4 h-4" />
                               </Button>
                             </div>
-                          </CardContent>
-                        </Card>
+                          </div>
+                        </GlassCard>
                       );
                     })}
                   </div>
 
                   {filteredMealPlans.length === 0 && (
-                    <Card
-                      className={`${theme.card} ${theme.shadow} rounded-2xl`}
-                    >
-                      <CardContent className="p-12 text-center">
+                    <GlassCard elevation={2}>
+                      <div className="p-12 text-center">
                         <div
                           className={`p-6 rounded-2xl ${theme.gradient} ${theme.shadow} w-24 h-24 mx-auto mb-6 flex items-center justify-center`}
                         >
@@ -948,8 +953,8 @@ export default function CoachMealsPage() {
                           Create Meal Plan
                           <ArrowRight className="w-5 h-5 ml-2" />
                         </Button>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </GlassCard>
                   )}
                 </div>
               )}
@@ -980,11 +985,12 @@ export default function CoachMealsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredFoods.map((food) => (
-                  <Card
+                  <GlassCard
                     key={food.id}
-                    className={`${theme.card} ${theme.shadow} hover:scale-105 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group`}
+                    elevation={2}
+                    className="hover:scale-105 hover:shadow-2xl transition-all duration-300 overflow-hidden group"
                   >
-                    <CardHeader className="pb-4">
+                    <div className="pb-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
@@ -994,11 +1000,11 @@ export default function CoachMealsPage() {
                               <Utensils className="w-5 h-5 text-white" />
                             </div>
                             <div className="flex-1">
-                              <CardTitle
+                              <h3
                                 className={`text-lg font-bold ${theme.text} group-hover:text-green-600 transition-colors`}
                               >
                                 {food.name}
-                              </CardTitle>
+                              </h3>
                               <div
                                 className={`${theme.textSecondary} text-sm mt-1`}
                               >
@@ -1038,14 +1044,14 @@ export default function CoachMealsPage() {
                           </div>
                         </div>
                       </div>
-                    </CardHeader>
-                  </Card>
+                    </div>
+                  </GlassCard>
                 ))}
               </div>
 
               {filteredFoods.length === 0 && (
-                <Card className={`${theme.card} ${theme.shadow} rounded-2xl`}>
-                  <CardContent className="p-12 text-center">
+                <GlassCard elevation={2}>
+                  <div className="p-12 text-center">
                     <div
                       className={`p-6 rounded-2xl bg-gradient-to-r from-green-500 to-green-600 ${theme.shadow} w-24 h-24 mx-auto mb-6 flex items-center justify-center`}
                     >
@@ -1071,8 +1077,8 @@ export default function CoachMealsPage() {
                       Add Food
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </Button>
-                  </CardContent>
-                </Card>
+                  </div>
+                </GlassCard>
               )}
             </TabsContent>
 
@@ -1101,11 +1107,12 @@ export default function CoachMealsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {assignments.map((assignment) => (
-                  <Card
+                  <GlassCard
                     key={assignment.id}
-                    className={`${theme.card} ${theme.shadow} hover:scale-105 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group`}
+                    elevation={2}
+                    className="hover:scale-105 hover:shadow-2xl transition-all duration-300 overflow-hidden group"
                   >
-                    <CardHeader className="pb-4">
+                    <div className="pb-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
@@ -1115,12 +1122,12 @@ export default function CoachMealsPage() {
                               <Users className="w-5 h-5 text-white" />
                             </div>
                             <div className="flex-1">
-                              <CardTitle
+                              <h3
                                 className={`text-lg font-bold ${theme.text} group-hover:text-blue-600 transition-colors`}
                               >
                                 {assignment.client?.first_name || "Client"}{" "}
                                 {assignment.client?.last_name || "User"}
-                              </CardTitle>
+                              </h3>
                               <div
                                 className={`${theme.textSecondary} text-sm mt-1`}
                               >
@@ -1165,9 +1172,9 @@ export default function CoachMealsPage() {
                           </Button>
                         </div>
                       </div>
-                    </CardHeader>
+                    </div>
 
-                    <CardContent className="pt-0">
+                    <div className="pt-0">
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
@@ -1186,14 +1193,14 @@ export default function CoachMealsPage() {
                           <Trash className="w-4 h-4" />
                         </Button>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </GlassCard>
                 ))}
               </div>
 
               {assignments.length === 0 && (
-                <Card className={`${theme.card} ${theme.shadow} rounded-2xl`}>
-                  <CardContent className="p-12 text-center">
+                <GlassCard elevation={2}>
+                  <div className="p-12 text-center">
                     <div
                       className={`p-6 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 ${theme.shadow} w-24 h-24 mx-auto mb-6 flex items-center justify-center`}
                     >
@@ -1216,8 +1223,8 @@ export default function CoachMealsPage() {
                       Assign Meal Plan
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </Button>
-                  </CardContent>
-                </Card>
+                  </div>
+                </GlassCard>
               )}
             </TabsContent>
           </Tabs>
@@ -1225,18 +1232,19 @@ export default function CoachMealsPage() {
           {/* Add Food Modal */}
           {showAddFood && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <Card
-                className={`w-full max-w-md max-h-[90vh] overflow-y-auto ${theme.card} ${theme.shadow} rounded-2xl`}
+              <GlassCard
+                elevation={3}
+                className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl"
               >
-                <CardHeader>
-                  <CardTitle className={`${theme.text}`}>
+                <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+                  <h2 className={`text-xl font-bold ${theme.text}`}>
                     Add New Food
-                  </CardTitle>
+                  </h2>
                   <p className={`${theme.textSecondary}`}>
                     Add a new food item to your database
                   </p>
-                </CardHeader>
-                <CardContent>
+                </div>
+                <div className="p-6">
                   <form onSubmit={handleAddFood} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="name" className={`${theme.text}`}>
@@ -1440,26 +1448,27 @@ export default function CoachMealsPage() {
                       </Button>
                     </div>
                   </form>
-                </CardContent>
-              </Card>
+                </div>
+              </GlassCard>
             </div>
           )}
 
           {/* Add Meal Plan Modal */}
           {showAddMealPlan && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <Card
-                className={`w-full max-w-md ${theme.card} ${theme.shadow} rounded-2xl`}
+              <GlassCard
+                elevation={3}
+                className="w-full max-w-md rounded-2xl"
               >
-                <CardHeader>
-                  <CardTitle className={`${theme.text}`}>
+                <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+                  <h2 className={`text-xl font-bold ${theme.text}`}>
                     Create Meal Plan
-                  </CardTitle>
+                  </h2>
                   <p className={`${theme.textSecondary}`}>
                     Create a new meal plan
                   </p>
-                </CardHeader>
-                <CardContent>
+                </div>
+                <div className="p-6">
                   <form onSubmit={handleAddMealPlan} className="space-y-4">
                     <div className="space-y-2">
                       <Label
@@ -1538,16 +1547,17 @@ export default function CoachMealsPage() {
                       </Button>
                     </div>
                   </form>
-                </CardContent>
-              </Card>
+                </div>
+              </GlassCard>
             </div>
           )}
 
           {/* Meal Plan Assignment Modal */}
           {showAssignMealPlan && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div
-                className={`${theme.card} ${theme.shadow} rounded-2xl p-6 w-full max-w-md mx-4`}
+              <GlassCard
+                elevation={3}
+                className="w-full max-w-md mx-4 p-6 rounded-2xl"
               >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className={`text-xl font-semibold ${theme.text}`}>
@@ -1712,7 +1722,7 @@ export default function CoachMealsPage() {
                     </Button>
                   </div>
                 </form>
-              </div>
+              </GlassCard>
             </div>
           )}
         </div>

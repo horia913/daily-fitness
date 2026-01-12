@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 import WorkoutBlockBuilder from "@/components/coach/WorkoutBlockBuilder";
 import { WorkoutBlock } from "@/types/workoutBlocks";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
@@ -96,6 +97,7 @@ export default function WorkoutTemplateForm({
 }: WorkoutTemplateFormProps) {
   const { isDark, getThemeStyles } = useTheme();
   const theme = getThemeStyles();
+  const { user } = useAuth();
 
   // Helper function to handle number input changes properly
   const handleNumberChange = (value: string, defaultValue: number = 0) => {
@@ -515,13 +517,44 @@ export default function WorkoutTemplateForm({
   }, [isOpen, categories]);
   const loadCategories = useCallback(async () => {
     try {
+      if (!user?.id) {
+        console.log("No user found, using fallback categories");
+        // Fallback minimal categories to keep UI functional
+        setCategories([
+          { id: "general", name: "General", color: "#6B7280" },
+          { id: "strength", name: "Strength", color: "#EF4444" },
+          { id: "cardio", name: "Cardio", color: "#10B981" },
+          { id: "hiit", name: "HIIT", color: "#F59E0B" },
+          { id: "flexibility", name: "Flexibility", color: "#3B82F6" },
+          { id: "functional", name: "Functional", color: "#8B5CF6" },
+        ]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("workout_categories")
         .select("id,name,color")
+        .eq("coach_id", user.id)
+        .eq("is_active", true)
         .order("name", { ascending: true });
 
       if (error) throw error;
-      setCategories(data || []);
+      
+      // If we have categories from database, use them
+      if (data && data.length > 0) {
+        setCategories(data);
+      } else {
+        // If no categories exist, use fallback categories
+        console.log("No categories found for coach, using fallback categories");
+        setCategories([
+          { id: "general", name: "General", color: "#6B7280" },
+          { id: "strength", name: "Strength", color: "#EF4444" },
+          { id: "cardio", name: "Cardio", color: "#10B981" },
+          { id: "hiit", name: "HIIT", color: "#F59E0B" },
+          { id: "flexibility", name: "Flexibility", color: "#3B82F6" },
+          { id: "functional", name: "Functional", color: "#8B5CF6" },
+        ]);
+      }
     } catch (error) {
       console.error("Error loading categories:", error);
       // Fallback minimal categories to keep UI functional
@@ -534,7 +567,7 @@ export default function WorkoutTemplateForm({
         { id: "functional", name: "Functional", color: "#8B5CF6" },
       ]);
     }
-  }, []);
+  }, [user]);
 
   const loadAvailableExercises = useCallback(async () => {
     try {
@@ -2572,23 +2605,29 @@ export default function WorkoutTemplateForm({
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem
-                          key={cat.id}
-                          value={cat.id}
-                          className="rounded-lg"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{
-                                backgroundColor: cat.color || "#6B7280",
-                              }}
-                            />
-                            {cat.name || "Category"}
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {categories.length > 0 ? (
+                        categories.map((cat) => (
+                          <SelectItem
+                            key={cat.id}
+                            value={cat.id}
+                            className="rounded-lg"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: cat.color || "#6B7280",
+                                }}
+                              />
+                              {cat.name || "Category"}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-slate-500">
+                          No categories available. Create categories in the Categories page.
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                 </CardContent>

@@ -11,7 +11,8 @@ import { AchievementCard } from "@/components/ui/AchievementCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Award, Filter } from "lucide-react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { AchievementService } from "@/lib/achievementService";
+import type { AchievementProgress } from "@/lib/achievementService";
 
 interface Achievement {
   id: string;
@@ -29,84 +30,7 @@ function AchievementsPageContent() {
   const { user } = useAuth();
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
 
-  const [achievements, setAchievements] = useState<Achievement[]>([
-    {
-      id: "1",
-      name: "First Steps",
-      description: "Complete your first workout",
-      icon: "🎯",
-      rarity: "common",
-      unlocked: true,
-      unlockedAt: new Date("2024-01-15"),
-    },
-    {
-      id: "2",
-      name: "Week Warrior",
-      description: "Complete 5 workouts in one week",
-      icon: "💪",
-      rarity: "rare",
-      unlocked: true,
-      unlockedAt: new Date("2024-01-22"),
-    },
-    {
-      id: "3",
-      name: "Streak Master",
-      description: "Maintain a 30-day workout streak",
-      icon: "🔥",
-      rarity: "epic",
-      unlocked: false,
-      progress: 40, // 12/30 = 40%
-      requirement: "Complete 30 consecutive days of workouts",
-    },
-    {
-      id: "4",
-      name: "Iron Will",
-      description: "Complete 100 total workouts",
-      icon: "🏋️",
-      rarity: "epic",
-      unlocked: false,
-      progress: 87, // 87/100 = 87%
-      requirement: "Complete 100 workouts",
-    },
-    {
-      id: "5",
-      name: "Early Bird",
-      description: "Complete 10 workouts before 7am",
-      icon: "🌅",
-      rarity: "rare",
-      unlocked: false,
-      progress: 30, // 3/10 = 30%
-      requirement: "Complete 10 morning workouts",
-    },
-    {
-      id: "6",
-      name: "Legendary Athlete",
-      description: "Reach #1 on the leaderboard",
-      icon: "👑",
-      rarity: "legendary",
-      unlocked: false,
-      requirement: "Reach the top of the leaderboard",
-    },
-    {
-      id: "7",
-      name: "PR Hunter",
-      description: "Set 20 personal records",
-      icon: "🎖️",
-      rarity: "epic",
-      unlocked: false,
-      progress: 40, // 8/20 = 40%
-      requirement: "Set 20 new personal records",
-    },
-    {
-      id: "8",
-      name: "Consistency King",
-      description: "Complete your weekly goal for 4 weeks straight",
-      icon: "⭐",
-      rarity: "rare",
-      unlocked: true,
-      unlockedAt: new Date("2024-02-10"),
-    },
-  ]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [filterRarity, setFilterRarity] = useState<
@@ -124,12 +48,78 @@ function AchievementsPageContent() {
     if (!user) return;
 
     try {
-      // TODO: Replace with actual Supabase queries
-      // Simulating data fetch
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setLoading(false);
+      setLoading(true);
+      
+      // Get achievement progress (templates with progress)
+      const achievementProgress = await AchievementService.getAchievementProgress(user.id);
+      
+      // Map to UI format
+      const mappedAchievements: Achievement[] = achievementProgress.map((progress: AchievementProgress) => {
+        const { template, currentValue, progress: progressPercent, unlockedTiers, status, nextTier } = progress;
+        
+        // Map category to rarity
+        const rarityMap: Record<string, "common" | "uncommon" | "rare" | "epic" | "legendary"> = {
+          'milestone': 'common',
+          'activity': 'uncommon',
+          'performance': 'rare',
+          'volume': 'epic',
+          'strength': 'legendary'
+        };
+        const rarity = rarityMap[template.category] || 'common';
+        
+        // Get icon from template or use default
+        const icon = template.icon || '🏆';
+        
+        // Determine if unlocked (all tiers unlocked for tiered, or single threshold met for non-tiered)
+        const unlocked = status === 'unlocked';
+        
+        // Build description with progress info
+        let description = template.description || '';
+        if (template.is_tiered && nextTier) {
+          description += ` (Next: ${nextTier.label} at ${nextTier.threshold})`;
+        } else if (!template.is_tiered && template.single_threshold) {
+          description += ` (Target: ${template.single_threshold})`;
+        }
+        
+        // Build requirement text
+        let requirement: string | undefined;
+        if (template.is_tiered) {
+          const tiers = [
+            { name: 'bronze', threshold: template.tier_bronze_threshold, label: template.tier_bronze_label },
+            { name: 'silver', threshold: template.tier_silver_threshold, label: template.tier_silver_label },
+            { name: 'gold', threshold: template.tier_gold_threshold, label: template.tier_gold_label },
+            { name: 'platinum', threshold: template.tier_platinum_threshold, label: template.tier_platinum_label }
+          ].filter(t => t.threshold !== null && t.threshold !== undefined);
+          
+          if (unlockedTiers.length > 0) {
+            requirement = `Unlocked: ${unlockedTiers.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')}`;
+          } else if (nextTier) {
+            requirement = `${currentValue}/${nextTier.threshold} for ${nextTier.label}`;
+          } else {
+            requirement = `${currentValue}/${tiers[tiers.length - 1]?.threshold || 0}`;
+          }
+        } else {
+          requirement = `${currentValue}/${template.single_threshold || 0}`;
+        }
+        
+        return {
+          id: template.id,
+          name: template.name,
+          description: description,
+          icon: icon,
+          rarity: rarity,
+          unlocked: unlocked,
+          progress: status === 'locked' ? undefined : progressPercent, // Locked achievements have undefined progress
+          requirement: requirement,
+          unlockedAt: undefined // We don't track unlock date per template, only per tier
+        };
+      });
+      
+      setAchievements(mappedAchievements);
     } catch (error) {
       console.error("Error loading achievements data:", error);
+      setAchievements([]); // Return empty array on error, no fallback data
+    } finally {
       setLoading(false);
     }
   };

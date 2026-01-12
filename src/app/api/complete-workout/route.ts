@@ -199,6 +199,20 @@ export async function POST(req: NextRequest) {
       // Don't fail the request, just log error
     }
 
+    // Check and unlock achievements (non-blocking)
+    try {
+      const { AchievementService } = await import('@/lib/achievementService')
+      
+      // Check workout_count achievements
+      await AchievementService.checkAndUnlockAchievements(client_id, 'workout_count')
+      
+      // Check streak_weeks achievements (streak may have changed after completing this workout)
+      await AchievementService.checkAndUnlockAchievements(client_id, 'streak_weeks')
+    } catch (achievementError) {
+      console.error('Failed to check/unlock achievements (non-blocking):', achievementError)
+      // Don't fail the request, just log error
+    }
+
     return NextResponse.json({
       success: true,
       workout_log: updatedLog,

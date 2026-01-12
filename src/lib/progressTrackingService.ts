@@ -436,6 +436,16 @@ export class PersonalRecordsService {
         .single()
 
       if (error) throw error
+
+      // Check and unlock achievements (non-blocking)
+      try {
+        const { AchievementService } = await import('./achievementService')
+        await AchievementService.checkAndUnlockAchievements(clientId, 'pr_count')
+      } catch (achievementError) {
+        console.error('Failed to check/unlock achievements (non-blocking):', achievementError)
+        // Don't fail the request, just log error
+      }
+
       return data
     } catch (error) {
       console.error('Error upserting personal record:', error)

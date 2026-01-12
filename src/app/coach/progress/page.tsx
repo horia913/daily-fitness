@@ -59,6 +59,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { DatabaseService } from '@/lib/database'
+import { getStreak } from '@/lib/programService'
 
 interface ClientProgress {
   id: string
@@ -121,71 +123,101 @@ export default function CoachProgress() {
     
     setLoading(true)
     try {
-      // Load client profiles first
-      const { data: clientsData, error: clientsError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('role', 'client')
+      // Load coach's clients (not all clients)
+      const coachClients = await DatabaseService.getClients(user.id)
+      
+      if (!coachClients || coachClients.length === 0) {
+        setClientProgress([])
+        setWorkoutStats({
+          totalSessions: 0,
+          completedSessions: 0,
+          thisWeek: 0,
+          thisMonth: 0,
+          averageCompletionRate: 0
+        })
+        return
+      }
 
-      if (clientsError) throw clientsError
-
-      // Then load workout sessions separately for each client
+      // Process each client
       const processedClients: ClientProgress[] = []
       
-      for (const client of clientsData || []) {
-        const { data: sessionsData } = await supabase
-          .from('workout_sessions')
-          .select('id, status, completed_at, assigned_at')
-          .eq('client_id', client.id)
-          .eq('status', 'completed')
+      for (const clientRelationship of coachClients) {
+        const clientId = clientRelationship.client_id
+        const profile = clientRelationship.profiles
+        
+        if (!profile) continue
+        
+        // Load workout_logs (not workout_sessions) for this client
+        const { data: workoutLogs, error: logsError } = await supabase
+          .from('workout_logs')
+          .select('completed_at')
+          .eq('client_id', clientId)
+          .not('completed_at', 'is', null)
+          .order('completed_at', { ascending: false })
 
-        const completedSessions = sessionsData || []
-        
-        // Calculate this week's sessions
+        if (logsError) {
+          console.error(`Error fetching workout logs for client ${clientId}:`, logsError)
+          continue
+        }
+
+        const completedWorkouts = workoutLogs || []
         const now = new Date()
-        const weekStart = new Date(now.setDate(now.getDate() - now.getDay()))
-        const thisWeekSessions = completedSessions.filter(s => 
-          new Date(s.completed_at) >= weekStart
+        
+        // Calculate this week's workouts
+        const weekStart = new Date(now)
+        weekStart.setDate(now.getDate() - now.getDay())
+        weekStart.setHours(0, 0, 0, 0)
+        const thisWeekWorkouts = completedWorkouts.filter(log => 
+          log.completed_at && new Date(log.completed_at) >= weekStart
         )
         
-        // Calculate this month's sessions
+        // Calculate this month's workouts
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-        const thisMonthSessions = completedSessions.filter(s => 
-          new Date(s.completed_at) >= monthStart
+        const thisMonthWorkouts = completedWorkouts.filter(log => 
+          log.completed_at && new Date(log.completed_at) >= monthStart
         )
         
-        // Calculate streak
-        const sortedSessions = completedSessions.sort((a, b) => 
-          new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
-        )
+        // Calculate streak using program_day_assignments (complete weeks)
+        const streak = await getStreak(clientId)
         
-        let currentStreak = 0
-        let currentDate = new Date()
+        // Calculate completion rate - get assigned workouts count
+        const { count: assignedCount } = await supabase
+          .from('workout_assignments')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
         
-        for (const session of sortedSessions) {
-          const sessionDate = new Date(session.completed_at)
-          const daysDiff = Math.floor((currentDate.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24))
-          
-          if (daysDiff <= 1) {
-            currentStreak++
-            currentDate = sessionDate
-          } else {
-            break
-          }
+        const completionRate = assignedCount && assignedCount > 0
+          ? Math.round((completedWorkouts.length / assignedCount) * 100)
+          : 0
+        
+        // Calculate adherence - use active program weekly goal
+        const { data: activeProgram } = await supabase
+          .from('program_assignments')
+          .select('total_days, duration_weeks')
+          .eq('client_id', clientId)
+          .eq('status', 'active')
+          .maybeSingle()
+        
+        let adherence = 0
+        if (activeProgram && activeProgram.total_days > 0 && activeProgram.duration_weeks > 0) {
+          const weeklyGoal = activeProgram.total_days / activeProgram.duration_weeks
+          const expectedThisMonth = weeklyGoal * 4 // Approximate weeks in month
+          adherence = expectedThisMonth > 0
+            ? Math.min(100, Math.round((thisMonthWorkouts.length / expectedThisMonth) * 100))
+            : 0
         }
         
-        const completionRate = 85 // Default completion rate since we don't have total assigned
-        const adherence = Math.min(100, Math.round((thisMonthSessions.length / 20) * 100)) // Assuming 20 workouts/month goal
+        const lastWorkout = completedWorkouts[0]?.completed_at || ''
         
         processedClients.push({
-          id: client.id,
-          name: `${client.first_name} ${client.last_name}`,
-          totalWorkouts: completedSessions.length,
-          thisWeek: thisWeekSessions.length,
-          thisMonth: thisMonthSessions.length,
-          streak: currentStreak,
+          id: clientId,
+          name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown',
+          totalWorkouts: completedWorkouts.length,
+          thisWeek: thisWeekWorkouts.length,
+          thisMonth: thisMonthWorkouts.length,
+          streak,
           completionRate,
-          lastWorkout: sortedSessions[0]?.completed_at || '',
+          lastWorkout,
           adherence
         })
       }
@@ -211,49 +243,14 @@ export default function CoachProgress() {
     } catch (error) {
       console.error('Error loading progress data:', error)
       
-      // Set fallback data
-      setClientProgress([
-        {
-          id: '1',
-          name: 'Jane Doe',
-          totalWorkouts: 24,
-          thisWeek: 3,
-          thisMonth: 8,
-          streak: 5,
-          completionRate: 85,
-          lastWorkout: new Date().toISOString(),
-          adherence: 75
-        },
-        {
-          id: '2',
-          name: 'John Smith',
-          totalWorkouts: 18,
-          thisWeek: 2,
-          thisMonth: 6,
-          streak: 3,
-          completionRate: 78,
-          lastWorkout: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          adherence: 65
-        },
-        {
-          id: '3',
-          name: 'Sarah Wilson',
-          totalWorkouts: 31,
-          thisWeek: 4,
-          thisMonth: 12,
-          streak: 7,
-          completionRate: 92,
-          lastWorkout: new Date().toISOString(),
-          adherence: 88
-        }
-      ])
-      
+      // Return empty arrays on error - no fallback mock data
+      setClientProgress([])
       setWorkoutStats({
-        totalSessions: 73,
-        completedSessions: 73,
-        thisWeek: 9,
-        thisMonth: 26,
-        averageCompletionRate: 85
+        totalSessions: 0,
+        completedSessions: 0,
+        thisWeek: 0,
+        thisMonth: 0,
+        averageCompletionRate: 0
       })
     } finally {
       setLoading(false)
@@ -938,7 +935,9 @@ export default function CoachProgress() {
                               variant="outline"
                               size="sm"
                               className="flex-1 rounded-xl"
-                              onClick={() => {/* TODO: Schedule check-ins */}}
+                              onClick={() => {
+                                alert('Schedule Check-ins feature coming soon! This will allow you to schedule check-in sessions with clients.')
+                              }}
                             >
                               <Calendar className="w-4 h-4 mr-2" />
                               Schedule Check-ins
@@ -1075,7 +1074,9 @@ export default function CoachProgress() {
                             <Button
                               variant="outline"
                               className="w-full rounded-xl py-3"
-                              onClick={() => {/* TODO: Schedule group check-in */}}
+                              onClick={() => {
+                                alert('Schedule Group Check-in feature coming soon! This will allow you to schedule group check-in sessions with multiple clients.')
+                              }}
                             >
                               <Calendar className="w-4 h-4 mr-2" />
                               Schedule Group Check-in
@@ -1083,7 +1084,9 @@ export default function CoachProgress() {
                             <Button
                               variant="outline"
                               className="w-full rounded-xl py-3"
-                              onClick={() => {/* TODO: Generate progress report */}}
+                              onClick={() => {
+                                alert('Generate Progress Report feature coming soon! This will generate a comprehensive progress report for your clients.')
+                              }}
                             >
                               <BarChart3 className="w-4 h-4 mr-2" />
                               Generate Progress Report
@@ -1500,7 +1503,9 @@ export default function CoachProgress() {
                                   <Button
                                     variant="outline"
                                     className="rounded-xl h-12"
-                                    onClick={() => {/* TODO: Export data */}}
+                                    onClick={() => {
+                                      alert('Export Data feature coming soon! This will export client progress data in CSV or Excel format.')
+                                    }}
                                   >
                                     <Download className="w-4 h-4 mr-2" />
                                     Export

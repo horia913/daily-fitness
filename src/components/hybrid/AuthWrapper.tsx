@@ -135,16 +135,43 @@ export function AuthWrapper() {
 
   // Handle URL parameters for invite links
   useEffect(() => {
-    const inviteParam = searchParams.get("invite");
-    const emailParam = searchParams.get("email");
+    // Read from both searchParams (Next.js) and window.location (fallback)
+    let inviteParam: string | null = null;
+    let emailParam: string | null = null;
+
+    if (searchParams) {
+      inviteParam = searchParams.get("invite");
+      emailParam = searchParams.get("email");
+    }
+
+    // Fallback: read directly from URL if searchParams didn't work
+    if (typeof window !== 'undefined' && (!inviteParam || !emailParam)) {
+      const urlParams = new URLSearchParams(window.location.search);
+      inviteParam = inviteParam || urlParams.get("invite");
+      emailParam = emailParam || urlParams.get("email");
+    }
+
+    console.log('🔍 URL params check:', { inviteParam, emailParam, searchParamsAvailable: !!searchParams });
 
     if (inviteParam) {
-      setInviteCode(inviteParam);
+      const trimmedCode = inviteParam.trim();
+      setInviteCode(trimmedCode);
       setIsLogin(false); // Switch to signup mode
+      console.log('✅ Invite code set from URL:', trimmedCode);
     }
 
     if (emailParam) {
-      setEmail(emailParam);
+      try {
+        // Decode the email in case it's URL encoded
+        const decodedEmail = decodeURIComponent(emailParam).trim();
+        setEmail(decodedEmail);
+        console.log('✅ Email set from URL:', decodedEmail);
+      } catch (error) {
+        // If decoding fails, use the original
+        const trimmedEmail = emailParam.trim();
+        setEmail(trimmedEmail);
+        console.log('✅ Email set from URL (no decode needed):', trimmedEmail);
+      }
     }
   }, [searchParams]);
 
@@ -197,11 +224,6 @@ export function AuthWrapper() {
           setTimeout(() => router.push(redirectPath), 1500);
         }
       } else {
-        // Validate terms acceptance
-        if (!acceptedTerms) {
-          throw new Error("Please accept the Terms & Conditions to continue");
-        }
-
         // Validate coach selection for new signups
         if (!selectedCoachId) {
           throw new Error("Please select a coach");
@@ -276,17 +298,33 @@ export function AuthWrapper() {
             })
             .eq("code", inviteCode.trim());
 
-          // Create client-coach relationship
-          const { error: clientError } = await supabase.from("clients").insert({
-            coach_id: selectedCoachId,
-            client_id: data.user.id,
-            status: "active",
-          });
+          // Create client-coach relationship via API route to bypass RLS
+          try {
+            const clientResponse = await fetch('/api/clients/create', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                coach_id: selectedCoachId,
+                client_id: data.user.id,
+                status: 'active'
+              })
+            })
 
-          if (clientError) {
+            const clientResult = await clientResponse.json()
+
+            if (!clientResponse.ok) {
+              console.error(
+                "Error creating client-coach relationship:",
+                clientResult
+              );
+              // Don't throw error here as the user account was created successfully
+            }
+          } catch (clientApiError) {
             console.error(
-              "Error creating client-coach relationship:",
-              clientError
+              "Error calling client creation API:",
+              clientApiError
             );
             // Don't throw error here as the user account was created successfully
           }
@@ -607,37 +645,6 @@ export function AuthWrapper() {
             )}
           </div>
 
-          {/* Terms & Conditions Checkbox */}
-          {!isLogin && (
-            <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <input
-                type="checkbox"
-                id="terms"
-                checked={acceptedTerms}
-                onChange={(e) => setAcceptedTerms(e.target.checked)}
-                className="mt-1 w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-              />
-              <label
-                htmlFor="terms"
-                className="text-sm text-slate-700 leading-relaxed"
-              >
-                I agree to the{" "}
-                <a
-                  href="#"
-                  className="text-blue-600 hover:text-blue-700 font-medium underline"
-                >
-                  Terms & Conditions
-                </a>{" "}
-                and{" "}
-                <a
-                  href="#"
-                  className="text-blue-600 hover:text-blue-700 font-medium underline"
-                >
-                  Privacy Policy
-                </a>
-              </label>
-            </div>
-          )}
 
           <Button
             type="submit"
@@ -675,61 +682,6 @@ export function AuthWrapper() {
           </div>
         )}
 
-        {/* Social Login Options */}
-        <div className="mt-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-slate-500">
-                Or continue with
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-12 rounded-xl border-slate-200 hover:bg-slate-50"
-            >
-              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              Google
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-12 rounded-xl border-slate-200 hover:bg-slate-50"
-            >
-              <svg
-                className="w-5 h-5 mr-2"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" />
-              </svg>
-              Apple
-            </Button>
-          </div>
-        </div>
 
         {/* Security Assurance */}
         <div className="mt-6 pt-6 border-t border-slate-200">

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 export interface BlockDetail {
   label: string;
@@ -31,10 +32,7 @@ export function BlockDetailsGrid({
   return (
     <div className={`grid ${gridCols} gap-4`}>
       {validDetails.map((detail, index) => (
-        <div
-          key={index}
-          className="rounded-lg bg-slate-50 dark:bg-slate-800 p-4 text-center border border-slate-200 dark:border-slate-700"
-        >
+        <GlassCard key={index} elevation={1} className="p-4 text-center">
           <div className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wide mb-1">
             {detail.label}
           </div>
@@ -46,7 +44,7 @@ export function BlockDetailsGrid({
               </span>
             )}
           </div>
-        </div>
+        </GlassCard>
       ))}
     </div>
   );

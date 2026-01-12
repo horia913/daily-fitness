@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { BlockDetailsGrid, BlockDetail } from "./ui/BlockDetailsGrid";
 import { ProgressIndicator } from "./ui/ProgressIndicator";
 import { InstructionsBox } from "./ui/InstructionsBox";
@@ -88,71 +88,69 @@ export function BaseBlockExecutorLayout({
   };
 
   return (
-    <Card className={`${theme.card} border ${theme.border} shadow-lg`}>
-      <CardHeader>
-        <div className="flex items-center justify-between mb-4">
-          <BlockTypeBadge
-            blockType={block.block.block_type}
-            blockName={block.block.block_name}
-          />
-          <div className="text-right">
-            <div className="text-xs text-slate-500 dark:text-slate-400">
-              Block {block.block.block_order}
-            </div>
+    <GlassCard elevation={2} className="p-6">
+      <div className="flex items-center justify-between mb-4">
+        <BlockTypeBadge
+          blockType={block.block.block_type}
+          blockName={block.block.block_name}
+        />
+        <div className="text-right">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Block {block.block.block_order}
           </div>
         </div>
+      </div>
 
-        {/* Section 1: Exercise Name */}
-        <CardTitle className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-4">
-          {exerciseName}
-        </CardTitle>
+      {/* Section 1: Exercise Name */}
+      <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-4">
+        {exerciseName}
+      </h2>
 
-        {/* Exercise Actions */}
-        {shouldShowGeneralButtons && (
-          <div className="flex items-center gap-2 mb-4">
-            {showRestTimer && onRestTimerClick && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onRestTimerClick}
-                className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
-                title="Start Rest Timer"
-              >
-                <Timer className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              </Button>
-            )}
-            {currentExercise?.exercise?.video_url && onVideoClick && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  onVideoClick(
-                    currentExercise.exercise?.video_url || "",
-                    currentExercise.exercise?.name
-                  )
-                }
-                className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
-                title="Watch Exercise Video"
-              >
-                <Youtube className="w-5 h-5 text-red-600 dark:text-red-400" />
-              </Button>
-            )}
-            {currentExercise?.exercise_id && onAlternativesClick && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onAlternativesClick(currentExercise.exercise_id)}
-                className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
-                title="View Exercise Alternatives"
-              >
-                <RefreshCw className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </Button>
-            )}
-          </div>
-        )}
-      </CardHeader>
+      {/* Exercise Actions */}
+      {shouldShowGeneralButtons && (
+        <div className="flex items-center gap-2 mb-4">
+          {showRestTimer && onRestTimerClick && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRestTimerClick}
+              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
+              title="Start Rest Timer"
+            >
+              <Timer className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            </Button>
+          )}
+          {currentExercise?.exercise?.video_url && onVideoClick && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                onVideoClick(
+                  currentExercise.exercise?.video_url || "",
+                  currentExercise.exercise?.name
+                )
+              }
+              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
+              title="Watch Exercise Video"
+            >
+              <Youtube className="w-5 h-5 text-red-600 dark:text-red-400" />
+            </Button>
+          )}
+          {currentExercise?.exercise_id && onAlternativesClick && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onAlternativesClick(currentExercise.exercise_id)}
+              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
+              title="View Exercise Alternatives"
+            >
+              <RefreshCw className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </Button>
+          )}
+        </div>
+      )}
 
-      <CardContent className="space-y-6">
+      <div className="space-y-6">
         {/* Section 2: Block Details Grid */}
         <BlockDetailsGrid details={blockDetails} />
 
@@ -184,8 +182,8 @@ export function BaseBlockExecutorLayout({
             canGoNext={canGoNext}
           />
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </GlassCard>
   );
 }
 

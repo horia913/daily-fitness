@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import { ClientTypeGuard } from '@/components/guards/ClientTypeGuard'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -130,7 +129,11 @@ interface TimeSlot {
   start_time: string
   end_time: string
   is_available: boolean
-  is_booked: boolean
+  is_booked?: boolean
+  coach_id?: string
+  notes?: string
+  recurring_pattern?: string
+  recurring_end_date?: string
 }
 
 interface ClipCard {
@@ -185,14 +188,31 @@ export default function ClientScheduling() {
 
   useEffect(() => {
     if (selectedCoach && selectedDate) {
+      console.log('useEffect triggered - loading time slots for:', selectedCoach, selectedDate)
       loadTimeSlots()
     }
   }, [selectedCoach, selectedDate])
 
+  // Auto-select today's date when coach is selected
+  useEffect(() => {
+    if (selectedCoach && !selectedDate) {
+      const today = formatDate(new Date())
+      setSelectedDate(today)
+      console.log('Auto-selected today\'s date:', today)
+    }
+  }, [selectedCoach])
+
   const loadCoaches = async () => {
     try {
+      setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        console.log('No user found')
+        setLoading(false)
+        return
+      }
+
+      console.log('Loading coaches for user:', user.id)
 
       // Get coaches (users with role 'coach')
       const { data: coachesData, error } = await supabase
@@ -200,14 +220,27 @@ export default function ClientScheduling() {
         .select('id, first_name, last_name')
         .eq('role', 'coach')
 
-      if (error) throw error
+      console.log('Coaches data:', coachesData)
+      console.log('Coaches error:', error)
+
+      if (error) {
+        console.error('Error loading coaches:', error)
+        setCoaches([])
+        setLoading(false)
+        return
+      }
 
       setCoaches(coachesData || [])
       if (coachesData && coachesData.length > 0) {
         setSelectedCoach(coachesData[0].id)
+        console.log('Selected first coach:', coachesData[0].id)
+      } else {
+        console.log('No coaches found')
+        setSelectedCoach('')
       }
     } catch (error) {
       console.error('Error loading coaches:', error)
+      setCoaches([])
     } finally {
       setLoading(false)
     }
@@ -216,7 +249,7 @@ export default function ClientScheduling() {
   const loadClipCards = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user || !selectedCoach) return
 
       const { data: clipcardsData, error } = await supabase
         .from('clipcards')
@@ -252,17 +285,26 @@ export default function ClientScheduling() {
 
   const loadTimeSlots = async () => {
     try {
+      if (!selectedCoach || !selectedDate) {
+        setTimeSlots([])
+        return
+      }
+
+      console.log('Loading time slots for coach:', selectedCoach, 'date:', selectedDate)
+
       const { data: timeSlotsData, error } = await supabase
         .from('coach_time_slots')
         .select('*')
         .eq('coach_id', selectedCoach)
         .eq('date', selectedDate)
         .eq('is_available', true)
-        .gt('slots_available', 0)
         .order('start_time')
 
+      console.log('Time slots data:', timeSlotsData)
+      console.log('Time slots error:', error)
+
       if (error) {
-        console.log('Time slots table not found, using empty array')
+        console.error('Error loading time slots:', error)
         setTimeSlots([])
       } else {
         setTimeSlots(timeSlotsData || [])
@@ -335,7 +377,11 @@ export default function ClientScheduling() {
 
   const getSelectedCoachName = () => {
     const coach = coaches.find(c => c.id === selectedCoach)
-    return coach ? `${coach.first_name} ${coach.last_name}` : 'Select Coach'
+    if (!coach) return 'Select Coach'
+    const firstName = coach.first_name || ''
+    const lastName = coach.last_name || ''
+    const fullName = `${firstName} ${lastName}`.trim()
+    return fullName || 'Coach'
   }
 
   const getSelectedClipCardName = () => {
@@ -430,11 +476,16 @@ export default function ClientScheduling() {
       if (!user) return
 
       // Check 1 session/day limit
+      // scheduled_at is a timestamp, so we need to check the date part
+      const dateStart = `${selectedDate}T00:00:00.000Z`
+      const dateEnd = `${selectedDate}T23:59:59.999Z`
+      
       const { data: existingSessions, error: checkError } = await supabase
         .from('sessions')
         .select('id')
         .eq('client_id', user.id)
-        .eq('scheduled_date', selectedDate)
+        .gte('scheduled_at', dateStart)
+        .lte('scheduled_at', dateEnd)
         .in('status', ['scheduled', 'confirmed'])
 
       if (checkError) {
@@ -447,16 +498,44 @@ export default function ClientScheduling() {
         return
       }
 
-      const { data, error } = await supabase.rpc('book_session_with_clipcard', {
-        p_coach_id: selectedCoach,
-        p_client_id: user.id,
-        p_time_slot_id: selectedTimeSlot.id,
-        p_clipcard_id: selectedClipCard || null
+      // Create scheduled_at timestamp from date and start_time
+      const scheduledAt = `${selectedDate}T${selectedTimeSlot.start_time}`
+      
+      // Calculate duration in minutes from start_time and end_time
+      const start = new Date(`2000-01-01T${selectedTimeSlot.start_time}`)
+      const end = new Date(`2000-01-01T${selectedTimeSlot.end_time}`)
+      const durationMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60))
+
+      console.log('Creating session via API:', {
+        coach_id: selectedCoach,
+        client_id: user.id,
+        scheduled_at: scheduledAt,
+        duration_minutes: durationMinutes,
+        clipcard_id: selectedClipCard || null
       })
 
-      if (error) {
-        console.error('Error booking session:', error)
-        alert('Error booking session. Please try again.')
+      // Create session via API route to bypass RLS
+      const response = await fetch('/api/sessions/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          coach_id: selectedCoach,
+          client_id: user.id,
+          scheduled_at: scheduledAt,
+          duration_minutes: durationMinutes,
+          title: 'Training Session',
+          clipcard_id: selectedClipCard || null
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error('Error creating session:', result)
+        alert(result.error || 'Error booking session. Please try again.')
+        setBooking(false)
         return
       }
 
@@ -548,7 +627,6 @@ export default function ClientScheduling() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <ClientTypeGuard requiredType="in_gym">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen">
@@ -644,48 +722,69 @@ export default function ClientScheduling() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {coaches.map((coach) => {
-                    const CoachIcon = getCoachIcon(coach)
-                    const isSelected = selectedCoach === coach.id
-                    
-                    return (
-                      <Button
-                        key={coach.id}
-                        variant="outline"
-                        onClick={() => setSelectedCoach(coach.id)}
-                        className={`h-auto p-6 flex flex-col items-center gap-3 rounded-2xl border-2 transition-all duration-300 ${
-                          isSelected 
-                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg scale-105' 
-                            : 'border-slate-200 dark:border-slate-700 hover:border-green-300 hover:shadow-md'
-                        }`}
-                      >
-                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg ${
-                          isSelected 
-                            ? 'bg-gradient-to-br from-green-500 to-green-600' 
-                            : 'bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800'
-                        }`}>
-                          <CoachIcon className={`w-8 h-8 ${isSelected ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`} />
-                        </div>
-                        <div className="text-center">
-                          <span className={`font-semibold text-lg ${isSelected ? 'text-green-700 dark:text-green-300' : 'text-slate-800 dark:text-slate-200'}`}>
-                            {coach.first_name} {coach.last_name}
-                          </span>
-                          {isSelected && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <CheckCircle className="w-4 h-4 text-green-600" />
-                              <span className="text-sm text-green-600 font-medium">Selected</span>
-                            </div>
-                          )}
-                        </div>
-                      </Button>
-                    )
-                  })}
-                </div>
+                {coaches.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {coaches.map((coach) => {
+                      const CoachIcon = getCoachIcon(coach)
+                      const isSelected = selectedCoach === coach.id
+                      
+                      return (
+                        <Button
+                          key={coach.id}
+                          variant="outline"
+                          onClick={() => setSelectedCoach(coach.id)}
+                          className={`h-auto p-6 flex flex-col items-center gap-3 rounded-2xl border-2 transition-all duration-300 ${
+                            isSelected 
+                              ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg scale-105' 
+                              : 'border-slate-200 dark:border-slate-700 hover:border-green-300 hover:shadow-md'
+                          }`}
+                        >
+                          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg ${
+                            isSelected 
+                              ? 'bg-gradient-to-br from-green-500 to-green-600' 
+                              : 'bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800'
+                          }`}>
+                            <CoachIcon className={`w-8 h-8 ${isSelected ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`} />
+                          </div>
+                          <div className="text-center">
+                            <span className={`font-semibold text-lg ${isSelected ? 'text-green-700 dark:text-green-300' : 'text-slate-800 dark:text-slate-200'}`}>
+                              {coach.first_name || 'Coach'} {coach.last_name || ''}
+                            </span>
+                            {isSelected && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                <span className="text-sm text-green-600 font-medium">Selected</span>
+                              </div>
+                            )}
+                          </div>
+                        </Button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                      <User className="w-12 h-12 text-slate-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-4">
+                      No Coaches Available
+                    </h3>
+                    <p className="text-slate-600 dark:text-slate-300 mb-8 max-w-md mx-auto">
+                      There are no coaches available at the moment. Please contact support or check back later.
+                    </p>
+                    <Button 
+                      onClick={() => loadCoaches()}
+                      className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl px-8 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                    >
+                      <RefreshCw className="w-5 h-5 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* ClipCard Selection */}
+            {/* ClipCard Selection - Optional */}
             {selectedCoach && (
               <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
                 <CardHeader className="p-0 mb-6">
@@ -693,10 +792,10 @@ export default function ClientScheduling() {
                     <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
                       <CreditCard className="w-5 h-5 text-white" />
                     </div>
-                    Select Your ClipCard
+                    Select Your ClipCard (Optional)
                   </CardTitle>
                   <CardDescription className="text-slate-600 dark:text-slate-300">
-                    Choose which ClipCard to use for this session
+                    Choose which ClipCard to use for this session, or proceed without one
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -765,14 +864,24 @@ export default function ClientScheduling() {
                         No Active ClipCards
                       </h3>
                       <p className="text-slate-600 dark:text-slate-300 mb-8 max-w-md mx-auto">
-                        You don't have any active ClipCards with this coach. Contact your coach to purchase a ClipCard and start booking sessions!
+                        You don't have any active ClipCards with this coach. You can still book sessions directly, or contact your coach to purchase a ClipCard.
                       </p>
-                      <Button 
-                        className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl px-8 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                      >
-                        <MessageCircle className="w-5 h-5 mr-2" />
-                        Contact Coach
-                      </Button>
+                      <div className="flex gap-4 justify-center">
+                        <Button 
+                          onClick={() => setSelectedClipCard('')}
+                          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl px-8 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                        >
+                          <Calendar className="w-5 h-5 mr-2" />
+                          Continue Without ClipCard
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl px-8 py-3 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300"
+                        >
+                          <MessageCircle className="w-5 h-5 mr-2" />
+                          Contact Coach
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -780,7 +889,7 @@ export default function ClientScheduling() {
             )}
 
             {/* Date Selection */}
-            {selectedCoach && selectedClipCard && (
+            {selectedCoach && (
               <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
                 <CardHeader className="p-0 mb-6">
                   <div className="flex items-center justify-between">
@@ -835,7 +944,12 @@ export default function ClientScheduling() {
                         <Button
                           key={index}
                           variant="outline"
-                          onClick={() => !isPast && setSelectedDate(dateStr)}
+                          onClick={() => {
+                            if (!isPast) {
+                              console.log('Date selected:', dateStr)
+                              setSelectedDate(dateStr)
+                            }
+                          }}
                           disabled={isPast}
                           className={`h-auto p-4 flex flex-col gap-2 rounded-2xl border-2 transition-all duration-300 ${
                             isSelected 
@@ -874,7 +988,7 @@ export default function ClientScheduling() {
             )}
 
             {/* Time Slots */}
-            {selectedCoach && selectedClipCard && selectedDate && (
+            {selectedCoach && selectedDate && (
               <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
                 <CardHeader className="p-0 mb-6">
                   <CardTitle className="flex items-center gap-3 text-xl">
@@ -896,6 +1010,7 @@ export default function ClientScheduling() {
                   {timeSlots.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                       {timeSlots.map((slot) => {
+                        console.log('Rendering time slot:', slot)
                         const TimeSlotIcon = getTimeSlotIcon(slot)
                         const gradient = getTimeSlotGradient(slot)
                         
@@ -904,7 +1019,7 @@ export default function ClientScheduling() {
                             key={slot.id}
                             variant="outline"
                             onClick={() => openBookingModal(slot)}
-                            disabled={booking}
+                            disabled={booking || slot.is_booked}
                             className={`h-auto p-6 flex flex-col gap-3 rounded-2xl border-2 transition-all duration-300 ${gradient} border-slate-200 dark:border-slate-700 hover:border-orange-300 hover:shadow-lg hover:scale-105`}
                           >
                             <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center shadow-lg">
@@ -919,7 +1034,7 @@ export default function ClientScheduling() {
                               </div>
                             </div>
                             <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                              Available
+                              {slot.is_booked ? 'Booked' : 'Available'}
                             </Badge>
                           </Button>
                         )
@@ -1057,7 +1172,6 @@ export default function ClientScheduling() {
         </div>
         </div>
       </AnimatedBackground>
-      </ClientTypeGuard>
     </ProtectedRoute>
   )
 }

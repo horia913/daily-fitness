@@ -24,39 +24,23 @@ import {
   Timer,
 } from "lucide-react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-
-interface ProgressStats {
-  weeklyWorkouts: {
-    completed: number;
-    goal: number;
-  };
-  streak: number;
-  totalWorkouts: number;
-  personalRecords: number;
-  leaderboardRank: number;
-  totalAthletes: number;
-  achievementsUnlocked: number;
-  achievementsInProgress: number;
-  currentWeight: number;
-  weightChange: number; // negative = lost, positive = gained
-}
+import { getProgressStats, ProgressStats } from "@/lib/progressStatsService";
 
 function ProgressHubContent() {
   const { user } = useAuth();
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
 
   const [stats, setStats] = useState<ProgressStats>({
-    weeklyWorkouts: { completed: 3, goal: 4 },
-    streak: 12,
-    totalWorkouts: 87,
-    personalRecords: 8,
-    leaderboardRank: 5,
-    totalAthletes: 24,
-    achievementsUnlocked: 12,
-    achievementsInProgress: 3,
-    currentWeight: 79.5,
-    weightChange: -2.5,
+    weeklyWorkouts: { completed: 0, goal: 0 },
+    streak: 0,
+    totalWorkouts: 0,
+    personalRecords: 0,
+    leaderboardRank: 0,
+    totalAthletes: 0,
+    achievementsUnlocked: 0,
+    achievementsInProgress: 0,
+    currentWeight: null,
+    weightChange: 0,
   });
 
   const [loading, setLoading] = useState(true);
@@ -69,18 +53,20 @@ function ProgressHubContent() {
     if (!user) return;
 
     try {
-      // TODO: Replace with actual Supabase queries
-      // Simulating data fetch
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setLoading(false);
+      setLoading(true);
+      const progressStats = await getProgressStats(user.id);
+      setStats(progressStats);
     } catch (error) {
       console.error("Error loading progress data:", error);
+    } finally {
       setLoading(false);
     }
   };
 
   const weeklyProgress =
-    (stats.weeklyWorkouts.completed / stats.weeklyWorkouts.goal) * 100;
+    stats.weeklyWorkouts.goal > 0
+      ? (stats.weeklyWorkouts.completed / stats.weeklyWorkouts.goal) * 100
+      : 0;
 
   return (
     <AnimatedBackground>
@@ -508,7 +494,7 @@ function ProgressHubContent() {
                         : "rgba(0,0,0,0.6)",
                     }}
                   >
-                    Weight: {stats.currentWeight} kg
+                    Weight: {stats.currentWeight !== null ? `${stats.currentWeight} kg` : "Not recorded"}
                   </p>
 
                   <div className="flex items-center gap-1">
@@ -523,17 +509,31 @@ function ProgressHubContent() {
                             : getSemanticColor("warning").primary,
                       }}
                     />
-                    <p
-                      className="text-xs font-medium"
-                      style={{
-                        color:
-                          stats.weightChange < 0
-                            ? getSemanticColor("success").primary
-                            : getSemanticColor("warning").primary,
-                      }}
-                    >
-                      {Math.abs(stats.weightChange).toFixed(1)} kg this month
-                    </p>
+                    {stats.weightChange !== 0 && (
+                      <p
+                        className="text-xs font-medium"
+                        style={{
+                          color:
+                            stats.weightChange < 0
+                              ? getSemanticColor("success").primary
+                              : getSemanticColor("warning").primary,
+                        }}
+                      >
+                        {Math.abs(stats.weightChange).toFixed(1)} kg this month
+                      </p>
+                    )}
+                    {stats.weightChange === 0 && stats.currentWeight !== null && (
+                      <p
+                        className="text-xs font-medium"
+                        style={{
+                          color: isDark
+                            ? "rgba(255,255,255,0.5)"
+                            : "rgba(0,0,0,0.5)",
+                        }}
+                      >
+                        No change this month
+                      </p>
+                    )}
                   </div>
                 </div>
               </GlassCard>

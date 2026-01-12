@@ -13,6 +13,7 @@ import { LargeInput } from "../ui/LargeInput";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 export function GiantSetExecutor({
   block,
@@ -48,32 +49,31 @@ export function GiantSetExecutor({
   // Initialize arrays and recalculate suggested weights when exercises or e1rmMap changes
   useEffect(() => {
     if (exercises.length > 0) {
-      const initialWeights = exercises.map((ex, idx) => {
-        const currentWeight = weights[idx];
-        // Only set suggested weight if current weight is empty AND e1rmMap has data
-        const weightIsEmpty = !currentWeight || currentWeight.trim() === "" || parseFloat(currentWeight) === 0;
-        const hasE1rm = ex.exercise_id && e1rmMap[ex.exercise_id] && e1rmMap[ex.exercise_id] > 0;
-        
-        if (weightIsEmpty && hasE1rm && ex.load_percentage) {
-          const suggested = calculateSuggestedWeightUtil(
-            ex.exercise_id,
-            ex.load_percentage,
-            e1rmMap
-          );
-          if (suggested && suggested > 0) {
-            return suggested.toString();
+      // Only update if weights array is empty or length doesn't match
+      const shouldInitialize = weights.length === 0 || weights.length !== exercises.length;
+      
+      if (shouldInitialize) {
+        const initialWeights = exercises.map((ex) => {
+          // Only set suggested weight if e1rmMap has data
+          const hasE1rm = ex.exercise_id && e1rmMap[ex.exercise_id] && e1rmMap[ex.exercise_id] > 0;
+          
+          if (hasE1rm && ex.load_percentage) {
+            const suggested = calculateSuggestedWeightUtil(
+              ex.exercise_id,
+              ex.load_percentage,
+              e1rmMap
+            );
+            if (suggested && suggested > 0) {
+              return suggested.toString();
+            }
           }
-        }
-        // Keep existing weight if it has a value
-        return currentWeight || "";
-      });
-      setWeights(initialWeights);
-      // Only initialize reps array if it's empty or length doesn't match
-      if (reps.length !== exercises.length) {
+          return "";
+        });
+        setWeights(initialWeights);
         setReps(new Array(exercises.length).fill(""));
       }
     }
-  }, [exercises, e1rmMap, weights]);
+  }, [exercises, e1rmMap]); // Removed 'weights' from dependencies to prevent infinite loop
 
   // Block details
   const blockDetails: BlockDetail[] = [
@@ -263,9 +263,10 @@ export function GiantSetExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {exercises.map((exercise, idx) => (
-        <div
+        <GlassCard
           key={exercise.id || idx}
-          className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700"
+          elevation={1}
+          className="p-4"
         >
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-semibold text-slate-800 dark:text-white text-lg">
@@ -303,7 +304,7 @@ export function GiantSetExecutor({
               step="1"
             />
           </div>
-        </div>
+        </GlassCard>
       ))}
     </div>
   );

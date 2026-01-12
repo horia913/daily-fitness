@@ -65,9 +65,17 @@ export default function WorkoutLogsPage() {
   const [loading, setLoading] = useState(true);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
 
+  // Reset state when user changes
+  useEffect(() => {
+    setLoading(true);
+    setWorkoutLogs([]);
+  }, [user]);
+
   useEffect(() => {
     if (user && !authLoading) {
       loadWorkoutLogs();
+    } else if (!authLoading && !user) {
+      setLoading(false);
     }
   }, [user, authLoading]);
 
@@ -82,7 +90,8 @@ export default function WorkoutLogsPage() {
       // Get ALL workout_logs for this user (not grouped by assignment)
       const { data: workoutLogs, error } = await supabase
         .from("workout_logs")
-        .select(`
+        .select(
+          `
           id,
           client_id,
           started_at,
@@ -92,7 +101,8 @@ export default function WorkoutLogsPage() {
           total_reps_completed,
           total_weight_lifted,
           workout_assignment_id
-        `)
+        `
+        )
         .eq("client_id", user.id)
         .order("started_at", { ascending: false })
         .limit(100); // Increased limit to show more logs
@@ -112,11 +122,13 @@ export default function WorkoutLogsPage() {
       console.log("✅ Found workout logs:", workoutLogs.length);
 
       // Get unique assignment IDs to fetch template names
-      const assignmentIds = [...new Set(
-        workoutLogs
-          .map(log => log.workout_assignment_id)
-          .filter(Boolean) as string[]
-      )];
+      const assignmentIds = [
+        ...new Set(
+          workoutLogs
+            .map((log) => log.workout_assignment_id)
+            .filter(Boolean) as string[]
+        ),
+      ];
 
       console.log("📋 Found assignment IDs:", assignmentIds.length);
 
@@ -125,14 +137,16 @@ export default function WorkoutLogsPage() {
       if (assignmentIds.length > 0) {
         const { data: assignments, error: assignmentsError } = await supabase
           .from("workout_assignments")
-          .select(`
+          .select(
+            `
             id,
             workout_template_id,
             workout_templates (
               id,
               name
             )
-          `)
+          `
+          )
           .in("id", assignmentIds);
 
         if (assignmentsError) {
@@ -142,7 +156,8 @@ export default function WorkoutLogsPage() {
         if (assignments) {
           console.log("📋 Fetched assignments:", assignments.length);
           assignments.forEach((assignment: any) => {
-            const templateName = assignment.workout_templates?.name || "Workout";
+            const templateName =
+              assignment.workout_templates?.name || "Workout";
             assignmentTemplateMap.set(assignment.id, templateName);
             console.log(`  - Assignment ${assignment.id}: "${templateName}"`);
           });
@@ -155,13 +170,15 @@ export default function WorkoutLogsPage() {
           // Get workout name from assignment -> template
           let workoutName = "Workout"; // Default fallback
           if (log.workout_assignment_id) {
-            workoutName = assignmentTemplateMap.get(log.workout_assignment_id) || "Workout";
+            workoutName =
+              assignmentTemplateMap.get(log.workout_assignment_id) || "Workout";
           }
 
           // Get sets for THIS specific workout_log_id only
           const { data: sets, error: setsError } = await supabase
             .from("workout_set_logs")
-            .select(`
+            .select(
+              `
               id,
               weight,
               reps,
@@ -171,7 +188,8 @@ export default function WorkoutLogsPage() {
                 name,
                 category
               )
-            `)
+            `
+            )
             .eq("workout_log_id", log.id)
             .eq("client_id", user.id);
 
@@ -180,11 +198,11 @@ export default function WorkoutLogsPage() {
           }
 
           const workoutSets = (sets || []) as any[];
-          
+
           // Calculate totals from sets (or use database totals as fallback)
           const calculatedTotalSets = workoutSets.length;
           const calculatedTotalWeight = workoutSets.reduce(
-            (sum, set) => sum + ((set.weight || 0) * (set.reps || 0)),
+            (sum, set) => sum + (set.weight || 0) * (set.reps || 0),
             0
           );
           const calculatedUniqueExercises = new Set(
@@ -192,17 +210,22 @@ export default function WorkoutLogsPage() {
           ).size;
 
           // Use calculated values if available, otherwise use database totals
-          const totalSets = calculatedTotalSets > 0 
-            ? calculatedTotalSets 
-            : (log.total_sets_completed || 0);
-          
-          const totalWeight = calculatedTotalWeight > 0 
-            ? calculatedTotalWeight 
-            : (log.total_weight_lifted || 0);
-          
-          const uniqueExercises = calculatedUniqueExercises > 0 
-            ? calculatedUniqueExercises 
-            : (totalSets > 0 ? 1 : 0);
+          const totalSets =
+            calculatedTotalSets > 0
+              ? calculatedTotalSets
+              : log.total_sets_completed || 0;
+
+          const totalWeight =
+            calculatedTotalWeight > 0
+              ? calculatedTotalWeight
+              : log.total_weight_lifted || 0;
+
+          const uniqueExercises =
+            calculatedUniqueExercises > 0
+              ? calculatedUniqueExercises
+              : totalSets > 0
+              ? 1
+              : 0;
 
           return {
             ...log,
@@ -403,9 +426,7 @@ export default function WorkoutLogsPage() {
                         : "rgba(0,0,0,0.4)",
                     }}
                   />
-                  <h3
-                    className={`text-xl font-bold mb-2 ${theme.text}`}
-                  >
+                  <h3 className={`text-xl font-bold mb-2 ${theme.text}`}>
                     No Workout Logs Yet
                   </h3>
                   <p className={theme.textSecondary}>
@@ -418,14 +439,14 @@ export default function WorkoutLogsPage() {
                 {workoutLogs.map((log) => {
                   // Use the actual workout name from the log
                   const workoutName = log.workoutName || "Workout";
-                  
+
                   // Use completed_at if available, otherwise use started_at for date display
                   const completedDate = log.completed_at
                     ? new Date(log.completed_at)
                     : log.started_at
                     ? new Date(log.started_at)
                     : null;
-                  
+
                   // Calculate duration: use total_duration_minutes if available,
                   // otherwise calculate from started_at and completed_at
                   let duration: number | null = null;
@@ -441,227 +462,152 @@ export default function WorkoutLogsPage() {
                   return (
                     <div
                       key={log.id}
-                      onClick={() => router.push(`/client/progress/workout-logs/${log.id}`)}
+                      onClick={() =>
+                        router.push(`/client/progress/workout-logs/${log.id}`)
+                      }
                       className="cursor-pointer"
                     >
-                    <GlassCard
-                      elevation={2}
-                      className="p-6 transition-all hover:scale-[1.01] hover:shadow-xl"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3
-                            className={`text-xl font-bold mb-2 ${theme.text}`}
-                          >
-                            {workoutName}
-                          </h3>
-                          <div className="flex flex-wrap gap-4 text-sm">
-                            {completedDate && (
-                              <div className="flex items-center gap-2">
-                                <Calendar
-                                  className="w-4 h-4"
-                                  style={{
-                                    color: isDark
-                                      ? "rgba(255,255,255,0.6)"
-                                      : "rgba(0,0,0,0.6)",
-                                  }}
-                                />
-                                <span className={theme.textSecondary}>
-                                  {completedDate.toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  })}
-                                </span>
-                              </div>
-                            )}
-                            {duration && (
-                              <div className="flex items-center gap-2">
-                                <Clock
-                                  className="w-4 h-4"
-                                  style={{
-                                    color: isDark
-                                      ? "rgba(255,255,255,0.6)"
-                                      : "rgba(0,0,0,0.6)",
-                                  }}
-                                />
-                                <span className={theme.textSecondary}>
-                                  {duration} min
-                                </span>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2">
-                              <Dumbbell
-                                className="w-4 h-4"
-                                style={{
-                                  color: isDark
-                                    ? "rgba(255,255,255,0.6)"
-                                    : "rgba(0,0,0,0.6)",
-                                }}
-                              />
-                              <span className={theme.textSecondary}>
-                                {log.totalSets} sets
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <ChevronRight
-                          className="w-6 h-6 flex-shrink-0"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.4)"
-                              : "rgba(0,0,0,0.4)",
-                          }}
-                        />
-                      </div>
-
-                      {/* Exercise Summary */}
-                      {log.workout_set_logs && log.workout_set_logs.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
-                            <div>
-                              <p
-                                className="text-xs font-semibold mb-1"
-                                style={{
-                                  color: isDark
-                                    ? "rgba(255,255,255,0.5)"
-                                    : "rgba(0,0,0,0.5)",
-                                }}
-                              >
-                                EXERCISES
-                              </p>
-                              <p
-                                className="text-lg font-bold"
-                                style={{
-                                  color: getSemanticColor("trust").primary,
-                                }}
-                              >
-                                {log.uniqueExercises}
-                              </p>
-                            </div>
-                            <div>
-                              <p
-                                className="text-xs font-semibold mb-1"
-                                style={{
-                                  color: isDark
-                                    ? "rgba(255,255,255,0.5)"
-                                    : "rgba(0,0,0,0.5)",
-                                }}
-                              >
-                                TOTAL WEIGHT
-                              </p>
-                              <p
-                                className="text-lg font-bold"
-                                style={{
-                                  color: getSemanticColor("success").primary,
-                                }}
-                              >
-                                {log.totalWeight.toLocaleString()} kg
-                              </p>
-                            </div>
-                            <div>
-                              <p
-                                className="text-xs font-semibold mb-1"
-                                style={{
-                                  color: isDark
-                                    ? "rgba(255,255,255,0.5)"
-                                    : "rgba(0,0,0,0.5)",
-                                }}
-                              >
-                                SETS
-                              </p>
-                              <p
-                                className="text-lg font-bold"
-                                style={{
-                                  color: getSemanticColor("energy").primary,
-                                }}
-                              >
-                                {log.totalSets}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Individual Set Details - Expandable */}
-                          <details className="mt-4">
-                            <summary
-                              className="cursor-pointer text-sm font-semibold mb-2"
-                              style={{
-                                color: isDark
-                                  ? "rgba(255,255,255,0.7)"
-                                  : "rgba(0,0,0,0.7)",
-                              }}
+                      <GlassCard
+                        elevation={2}
+                        className="p-6 transition-all hover:scale-[1.01] hover:shadow-xl"
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3
+                              className={`text-xl font-bold mb-2 ${theme.text}`}
                             >
-                              View Set Details ({log.workout_set_logs.length} sets)
-                            </summary>
-                            <div className="mt-3 space-y-2">
-                              {log.workout_set_logs.map((set: any, idx: number) => (
-                                <div
-                                  key={set.id || idx}
-                                  className="p-3 rounded-lg"
-                                  style={{
-                                    background: isDark
-                                      ? "rgba(255,255,255,0.05)"
-                                      : "rgba(0,0,0,0.03)",
-                                  }}
-                                >
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <p
-                                        className="font-semibold text-sm mb-1"
-                                        style={{
-                                          color: isDark ? "#fff" : "#1A1A1A",
-                                        }}
-                                      >
-                                        {set.exercises?.name || "Exercise"}
-                                      </p>
-                                      <div className="flex gap-4 text-xs">
-                                        {set.weight && (
-                                          <span
-                                            style={{
-                                              color: isDark
-                                                ? "rgba(255,255,255,0.6)"
-                                                : "rgba(0,0,0,0.6)",
-                                            }}
-                                          >
-                                            {set.weight} kg
-                                          </span>
-                                        )}
-                                        {set.reps && (
-                                          <span
-                                            style={{
-                                              color: isDark
-                                                ? "rgba(255,255,255,0.6)"
-                                                : "rgba(0,0,0,0.6)",
-                                            }}
-                                          >
-                                            {set.reps} reps
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {set.completed_at && (
-                                      <span
-                                        className="text-xs"
-                                        style={{
-                                          color: isDark
-                                            ? "rgba(255,255,255,0.5)"
-                                            : "rgba(0,0,0,0.5)",
-                                        }}
-                                      >
-                                        {new Date(set.completed_at).toLocaleTimeString([], {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                        })}
-                                      </span>
-                                    )}
-                                  </div>
+                              {workoutName}
+                            </h3>
+                            <div className="flex flex-wrap gap-4 text-sm">
+                              {completedDate && (
+                                <div className="flex items-center gap-2">
+                                  <Calendar
+                                    className="w-4 h-4"
+                                    style={{
+                                      color: isDark
+                                        ? "rgba(255,255,255,0.6)"
+                                        : "rgba(0,0,0,0.6)",
+                                    }}
+                                  />
+                                  <span className={theme.textSecondary}>
+                                    {completedDate.toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })}
+                                  </span>
                                 </div>
-                              ))}
+                              )}
+                              {duration && (
+                                <div className="flex items-center gap-2">
+                                  <Clock
+                                    className="w-4 h-4"
+                                    style={{
+                                      color: isDark
+                                        ? "rgba(255,255,255,0.6)"
+                                        : "rgba(0,0,0,0.6)",
+                                    }}
+                                  />
+                                  <span className={theme.textSecondary}>
+                                    {duration} min
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2">
+                                <Dumbbell
+                                  className="w-4 h-4"
+                                  style={{
+                                    color: isDark
+                                      ? "rgba(255,255,255,0.6)"
+                                      : "rgba(0,0,0,0.6)",
+                                  }}
+                                />
+                                <span className={theme.textSecondary}>
+                                  {log.totalSets} sets
+                                </span>
+                              </div>
                             </div>
-                          </details>
+                          </div>
+                          <ChevronRight
+                            className="w-6 h-6 flex-shrink-0"
+                            style={{
+                              color: isDark
+                                ? "rgba(255,255,255,0.4)"
+                                : "rgba(0,0,0,0.4)",
+                            }}
+                          />
                         </div>
-                      )}
-                    </GlassCard>
+
+                        {/* Exercise Summary */}
+                        {log.workout_set_logs &&
+                          log.workout_set_logs.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                                <div>
+                                  <p
+                                    className="text-xs font-semibold mb-1"
+                                    style={{
+                                      color: isDark
+                                        ? "rgba(255,255,255,0.5)"
+                                        : "rgba(0,0,0,0.5)",
+                                    }}
+                                  >
+                                    EXERCISES
+                                  </p>
+                                  <p
+                                    className="text-lg font-bold"
+                                    style={{
+                                      color: getSemanticColor("trust").primary,
+                                    }}
+                                  >
+                                    {log.uniqueExercises}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p
+                                    className="text-xs font-semibold mb-1"
+                                    style={{
+                                      color: isDark
+                                        ? "rgba(255,255,255,0.5)"
+                                        : "rgba(0,0,0,0.5)",
+                                    }}
+                                  >
+                                    TOTAL WEIGHT
+                                  </p>
+                                  <p
+                                    className="text-lg font-bold"
+                                    style={{
+                                      color:
+                                        getSemanticColor("success").primary,
+                                    }}
+                                  >
+                                    {log.totalWeight.toLocaleString()} kg
+                                  </p>
+                                </div>
+                                <div>
+                                  <p
+                                    className="text-xs font-semibold mb-1"
+                                    style={{
+                                      color: isDark
+                                        ? "rgba(255,255,255,0.5)"
+                                        : "rgba(0,0,0,0.5)",
+                                    }}
+                                  >
+                                    SETS
+                                  </p>
+                                  <p
+                                    className="text-lg font-bold"
+                                    style={{
+                                      color: getSemanticColor("energy").primary,
+                                    }}
+                                  >
+                                    {log.totalSets}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                      </GlassCard>
                     </div>
                   );
                 })}
@@ -673,4 +619,3 @@ export default function WorkoutLogsPage() {
     </ProtectedRoute>
   );
 }
-

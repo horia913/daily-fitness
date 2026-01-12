@@ -345,11 +345,21 @@ export class MealPlanService {
 
   // Meal Plan Assignment functions
   static async assignMealPlanToClients(mealPlanId: string, clientIds: string[], coachId: string): Promise<void> {
+    // For each client, deactivate existing active meal plans before assigning new one
+    for (const clientId of clientIds) {
+      await supabase
+        .from('meal_plan_assignments')
+        .update({ is_active: false })
+        .eq('client_id', clientId)
+        .eq('is_active', true)
+    }
+
     const assignments = clientIds.map(clientId => ({
       meal_plan_id: mealPlanId,
       client_id: clientId,
       coach_id: coachId,
-      start_date: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
+      start_date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
+      is_active: true // Ensure assignment is active by default
     }))
 
     const { error } = await supabase

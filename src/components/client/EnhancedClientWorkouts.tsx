@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/contexts/ThemeContext";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
@@ -38,6 +38,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import WorkoutTemplateService, {
   DailyWorkout,
   DailyWorkoutExercise,
@@ -1073,25 +1074,6 @@ export default function EnhancedClientWorkouts({
     return messages[Math.floor(Math.random() * messages.length)];
   };
 
-  // Quartz card style (faceted quartz surfaces)
-  // Using individual border properties instead of shorthand to avoid conflicts with borderLeft
-  const borderColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)";
-  const quartzCardStyle: React.CSSProperties = {
-    background: isDark
-      ? "linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%)"
-      : "linear-gradient(165deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)",
-    backdropFilter: "blur(24px) saturate(180%)",
-    WebkitBackdropFilter: "blur(24px) saturate(180%)",
-    borderTop: `1px solid ${borderColor}`,
-    borderRight: `1px solid ${borderColor}`,
-    borderBottom: `1px solid ${borderColor}`,
-    borderLeft: `1px solid ${borderColor}`,
-    borderRadius: "24px",
-    position: "relative" as const,
-    overflow: "hidden" as const,
-    transition: "all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)",
-  };
-
   const getAvatarUrl = () => {
     if (avatarUrl) return avatarUrl;
     if (profile?.first_name) {
@@ -1164,62 +1146,37 @@ export default function EnhancedClientWorkouts({
             {/* Header Section */}
             <header
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "40px",
+                marginBottom: "48px",
               }}
             >
               <div>
+                <h4
+                  className="mono"
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.3em",
+                    color: isDark ? "#22D3EE" : "#0891B2",
+                    margin: 0,
+                    marginBottom: "8px",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  Training Protocol
+                </h4>
                 <h1
                   style={{
-                    fontSize: "30px",
-                    fontWeight: 700,
-                    lineHeight: "1.25",
+                    fontSize: "48px",
+                    fontWeight: 800,
+                    lineHeight: "1.2",
                     letterSpacing: "-0.02em",
                     color: isDark ? "#FFFFFF" : "#1A1A1A",
                     margin: 0,
-                    marginBottom: "4px",
                   }}
                 >
-                  Your Workouts
+                  Your <span style={{ color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280" }}>Workouts</span>
                 </h1>
-                <p
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 400,
-                    color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                    margin: 0,
-                  }}
-                >
-                  {programSubtitle}
-                </p>
-              </div>
-              <div
-                style={{
-                  width: "56px",
-                  height: "56px",
-                  borderRadius: "16px",
-                  ...quartzCardStyle,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "4px",
-                  border: `2px solid ${
-                    isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"
-                  }`,
-                }}
-              >
-                <img
-                  src={getAvatarUrl()}
-                  alt="Avatar"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    borderRadius: "12px",
-                    objectFit: "cover",
-                  }}
-                />
               </div>
             </header>
 
@@ -1228,17 +1185,14 @@ export default function EnhancedClientWorkouts({
               <section style={{ marginBottom: "32px" }}>
                 <div
                   style={{
-                    ...quartzCardStyle,
-                    padding: "32px",
-                    minHeight: "280px",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
                     borderLeft: "4px solid #EF4444",
-                    position: "relative",
                   }}
-                  className="kinetic-shimmer"
+                  className="rounded-2xl"
                 >
+                  <GlassCard
+                    elevation={2}
+                    className="p-8 min-h-[280px] flex flex-col justify-between relative overflow-hidden kinetic-shimmer"
+                  >
                   {/* Kinetic shimmer overlay */}
                   <div
                     style={{
@@ -1504,11 +1458,11 @@ export default function EnhancedClientWorkouts({
                       </button>
                     </div>
                   </div>
+                </GlassCard>
                 </div>
               </section>
             ) : (
-              <Card className="bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 border-0 shadow-xl rounded-2xl sm:rounded-3xl overflow-hidden">
-                <CardContent className="p-8 sm:p-16 text-center">
+              <GlassCard elevation={2} className="p-8 sm:p-16 text-center overflow-hidden">
                   {todaysWorkout?.weekCompleted ? (
                     <>
                       <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8">
@@ -1565,19 +1519,21 @@ export default function EnhancedClientWorkouts({
                       </p>
                     </>
                   )}
-                </CardContent>
-              </Card>
+              </GlassCard>
             )}
 
             {/* Weekly Progress Banner */}
             <section style={{ marginBottom: "32px" }}>
               <div
                 style={{
-                  ...quartzCardStyle,
-                  padding: "24px",
                   borderLeft: "4px solid #3B82F6",
                 }}
+                className="rounded-2xl"
               >
+                <GlassCard
+                  elevation={2}
+                  className="p-6"
+                >
                 <div
                   style={{
                     display: "flex",
@@ -1737,6 +1693,7 @@ export default function EnhancedClientWorkouts({
                     </div>
                   </div>
                 </div>
+              </GlassCard>
               </div>
             </section>
 
@@ -1744,16 +1701,9 @@ export default function EnhancedClientWorkouts({
 
             {/* Quick Stats */}
             <div className="grid grid-cols-3" style={{ gap: "12px" }}>
-              <div
-                style={{
-                  ...quartzCardStyle,
-                  padding: "24px",
-                  textAlign: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "12px",
-                }}
+              <GlassCard
+                elevation={1}
+                className="p-6 text-center flex flex-col items-center gap-3"
               >
                 <div
                   style={{
@@ -1791,17 +1741,10 @@ export default function EnhancedClientWorkouts({
                 >
                   Day Streak
                 </div>
-              </div>
-              <div
-                style={{
-                  ...quartzCardStyle,
-                  padding: "24px",
-                  textAlign: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "12px",
-                }}
+              </GlassCard>
+              <GlassCard
+                elevation={1}
+                className="p-6 text-center flex flex-col items-center gap-3"
               >
                 <div
                   style={{
@@ -1839,17 +1782,10 @@ export default function EnhancedClientWorkouts({
                 >
                   This Month
                 </div>
-              </div>
-              <div
-                style={{
-                  ...quartzCardStyle,
-                  padding: "24px",
-                  textAlign: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "12px",
-                }}
+              </GlassCard>
+              <GlassCard
+                elevation={1}
+                className="p-6 text-center flex flex-col items-center gap-3"
               >
                 <div
                   style={{
@@ -1887,7 +1823,7 @@ export default function EnhancedClientWorkouts({
                 >
                   Success Rate
                 </div>
-              </div>
+              </GlassCard>
             </div>
 
             {/* Current Program Status - Collapsible */}
@@ -2002,31 +1938,21 @@ export default function EnhancedClientWorkouts({
                     return (
                       <div
                         key={assignment.id}
-                        style={{
-                          ...quartzCardStyle,
-                          padding: "20px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          cursor: "pointer",
-                          opacity: isSkipped ? 0.7 : 1,
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = isDark
-                            ? "rgba(255,255,255,0.08)"
-                            : "rgba(255,255,255,0.95)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = isDark
-                            ? "linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%)"
-                            : "linear-gradient(165deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)";
-                        }}
                         onClick={() => {
                           router.push(
                             `/client/workouts/${assignment.id}/details`
                           );
                         }}
                       >
+                        <div
+                          style={{
+                            opacity: isSkipped ? 0.7 : 1,
+                          }}
+                        >
+                          <GlassCard
+                            elevation={2}
+                            className="p-5 flex items-center justify-between cursor-pointer"
+                          >
                         <div
                           style={{
                             display: "flex",
@@ -2183,6 +2109,8 @@ export default function EnhancedClientWorkouts({
                             }}
                           />
                         </div>
+                      </GlassCard>
+                        </div>
                       </div>
                     );
                   })}
@@ -2192,27 +2120,25 @@ export default function EnhancedClientWorkouts({
 
             {/* Completed Programs */}
             {completedPrograms.length > 0 && (
-              <Card
-                className={`${theme.card} ${theme.shadow} rounded-3xl overflow-hidden`}
-              >
-                <CardHeader className="p-8 border-b border-slate-200 dark:border-slate-700">
-                  <CardTitle className="flex items-center gap-4">
+              <GlassCard elevation={2} className="overflow-hidden">
+                <div className="p-8 border-b border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
                       <Trophy className="w-5 h-5 text-white" />
                     </div>
                     <span className={`text-2xl font-bold ${theme.text}`}>
                       Completed Programs
                     </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-8">
+                  </div>
+                </div>
+                <div className="p-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {completedPrograms.map((program) => (
-                      <Card
+                      <GlassCard
                         key={program.id}
-                        className={`${theme.card} border-2 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600 transition-all duration-300 rounded-2xl`}
+                        elevation={1}
+                        className="p-6 border-2 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600 transition-all duration-300"
                       >
-                        <CardContent className="p-6">
                           <div className="flex items-center justify-between mb-4">
                             <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
                               <Trophy className="w-6 h-6 text-white" />
@@ -2304,12 +2230,11 @@ export default function EnhancedClientWorkouts({
                               ></div>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
+                      </GlassCard>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </GlassCard>
             )}
 
             {/* All Assigned Workouts */}
@@ -2376,15 +2301,15 @@ export default function EnhancedClientWorkouts({
                             ? "bg-green-500/20 border-green-500/30"
                             : "bg-green-100 border-green-200",
                           text: isDark ? "text-green-400" : "text-green-700",
-                          label: "ACTIVE",
+                          label: "IN PROGRESS",
                         };
                       } else {
                         return {
                           bg: isDark
-                            ? "bg-slate-800/50 border-slate-700"
+                            ? "bg-slate-500/20 border-slate-500/30"
                             : "bg-slate-100 border-slate-200",
-                          text: isDark ? "text-slate-400" : "text-slate-600",
-                          label: assignment.status?.toUpperCase() || "PENDING",
+                          text: isDark ? "text-slate-400" : "text-slate-700",
+                          label: "COMPLETED",
                         };
                       }
                     };
@@ -2392,34 +2317,33 @@ export default function EnhancedClientWorkouts({
                     const statusBadge = getStatusBadge();
 
                     return (
-                      <div
+                      <Link
                         key={assignment.id}
-                        className={`group cursor-pointer transition-all duration-300 ${
-                          isDark
-                            ? "bg-gradient-to-br from-white/[0.06] to-white/[0.01] border border-white/10 hover:bg-white/[0.08] hover:border-white/20"
-                            : "bg-white border border-slate-200/80 hover:border-slate-300 hover:shadow-lg"
-                        }`}
-                        style={{
-                          borderRadius: "24px",
-                          padding: "20px",
-                          backdropFilter: isDark
-                            ? "blur(24px) saturate(180%)"
-                            : "none",
-                          position: "relative",
-                          overflow: "hidden",
-                        }}
-                        onClick={() => {
-                          if (assignment.type === "program") {
-                            router.push(
-                              `/client/programs/${assignment.program_id}/details`
-                            );
-                          } else {
-                            router.push(
-                              `/client/workouts/${assignment.id}/details`
-                            );
-                          }
-                        }}
+                        href={
+                          assignment.type === "program"
+                            ? `/client/programs/${assignment.program_id}/details`
+                            : `/client/workouts/${assignment.id}/details`
+                        }
+                        className="group block"
                       >
+                        <div
+                          className="rounded-2xl border transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
+                          style={{
+                            background: isDark
+                              ? "rgba(28, 28, 30, 0.80)"
+                              : "rgba(255, 255, 255, 0.85)",
+                            backdropFilter: "blur(20px) saturate(150%)",
+                            WebkitBackdropFilter: "blur(20px) saturate(150%)",
+                            border: `1px solid ${
+                              isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.18)"
+                            }`,
+                            borderRadius: "1rem",
+                            padding: "24px",
+                            boxShadow: isDark
+                              ? "0px 4px 16px rgba(0,0,0,0.6)"
+                              : "0px 4px 16px rgba(0,0,0,0.12)",
+                          }}
+                        >
                         {/* Shimmer effect overlay */}
                         {isDark && (
                           <div
@@ -2593,17 +2517,14 @@ export default function EnhancedClientWorkouts({
                                       `/client/programs/${assignment.program_id}/details`
                                     );
                                   } else {
-                                    router.push(
-                                      `/client/workouts/${assignment.id}/start`
-                                    );
+                                    router.push(`/client/workouts/${assignment.id}/start`);
                                   }
                                 }}
-                                className="h-10 px-4 sm:px-6 rounded-xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30 hover:shadow-green-500/40 transition-all flex-1 sm:flex-initial"
-                                style={{
-                                  boxShadow: isDark
-                                    ? "0 4px 20px rgba(16, 185, 129, 0.3)"
-                                    : "0 4px 12px rgba(16, 185, 129, 0.2)",
-                                }}
+                                className={`h-10 px-3 sm:px-4 rounded-xl font-semibold transition-all flex-1 sm:flex-initial ${
+                                  isDark
+                                    ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0"
+                                    : "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0"
+                                }`}
                               >
                                 <Play
                                   size={16}
@@ -2626,7 +2547,8 @@ export default function EnhancedClientWorkouts({
                             />
                           </div>
                         </div>
-                      </div>
+                        </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -2636,19 +2558,20 @@ export default function EnhancedClientWorkouts({
             {/* Exercise Alternatives Modal */}
             {showAlternatives && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                <Card
-                  className={`max-w-2xl w-full max-h-[80vh] overflow-hidden ${theme.card} ${theme.shadow} rounded-3xl`}
+                <GlassCard
+                  elevation={3}
+                  className="max-w-2xl w-full max-h-[80vh] overflow-hidden rounded-3xl"
                 >
-                  <CardHeader className="border-b border-slate-200 dark:border-slate-700 p-8">
+                  <div className="border-b border-slate-200 dark:border-slate-700 p-8">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-3">
+                      <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                           <Shuffle className="w-4 h-4 text-white" />
                         </div>
                         <span className={`text-xl font-bold ${theme.text}`}>
                           Exercise Alternatives
                         </span>
-                      </CardTitle>
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -2658,8 +2581,8 @@ export default function EnhancedClientWorkouts({
                         <X className="w-5 h-5" />
                       </Button>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-8">
+                  </div>
+                  <div className="p-8">
                     {selectedExerciseAlternatives.length > 0 ? (
                       <div className="space-y-6">
                         <p className={`text-base ${theme.textSecondary}`}>
@@ -2737,8 +2660,8 @@ export default function EnhancedClientWorkouts({
                         </p>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </GlassCard>
               </div>
             )}
           </div>

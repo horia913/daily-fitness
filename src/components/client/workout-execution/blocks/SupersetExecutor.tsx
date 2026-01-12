@@ -13,6 +13,7 @@ import { LargeInput } from "../ui/LargeInput";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 export function SupersetExecutor({
   block,
@@ -261,7 +262,7 @@ export function SupersetExecutor({
   const loggingInputs = (
     <div className="space-y-6">
       {/* Exercise A */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-700">
+      <GlassCard elevation={1} className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h4 className="font-semibold text-blue-800 dark:text-blue-200 text-lg">
             Exercise A: {exerciseA?.exercise?.name || "Exercise A"}
@@ -291,10 +292,10 @@ export function SupersetExecutor({
             step="1"
           />
         </div>
-      </div>
+      </GlassCard>
 
       {/* Exercise B */}
-      <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-700">
+      <GlassCard elevation={1} className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h4 className="font-semibold text-purple-800 dark:text-purple-200 text-lg">
             Exercise B: {exerciseB?.exercise?.name || "Exercise B"}
@@ -324,7 +325,7 @@ export function SupersetExecutor({
             step="1"
           />
         </div>
-      </div>
+      </GlassCard>
     </div>
   );
 

@@ -50,58 +50,29 @@ function NutritionDashboardContent() {
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
 
   const [nutritionData, setNutritionData] = useState<NutritionData>({
-    // Start with zero actual intake; goals are static defaults
-    calories: { consumed: 0, goal: 2200 },
-    protein: { consumed: 0, goal: 150 },
-    carbs: { consumed: 0, goal: 250 },
-    fat: { consumed: 0, goal: 70 },
-    water: { glasses: 0, goal: 8, ml: 0, goalMl: 3000 }, // 8 glasses = 3000ml (375ml per glass)
+    calories: { consumed: 0, goal: 0 },
+    protein: { consumed: 0, goal: 0 },
+    carbs: { consumed: 0, goal: 0 },
+    fat: { consumed: 0, goal: 0 },
+    water: { glasses: 0, goal: 0, ml: 0, goalMl: 0 },
   });
 
-  const [meals, setMeals] = useState<Meal[]>([
-    {
-      id: "1",
-      type: "breakfast",
-      name: "Breakfast",
-      emoji: "🍳",
-      items: [],
-      logged: false,
-    },
-    {
-      id: "2",
-      type: "lunch",
-      name: "Lunch",
-      emoji: "🥗",
-      items: [],
-      logged: false,
-    },
-    {
-      id: "3",
-      type: "dinner",
-      name: "Dinner",
-      emoji: "🍽️",
-      items: [],
-      logged: false,
-    },
-    {
-      id: "4",
-      type: "snack",
-      name: "Snacks",
-      emoji: "🍎",
-      items: [],
-      logged: false,
-    },
-  ]);
+  const [meals, setMeals] = useState<Meal[]>([]);
 
   const [uploadingMeal, setUploadingMeal] = useState<string | null>(null);
   const [loadingMeals, setLoadingMeals] = useState(true);
   const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null);
   const [hasMealsInPlan, setHasMealsInPlan] = useState<boolean | null>(null);
+  const [waterGoalGlasses, setWaterGoalGlasses] = useState<number>(0);
+  const [displayedWaterGlasses, setDisplayedWaterGlasses] = useState<number>(1); // Start with 1, expand as needed
+  const [waterGoalId, setWaterGoalId] = useState<string | null>(null); // Store goal id for updates
+  const [loadingWaterGoal, setLoadingWaterGoal] = useState(false); // Prevent duplicate goal creation
 
-  // Load today's meal logs
+  // Load today's meal logs and water goal
   useEffect(() => {
     if (user) {
       loadTodayMeals();
+      loadWaterGoal();
     }
   }, [user]);
 
@@ -113,11 +84,16 @@ function NutritionDashboardContent() {
       const today = new Date().toISOString().split("T")[0];
 
       // STEP 1: Get active meal plan assignment with meal plan details
-      const { data: assignment, error: assignmentError } = await supabase
+      // Check for active assignments that are within date range (or no end_date)
+      // Use .limit(1) instead of .maybeSingle() to handle multiple active assignments
+      const { data: assignmentsData, error: assignmentError } = await supabase
         .from("meal_plan_assignments")
         .select(
           `
           meal_plan_id,
+          start_date,
+          end_date,
+          is_active,
           meal_plans (
             id,
             target_calories,
@@ -129,18 +105,43 @@ function NutritionDashboardContent() {
         )
         .eq("client_id", user.id)
         .eq("is_active", true)
-        .maybeSingle();
+        .lte("start_date", today) // Assignment has started
+        .or(`end_date.is.null,end_date.gte.${today}`) // No end date OR hasn't ended yet
+        .order("start_date", { ascending: false })
+        .limit(1); // Get only the most recent active assignment
+
+      // Extract the first assignment (most recent) or null if none found
+      const assignment = assignmentsData && assignmentsData.length > 0 ? assignmentsData[0] : null;
+
+      if (assignmentError) {
+        console.error("Error loading meal plan assignment:", assignmentError);
+        console.error("Assignment error details:", {
+          message: assignmentError.message,
+          details: assignmentError.details,
+          hint: assignmentError.hint,
+          code: assignmentError.code
+        });
+      }
+
+      // Debug: Log assignment query result
+      console.log("Meal plan assignment query result:", {
+        hasAssignment: !!assignment,
+        assignment,
+        today,
+        error: assignmentError
+      });
 
       if (assignmentError || !assignment) {
+        console.log("No active meal plan assignment found for client:", user.id);
         // No active plan – clear meals and zero out today's intake
         setHasActivePlan(false);
         setMeals([]);
         setNutritionData((prev) => ({
           ...prev,
-          calories: { ...prev.calories, consumed: 0, goal: 2200 },
-          protein: { ...prev.protein, consumed: 0, goal: 150 },
-          carbs: { ...prev.carbs, consumed: 0, goal: 250 },
-          fat: { ...prev.fat, consumed: 0, goal: 70 },
+          calories: { consumed: 0, goal: 0 },
+          protein: { consumed: 0, goal: 0 },
+          carbs: { consumed: 0, goal: 0 },
+          fat: { consumed: 0, goal: 0 },
         }));
         setLoadingMeals(false);
         return;
@@ -148,12 +149,12 @@ function NutritionDashboardContent() {
 
       setHasActivePlan(true);
 
-      // Extract meal plan targets (use defaults if not set)
+      // Extract meal plan targets (use 0 if not set - no defaults)
       const mealPlan = assignment.meal_plans as any;
-      const targetCalories = mealPlan?.target_calories || 2200;
-      const targetProtein = mealPlan?.target_protein || 150;
-      const targetCarbs = mealPlan?.target_carbs || 250;
-      const targetFat = mealPlan?.target_fat || 70;
+      const targetCalories = mealPlan?.target_calories || 0;
+      const targetProtein = mealPlan?.target_protein || 0;
+      const targetCarbs = mealPlan?.target_carbs || 0;
+      const targetFat = mealPlan?.target_fat || 0;
 
       // STEP 2: Get all meals in the active meal plan
       const { data: planMeals, error: mealsError } = await supabase
@@ -166,13 +167,13 @@ function NutritionDashboardContent() {
         console.error("Error fetching meals or no meals in plan:", mealsError);
         setHasMealsInPlan(false);
         setMeals([]);
-        // Active plan but no meals -> zero intake, but keep meal plan targets
+        // Active plan but no meals -> zero intake, use meal plan targets (may be 0)
         setNutritionData((prev) => ({
           ...prev,
-          calories: { consumed: 0, goal: targetCalories },
-          protein: { consumed: 0, goal: targetProtein },
-          carbs: { consumed: 0, goal: targetCarbs },
-          fat: { consumed: 0, goal: targetFat },
+          calories: { consumed: 0, goal: targetCalories || 0 },
+          protein: { consumed: 0, goal: targetProtein || 0 },
+          carbs: { consumed: 0, goal: targetCarbs || 0 },
+          fat: { consumed: 0, goal: targetFat || 0 },
         }));
         setLoadingMeals(false);
         return;
@@ -299,38 +300,18 @@ function NutritionDashboardContent() {
         });
       }
 
-      // Update nutrition totals based on all meals
-      const totalCalories = mealsWithData.reduce(
-        (sum, meal) =>
-          sum +
-          meal.items.reduce((itemSum, item) => itemSum + item.calories, 0),
-        0
-      );
-      const totalProtein = mealsWithData.reduce(
-        (sum, meal) =>
-          sum + meal.items.reduce((itemSum, item) => itemSum + item.protein, 0),
-        0
-      );
-      const totalCarbs = mealsWithData.reduce(
-        (sum, meal) =>
-          sum + meal.items.reduce((itemSum, item) => itemSum + item.carbs, 0),
-        0
-      );
-      const totalFat = mealsWithData.reduce(
-        (sum, meal) =>
-          sum + meal.items.reduce((itemSum, item) => itemSum + item.fat, 0),
-        0
-      );
-
-      setNutritionData((prev) => ({
-        ...prev,
-        calories: { consumed: totalCalories, goal: targetCalories },
-        protein: { consumed: totalProtein, goal: targetProtein },
-        carbs: { consumed: totalCarbs, goal: targetCarbs },
-        fat: { consumed: totalFat, goal: targetFat },
-      }));
-
+      // Update nutrition totals based on LOGGED meals only
+      // Set meals state
       setMeals(mealsWithData);
+
+      // Calculate totals from meals array and update goals
+      calculateNutritionTotals(
+        mealsWithData,
+        targetCalories,
+        targetProtein,
+        targetCarbs,
+        targetFat
+      );
     } catch (error) {
       console.error("Error loading meals:", error);
     } finally {
@@ -338,23 +319,238 @@ function NutritionDashboardContent() {
     }
   };
 
-  const handleWaterGlassClick = (targetGlasses: number) => {
-    setNutritionData((prev) => {
-      // If clicking the same number of glasses, remove one
-      const newGlasses =
-        targetGlasses === prev.water.glasses
-          ? Math.max(prev.water.glasses - 1, 0)
-          : targetGlasses;
-      const newMl = newGlasses * 375; // 375ml per glass
-      return {
+  const loadWaterGoal = async () => {
+    if (!user?.id) return;
+    if (loadingWaterGoal) return; // Prevent duplicate calls
+    
+    setLoadingWaterGoal(true);
+    try {
+      // Fetch active water intake goal from goals table (including current_value for today's intake)
+      const { data: goals, error } = await supabase
+        .from("goals")
+        .select("id, target_value, target_unit, current_value")
+        .eq("client_id", user.id)
+        .eq("status", "active")
+        .ilike("title", "%Water Intake%")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error("Error loading water goal:", error);
+        // If no goal found or error, set goal to 0
+        setWaterGoalId(null);
+        setWaterGoalGlasses(0);
+        setDisplayedWaterGlasses(1); // Show at least 1 glass even if no goal
+        setNutritionData((prev) => ({
+          ...prev,
+          water: { ...prev.water, goal: 0, goalMl: 0, glasses: 0, ml: 0 },
+        }));
+        return;
+      }
+
+      if (!goals || goals.length === 0) {
+        // No water goal configured - create one automatically with default values
+        console.log("No water goal found - creating default water goal");
+        const defaultTargetLiters = 3; // 3 liters (8 glasses) default goal
+        const defaultTargetMl = defaultTargetLiters * 1000;
+        
+        const { data: newGoal, error: createError } = await supabase
+          .from("goals")
+          .insert({
+            client_id: user.id,
+            title: "Water Intake",
+            description: "Daily water intake goal",
+            category: "other",
+            target_value: defaultTargetLiters,
+            target_unit: "liters",
+            current_value: 0,
+            status: "active",
+            priority: "medium",
+            start_date: new Date().toISOString().split("T")[0],
+            progress_percentage: 0,
+          })
+          .select("id, target_value, target_unit, current_value")
+          .single();
+
+        if (createError) {
+          console.error("Error creating water goal:", createError);
+          setWaterGoalId(null);
+          setWaterGoalGlasses(0);
+          setDisplayedWaterGlasses(1);
+          setNutritionData((prev) => ({
+            ...prev,
+            water: { ...prev.water, goal: 0, goalMl: 0, glasses: 0, ml: 0 },
+          }));
+          return;
+        }
+
+        // Use the newly created goal
+        const goalGlasses = Math.ceil(defaultTargetMl / 375); // 8 glasses
+        const displayGoalGlasses = Math.min(goalGlasses, 16);
+        
+        setWaterGoalId(newGoal.id);
+        setWaterGoalGlasses(displayGoalGlasses);
+        setDisplayedWaterGlasses(Math.max(displayGoalGlasses, 1));
+        setNutritionData((prev) => ({
+          ...prev,
+          water: {
+            glasses: 0,
+            goal: displayGoalGlasses,
+            ml: 0,
+            goalMl: defaultTargetMl,
+          },
+        }));
+        console.log("Water goal created successfully:", newGoal.id);
+        setLoadingWaterGoal(false);
+        return;
+      }
+
+      const waterGoal = goals[0];
+      console.log("Water goal loaded:", waterGoal.id, "current_value:", waterGoal.current_value);
+      setWaterGoalId(waterGoal.id); // Store goal id for updates
+      const targetValue = waterGoal.target_value || 0;
+      const currentValue = waterGoal.current_value || 0; // Today's water intake (in ml)
+      const unit = waterGoal.target_unit?.toLowerCase() || "liters";
+
+      // Convert target_value to milliliters and glasses based on unit
+      let goalMl = 0;
+      if (unit === "liters" || unit === "l") {
+        goalMl = targetValue * 1000; // Convert liters to ml
+      } else if (unit === "glasses") {
+        goalMl = targetValue * 375; // 375ml per glass
+      } else if (unit === "ml" || unit === "milliliters") {
+        goalMl = targetValue; // Already in ml
+      } else {
+        // Default: assume liters
+        goalMl = targetValue * 1000;
+      }
+
+      const goalGlasses = Math.ceil(goalMl / 375); // Round up to nearest glass
+      
+      // Cap at 16 glasses (6000ml) for display, but allow tracking up to 16
+      const displayGoalGlasses = Math.min(goalGlasses, 16);
+
+      setWaterGoalGlasses(displayGoalGlasses);
+      
+      // Convert current_value (ml) to glasses for display
+      const currentGlasses = Math.floor(currentValue / 375); // 375ml per glass
+      const currentMl = currentValue;
+      
+      // Initialize displayed glasses to max of goal, current, or 1
+      setDisplayedWaterGlasses(Math.max(displayGoalGlasses, currentGlasses, 1));
+      
+      setNutritionData((prev) => ({
         ...prev,
         water: {
-          ...prev.water,
-          glasses: newGlasses,
-          ml: newMl,
+          glasses: currentGlasses,
+          goal: displayGoalGlasses,
+          ml: currentMl,
+          goalMl: goalMl,
         },
-      };
-    });
+      }));
+    } catch (error) {
+      console.error("Error loading water goal:", error);
+      setWaterGoalId(null);
+      setWaterGoalGlasses(0);
+      setDisplayedWaterGlasses(1); // Show at least 1 glass even if no goal
+      setNutritionData((prev) => ({
+        ...prev,
+        water: { ...prev.water, goal: 0, goalMl: 0, glasses: 0, ml: 0 },
+      }));
+    } finally {
+      setLoadingWaterGoal(false);
+    }
+  };
+
+  const handleWaterGlassClick = async (targetGlasses: number) => {
+    console.log("handleWaterGlassClick called with:", targetGlasses, "waterGoalId:", waterGoalId, "user:", user?.id);
+    
+    if (!user?.id || !waterGoalId) {
+      console.log("No goal configured - updating UI state only");
+      // No goal configured, just update UI state
+      setNutritionData((prev) => {
+        const maxGlasses = 16;
+        let newGlasses =
+          targetGlasses === prev.water.glasses
+            ? Math.max(prev.water.glasses - 1, 0)
+            : Math.min(targetGlasses, maxGlasses);
+        
+        if (newGlasses > displayedWaterGlasses && newGlasses <= maxGlasses) {
+          setDisplayedWaterGlasses(newGlasses);
+        }
+        
+        const newMl = newGlasses * 375;
+        return {
+          ...prev,
+          water: { ...prev.water, glasses: newGlasses, ml: newMl },
+        };
+      });
+      return;
+    }
+
+    try {
+      console.log("Saving water intake to database...");
+      // Store old value for error revert
+      const oldGlasses = nutritionData.water.glasses;
+      const oldMl = nutritionData.water.ml;
+      
+      // Allow tracking up to 16 glasses (6000ml max)
+      const maxGlasses = 16;
+      // If clicking the same number of glasses, remove one
+      let newGlasses =
+        targetGlasses === oldGlasses
+          ? Math.max(oldGlasses - 1, 0)
+          : Math.min(targetGlasses, maxGlasses); // Cap at 16 glasses
+      
+      // Expand displayed glasses if user clicks beyond current display (up to 16)
+      if (newGlasses > displayedWaterGlasses && newGlasses <= maxGlasses) {
+        setDisplayedWaterGlasses(newGlasses);
+      }
+      
+      const newMl = newGlasses * 375; // 375ml per glass
+      
+      console.log("Updating UI state - newGlasses:", newGlasses, "newMl:", newMl);
+      // Update UI state immediately (optimistic update)
+      setNutritionData((prev) => ({
+        ...prev,
+        water: { ...prev.water, glasses: newGlasses, ml: newMl },
+      }));
+
+      console.log("Saving to database - goalId:", waterGoalId, "newMl:", newMl);
+      // Save to database (goals table current_value in ml)
+      const { data: updateData, error: updateError } = await supabase
+        .from("goals")
+        .update({
+          current_value: newMl, // Store in ml
+          progress_percentage: waterGoalGlasses > 0 
+            ? Math.min((newGlasses / waterGoalGlasses) * 100, 100)
+            : 0,
+          status: waterGoalGlasses > 0 && newGlasses >= waterGoalGlasses ? "completed" : "active",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", waterGoalId)
+        .select("id, current_value");
+
+      if (updateError) {
+        console.error("Error updating water intake:", updateError);
+        // Revert UI state on error (restore old values)
+        setNutritionData((prev) => ({
+          ...prev,
+          water: { ...prev.water, glasses: oldGlasses, ml: oldMl },
+        }));
+        alert("Failed to save water intake. Please try again.");
+      } else {
+        console.log("Water intake saved successfully! Response:", updateData);
+        if (!updateData || updateData.length === 0) {
+          console.warn("Update succeeded but no rows were updated - goal might not exist or permissions issue");
+        } else {
+          console.log("Updated goal:", updateData[0]);
+        }
+      }
+    } catch (error) {
+      console.error("Error in handleWaterGlassClick:", error);
+      alert("Failed to save water intake. Please try again.");
+    }
   };
 
   // Helper function to build meal description from food items
@@ -382,6 +578,67 @@ function NutritionDashboardContent() {
   // Helper function to get logged meals count
   const getLoggedMealsCount = (): number => {
     return meals.filter((m) => m.logged).length;
+  };
+
+  // Helper function to calculate and update nutrition totals from meals array
+  // If goals are provided, updates them; otherwise preserves existing goals from state
+  const calculateNutritionTotals = (
+    mealsArray: Meal[],
+    targetCalories?: number,
+    targetProtein?: number,
+    targetCarbs?: number,
+    targetFat?: number
+  ) => {
+    const totalCalories = mealsArray.reduce(
+      (sum, meal) =>
+        meal.logged
+          ? sum + meal.items.reduce((itemSum, item) => itemSum + item.calories, 0)
+          : sum,
+      0
+    );
+    const totalProtein = mealsArray.reduce(
+      (sum, meal) =>
+        meal.logged
+          ? sum + meal.items.reduce((itemSum, item) => itemSum + item.protein, 0)
+          : sum,
+      0
+    );
+    const totalCarbs = mealsArray.reduce(
+      (sum, meal) =>
+        meal.logged
+          ? sum + meal.items.reduce((itemSum, item) => itemSum + item.carbs, 0)
+          : sum,
+      0
+    );
+    const totalFat = mealsArray.reduce(
+      (sum, meal) =>
+        meal.logged
+          ? sum + meal.items.reduce((itemSum, item) => itemSum + item.fat, 0)
+          : sum,
+      0
+    );
+
+    // Update nutrition data
+    // If goals provided, use them; otherwise preserve existing goals from state
+    setNutritionData((prev) => ({
+      ...prev,
+      calories: {
+        consumed: totalCalories,
+        goal: targetCalories !== undefined ? targetCalories : prev.calories.goal,
+      },
+      protein: {
+        consumed: totalProtein,
+        goal: targetProtein !== undefined ? targetProtein : prev.protein.goal,
+      },
+      carbs: {
+        consumed: totalCarbs,
+        goal: targetCarbs !== undefined ? targetCarbs : prev.carbs.goal,
+      },
+      fat: {
+        consumed: totalFat,
+        goal: targetFat !== undefined ? targetFat : prev.fat.goal,
+      },
+    }));
   };
 
   const handleMealPhotoUpload = async (mealId: string, mealType: string) => {
@@ -433,8 +690,8 @@ function NutritionDashboardContent() {
 
         // Update local state with the logged photo
         if (result.photoLog) {
-          setMeals((prev) =>
-            prev.map((meal) =>
+          setMeals((prev) => {
+            const updated = prev.map((meal) =>
               meal.id === mealId
                 ? {
                     ...meal,
@@ -443,8 +700,11 @@ function NutritionDashboardContent() {
                     logged_at: result.photoLog!.created_at,
                   }
                 : meal
-            )
-          );
+            );
+            // Recalculate nutrition totals automatically after meal is logged
+            calculateNutritionTotals(updated);
+            return updated;
+          });
         }
 
         alert("Meal photo uploaded successfully!");
@@ -1084,21 +1344,28 @@ function NutritionDashboardContent() {
                   isDark ? "text-neutral-400" : "text-neutral-500"
                 }`}
               >
-                Daily Goal: {nutritionData.water.goalMl.toLocaleString()}ml (
-                {nutritionData.water.goal} glasses)
+                {nutritionData.water.goalMl > 0 ? (
+                  <>Daily Goal: {nutritionData.water.goalMl.toLocaleString()}ml ({nutritionData.water.goal} glasses)</>
+                ) : (
+                  <>No water goal configured. Set your goal in the Habits page.</>
+                )}
               </p>
             </div>
             <div className="flex gap-2.5 overflow-x-auto pb-2">
-              {/* Interactive glasses - show 10 total (8 goal + 2 extra for tracking beyond) */}
-              {Array.from({ length: 10 }).map((_, index) => {
+              {/* Interactive glasses - show goal number initially, expand dynamically up to 16 (6000ml) */}
+              {Array.from({ length: Math.min(displayedWaterGlasses, 16) }).map((_, index) => {
                 const isActive = index < nutritionData.water.glasses;
+                const glassNumber = index + 1;
+                const isGoalGlass = glassNumber <= waterGoalGlasses;
                 return (
                   <button
                     key={index}
-                    onClick={() => handleWaterGlassClick(index + 1)}
+                    onClick={() => handleWaterGlassClick(glassNumber)}
                     className={`p-2 rounded-lg transition-all ${
                       isActive
-                        ? "bg-blue-500/10 text-blue-400 active:scale-90"
+                        ? isGoalGlass
+                          ? "bg-blue-500/10 text-blue-400 active:scale-90"
+                          : "bg-blue-500/5 text-blue-300 active:scale-90"
                         : "bg-white/5 text-neutral-600 hover:bg-white/10"
                     }`}
                     style={{
@@ -1111,6 +1378,16 @@ function NutritionDashboardContent() {
                   </button>
                 );
               })}
+              {/* Show + button if we're at displayed limit but haven't reached max */}
+              {displayedWaterGlasses < 16 && nutritionData.water.glasses >= displayedWaterGlasses && (
+                <button
+                  onClick={() => handleWaterGlassClick(nutritionData.water.glasses + 1)}
+                  className="p-2 rounded-lg transition-all bg-white/5 text-neutral-600 hover:bg-white/10 active:scale-90 flex items-center gap-1"
+                >
+                  <Droplet className="w-6 h-6" />
+                  <span className="text-xs">+</span>
+                </button>
+              )}
             </div>
             <div className="text-right">
               <div

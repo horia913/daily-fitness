@@ -1,6 +1,6 @@
 // Email Service for DailyFitness
-// This is a placeholder for email functionality
-// You can integrate with services like SendGrid, Resend, or Nodemailer
+// Uses OneSignal REST API to send transactional emails
+// Requires NEXT_PUBLIC_ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY environment variables
 
 interface EmailData {
   to: string
@@ -13,16 +13,15 @@ class EmailService {
   private isConfigured = false
 
   constructor() {
-    // Check if email service is configured
+    // Check if OneSignal is configured (using it for email sending)
     this.isConfigured = !!(
-      process.env.EMAIL_SERVICE_API_KEY || 
-      process.env.SENDGRID_API_KEY || 
-      process.env.RESEND_API_KEY
+      process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID && 
+      process.env.ONESIGNAL_REST_API_KEY
     )
   }
 
   /**
-   * Send an email
+   * Send an email using OneSignal
    */
   async send(emailData: EmailData): Promise<boolean> {
     if (!this.isConfigured) {
@@ -31,22 +30,41 @@ class EmailService {
     }
 
     try {
-      // TODO: Implement actual email sending
-      // This would integrate with your chosen email service
-      
-      // Example for SendGrid:
-      // const sgMail = require('@sendgrid/mail')
-      // sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-      // await sgMail.send(emailData)
-      
-      // Example for Resend:
-      // const resend = new Resend(process.env.RESEND_API_KEY)
-      // await resend.emails.send(emailData)
-      
-      console.log('Email sent successfully:', emailData.to)
-      return true
+      const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
+      const apiKey = process.env.ONESIGNAL_REST_API_KEY
+
+      if (!appId || !apiKey) {
+        console.error('OneSignal credentials not configured')
+        return false
+      }
+
+      const payload: any = {
+        app_id: appId,
+        email_to: [emailData.to],
+        email_subject: emailData.subject,
+        email_body: emailData.html
+      }
+
+      const response = await fetch('https://onesignal.com/api/v1/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${apiKey}`
+        },
+        body: JSON.stringify(payload)
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        console.log('✅ Email sent successfully via OneSignal:', emailData.to)
+        return true
+      } else {
+        console.error('❌ Failed to send email via OneSignal:', result)
+        return false
+      }
     } catch (error) {
-      console.error('Error sending email:', error)
+      console.error('❌ Error sending email:', error)
       return false
     }
   }

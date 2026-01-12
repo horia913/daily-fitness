@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface NavigationControlsProps {
@@ -26,7 +27,7 @@ export function NavigationControls({
   }
 
   return (
-    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+    <GlassCard elevation={1} className="flex items-center justify-between p-4">
       <div className="text-sm font-medium text-slate-600 dark:text-slate-400">
         Block {currentBlock} of {totalBlocks}
       </div>
@@ -56,6 +57,6 @@ export function NavigationControls({
           </Button>
         )}
       </div>
-    </div>
+    </GlassCard>
   );
 }

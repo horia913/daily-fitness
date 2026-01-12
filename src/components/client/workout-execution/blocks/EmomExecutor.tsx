@@ -13,6 +13,7 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 export function EmomExecutor({
   block,
@@ -262,23 +263,25 @@ export function EmomExecutor({
       </div>
 
       {/* Weight and Reps Input */}
-      <div className="grid grid-cols-2 gap-4">
-        <LargeInput
-          label="Weight"
-          value={weight}
-          onChange={setWeight}
-          placeholder="0"
-          step="0.5"
-          unit="kg"
-        />
-        <LargeInput
-          label="Reps Completed"
-          value={reps}
-          onChange={setReps}
-          placeholder="0"
-          step="1"
-        />
-      </div>
+      <GlassCard elevation={1} className="p-4">
+        <div className="grid grid-cols-2 gap-4">
+          <LargeInput
+            label="Weight"
+            value={weight}
+            onChange={setWeight}
+            placeholder="0"
+            step="0.5"
+            unit="kg"
+          />
+          <LargeInput
+            label="Reps Completed"
+            value={reps}
+            onChange={setReps}
+            placeholder="0"
+            step="1"
+          />
+        </div>
+      </GlassCard>
     </div>
   );
 

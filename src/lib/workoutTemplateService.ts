@@ -985,6 +985,14 @@ export class WorkoutTemplateService {
 
   static async createProgramAssignment(clientId: string, programId: string, startDate: string, coachId?: string): Promise<ProgramAssignment | null> {
     try {
+      // Enforce single program assignment: Set all existing programs to 'completed'
+      // This ensures only one program is active per client
+      await supabase
+        .from('program_assignments')
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .eq('client_id', clientId)
+        .eq('status', 'active')
+
       const { data: existing, error: existingError } = await supabase
         .from('program_assignments')
         .select('*')
@@ -1004,6 +1012,7 @@ export class WorkoutTemplateService {
         program_id: programId,
         start_date: startDate,
         total_days: totalDays,
+        status: 'active', // Explicitly set to active
       }
 
       if (coachId) {
@@ -1020,6 +1029,17 @@ export class WorkoutTemplateService {
 
         if (insertResponse.error) throw insertResponse.error
         data = insertResponse.data
+      } else {
+        // Update existing assignment to active
+        const updateResponse = await supabase
+          .from('program_assignments')
+          .update({ status: 'active', start_date: startDate, updated_at: new Date().toISOString() })
+          .eq('id', existing.id)
+          .select('*')
+          .single()
+
+        if (updateResponse.error) throw updateResponse.error
+        data = updateResponse.data
       }
 
       if (data?.id) {

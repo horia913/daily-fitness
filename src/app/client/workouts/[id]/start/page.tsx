@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
+import { GlassCard } from "@/components/ui/GlassCard";
 import {
   Card,
   CardContent,
@@ -2502,19 +2503,8 @@ export default function LiveWorkout() {
               style={{ display: "flex", flexDirection: "column", gap: "20px" }}
             >
               {/* Enhanced Header */}
-              <Card
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "24px",
-                  padding: "24px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                  marginBottom: "20px",
-                  border: "none",
-                  overflow: "hidden",
-                }}
-              >
-                <CardContent style={{ padding: "0" }}>
-                  <div className="flex items-center" style={{ gap: "16px" }}>
+              <GlassCard elevation={2} className="p-6 mb-5">
+                <div className="flex items-center" style={{ gap: "16px" }}>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -2557,7 +2547,7 @@ export default function LiveWorkout() {
                             style={{
                               fontSize: "20px",
                               fontWeight: "700",
-                              color: "#1A1A1A",
+                              color: isDark ? "#fff" : "#1A1A1A",
                               lineHeight: "1.2",
                               marginBottom: "4px",
                             }}
@@ -2568,7 +2558,7 @@ export default function LiveWorkout() {
                             style={{
                               fontSize: "14px",
                               fontWeight: "400",
-                              color: "#6B7280",
+                              color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
                             }}
                           >
                             Live Workout Session
@@ -2591,23 +2581,21 @@ export default function LiveWorkout() {
                         style={{
                           fontSize: "14px",
                           fontWeight: "400",
-                          color: "#6B7280",
+                          color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
                         }}
                       >
                         Live
                       </span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+              </GlassCard>
               {/* Workout Block System */}
               {useBlockSystem && workoutBlocks.length > 0 ? (
                 <>
                   {/* Block Progress Indicator */}
                   {workoutBlocks.length > 1 && (
-                    <Card className={`${theme.card} border ${theme.border} rounded-2xl overflow-hidden mb-4`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                    <GlassCard elevation={2} className="p-4 mb-4">
+                      <div className="flex items-center gap-2 overflow-x-auto pb-2">
                           {workoutBlocks.map((block, index) => {
                             const isCompleted = block.isCompleted || index < currentBlockIndex;
                             const isCurrent = index === currentBlockIndex;
@@ -2641,8 +2629,7 @@ export default function LiveWorkout() {
                         <div className="text-xs text-slate-500 dark:text-slate-400 mt-2 text-center">
                           Block {currentBlockIndex + 1} of {workoutBlocks.length}
                         </div>
-                      </CardContent>
-                    </Card>
+                    </GlassCard>
                   )}
                   <LiveWorkoutBlockExecutor
                     block={workoutBlocks[currentBlockIndex]}

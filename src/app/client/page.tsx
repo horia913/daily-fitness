@@ -981,6 +981,41 @@ export default function ClientDashboard() {
                       </p>
                     </div>
                   </Link>
+
+                  {/* Session Scheduling */}
+                  <Link href="/client/scheduling">
+                    <div
+                      className="p-5 h-full transition-all cursor-pointer hover:scale-[1.02]"
+                      style={crystalCardStyle}
+                    >
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
+                        style={{
+                          background:
+                            "linear-gradient(135deg, #EC4899 0%, #BE185D 100%)",
+                          boxShadow: "0 4px 12px rgba(236, 72, 153, 0.3)",
+                        }}
+                      >
+                        <Calendar className="w-6 h-6 text-white" />
+                      </div>
+                      <h4
+                        className="text-base font-bold mb-1"
+                        style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
+                      >
+                        Book Session
+                      </h4>
+                      <p
+                        className="text-xs"
+                        style={{
+                          color: isDark
+                            ? "rgba(255,255,255,0.6)"
+                            : "rgba(0,0,0,0.6)",
+                        }}
+                      >
+                        Schedule with coach
+                      </p>
+                    </div>
+                  </Link>
                 </section>
               </div>
             </div>

@@ -1,18 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { MealPlanService, MealPlan } from "@/lib/mealPlanService";
+import { DatabaseService, Client } from "@/lib/database";
+import MealPlanCard from "@/components/features/nutrition/MealPlanCard";
+import MealPlanAssignmentModal from "@/components/features/nutrition/MealPlanAssignmentModal";
 import {
   Select,
   SelectContent,
@@ -42,6 +45,7 @@ import {
   Activity,
   Layers,
   UserPlus,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import MealPlanBuilder from "@/components/MealPlanBuilder";
@@ -63,16 +67,6 @@ interface Food {
   category: string;
 }
 
-interface MealPlan {
-  id: string;
-  name: string;
-  notes?: string;
-  target_calories?: number;
-  target_protein?: number;
-  target_carbs?: number;
-  target_fat?: number;
-  created_at: string;
-}
 
 interface MealPlanAssignment {
   id: string;
@@ -94,38 +88,24 @@ interface MealPlanAssignment {
 export default function CoachNutritionPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const { getThemeStyles, performanceSettings } = useTheme();
+  const { getThemeStyles, performanceSettings, isDark, getSemanticColor } = useTheme();
   const theme = getThemeStyles();
 
-  const [activeTab, setActiveTab] = useState("meal-plans");
+  const [activeTab, setActiveTab] = useState<"meal-plans" | "foods" | "assignments">("meal-plans");
   const [loading, setLoading] = useState(false);
   const [foods, setFoods] = useState<Food[]>([]);
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
   const [assignments, setAssignments] = useState<MealPlanAssignment[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedMealPlanForAssignment, setSelectedMealPlanForAssignment] = useState<MealPlan | null>(null);
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
 
   // Form states
   const [showAddFood, setShowAddFood] = useState(false);
   const [showAddMealPlan, setShowAddMealPlan] = useState(false);
-  const [showAssignMealPlan, setShowAssignMealPlan] = useState(false);
-  const [selectedMealPlan, setSelectedMealPlan] = useState<MealPlan | null>(
-    null
-  );
-  const [clients, setClients] = useState<
-    Array<{
-      id: string;
-      first_name?: string;
-      last_name?: string;
-      email: string;
-    }>
-  >([]);
-  const [assignmentForm, setAssignmentForm] = useState({
-    client_id: "",
-    meal_plan_id: "",
-    start_date: new Date().toISOString().split("T")[0],
-    end_date: "",
-    notes: "",
-  });
+  const [clients, setClients] = useState<Client[]>([]);
 
   // Food form
   const [foodForm, setFoodForm] = useState({
@@ -154,6 +134,7 @@ export default function CoachNutritionPage() {
   useEffect(() => {
     if (user) {
       loadData();
+      loadMealPlans();
     }
   }, [user]);
 
@@ -169,30 +150,14 @@ export default function CoachNutritionPage() {
         .eq("is_active", true)
         .order("name");
 
-      // Load meal plans
-      const { data: mealPlansData } = await supabase
-        .from("meal_plans")
-        .select("*")
-        .eq("coach_id", user.id)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
-
       // Load clients
-      const { data: clientsData } = await supabase
-        .from("clients")
-        .select("client_id")
-        .eq("coach_id", user.id)
-        .eq("status", "active");
-
-      const clientsList =
-        clientsData?.map((client) => ({
-          id: client.client_id,
-          first_name: "Client",
-          last_name: "Popescu",
-          email: "client@test.com",
-        })) || [];
-
-      setClients(clientsList);
+      try {
+        const coachClients = await DatabaseService.getClients(user.id);
+        setClients(coachClients);
+      } catch (error) {
+        console.error("Error loading clients:", error);
+        setClients([]);
+      }
 
       // Load assignments
       let assignmentsData = [];
@@ -233,7 +198,6 @@ export default function CoachNutritionPage() {
       }
 
       setFoods(foodsData || []);
-      setMealPlans(mealPlansData || []);
       setAssignments(assignmentsData || []);
     } catch (error) {
       console.error("Error loading nutrition data:", error);
@@ -241,6 +205,120 @@ export default function CoachNutritionPage() {
       setLoading(false);
     }
   };
+
+  const loadMealPlans = async () => {
+    try {
+      if (!user) return;
+      setLoading(true);
+
+      const mealPlansData = await MealPlanService.getMealPlans(user.id);
+
+      // Calculate actual stats for each meal plan
+      const mealPlansWithStats = await Promise.all(
+        mealPlansData.map(async (plan) => {
+          // Get meal count (from meal_plan_items - count distinct meal_type)
+          let mealCount = 0;
+          try {
+            const { data, error } = await supabase
+              .from("meal_plan_items")
+              .select("meal_type")
+              .eq("meal_plan_id", plan.id);
+
+            if (!error && data) {
+              // Count unique meal types
+              const uniqueMealTypes = new Set(
+                data.map((item) => item.meal_type)
+              );
+              mealCount = uniqueMealTypes.size;
+            }
+          } catch (error) {
+            // Silently fail - meal count is optional
+          }
+
+          // Get assignment count
+          let assignmentCount = 0;
+          try {
+            const { count, error } = await supabase
+              .from("meal_plan_assignments")
+              .select("*", { count: "exact", head: true })
+              .eq("meal_plan_id", plan.id);
+            if (!error && count !== null) {
+              assignmentCount = count;
+            }
+          } catch (error) {
+            console.warn(
+              `Error counting assignments for plan ${plan.id}:`,
+              error
+            );
+          }
+
+          return {
+            ...plan,
+            meal_count: mealCount,
+            usage_count: assignmentCount,
+          };
+        })
+      );
+
+      setMealPlans(mealPlansWithStats);
+    } catch (error) {
+      console.error("Error loading meal plans:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteMealPlan = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this meal plan?")) return;
+
+    try {
+      setLoading(true);
+      await MealPlanService.deleteMealPlan(id);
+      loadMealPlans();
+      alert("Meal plan deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting meal plan:", error);
+      alert("Error deleting meal plan. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssignMealPlan = async (mealPlan: MealPlan) => {
+    setSelectedMealPlanForAssignment(mealPlan);
+    setSelectedClients([]);
+
+    // Load clients for this coach
+    if (user?.id) {
+      try {
+        const coachClients = await DatabaseService.getClients(user.id);
+        setClients(coachClients);
+      } catch (error) {
+        console.error("Error loading clients:", error);
+        alert("Error loading clients. Please try again.");
+        return;
+      }
+    }
+
+    setShowAssignModal(true);
+  };
+
+  const handleAssignmentComplete = () => {
+    setShowAssignModal(false);
+    setSelectedMealPlanForAssignment(null);
+    setSelectedClients([]);
+    loadMealPlans(); // Refresh to update usage counts
+  };
+
+  const filteredMealPlans = useMemo(() => {
+    if (!searchQuery.trim()) return mealPlans;
+    const query = searchQuery.toLowerCase();
+    return mealPlans.filter(
+      (plan) =>
+        plan.name.toLowerCase().includes(query) ||
+        (plan.description && plan.description.toLowerCase().includes(query))
+    );
+  }, [mealPlans, searchQuery]);
 
   const handleAddFood = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -327,63 +405,6 @@ export default function CoachNutritionPage() {
     }
   };
 
-  const handleDeleteMealPlan = async (mealPlanId: string) => {
-    if (!confirm("Are you sure you want to delete this meal plan?")) return;
-
-    try {
-      const { error } = await supabase
-        .from("meal_plans")
-        .delete()
-        .eq("id", mealPlanId);
-
-      if (error) throw error;
-      loadData();
-    } catch (error) {
-      console.error("Error deleting meal plan:", error);
-    }
-  };
-
-  const handleAssignMealPlan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !assignmentForm.client_id || !assignmentForm.meal_plan_id) {
-      alert("Please select both a client and a meal plan");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("meal_plan_assignments")
-        .insert({
-          coach_id: user.id,
-          client_id: assignmentForm.client_id,
-          meal_plan_id: assignmentForm.meal_plan_id,
-          start_date: assignmentForm.start_date,
-          end_date: assignmentForm.end_date || null,
-          notes: assignmentForm.notes || null,
-        })
-        .select();
-
-      if (error) throw error;
-
-      setAssignmentForm({
-        client_id: "",
-        meal_plan_id: "",
-        start_date: new Date().toISOString().split("T")[0],
-        end_date: "",
-        notes: "",
-      });
-      setShowAssignMealPlan(false);
-      loadData();
-      alert("Meal plan assigned successfully!");
-    } catch (error) {
-      console.error("Error assigning meal plan:", error);
-      alert("Error assigning meal plan. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleUnassignMealPlan = async (assignmentId: string) => {
     if (!confirm("Are you sure you want to unassign this meal plan?")) return;
 
@@ -411,11 +432,6 @@ export default function CoachNutritionPage() {
       food.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredMealPlans = mealPlans.filter(
-    (plan) =>
-      plan.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      plan.notes?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   if (loading) {
     return (
@@ -444,28 +460,28 @@ export default function CoachNutritionPage() {
         <div className="min-h-screen pb-24">
           <div className="max-w-7xl mx-auto p-6">
             {/* Header */}
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl mb-6`}>
-              <CardHeader>
+            <GlassCard elevation={2} className="mb-6">
+              <div className="p-6">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
                     <Apple className="w-8 h-8 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
-                    <CardTitle className={`text-2xl ${theme.text}`}>
+                    <h1 className={`text-2xl font-bold ${theme.text}`}>
                       Nutrition Planning Hub
-                    </CardTitle>
+                    </h1>
                     <p className={`${theme.textSecondary}`}>
                       Create meal plans, manage food databases, and assign
                       nutrition programs to your clients
                     </p>
                   </div>
                 </div>
-              </CardHeader>
-            </Card>
+              </div>
+            </GlassCard>
 
             {/* Search */}
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl mb-6`}>
-              <CardContent className="pt-6">
+            <GlassCard elevation={1} className="mb-6">
+              <div className="p-6">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
@@ -475,96 +491,218 @@ export default function CoachNutritionPage() {
                     className={`pl-10 ${theme.border} ${theme.text} bg-transparent rounded-xl`}
                   />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
-            {/* Tabs */}
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="space-y-6"
-            >
-              <TabsList
-                className={`grid w-full grid-cols-3 ${theme.card} ${theme.shadow} rounded-xl`}
-              >
-                <TabsTrigger
-                  value="meal-plans"
-                  className="flex items-center gap-2 rounded-xl"
+            {/* Tab Buttons */}
+            <GlassCard elevation={2} className="p-2">
+              <div className="flex gap-2">
+                <Button
+                  variant={activeTab === "meal-plans" ? "default" : "ghost"}
+                  onClick={() => setActiveTab("meal-plans")}
+                  className="flex-1 rounded-xl"
+                  style={
+                    activeTab === "meal-plans"
+                      ? {
+                          background: getSemanticColor("trust").gradient,
+                          boxShadow: `0 4px 12px ${
+                            getSemanticColor("trust").primary
+                          }30`,
+                        }
+                      : {}
+                  }
                 >
-                  <ChefHat className="w-4 h-4" />
+                  <ChefHat className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Meal Plans</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="foods"
-                  className="flex items-center gap-2 rounded-xl"
+                </Button>
+                <Button
+                  variant={activeTab === "foods" ? "default" : "ghost"}
+                  onClick={() => setActiveTab("foods")}
+                  className="flex-1 rounded-xl"
+                  style={
+                    activeTab === "foods"
+                      ? {
+                          background: getSemanticColor("trust").gradient,
+                          boxShadow: `0 4px 12px ${
+                            getSemanticColor("trust").primary
+                          }30`,
+                        }
+                      : {}
+                  }
                 >
-                  <Utensils className="w-4 h-4" />
+                  <Utensils className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Food Database</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="assignments"
-                  className="flex items-center gap-2 rounded-xl"
+                </Button>
+                <Button
+                  variant={activeTab === "assignments" ? "default" : "ghost"}
+                  onClick={() => setActiveTab("assignments")}
+                  className="flex-1 rounded-xl"
+                  style={
+                    activeTab === "assignments"
+                      ? {
+                          background: getSemanticColor("trust").gradient,
+                          boxShadow: `0 4px 12px ${
+                            getSemanticColor("trust").primary
+                          }30`,
+                        }
+                      : {}
+                  }
                 >
-                  <Users className="w-4 h-4" />
+                  <Users className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Assignments</span>
-                </TabsTrigger>
-              </TabsList>
+                </Button>
+              </div>
+            </GlassCard>
 
-              {/* Meal Plans Tab */}
-              <TabsContent
-                value="meal-plans"
-                className="space-y-6 mt-24 sm:mt-28"
-              >
-                <div className="text-center py-12">
-                  <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-green-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <ChefHat className="w-10 h-10 text-white" />
-                  </div>
-                  <h3 className={`text-2xl font-bold ${theme.text} mb-2`}>
-                    Meal Plans Management
-                  </h3>
-                  <p className={`${theme.textSecondary} mb-6 max-w-md mx-auto`}>
-                    Create and manage nutrition plans for your clients. Access
-                    the full meal plans interface for detailed meal planning.
-                  </p>
+            {/* Tab Content */}
+            {activeTab === "meal-plans" && (
+              <div className="space-y-6">
+                {/* Actions */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <GlassCard elevation={1} className="flex-1">
+                    <div className="relative">
+                      <Search
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5"
+                        style={{ color: isDark ? "#A1A1AA" : "#9CA3AF" }}
+                      />
+                      <Input
+                        placeholder="Search meal plans..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 rounded-xl bg-transparent border-0"
+                        style={{
+                          color: isDark ? "#fff" : "#1A1A1A",
+                        }}
+                      />
+                    </div>
+                  </GlassCard>
                   <Button
-                    onClick={() => router.push("/coach/nutrition/meal-plans")}
-                    className="rounded-xl bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white"
+                    onClick={loadMealPlans}
+                    variant="ghost"
+                    className="rounded-xl"
                   >
-                    <ChefHat className="w-4 h-4 mr-2" />
-                    Go to Meal Plans
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                  <Button
+                    onClick={() => router.push("/coach/nutrition/meal-plans/create")}
+                    className="rounded-xl"
+                    style={{
+                      background: getSemanticColor("success").gradient,
+                      boxShadow: `0 4px 12px ${
+                        getSemanticColor("success").primary
+                      }30`,
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Meal Plan
                   </Button>
                 </div>
-              </TabsContent>
 
-              {/* Food Database Tab */}
-              <TabsContent value="foods" className="space-y-6 mt-24 sm:mt-28">
+                {/* Meal Plans Grid */}
+                {loading && mealPlans.length === 0 ? (
+                  <GlassCard elevation={2} className="p-12">
+                    <div className="animate-pulse space-y-4">
+                      <div className="h-8 bg-white/20 dark:bg-slate-700/20 rounded-xl w-1/4 backdrop-blur-sm"></div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[1, 2, 3].map((i) => (
+                          <div
+                            key={i}
+                            className="h-64 bg-white/20 dark:bg-slate-700/20 rounded-2xl backdrop-blur-sm"
+                          ></div>
+                        ))}
+                      </div>
+                    </div>
+                  </GlassCard>
+                ) : filteredMealPlans.length === 0 ? (
+                  <GlassCard elevation={2} className="p-12 text-center">
+                    <div
+                      className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center"
+                      style={{
+                        background: getSemanticColor("success").gradient,
+                        boxShadow: `0 8px 24px ${
+                          getSemanticColor("success").primary
+                        }40`,
+                      }}
+                    >
+                      <ChefHat className="w-10 h-10 text-white" />
+                    </div>
+                    <h3
+                      className="text-xl sm:text-2xl font-bold mb-2"
+                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                    >
+                      {searchQuery ? "No meal plans found" : "No meal plans yet"}
+                    </h3>
+                    <p
+                      className="mb-6 max-w-md mx-auto"
+                      style={{ color: isDark ? "#A1A1AA" : "#6B7280" }}
+                    >
+                      {searchQuery
+                        ? "Try adjusting your search query"
+                        : "Create your first meal plan to get started with nutrition planning."}
+                    </p>
+                    {!searchQuery && (
+                      <Button
+                        onClick={() => router.push("/coach/nutrition/meal-plans/create")}
+                        className="rounded-xl"
+                        style={{
+                          background: getSemanticColor("success").gradient,
+                          boxShadow: `0 4px 12px ${
+                            getSemanticColor("success").primary
+                          }30`,
+                        }}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Your First Meal Plan
+                      </Button>
+                    )}
+                  </GlassCard>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredMealPlans.map((plan) => (
+                      <MealPlanCard
+                        key={plan.id}
+                        mealPlan={plan}
+                        onEdit={(plan) =>
+                          router.push(`/coach/nutrition/meal-plans/${plan.id}/edit`)
+                        }
+                        onDelete={handleDeleteMealPlan}
+                        onAssign={handleAssignMealPlan}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "foods" && (
+              <div className="space-y-6">
                 <OptimizedFoodDatabase coachId={user?.id || ""} />
-              </TabsContent>
+              </div>
+            )}
 
-              {/* Assignments Tab */}
-              <TabsContent
-                value="assignments"
-                className="space-y-6 mt-24 sm:mt-28"
-              >
+            {activeTab === "assignments" && (
+              <div className="space-y-6">
                 <OptimizedNutritionAssignments coachId={user?.id || ""} />
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
 
             {/* Add Food Modal */}
             {showAddFood && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                <Card
-                  className={`w-full max-w-md max-h-[90vh] overflow-y-auto ${theme.card} ${theme.shadow} rounded-2xl`}
+                <GlassCard
+                  elevation={3}
+                  className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl"
                 >
-                  <CardHeader>
-                    <CardTitle className={`${theme.text}`}>
+                  <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+                    <h2 className={`text-xl font-bold ${theme.text}`}>
                       Add New Food
-                    </CardTitle>
+                    </h2>
                     <p className={`${theme.textSecondary}`}>
                       Add a new food item to your database
                     </p>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <div className="p-6">
                     <form onSubmit={handleAddFood} className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="name" className={`${theme.text}`}>
@@ -776,26 +914,27 @@ export default function CoachNutritionPage() {
                         </Button>
                       </div>
                     </form>
-                  </CardContent>
-                </Card>
+                  </div>
+                </GlassCard>
               </div>
             )}
 
             {/* Add Meal Plan Modal */}
             {showAddMealPlan && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                <Card
-                  className={`w-full max-w-md ${theme.card} ${theme.shadow} rounded-2xl`}
+                <GlassCard
+                  elevation={3}
+                  className="w-full max-w-md rounded-2xl"
                 >
-                  <CardHeader>
-                    <CardTitle className={`${theme.text}`}>
+                  <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+                    <h2 className={`text-xl font-bold ${theme.text}`}>
                       Create Meal Plan
-                    </CardTitle>
+                    </h2>
                     <p className={`${theme.textSecondary}`}>
                       Create a new meal plan
                     </p>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <div className="p-6">
                     <form onSubmit={handleAddMealPlan} className="space-y-4">
                       <div className="space-y-2">
                         <Label
@@ -874,182 +1013,21 @@ export default function CoachNutritionPage() {
                         </Button>
                       </div>
                     </form>
-                  </CardContent>
-                </Card>
+                  </div>
+                </GlassCard>
               </div>
             )}
 
             {/* Meal Plan Assignment Modal */}
-            {showAssignMealPlan && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div
-                  className={`${theme.card} ${theme.shadow} rounded-2xl p-6 w-full max-w-md mx-4`}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className={`text-xl font-semibold ${theme.text}`}>
-                      Assign Meal Plan
-                    </h2>
-                    <button
-                      onClick={() => setShowAssignMealPlan(false)}
-                      className={`${theme.textSecondary} hover:${theme.text}`}
-                    >
-                      <Eye className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  <form onSubmit={handleAssignMealPlan} className="space-y-4">
-                    <div>
-                      <Label htmlFor="client" className={`${theme.text}`}>
-                        Select Client
-                      </Label>
-                      <Select
-                        value={assignmentForm.client_id}
-                        onValueChange={(value) =>
-                          setAssignmentForm({
-                            ...assignmentForm,
-                            client_id: value,
-                          })
-                        }
-                      >
-                        <SelectTrigger
-                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                        >
-                          <SelectValue placeholder="Choose a client" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients.map((client) => (
-                            <SelectItem key={client.id} value={client.id}>
-                              {client.first_name && client.last_name
-                                ? `${client.first_name} ${client.last_name}`
-                                : client.email}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {clients.length === 0 && (
-                        <p className={`text-xs ${theme.textSecondary} mt-1`}>
-                          No active clients found. Make sure you have clients
-                          assigned to you.
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="mealPlan" className={`${theme.text}`}>
-                        Select Meal Plan
-                      </Label>
-                      <Select
-                        value={assignmentForm.meal_plan_id}
-                        onValueChange={(value) =>
-                          setAssignmentForm({
-                            ...assignmentForm,
-                            meal_plan_id: value,
-                          })
-                        }
-                      >
-                        <SelectTrigger
-                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                        >
-                          <SelectValue placeholder="Choose a meal plan" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mealPlans.map((mealPlan) => (
-                            <SelectItem key={mealPlan.id} value={mealPlan.id}>
-                              {mealPlan.name}
-                              {mealPlan.target_calories &&
-                                ` (${mealPlan.target_calories} cal)`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {mealPlans.length === 0 && (
-                        <p className={`text-xs ${theme.textSecondary} mt-1`}>
-                          No meal plans found. Create a meal plan first.
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="startDate" className={`${theme.text}`}>
-                          Start Date
-                        </Label>
-                        <Input
-                          id="startDate"
-                          type="date"
-                          value={assignmentForm.start_date}
-                          onChange={(e) =>
-                            setAssignmentForm({
-                              ...assignmentForm,
-                              start_date: e.target.value,
-                            })
-                          }
-                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="endDate" className={`${theme.text}`}>
-                          End Date (Optional)
-                        </Label>
-                        <Input
-                          id="endDate"
-                          type="date"
-                          value={assignmentForm.end_date}
-                          onChange={(e) =>
-                            setAssignmentForm({
-                              ...assignmentForm,
-                              end_date: e.target.value,
-                            })
-                          }
-                          className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="notes" className={`${theme.text}`}>
-                        Notes
-                      </Label>
-                      <Textarea
-                        id="notes"
-                        placeholder="Add any special instructions..."
-                        rows={3}
-                        value={assignmentForm.notes}
-                        onChange={(e) =>
-                          setAssignmentForm({
-                            ...assignmentForm,
-                            notes: e.target.value,
-                          })
-                        }
-                        className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                      />
-                    </div>
-
-                    <div className="flex gap-3 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowAssignMealPlan(false)}
-                        className={`flex-1 ${theme.border} ${theme.textSecondary} rounded-xl`}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl"
-                        disabled={
-                          loading ||
-                          !assignmentForm.client_id ||
-                          !assignmentForm.meal_plan_id
-                        }
-                      >
-                        {loading ? "Assigning..." : "Assign Meal Plan"}
-                      </Button>
-                    </div>
-                  </form>
-                </div>
-              </div>
+            {showAssignModal && selectedMealPlanForAssignment && (
+              <MealPlanAssignmentModal
+                mealPlan={selectedMealPlanForAssignment}
+                clients={clients}
+                selectedClients={selectedClients}
+                onSelectedClientsChange={setSelectedClients}
+                onClose={handleAssignmentComplete}
+                onComplete={handleAssignmentComplete}
+              />
             )}
           </div>
         </div>

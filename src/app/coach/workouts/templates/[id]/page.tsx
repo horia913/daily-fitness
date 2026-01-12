@@ -79,6 +79,17 @@ export default function WorkoutTemplateDetailsPage() {
     }
   };
 
+  // Reset state when templateId changes or component mounts
+  useEffect(() => {
+    if (templateId) {
+      setLoading(true);
+      setTemplate(null);
+      setWorkoutBlocks([]);
+      setExerciseCount(0);
+      setError(null);
+    }
+  }, [templateId]);
+
   useEffect(() => {
     if (!authLoading && templateId) {
       if (user?.id) {
@@ -88,6 +99,8 @@ export default function WorkoutTemplateDetailsPage() {
         setError("User not authenticated");
         setLoading(false);
       }
+    } else if (!authLoading && !user) {
+      setLoading(false);
     }
   }, [templateId, authLoading, user]);
 

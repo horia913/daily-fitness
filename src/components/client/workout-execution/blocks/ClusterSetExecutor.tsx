@@ -12,6 +12,7 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 export function ClusterSetExecutor({
   block,
@@ -226,7 +227,7 @@ export function ClusterSetExecutor({
 
   const loggingInputs = (
     <div className="space-y-4">
-      <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+      <GlassCard elevation={1} className="p-4">
         <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">
           Cluster 1 of {clustersPerSet} (Set {currentSet + 1} of {totalSets})
         </div>
@@ -248,7 +249,7 @@ export function ClusterSetExecutor({
             set
           </div>
         </div>
-      </div>
+      </GlassCard>
     </div>
   );
 

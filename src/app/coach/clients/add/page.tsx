@@ -25,7 +25,6 @@ import {
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { emailService } from '@/lib/emailService'
 import { useRouter } from 'next/navigation'
 
 export default function AddClient() {
@@ -178,10 +177,11 @@ export default function AddClient() {
       const inviteLink = `${baseUrl}/?invite=${inviteCode}&email=${encodeURIComponent(formData.email)}`
       
       setGeneratedInviteLink(inviteLink)
-      setSuccess('Invite link generated successfully!')
+      setSuccess('Invite link generated successfully! Copy the link below and send it to your client via WhatsApp or any messaging app.')
       
-      // Send email with the invite link
-      await sendInviteEmail(inviteLink, inviteCode)
+      // Email sending is optional - link can be shared manually
+      // Uncomment the line below if you want to try sending email (requires OneSignal domain setup)
+      // await sendInviteEmail(inviteLink, inviteCode)
 
     } catch (error: any) {
       console.error('Error generating invite link:', error)
@@ -206,26 +206,30 @@ export default function AddClient() {
 
   const sendInviteEmail = async (inviteLink: string, inviteCode: string) => {
     try {
-      const success = await emailService.sendInviteEmail(
-        formData.email,
-        'there', // Generic greeting since we don't have name
-        inviteCode,
-        formData.inviteExpiryDays,
-        inviteLink
-      )
-      
-      if (success) {
-        console.log('Invite email sent successfully')
-      } else {
-        console.log('Email service not configured - email would be sent:', {
-          to: formData.email,
-          inviteLink,
-          expiryDays: formData.inviteExpiryDays
+      const response = await fetch('/api/emails/send-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientEmail: formData.email,
+          clientName: 'there', // Generic greeting since we don't have name
+          inviteCode,
+          expiryDays: formData.inviteExpiryDays,
+          inviteLink
         })
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        console.log('✅ Invite email sent successfully')
+      } else {
+        console.error('❌ Failed to send invite email:', result.error)
       }
       
     } catch (error) {
-      console.error('Error sending email:', error)
+      console.error('❌ Error sending email:', error)
       // Don't throw error - invite link was still generated successfully
     }
   }
@@ -265,7 +269,7 @@ export default function AddClient() {
               error={validationErrors.email}
               required
               placeholder="client@example.com"
-              helperText="We'll send the invite link to this email address"
+              helperText="We'll generate a signup link with this email pre-filled"
             />
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -359,28 +363,30 @@ export default function AddClient() {
                 {/* Invite Link Display */}
                 <div className={`${theme.card} ${theme.shadow} rounded-xl p-6 border-2 border-purple-200 dark:border-purple-800`}>
                   <div className="text-center">
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Invite Link</p>
-                    <div className="bg-slate-900 dark:bg-slate-800 text-white p-4 rounded-lg mb-4 break-all">
-                      <p className="text-sm font-mono">{generatedInviteLink}</p>
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">📋 Signup Link</p>
+                    <div className="bg-slate-900 dark:bg-slate-800 text-white p-4 rounded-lg mb-4 break-all border border-slate-700">
+                      <p className="text-sm font-mono select-all">{generatedInviteLink}</p>
                     </div>
                     
                     <Button 
                       onClick={copyInviteLink}
-                      variant="outline"
-                      className="mb-4"
+                      className={`${theme.primary} ${theme.shadow} mb-2 px-6 py-3 text-base font-semibold`}
                     >
                       {copied ? (
                         <>
-                          <Check className="w-4 h-4 mr-2 text-green-600" />
-                          Copied!
+                          <Check className="w-5 h-5 mr-2" />
+                          Copied to Clipboard! ✓
                         </>
                       ) : (
                         <>
-                          <Copy className="w-4 h-4 mr-2" />
+                          <Copy className="w-5 h-5 mr-2" />
                           Copy Link
                         </>
                       )}
                     </Button>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                      Click the button above or select and copy the link manually
+                    </p>
                   </div>
                 </div>
 
@@ -471,7 +477,7 @@ export default function AddClient() {
                     Add New Client 👥
                   </h1>
                   <p className={`text-lg ${theme.textSecondary}`}>
-                    Send an invite link to a new client
+                    Generate a signup link for a new client
                   </p>
                 </div>
               </div>

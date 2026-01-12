@@ -15,6 +15,7 @@ import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { supabase } from "@/lib/supabase";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 export function ForTimeExecutor({
   block,
@@ -489,23 +490,25 @@ export function ForTimeExecutor({
 
       {/* Weight and Reps Input - Show when timer is stopped or not started */}
       {(!startTime || timerStopped) && (
-        <div className="grid grid-cols-2 gap-4">
-          <LargeInput
-            label="Weight"
-            value={weight}
-            onChange={setWeight}
-            placeholder="0"
-            step="0.5"
-            unit="kg"
-          />
-          <LargeInput
-            label="Completed Reps"
-            value={reps}
-            onChange={setReps}
-            placeholder="0"
-            step="1"
-          />
-        </div>
+        <GlassCard elevation={1} className="p-4">
+          <div className="grid grid-cols-2 gap-4">
+            <LargeInput
+              label="Weight"
+              value={weight}
+              onChange={setWeight}
+              placeholder="0"
+              step="0.5"
+              unit="kg"
+            />
+            <LargeInput
+              label="Completed Reps"
+              value={reps}
+              onChange={setReps}
+              placeholder="0"
+              step="1"
+            />
+          </div>
+        </GlassCard>
       )}
     </div>
   );

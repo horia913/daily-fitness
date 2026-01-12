@@ -22,9 +22,18 @@ export default function EditWorkoutTemplatePage() {
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
 
+  // Reset state when templateId changes
+  useEffect(() => {
+    setLoading(true);
+    setTemplate(null);
+    setIsOpen(false);
+  }, [templateId]);
+
   useEffect(() => {
     if (templateId && user?.id) {
       loadTemplate();
+    } else if (!user) {
+      setLoading(false);
     }
   }, [templateId, user]);
 

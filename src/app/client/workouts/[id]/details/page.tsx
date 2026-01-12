@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabase";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { useTheme } from "@/contexts/ThemeContext";
 import { fetchPersonalRecords } from "@/lib/personalRecords";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 interface AssignmentInfo {
   id: string;
@@ -609,21 +610,23 @@ export default function WorkoutDetailsPage() {
     });
   };
 
-  // Monolith card style
-  const monolithCardStyle: React.CSSProperties = {
+  // Glass card style (matching mockup)
+  const glassCardStyle: React.CSSProperties = {
     background: isDark
-      ? "linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%)"
-      : "linear-gradient(165deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)",
-    backdropFilter: "blur(24px) saturate(180%)",
-    WebkitBackdropFilter: "blur(24px) saturate(180%)",
+      ? "rgba(255, 255, 255, 0.03)"
+      : "rgba(255, 255, 255, 0.4)",
+    backdropFilter: "blur(12px) saturate(180%)",
+    WebkitBackdropFilter: "blur(12px) saturate(180%)",
     border: `1px solid ${
-      isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)"
+      isDark ? "rgba(255, 255, 255, 0.125)" : "rgba(255, 255, 255, 0.2)"
     }`,
     borderRadius: "24px",
     boxShadow: isDark
-      ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
-      : "0 10px 30px -5px rgba(0, 0, 0, 0.1)",
-    transition: "all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)",
+      ? "0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 0 20px 0 rgba(255, 255, 255, 0.02)"
+      : "0 4px 24px -1px rgba(0, 0, 0, 0.1), inset 0 0 20px 0 rgba(255, 255, 255, 0.05)",
+    transition: "all 0.4s cubic-bezier(0.23, 1, 0.32, 1)",
+    position: "relative",
+    overflow: "hidden",
   };
 
   if (loading) {
@@ -1351,15 +1354,12 @@ export default function WorkoutDetailsPage() {
           animation: shine 8s linear infinite;
         }
         .exercise-item {
-          max-height: 100px;
+          max-height: 120px;
           overflow: hidden;
-          transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: max-height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .exercise-item.active {
-          max-height: 2000px;
-          background: ${
-            isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.02)"
-          };
+          max-height: 5000px;
         }
         .rotate-icon {
           transition: transform 0.3s ease;
@@ -1377,289 +1377,137 @@ export default function WorkoutDetailsPage() {
         {/* Navigation */}
         <nav
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "24px",
-            maxWidth: "1280px",
-            margin: "0 auto",
+            marginBottom: "48px",
           }}
         >
           <button
             onClick={() => router.push("/client/workouts")}
             style={{
-              width: "40px",
-              height: "40px",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "12px",
-              background: isDark
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.02)",
-              border: `1px solid ${
-                isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-              }`,
-              color: isDark ? "#FFFFFF" : "#1A1A1A",
+              gap: "8px",
+              background: "transparent",
+              border: "none",
+              color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
               cursor: "pointer",
-              transition: "all 0.2s ease",
+              transition: "color 0.3s ease",
+              padding: 0,
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = isDark
-                ? "rgba(255,255,255,0.1)"
-                : "rgba(0,0,0,0.05)";
+              e.currentTarget.style.color = isDark ? "#FFFFFF" : "#1A1A1A";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = isDark
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.02)";
+              e.currentTarget.style.color = isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)";
             }}
           >
-            <ChevronLeft style={{ width: "24px", height: "24px" }} />
-          </button>
-          <div style={{ textAlign: "center" }}>
+            <ChevronLeft 
+              style={{ 
+                width: "20px", 
+                height: "20px",
+                transition: "transform 0.3s ease",
+              }}
+              className="group-hover:-translate-x-1"
+            />
             <span
               style={{
-                fontSize: "10px",
+                fontFamily: "monospace",
+                fontSize: "14px",
                 textTransform: "uppercase",
                 letterSpacing: "0.3em",
-                color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                fontWeight: 700,
               }}
             >
-              Protocol View
+              Back to Program
             </span>
-          </div>
-          <button
-            style={{
-              width: "40px",
-              height: "40px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "12px",
-              background: isDark
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.02)",
-              border: `1px solid ${
-                isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-              }`,
-              color: isDark ? "#FFFFFF" : "#1A1A1A",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = isDark
-                ? "rgba(255,255,255,0.1)"
-                : "rgba(0,0,0,0.05)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = isDark
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.02)";
-            }}
-          >
-            <MoreHorizontal style={{ width: "24px", height: "24px" }} />
           </button>
         </nav>
 
         <main
           style={{
-            maxWidth: "768px",
+            maxWidth: "896px",
             margin: "0 auto",
-            padding: "0 24px 40px",
+            padding: "0 24px",
+            paddingBottom: "180px",
           }}
         >
           {/* Header Section */}
-          <header style={{ marginBottom: "40px" }}>
+          <header style={{ marginBottom: "64px" }}>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "12px",
+                gap: "16px",
                 marginBottom: "16px",
               }}
             >
               {assignment.category && (
                 <span
                   style={{
-                    padding: "4px 12px",
-                    borderRadius: "999px",
-                    background: "rgba(59, 130, 246, 0.1)",
-                    color: "#3B82F6",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    border: "1px solid rgba(59, 130, 246, 0.2)",
-                    letterSpacing: "0.05em",
+                    padding: "2px 10px",
+                    borderRadius: "100px",
+                    fontSize: "10px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    fontWeight: 800,
+                    border: `1px solid ${isDark ? "#A78BFA" : "#A78BFA"}`,
+                    background: isDark ? "rgba(167, 139, 250, 0.15)" : "rgba(167, 139, 250, 0.15)",
+                    color: isDark ? "#A78BFA" : "#A78BFA",
                   }}
                 >
                   {assignment.category.toUpperCase()}
                 </span>
               )}
-              {assignment.currentWeek && (
-                <span
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                    fontSize: "12px",
-                    fontFamily: "monospace",
-                  }}
-                >
-                  WEEK {assignment.currentWeek}
-                </span>
-              )}
+              <span
+                style={{
+                  color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
+                  fontFamily: "monospace",
+                  fontSize: "12px",
+                }}
+              >
+                {assignment.estimatedDuration || 0} MINS
+              </span>
             </div>
             <h1
               style={{
-                fontSize: "36px",
+                fontSize: "48px",
                 fontWeight: 800,
                 letterSpacing: "-0.02em",
+                lineHeight: "1.2",
                 marginBottom: "24px",
                 color: isDark ? "#FFFFFF" : "#1A1A1A",
-                lineHeight: "1.2",
               }}
-              className="shimmer-text"
             >
-                  {assignment.name}
+              {assignment.name}
             </h1>
+            {assignment.description && (
+              <p
+                style={{
+                  fontSize: "18px",
+                  lineHeight: "1.75",
+                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
+                  fontWeight: 300,
+                  maxWidth: "672px",
+                  margin: 0,
+                }}
+              >
+                {assignment.description}
+              </p>
+            )}
           </header>
 
-          {/* Stats Grid */}
-          <section
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: "16px",
-              marginBottom: "40px",
-            }}
-            className="md:grid-cols-4"
-          >
-            <div
+          {/* Exercise List */}
+          <section style={{ marginBottom: "128px" }}>
+            <h2
               style={{
-                ...monolithCardStyle,
-                padding: "16px",
-                textAlign: "center",
-              }}
-            >
-              <Clock
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  margin: "0 auto 8px",
-                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                }}
-              />
-              <div
-                style={{
-                  fontSize: "18px",
-                  fontWeight: 700,
-                  color: isDark ? "#FFFFFF" : "#1A1A1A",
-                  marginBottom: "4px",
-                }}
-              >
-                ~{assignment.estimatedDuration || 0}
-              </div>
-              <div
-                style={{
-                  fontSize: "10px",
-                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  fontWeight: 700,
-                }}
-              >
-                Minutes
-              </div>
-            </div>
-            <div
-              style={{
-                ...monolithCardStyle,
-                padding: "16px",
-                textAlign: "center",
-              }}
-            >
-              <Layers
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  margin: "0 auto 8px",
-                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                }}
-              />
-              <div
-                style={{
-                  fontSize: "18px",
-                  fontWeight: 700,
-                  color: isDark ? "#FFFFFF" : "#1A1A1A",
-                  marginBottom: "4px",
-                }}
-              >
-                {totalSets}
-              </div>
-              <div
-                style={{
-                  fontSize: "10px",
-                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  fontWeight: 700,
-                }}
-              >
-                Total Sets
-              </div>
-            </div>
-            <div
-              style={{
-                ...monolithCardStyle,
-                padding: "16px",
-                textAlign: "center",
-              }}
-            >
-              <Dumbbell
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  margin: "0 auto 8px",
-                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                }}
-              />
-              <div
-                style={{
-                  fontSize: "18px",
-                  fontWeight: 700,
-                  color: isDark ? "#FFFFFF" : "#1A1A1A",
-                  marginBottom: "4px",
-                }}
-              >
-                {totalExercises}
-              </div>
-              <div
-                style={{
-                  fontSize: "10px",
-                  color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  fontWeight: 700,
-                }}
-              >
-                Exercises
-              </div>
-            </div>
-          </section>
-
-          {/* Blocks List */}
-          <section>
-            <h3
-              style={{
+                fontFamily: "monospace",
                 fontSize: "12px",
-                fontWeight: 700,
                 textTransform: "uppercase",
-                letterSpacing: "0.2em",
-                color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                marginBottom: "24px",
+                letterSpacing: "0.3em",
+                color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)",
+                marginBottom: "32px",
               }}
             >
-              Workout Content
-            </h3>
+              Workout Protocol
+            </h2>
             <div
               style={{ display: "flex", flexDirection: "column", gap: "16px" }}
             >
@@ -1672,36 +1520,18 @@ export default function WorkoutDetailsPage() {
                   <div
                     key={block.id}
                     className={`exercise-item ${isExpanded ? "active" : ""}`}
-                    style={{
-                      ...monolithCardStyle,
-                      borderRadius: "24px",
-                      overflow: "hidden",
-                      cursor: "pointer",
-                    }}
                     onClick={() => toggleExercise(block.id)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = isDark
-                        ? "rgba(255,255,255,0.2)"
-                        : "rgba(0,0,0,0.2)";
-                      e.currentTarget.style.background = isDark
-                        ? "linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)"
-                        : "linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = isDark
-                        ? "rgba(255,255,255,0.08)"
-                        : "rgba(0,0,0,0.1)";
-                      e.currentTarget.style.background = isDark
-                        ? "linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%)"
-                        : "linear-gradient(165deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)";
-                    }}
                   >
+                    <GlassCard
+                      elevation={2}
+                      className="overflow-hidden cursor-pointer"
+                    >
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        padding: "20px",
+                        padding: "24px 32px",
                       }}
                     >
                       <div
@@ -1715,14 +1545,16 @@ export default function WorkoutDetailsPage() {
                           style={{
                             width: "48px",
                             height: "48px",
-                            borderRadius: "12px",
+                            borderRadius: "100%",
                             background: isDark
-                              ? "rgba(255,255,255,0.05)"
-                              : "rgba(0,0,0,0.02)",
+                              ? "rgba(255,255,255,0.03)"
+                              : "rgba(255,255,255,0.4)",
+                            backdropFilter: "blur(12px) saturate(180%)",
+                            WebkitBackdropFilter: "blur(12px) saturate(180%)",
                             border: `1px solid ${
                               isDark
-                                ? "rgba(255,255,255,0.1)"
-                                : "rgba(0,0,0,0.1)"
+                                ? "rgba(255,255,255,0.125)"
+                                : "rgba(255,255,255,0.2)"
                             }`,
                             display: "flex",
                             alignItems: "center",
@@ -1730,7 +1562,8 @@ export default function WorkoutDetailsPage() {
                             fontWeight: 700,
                             fontFamily: "monospace",
                             fontSize: "18px",
-                            color: isDark ? "#FFFFFF" : "#1A1A1A",
+                            color: isDark ? "rgba(255,255,255,0.8)" : "#1A1A1A",
+                            boxShadow: "0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 0 20px 0 rgba(255, 255, 255, 0.02)",
                           }}
                         >
                           {String(blockIndex + 1).padStart(2, "0")}
@@ -1828,7 +1661,7 @@ export default function WorkoutDetailsPage() {
                       />
                     </div>
                     {isExpanded && (
-                      <div style={{ padding: "0 20px 24px" }}>
+                      <div style={{ padding: "0 32px 32px" }}>
                         {/* Block Notes */}
                         {block.notes && (
                           <div
@@ -1947,50 +1780,119 @@ export default function WorkoutDetailsPage() {
                                 key={exercise.id}
                                 style={{
                                   background: isDark
-                                    ? "rgba(0,0,0,0.4)"
-                                    : "rgba(0,0,0,0.02)",
+                                    ? "rgba(255, 255, 255, 0.03)"
+                                    : "rgba(255, 255, 255, 0.4)",
+                                  backdropFilter: "blur(12px) saturate(180%)",
+                                  WebkitBackdropFilter: "blur(12px) saturate(180%)",
                                   borderRadius: "16px",
                                   padding: "16px",
                                   border: `1px solid ${
                                     isDark
-                                      ? "rgba(255,255,255,0.05)"
-                                      : "rgba(0,0,0,0.05)"
+                                      ? "rgba(255,255,255,0.125)"
+                                      : "rgba(255,255,255,0.2)"
                                   }`,
+                                  boxShadow: "0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 0 20px 0 rgba(255, 255, 255, 0.02)",
+                                  transition: "all 0.4s cubic-bezier(0.23, 1, 0.32, 1)",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "16px",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.transform = "translateY(-4px) scale(1.01)";
+                                  e.currentTarget.style.background = isDark
+                                    ? "rgba(255, 255, 255, 0.05)"
+                                    : "rgba(255, 255, 255, 0.5)";
+                                  e.currentTarget.style.borderColor = isDark
+                                    ? "rgba(255,255,255,0.2)"
+                                    : "rgba(255,255,255,0.3)";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.transform = "translateY(0) scale(1)";
+                                  e.currentTarget.style.background = isDark
+                                    ? "rgba(255, 255, 255, 0.03)"
+                                    : "rgba(255, 255, 255, 0.4)";
+                                  e.currentTarget.style.borderColor = isDark
+                                    ? "rgba(255,255,255,0.125)"
+                                    : "rgba(255,255,255,0.2)";
                                 }}
                               >
-                                <div style={{ marginBottom: "12px" }}>
-                                  {exercise.exerciseLetter && (
-                                    <span
-                                      style={{
-                                        fontSize: "10px",
-                                        letterSpacing: "0.1em",
-                                        padding: "2px 8px",
-                                        borderRadius: "4px",
-                                        textTransform: "uppercase",
-                                        fontWeight: 700,
-                                        background: exerciseBadgeColor.bg,
-                                        color: exerciseBadgeColor.text,
-                                        border: `1px solid ${exerciseBadgeColor.border}`,
-                                        marginRight: "8px",
-                                      }}
-                                    >
-                                      {formatBlockTypeLabel(
-                                        block.blockType,
-                                        exercise.exerciseLetter
-                                      )}
-                                    </span>
-                                  )}
-                                  <h5
+                                <div style={{ display: "flex", alignItems: "start", gap: "12px" }}>
+                                  <div
                                     style={{
-                                      fontSize: "16px",
+                                      width: "40px",
+                                      height: "40px",
+                                      borderRadius: "100%",
+                                      background: isDark
+                                        ? "rgba(255,255,255,0.03)"
+                                        : "rgba(255,255,255,0.4)",
+                                      backdropFilter: "blur(12px) saturate(180%)",
+                                      WebkitBackdropFilter: "blur(12px) saturate(180%)",
+                                      border: `1px solid ${
+                                        isDark
+                                          ? "rgba(255,255,255,0.125)"
+                                          : "rgba(255,255,255,0.2)"
+                                      }`,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
                                       fontWeight: 700,
-                                      color: isDark ? "#FFFFFF" : "#1A1A1A",
-                                      margin: "4px 0 0 0",
-                                      display: "inline-block",
+                                      fontFamily: "monospace",
+                                      fontSize: "14px",
+                                      color: isDark ? "rgba(255,255,255,0.8)" : "#1A1A1A",
+                                      flexShrink: 0,
+                                      boxShadow: "0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 0 20px 0 rgba(255, 255, 255, 0.02)",
                                     }}
                                   >
-                                    {exercise.name}
-                                  </h5>
+                                    {exercise.exerciseLetter || String(exerciseIndex + 1).padStart(2, "0")}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    {exercise.exerciseLetter && (
+                                      <span
+                                        style={{
+                                          fontSize: "9px",
+                                          letterSpacing: "0.1em",
+                                          padding: "2px 8px",
+                                          borderRadius: "100px",
+                                          textTransform: "uppercase",
+                                          fontWeight: 800,
+                                          background: isDark
+                                            ? "rgba(251, 191, 36, 0.15)"
+                                            : "rgba(251, 191, 36, 0.15)",
+                                          color: isDark ? "#FBBF24" : "#FBBF24",
+                                          border: `1px solid ${isDark ? "rgba(251, 191, 36, 0.3)" : "rgba(251, 191, 36, 0.3)"}`,
+                                          marginBottom: "4px",
+                                          display: "inline-block",
+                                        }}
+                                      >
+                                        {formatBlockTypeLabel(
+                                          block.blockType,
+                                          exercise.exerciseLetter
+                                        )}
+                                      </span>
+                                    )}
+                                    <h3
+                                      style={{
+                                        fontSize: "16px",
+                                        fontWeight: 600,
+                                        color: isDark ? "#FFFFFF" : "#1A1A1A",
+                                        margin: "4px 0 0 0",
+                                      }}
+                                    >
+                                      {exercise.name}
+                                    </h3>
+                                    {exercise.notes && (
+                                      <p
+                                        style={{
+                                          fontSize: "12px",
+                                          color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)",
+                                          margin: "4px 0 0 0",
+                                          lineHeight: "1.5",
+                                        }}
+                                      >
+                                        {exercise.notes}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
 
                                 {/* Exercise Card Fields - from special tables based on block type */}
@@ -2005,23 +1907,24 @@ export default function WorkoutDetailsPage() {
                                       return (
                                         <div
                                           style={{
-                                            display: "grid",
-                                            gridTemplateColumns: `repeat(${Math.min(timeParams.length, 3)}, 1fr)`,
-                                            gap: "12px",
-                                            marginBottom: "0",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "16px 24px",
+                                            flexWrap: "wrap",
                                           }}
                                         >
                                           {timeParams.map((param, idx) => (
-                                            <div key={idx}>
+                                            <div key={idx} style={{ textAlign: "center", minWidth: "60px" }}>
                                               <div
                                                 style={{
-                                                  fontSize: "10px",
+                                                  fontSize: "9px",
                                                   color: isDark
-                                                    ? "rgba(255,255,255,0.5)"
-                                                    : "#6B7280",
+                                                    ? "rgba(255,255,255,0.3)"
+                                                    : "rgba(0,0,0,0.3)",
                                                   textTransform: "uppercase",
-                                                  fontWeight: 700,
-                                                  marginBottom: "4px",
+                                                  fontFamily: "monospace",
+                                                  letterSpacing: "0.1em",
+                                                  marginBottom: "2px",
                                                 }}
                                               >
                                                 {param.label}
@@ -2029,11 +1932,9 @@ export default function WorkoutDetailsPage() {
                                               <div
                                                 style={{
                                                   fontFamily: "monospace",
-                                                  fontWeight: 700,
-                                                  fontSize: "16px",
-                                                  color: isDark
-                                                    ? "#FFFFFF"
-                                                    : "#1A1A1A",
+                                                  fontWeight: 500,
+                                                  fontSize: "20px",
+                                                  color: isDark ? "#FFFFFF" : "#1A1A1A",
                                                 }}
                                               >
                                                 {param.value}
@@ -2049,46 +1950,45 @@ export default function WorkoutDetailsPage() {
                                   // For all other blocks, use getExerciseCardFields
                                   const exerciseFields = getExerciseCardFields(block, exercise);
                                   if (exerciseFields.length > 0) {
-                                    return (
-                                      <div
-                                        style={{
-                                          display: "grid",
-                                          gridTemplateColumns: `repeat(${Math.min(exerciseFields.length, 3)}, 1fr)`,
-                                          gap: "12px",
-                                          marginBottom: "0",
-                                        }}
-                                      >
-                                        {exerciseFields.map((field, idx) => (
-                                          <div key={idx}>
-                                            <div
-                                              style={{
-                                                fontSize: "10px",
-                                                color: isDark
-                                                  ? "rgba(255,255,255,0.5)"
-                                                  : "#6B7280",
-                                                textTransform: "uppercase",
-                                                fontWeight: 700,
-                                                marginBottom: "4px",
-                                              }}
-                                            >
-                                              {field.label}
+                                      return (
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "16px 24px",
+                                            flexWrap: "wrap",
+                                          }}
+                                        >
+                                          {exerciseFields.map((field, idx) => (
+                                            <div key={idx} style={{ textAlign: "center", minWidth: "60px" }}>
+                                              <div
+                                                style={{
+                                                  fontSize: "9px",
+                                                  color: isDark
+                                                    ? "rgba(255,255,255,0.3)"
+                                                    : "rgba(0,0,0,0.3)",
+                                                  textTransform: "uppercase",
+                                                  fontFamily: "monospace",
+                                                  letterSpacing: "0.1em",
+                                                  marginBottom: "2px",
+                                                }}
+                                              >
+                                                {field.label}
+                                              </div>
+                                              <div
+                                                style={{
+                                                  fontFamily: "monospace",
+                                                  fontWeight: 500,
+                                                  fontSize: "20px",
+                                                  color: field.label === "Rest" ? (isDark ? "#22D3EE" : "#0891B2") : (isDark ? "#FFFFFF" : "#1A1A1A"),
+                                                }}
+                                              >
+                                                {field.value || "—"}
+                                              </div>
                                             </div>
-                                            <div
-                                              style={{
-                                                fontFamily: "monospace",
-                                                fontWeight: 700,
-                                                fontSize: "16px",
-                                                color: isDark
-                                                  ? "#FFFFFF"
-                                                  : "#1A1A1A",
-                                              }}
-                                            >
-                                              {field.value || "—"}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    );
+                                          ))}
+                                        </div>
+                                      );
                                   }
                                   return null;
                                 })()}
@@ -2245,6 +2145,7 @@ export default function WorkoutDetailsPage() {
                         </div>
                       </div>
                     )}
+                    </GlassCard>
                   </div>
                 );
               })}
@@ -2252,79 +2153,84 @@ export default function WorkoutDetailsPage() {
           </section>
         </main>
 
-        {/* Fixed Bottom Action Bar */}
+        {/* Fixed Bottom Action Button */}
         <div
           style={{
             position: "fixed",
-            bottom: 0,
+            bottom: "80px",
             left: 0,
-            right: 0,
-            padding: "24px",
-            background: isDark
-              ? "linear-gradient(to top, #000000, rgba(0,0,0,0.9), transparent)"
-              : "linear-gradient(to top, #FFFFFF, rgba(255,255,255,0.9), transparent)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
+            width: "100%",
+            padding: "16px 24px",
+            display: "flex",
+            justifyContent: "center",
+            pointerEvents: "none",
             zIndex: 50,
           }}
         >
-          <div
+          <button
+            onClick={() =>
+              router.push(`/client/workouts/${assignment.id}/start`)
+            }
             style={{
-              maxWidth: "768px",
-              margin: "0 auto",
+              pointerEvents: "auto",
+              background: "#FFFFFF",
+              borderRadius: "100px",
+              padding: "12px 24px",
               display: "flex",
-              flexDirection: "column",
-              gap: "16px",
+              alignItems: "center",
+              gap: "12px",
+              color: "#000000",
+              transition: "all 0.3s ease",
+              cursor: "pointer",
+              border: "none",
+              boxShadow: "0 4px 24px -1px rgba(0, 0, 0, 0.2)",
+              position: "relative",
+              overflow: "hidden",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 0 30px rgba(255, 255, 255, 0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 0 20px 0 rgba(255, 255, 255, 0.02)";
             }}
           >
-            <button
-              onClick={() =>
-                router.push(`/client/workouts/${assignment.id}/start`)
-              }
+            <span
               style={{
-                flex: 1,
-                height: "64px",
-                background: "linear-gradient(135deg, #EF4444 0%, #991B1B 100%)",
-                boxShadow: "0 0 30px rgba(239, 68, 68, 0.3)",
-                borderRadius: "18px",
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                cursor: "pointer",
-                border: "none",
-                color: "#FFFFFF",
-                fontSize: "18px",
-                fontWeight: 800,
-                textTransform: "uppercase",
+                fontFamily: "monospace",
+                fontWeight: 700,
                 letterSpacing: "0.1em",
+                fontSize: "12px",
+                textTransform: "uppercase",
+                color: "#000000",
+              }}
+            >
+              Initialize Session
+            </span>
+            <div
+              className="button-icon-container"
+              style={{
+                background: "#000000",
+                color: "#FFFFFF",
+                borderRadius: "100px",
+                padding: "4px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "12px",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform =
-                  "translateY(-2px) scale(1.02)";
-                e.currentTarget.style.boxShadow =
-                  "0 0 40px rgba(239, 68, 68, 0.5)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0) scale(1)";
-                e.currentTarget.style.boxShadow =
-                  "0 0 30px rgba(239, 68, 68, 0.3)";
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = "scale(0.98)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform =
-                  "translateY(-2px) scale(1.02)";
+                transition: "transform 0.3s ease",
               }}
             >
-              <Play
-                style={{ width: "24px", height: "24px", fill: "currentColor" }}
+              <ChevronLeft
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  transform: "rotate(180deg)",
+                  strokeWidth: 3,
+                }}
               />
-              Begin Protocol
-            </button>
-          </div>
+            </div>
+          </button>
         </div>
       </div>
     </AnimatedBackground>

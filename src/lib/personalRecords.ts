@@ -20,32 +20,19 @@ export interface ExercisePR {
 
 export async function fetchPersonalRecords(userId: string): Promise<PersonalRecord[]> {
   try {
-    // Get all completed workout sessions for the user
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('workout_sessions')
-      .select('id, assignment_id, completed_at')
-      .eq('client_id', userId)
-      .eq('status', 'completed')
-      .order('completed_at', { ascending: false })
-
-    if (sessionsError) return getFallbackPersonalRecords()
-    if (!sessions || sessions.length === 0) return getFallbackPersonalRecords()
-
-    // Get assignment IDs from sessions
-    const assignmentIds = sessions
-      .map(s => s.assignment_id)
-      .filter((id): id is string => id !== null && id !== undefined)
-
-    if (assignmentIds.length === 0) return getFallbackPersonalRecords()
-
-    // Get workout_logs for these assignments (workout_logs.workout_assignment_id)
+    // Query workout_logs directly using client_id (workout_sessions is optional/unused)
     const { data: workoutLogs, error: logsError } = await supabase
       .from('workout_logs')
       .select('id')
-      .in('workout_assignment_id', assignmentIds)
+      .eq('client_id', userId)
 
-    if (logsError || !workoutLogs || workoutLogs.length === 0) {
-      return getFallbackPersonalRecords()
+    if (logsError) {
+      console.error('Error fetching workout logs:', logsError)
+      return []
+    }
+    
+    if (!workoutLogs || workoutLogs.length === 0) {
+      return []
     }
 
     // Get set logs from workout_set_logs table (correct table name)
@@ -71,9 +58,9 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
 
     if (exerciseLogsError) {
       console.error('Error fetching workout_set_logs:', exerciseLogsError)
-      return getFallbackPersonalRecords()
+      return []
     }
-    if (!logs || logs.length === 0) return getFallbackPersonalRecords()
+    if (!logs || logs.length === 0) return []
 
     // Group logs by exercise name
     const exerciseGroups = new Map<string, any[]>()
@@ -142,60 +129,9 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
       .slice(0, 10)
 
   } catch (error) {
-    // Return fallback data on any error
-    return getFallbackPersonalRecords()
+    console.error('Error fetching personal records:', error)
+    return []
   }
-}
-
-// Fallback data when database queries fail
-function getFallbackPersonalRecords(): PersonalRecord[] {
-  return [
-    {
-      id: '1',
-      exerciseName: 'Bench Press',
-      record: '85kg for 5 reps',
-      date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      weight: 85,
-      reps: 5,
-      isRecent: true
-    },
-    {
-      id: '2',
-      exerciseName: 'Squat',
-      record: '120kg for 3 reps',
-      date: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-      weight: 120,
-      reps: 3,
-      isRecent: true
-    },
-    {
-      id: '3',
-      exerciseName: 'Deadlift',
-      record: '140kg for 1 rep',
-      date: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000).toISOString(),
-      weight: 140,
-      reps: 1,
-      isRecent: true
-    },
-    {
-      id: '4',
-      exerciseName: 'Pull-ups',
-      record: 'Bodyweight for 12 reps',
-      date: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
-      weight: 0,
-      reps: 12,
-      isRecent: true
-    },
-    {
-      id: '5',
-      exerciseName: 'Push-ups',
-      record: 'Bodyweight for 30 reps',
-      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
-      weight: 0,
-      reps: 30,
-      isRecent: false
-    }
-  ]
 }
 
 // Helper function to format record display
