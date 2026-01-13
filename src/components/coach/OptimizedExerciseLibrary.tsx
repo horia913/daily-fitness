@@ -286,12 +286,22 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
 
       if (error) {
         console.error('Error deleting exercise:', error)
+        
+        // Check if it's a foreign key constraint error
+        if (error.code === '23503' || error.message?.includes('foreign key constraint')) {
+          alert('Cannot delete this exercise because it is currently being used in workout templates. Please remove it from all workouts first, or deactivate it instead.')
+          return
+        }
+        
+        // Generic error message
+        alert('Failed to delete exercise. Please try again.')
         return
       }
 
       setExercises(exercises.filter(exercise => exercise.id !== exerciseId))
     } catch (error) {
       console.error('Error deleting exercise:', error)
+      alert('An error occurred while deleting the exercise. Please try again.')
     }
   }
 

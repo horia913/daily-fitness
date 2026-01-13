@@ -188,12 +188,32 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
+      // Check for duplicate exercise name (only when creating new, not editing)
+      if (!exercise) {
+        const { data: existingExercise } = await supabase
+          .from('exercises')
+          .select('id, name')
+          .eq('name', formData.name.trim())
+          .eq('coach_id', user.id)
+          .single()
+
+        if (existingExercise) {
+          showErrorToast(
+            addToast,
+            `An exercise named "${formData.name.trim()}" already exists. Please use a different name or edit the existing exercise.`,
+            'Duplicate Exercise'
+          )
+          setLoading(false)
+          return
+        }
+      }
+
       // Prepare data - only send fields that exist in database
-      // Use category_id (foreign key) instead of category (string)
+      // Use category (string) field, not category_id
       const exerciseData: any = {
         name: formData.name.trim(),
         description: formData.description?.trim() || null,
-        category_id: formData.category || null, // Use category_id as foreign key
+        category: formData.category || null, // Use category as string field
         coach_id: user.id,
         // Filter out empty strings and ensure arrays are not empty
         instructions: formData.instructions.filter(instruction => instruction.trim() !== ''),
@@ -235,6 +255,18 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
             console.error('Database insert error:', error)
             console.error('Error details:', JSON.stringify(error, null, 2))
             console.error('Data being sent:', JSON.stringify(exerciseData, null, 2))
+            
+            // Check if error is due to unique constraint violation
+            if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate')) {
+              showErrorToast(
+                addToast,
+                `An exercise named "${formData.name.trim()}" already exists. Please use a different name.`,
+                'Duplicate Exercise'
+              )
+              setLoading(false)
+              return
+            }
+            
             throw error
           }
         }
@@ -341,7 +373,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
 
   return (
     <div 
-      className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 ${isDark ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/50 backdrop-blur-sm'}`}
+      className={`fixed inset-0 z-[9999] flex items-start justify-center p-4 pt-8 pb-24 ${isDark ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/50 backdrop-blur-sm'}`}
       onClick={(e) => {
         // Don't close if clicking on Select dropdown
         if ((e.target as HTMLElement).closest('[data-slot="select-content"]')) {
@@ -358,8 +390,8 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
         style={{
           animation: 'modalSlideIn 0.3s ease-out',
           maxWidth: 'min(95vw, 50rem)',
-          height: 'min(88vh, calc(100vh - 4rem))',
-          maxHeight: 'min(88vh, calc(100vh - 4rem))'
+          height: 'min(85vh, calc(100vh - 8rem))',
+          maxHeight: 'min(85vh, calc(100vh - 8rem))'
         }}
       >
         {/* Header - Sticky */}
@@ -717,7 +749,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
         </div>
 
         {/* Footer - Sticky at Bottom */}
-        <div className={`${theme.card} border-t ${theme.border} px-6 py-4 rounded-b-3xl flex-shrink-0`}>
+        <div className={`${theme.card} border-t ${theme.border} px-6 py-4 pb-6 rounded-b-3xl flex-shrink-0`}>
           <div className="flex justify-end gap-3">
             <Button 
               type="button" 

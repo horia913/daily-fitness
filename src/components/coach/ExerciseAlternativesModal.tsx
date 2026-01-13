@@ -71,7 +71,8 @@ export default function ExerciseAlternativesModal({
 
   const [alternatives, setAlternatives] = useState<ExerciseAlternative[]>([])
   const [loading, setLoading] = useState(false)
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState(false) // Controls showing/hiding the form
+  const [addingInProgress, setAddingInProgress] = useState(false) // Tracks if the add operation is in progress
   
   // Add alternative form state
   const [selectedAlternativeId, setSelectedAlternativeId] = useState<string>('')
@@ -88,10 +89,13 @@ export default function ExerciseAlternativesModal({
   const loadAlternatives = async () => {
     setLoading(true)
     try {
+      console.log('Loading alternatives for exercise:', exercise.id)
       const data = await WorkoutTemplateService.getExerciseAlternatives(exercise.id)
-      setAlternatives(data)
+      console.log('Loaded alternatives:', data)
+      setAlternatives(data || [])
     } catch (error) {
       console.error('Error loading alternatives:', error)
+      setAlternatives([])
     } finally {
       setLoading(false)
     }
@@ -103,8 +107,17 @@ export default function ExerciseAlternativesModal({
       return
     }
 
-    setLoading(true)
+    if (addingInProgress) return // Prevent multiple clicks
+
+    setAddingInProgress(true)
     try {
+      console.log('Adding alternative:', {
+        primaryExerciseId: exercise.id,
+        alternativeExerciseId: selectedAlternativeId,
+        reason: selectedReason,
+        notes
+      })
+
       const result = await WorkoutTemplateService.addExerciseAlternative(
         exercise.id,
         selectedAlternativeId,
@@ -112,22 +125,21 @@ export default function ExerciseAlternativesModal({
         notes || undefined
       )
 
-      if (result) {
-        await loadAlternatives()
-        // Reset form
-        setSelectedAlternativeId('')
-        setSelectedReason('equipment')
-        setNotes('')
-        setSearchTerm('')
-        setAdding(false)
-      } else {
-        alert('Failed to add alternative. It may already exist.')
-      }
+      console.log('Add alternative result:', result)
+
+      // Reload alternatives list
+      await loadAlternatives()
+      // Reset form
+      setSelectedAlternativeId('')
+      setSelectedReason('equipment')
+      setNotes('')
+      setSearchTerm('')
     } catch (error) {
       console.error('Error adding alternative:', error)
-      alert('Error adding alternative')
+      alert(`Error adding alternative: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
-      setLoading(false)
+      // Always reset the loading state
+      setAddingInProgress(false)
     }
   }
 
@@ -169,15 +181,16 @@ export default function ExerciseAlternativesModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pb-24 bg-black/50 backdrop-blur-sm overflow-y-auto">
       <div 
-        className={`${theme.card} rounded-3xl shadow-2xl w-full border-2 border-slate-200 dark:border-slate-700 my-4`}
+        className={`${theme.card} rounded-3xl shadow-2xl w-full border-2 border-slate-200 dark:border-slate-700`}
         style={{ 
           maxWidth: 'min(95vw, 50rem)',
-          maxHeight: 'min(88vh, calc(100vh - 4rem))',
-          height: 'min(88vh, calc(100vh - 4rem))',
+          maxHeight: 'min(85vh, calc(100vh - 7rem))',
+          height: 'min(85vh, calc(100vh - 7rem))',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          overflow: 'visible'
         }}
       >
         {/* Header - Sticky */}
@@ -272,10 +285,14 @@ export default function ExerciseAlternativesModal({
                       Alternative Exercise
                     </label>
                     <Select value={selectedAlternativeId} onValueChange={setSelectedAlternativeId}>
-                      <SelectTrigger className="rounded-xl border-2">
+                      <SelectTrigger className="rounded-xl border-2 w-full">
                         <SelectValue placeholder="Select an alternative exercise..." />
                       </SelectTrigger>
-                      <SelectContent className="max-h-60">
+                      <SelectContent 
+                        className="max-h-60" 
+                        position="popper"
+                        style={{ zIndex: 10000 }}
+                      >
                         {availableExercises.length === 0 ? (
                           <div className="p-4 text-center text-sm text-slate-500">
                             {searchTerm ? 'No exercises found matching your search' : 'No available exercises'}
@@ -342,10 +359,10 @@ export default function ExerciseAlternativesModal({
                   <div className="flex gap-2">
                     <Button
                       onClick={addAlternative}
-                      disabled={loading || !selectedAlternativeId}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl"
+                      disabled={addingInProgress || !selectedAlternativeId}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl disabled:opacity-50"
                     >
-                      {loading ? 'Adding...' : 'Add Alternative'}
+                      {addingInProgress ? 'Adding...' : 'Add Alternative'}
                     </Button>
                     <Button
                       variant="outline"
@@ -453,7 +470,7 @@ export default function ExerciseAlternativesModal({
         </CardContent>
 
         {/* Footer - Sticky */}
-        <div className={`border-t border-slate-200 dark:border-slate-700 p-4 flex-shrink-0`}>
+        <div className={`border-t border-slate-200 dark:border-slate-700 p-4 pb-6 flex-shrink-0`}>
           <Button
             onClick={onClose}
             variant="outline"

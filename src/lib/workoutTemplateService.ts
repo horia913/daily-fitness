@@ -1793,7 +1793,7 @@ export class WorkoutTemplateService {
           primary_exercise_id: primaryExerciseId,
           alternative_exercise_id: alternativeExerciseId,
           reason,
-          notes
+          notes: notes || null
         })
         .select(`
           *,
@@ -1801,11 +1801,17 @@ export class WorkoutTemplateService {
         `)
         .single()
 
-      if (error) throw error
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('This alternative already exists for this exercise')
+        }
+        throw error
+      }
+
       return data
     } catch (error) {
       console.error('Error adding exercise alternative:', error)
-      return null
+      throw error
     }
   }
 
