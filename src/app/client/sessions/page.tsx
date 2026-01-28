@@ -128,6 +128,7 @@ import {
   Upload as UploadIcon
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { fetchApi } from '@/lib/apiClient'
 
 interface Session {
   id: string
@@ -341,7 +342,7 @@ export default function ClientSessions() {
       if (!confirm(confirmMessage)) return
 
       // Call API route
-      const response = await fetch('/api/cancel-session', {
+      const response = await fetchApi('/api/cancel-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, clientId: user.id }),
@@ -630,68 +631,27 @@ export default function ClientSessions() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-          <div className="p-4">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Header Skeleton */}
-              <div className="text-center space-y-4 py-8">
-                <div className="animate-pulse">
-                  <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded-2xl w-80 mx-auto mb-4"></div>
-                  <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-96 mx-auto mb-6"></div>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <GlassCard elevation={2} className="fc-glass fc-card p-8">
+              <div className="animate-pulse space-y-6">
+                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  ))}
+                </div>
+                <div className="h-16 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-28 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  ))}
                 </div>
               </div>
-
-              {/* Stats Cards Skeleton */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                        <div>
-                          <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg mb-2"></div>
-                          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Filter Skeleton */}
-              <div className="animate-pulse">
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg">
-                  <div className="flex gap-4">
-                    <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg w-32"></div>
-                    <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg w-32"></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Session Cards Skeleton */}
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                          <div>
-                            <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-48 mb-2"></div>
-                            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32"></div>
-                          </div>
-                        </div>
-                        <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
-                      </div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full mb-2"></div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/3"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            </GlassCard>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     )
   }
@@ -703,142 +663,138 @@ export default function ClientSessions() {
       <ClientTypeGuard requiredType="in_gym">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen">
-        <div className="p-4">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="text-center space-y-4 py-8">
-              <div className="flex items-center justify-center gap-3 mb-4">
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Calendar className="w-7 h-7 text-white" />
+                  <Calendar className="w-6 h-6 text-white" />
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-                  Training Log
-                </h1>
+                <div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Session Tracker
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                    Training Log
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    {getMotivationalMessage()}
+                  </p>
+                </div>
               </div>
-              <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-                {getMotivationalMessage()}
-              </p>
-              
-              {/* Book Session Button */}
               <Button
                 onClick={openBookingModal}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl px-8 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 mt-4"
+                className="fc-btn fc-btn-primary"
               >
                 <Plus className="w-5 h-5 mr-2" />
                 Book a Session
               </Button>
             </div>
+          </GlassCard>
 
-            {/* Session Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <GlassCard elevation={1} className="p-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
                     <CheckCircle className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Completed</p>
-                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.completed}</p>
+                    <p className="text-sm text-[color:var(--fc-text-subtle)]">Completed</p>
+                    <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.completed}</p>
                   </div>
                 </div>
               </GlassCard>
 
-              <GlassCard elevation={1} className="p-6">
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                     <Clock className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Scheduled</p>
-                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.scheduled}</p>
+                    <p className="text-sm text-[color:var(--fc-text-subtle)]">Scheduled</p>
+                    <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.scheduled}</p>
                   </div>
                 </div>
               </GlassCard>
 
-              <GlassCard elevation={1} className="p-6">
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
                     <Star className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Avg Rating</p>
-                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+                    <p className="text-sm text-[color:var(--fc-text-subtle)]">Avg Rating</p>
+                    <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       {stats.avgRating > 0 ? stats.avgRating.toFixed(1) : 'N/A'}
                     </p>
                   </div>
                 </div>
               </GlassCard>
 
-              <GlassCard elevation={1} className="p-6">
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
                     <Trophy className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Total</p>
-                    <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.total}</p>
+                    <p className="text-sm text-[color:var(--fc-text-subtle)]">Total</p>
+                    <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.total}</p>
                   </div>
                 </div>
               </GlassCard>
             </div>
 
-            {/* Filters and Sorting */}
-            <GlassCard elevation={1} className="p-4">
-              <div className="p-0">
-                <div className="flex flex-col lg:flex-row gap-4">
-                  <div className="flex-1">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Status Filter</label>
-                    <select 
-                      value={filterStatus} 
-                      onChange={(e) => setFilterStatus(e.target.value as 'all' | 'scheduled' | 'completed' | 'cancelled' | 'no_show')}
-                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                    >
-                      <option value="all">All Sessions</option>
-                      <option value="scheduled">Scheduled</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="no_show">No Show</option>
-                    </select>
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Sort by</label>
-                    <select 
-                      value={sortBy} 
-                      onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'rating' | 'duration')}
-                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                    >
-                      <option value="newest">Newest First</option>
-                      <option value="oldest">Oldest First</option>
-                      <option value="rating">Highest Rating</option>
-                      <option value="duration">Longest Duration</option>
-                    </select>
-                  </div>
+            <GlassCard elevation={1} className="fc-glass fc-card p-4">
+              <div className="flex flex-col lg:flex-row gap-4">
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-[color:var(--fc-text-dim)] mb-2 block">Status Filter</label>
+                  <select 
+                    value={filterStatus} 
+                    onChange={(e) => setFilterStatus(e.target.value as 'all' | 'scheduled' | 'completed' | 'cancelled' | 'no_show')}
+                    className="w-full px-3 py-2 border border-[color:var(--fc-glass-border)] rounded-xl bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-primary)]"
+                  >
+                    <option value="all">All Sessions</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="no_show">No Show</option>
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-[color:var(--fc-text-dim)] mb-2 block">Sort by</label>
+                  <select 
+                    value={sortBy} 
+                    onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'rating' | 'duration')}
+                    className="w-full px-3 py-2 border border-[color:var(--fc-glass-border)] rounded-xl bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-primary)]"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="rating">Highest Rating</option>
+                    <option value="duration">Longest Duration</option>
+                  </select>
                 </div>
               </div>
             </GlassCard>
 
-            {/* Sessions List */}
             <div className="space-y-4 pb-24">
               {filteredAndSortedSessions().map((session) => (
-                <GlassCard key={session.id} elevation={2} className={`bg-gradient-to-r ${getSessionGradient(session)} rounded-2xl p-6 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]`}>
-                  <div className="p-0">
+                <GlassCard key={session.id} elevation={2} className={`fc-glass fc-card p-6 ${getSessionGradient(session)}`}>
                     <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                       {/* Left Section - Icon and Info */}
                       <div className="flex items-start gap-4 flex-1">
-                        <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-lg">
+                        <div className="w-20 h-20 bg-[color:var(--fc-glass-highlight)] rounded-2xl flex items-center justify-center shadow-lg">
                           {getSessionIcon(session)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 truncate">
+                            <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)] truncate">
                               {session.session_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                             </h3>
                             <Badge className={`${getStatusColor(session.status)} rounded-full px-3 py-1`}>
                               {session.status.replace('_', ' ')}
                             </Badge>
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 dark:text-slate-400 mb-3">
+                          <div className="flex flex-wrap items-center gap-4 text-sm text-[color:var(--fc-text-subtle)] mb-3">
                             <span className="flex items-center gap-1">
                               <User className="w-4 h-4" />
                               {session.coach.first_name} {session.coach.last_name}
@@ -857,7 +813,7 @@ export default function ClientSessions() {
                             </span>
                           </div>
                           {(session.notes || session.coach_notes) && (
-                            <p className="text-slate-600 dark:text-slate-300 text-sm mb-3">
+                            <p className="text-[color:var(--fc-text-dim)] text-sm mb-3">
                               {session.notes || session.coach_notes}
                             </p>
                           )}
@@ -881,7 +837,7 @@ export default function ClientSessions() {
                                 />
                               ))}
                             </div>
-                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">
                               {session.session_rating}/5
                             </span>
                           </div>
@@ -891,7 +847,7 @@ export default function ClientSessions() {
                         <div className="flex gap-2">
                           <Button
                             onClick={() => openSessionDetails(session)}
-                            className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl px-4 py-2"
+                            className="fc-btn fc-btn-secondary"
                           >
                             <Eye className="w-4 h-4 mr-2" />
                             Details
@@ -899,7 +855,7 @@ export default function ClientSessions() {
                           {session.status === 'scheduled' && (
                             <Button
                               onClick={() => cancelSession(session.id)}
-                              className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 rounded-xl px-4 py-2"
+                              className="fc-btn bg-red-100 text-red-700 hover:bg-red-200"
                             >
                               <X className="w-4 h-4 mr-2" />
                               Cancel
@@ -908,20 +864,19 @@ export default function ClientSessions() {
                         </div>
                       </div>
                     </div>
-                  </div>
                 </GlassCard>
               ))}
 
               {filteredAndSortedSessions().length === 0 && (
-                <GlassCard elevation={2} className="p-12">
+                <GlassCard elevation={2} className="fc-glass fc-card p-12">
                   <div className="text-center">
-                    <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                      <Calendar className="w-12 h-12 text-slate-400" />
+                    <div className="w-24 h-24 bg-[color:var(--fc-glass-highlight)] rounded-3xl flex items-center justify-center mx-auto mb-6">
+                      <Calendar className="w-12 h-12 text-[color:var(--fc-text-subtle)]" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-4">
+                    <h3 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
                       {filterStatus === 'all' ? 'No Sessions Yet' : `No ${filterStatus} Sessions`}
                     </h3>
-                    <p className="text-slate-600 dark:text-slate-300 mb-8 max-w-md mx-auto">
+                    <p className="text-[color:var(--fc-text-dim)] mb-8 max-w-md mx-auto">
                       {filterStatus === 'all' 
                         ? "You haven't booked any sessions yet. Book a session with your coach to get started on your fitness journey!"
                         : `No sessions with status "${filterStatus}" found. Try changing your filter to see other sessions.`
@@ -929,12 +884,12 @@ export default function ClientSessions() {
                     </p>
                     {filterStatus === 'all' ? (
                       <div className="text-center">
-                        <p className="text-slate-600 dark:text-slate-400 mb-4">
+                        <p className="text-[color:var(--fc-text-subtle)] mb-4">
                           Contact your coach to schedule your first training session.
                         </p>
                         <Button 
                           onClick={() => window.location.href = '/client'}
-                          className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl px-8 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                          className="fc-btn fc-btn-primary"
                         >
                           <Calendar className="w-5 h-5 mr-2" />
                           Back to Dashboard
@@ -943,7 +898,7 @@ export default function ClientSessions() {
                     ) : (
                       <Button 
                         onClick={() => setFilterStatus('all')}
-                        className="bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white rounded-xl px-8 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                        className="fc-btn fc-btn-secondary"
                       >
                         <Eye className="w-5 h-5 mr-2" />
                         View All Sessions
@@ -954,7 +909,6 @@ export default function ClientSessions() {
               )}
             </div>
           </div>
-        </div>
 
         {/* Booking Modal */}
         {showBookingModal && (
@@ -1124,7 +1078,6 @@ export default function ClientSessions() {
             </div>
           </div>
         )}
-        </div>
       </AnimatedBackground>
     </ClientTypeGuard>
     </ProtectedRoute>

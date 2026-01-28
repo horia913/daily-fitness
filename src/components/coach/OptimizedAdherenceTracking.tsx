@@ -179,26 +179,26 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
   }, [])
 
   const getAdherenceColor = (score: number) => {
-    if (score >= 90) return 'text-green-600 dark:text-green-400'
-    if (score >= 75) return 'text-blue-600 dark:text-blue-400'
-    if (score >= 60) return 'text-orange-600 dark:text-orange-400'
-    if (score >= 50) return 'text-red-600 dark:text-red-400'
-    return 'text-red-700 dark:text-red-300'
+    if (score >= 90) return 'text-[color:var(--fc-status-success)]'
+    if (score >= 75) return 'text-[color:var(--fc-accent-cyan)]'
+    if (score >= 60) return 'text-[color:var(--fc-status-warning)]'
+    if (score >= 50) return 'text-[color:var(--fc-status-error)]'
+    return 'text-[color:var(--fc-status-error)]'
   }
 
   const getAdherenceBgColor = (score: number) => {
-    if (score >= 90) return 'bg-green-100 dark:bg-green-900/30'
-    if (score >= 75) return 'bg-blue-100 dark:bg-blue-900/30'
-    if (score >= 60) return 'bg-orange-100 dark:bg-orange-900/30'
-    if (score >= 50) return 'bg-red-100 dark:bg-red-900/30'
-    return 'bg-red-200 dark:bg-red-900/50'
+    if (score >= 90) return 'bg-[color:var(--fc-glass-soft)]'
+    if (score >= 75) return 'bg-[color:var(--fc-glass-soft)]'
+    if (score >= 60) return 'bg-[color:var(--fc-glass-soft)]'
+    if (score >= 50) return 'bg-[color:var(--fc-glass-soft)]'
+    return 'bg-[color:var(--fc-glass-soft)]'
   }
 
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
-      case 'up': return <TrendingUp className="w-4 h-4 text-green-600" />
-      case 'down': return <TrendingDown className="w-4 h-4 text-red-600" />
-      default: return <Activity className="w-4 h-4 text-slate-400" />
+      case 'up': return <TrendingUp className="w-4 h-4 text-[color:var(--fc-status-success)]" />
+      case 'down': return <TrendingDown className="w-4 h-4 text-[color:var(--fc-status-error)]" />
+      default: return <Activity className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
     }
   }
 
@@ -230,15 +230,15 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
     return (
       <div className={`min-h-screen ${theme.background}`}>
         <div className="animate-pulse">
-          <div className="h-64 bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className={`${theme.card} rounded-2xl p-6`}>
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+              <div className="fc-glass fc-card rounded-2xl p-6">
+                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
                 </div>
               </div>
             </div>
@@ -253,124 +253,129 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen">
         {/* Enhanced Header */}
-      <div className={`p-6 ${theme.background} relative overflow-hidden`}>
-        {/* Floating background elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-green-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/coach')}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <h1 className={`text-3xl font-bold ${theme.text} mb-2`}>
-                  Client Adherence Tracking 📈
-                </h1>
-                <p className={`text-lg ${theme.textSecondary}`}>
-                  Monitor detailed client engagement and program adherence
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </Button>
-              <Button
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </Button>
-            </div>
+        <div className={`p-6 ${theme.background} relative overflow-hidden`}>
+          {/* Floating background elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent-cyan)]/10 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-domain-meals)]/10 rounded-full blur-3xl"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-2xl"></div>
           </div>
 
-          {/* Overall Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-green-300 transition-all duration-300`}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
-                    <Target className="w-6 h-6 text-green-600 dark:text-green-400" />
+          <div className="max-w-7xl mx-auto relative z-10">
+            <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+              <CardContent className="p-5 sm:p-6 space-y-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <Button
+                      variant="ghost"
+                      onClick={() => router.push('/coach')}
+                      className="fc-btn fc-btn-ghost h-10 w-10"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </Button>
+                    <div className="space-y-2">
+                      <Badge className="fc-badge">Adherence Monitor</Badge>
+                      <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                        Client Adherence Tracking 📈
+                      </h1>
+                      <p className="text-lg text-[color:var(--fc-text-dim)]">
+                        Monitor detailed client engagement and program adherence
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{stats.avgAdherence.toFixed(1)}%</p>
-                    <p className={`text-sm ${theme.textSecondary}`}>Avg Adherence</p>
+                  
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      className="fc-btn fc-btn-ghost flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="fc-btn fc-btn-ghost flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export
+                    </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-blue-300 transition-all duration-300`}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                    <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{stats.totalClients}</p>
-                    <p className={`text-sm ${theme.textSecondary}`}>Active Clients</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                {/* Overall Stats */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                          <Target className="w-5 h-5 text-[color:var(--fc-status-success)]" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.avgAdherence.toFixed(1)}%</p>
+                          <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Adherence</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-orange-300 transition-all duration-300`}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
-                    <AlertCircle className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{stats.totalAlerts}</p>
-                    <p className={`text-sm ${theme.textSecondary}`}>Active Alerts</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                          <Users className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.totalClients}</p>
+                          <p className="text-sm text-[color:var(--fc-text-dim)]">Active Clients</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-purple-300 transition-all duration-300`}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
-                    <Flame className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{stats.avgStreak.toFixed(0)}</p>
-                    <p className={`text-sm ${theme.textSecondary}`}>Avg Streak</p>
-                  </div>
+                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                          <AlertCircle className="w-5 h-5 text-[color:var(--fc-status-warning)]" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.totalAlerts}</p>
+                          <p className="text-sm text-[color:var(--fc-text-dim)]">Active Alerts</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                          <Flame className="w-5 h-5 text-[color:var(--fc-accent-purple)]" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.avgStreak.toFixed(0)}</p>
+                          <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Streak</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
-      </div>
 
       {/* Main Content */}
       <div className="p-6">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Filters */}
-          <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
             <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex items-center gap-2 flex-1">
-                  <Users className="w-4 h-4 text-slate-400" />
+              <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_1fr] gap-4">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                   <Select value={selectedClient} onValueChange={setSelectedClient}>
-                    <SelectTrigger className="w-full md:w-48">
+                    <SelectTrigger className="fc-select w-full h-11">
                       <SelectValue placeholder="All Clients" />
                     </SelectTrigger>
                     <SelectContent>
@@ -385,9 +390,9 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-slate-400" />
+                  <Calendar className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                   <Select value={selectedPeriod} onValueChange={(value: any) => setSelectedPeriod(value)}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="fc-select w-full h-11">
                       <SelectValue placeholder="Period" />
                     </SelectTrigger>
                     <SelectContent>
@@ -399,9 +404,9 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-slate-400" />
+                  <BarChart3 className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                   <Select value={selectedMetric} onValueChange={(value: any) => setSelectedMetric(value)}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="fc-select w-full h-11">
                       <SelectValue placeholder="Metric" />
                     </SelectTrigger>
                     <SelectContent>
@@ -419,42 +424,42 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
           {/* Client Adherence Cards */}
           <div className="space-y-6">
             {filteredClients.map(client => (
-              <Card key={client.clientId} className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-lg transition-all duration-300`}>
+              <Card key={client.clientId} className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:shadow-lg transition-all duration-300">
                 <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div className="flex items-center gap-4">
                       {/* Client Avatar */}
                       <div className="relative">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                        <div className="w-12 h-12 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold text-lg">
                           {client.avatar}
                         </div>
                         {/* Status indicator */}
-                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                          client.overallAdherence >= 90 ? 'bg-green-500' :
-                          client.overallAdherence >= 75 ? 'bg-blue-500' :
-                          client.overallAdherence >= 60 ? 'bg-orange-500' :
-                          client.overallAdherence >= 50 ? 'bg-red-500' : 'bg-red-700'
+                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[color:var(--fc-glass-border)] ${
+                          client.overallAdherence >= 90 ? 'bg-[color:var(--fc-status-success)]' :
+                          client.overallAdherence >= 75 ? 'bg-[color:var(--fc-accent-cyan)]' :
+                          client.overallAdherence >= 60 ? 'bg-[color:var(--fc-status-warning)]' :
+                          client.overallAdherence >= 50 ? 'bg-[color:var(--fc-status-error)]' : 'bg-[color:var(--fc-status-error)]'
                         }`}></div>
                       </div>
 
                       <div className="flex-1">
-                        <CardTitle className={`text-xl ${theme.text}`}>
+                        <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">
                           {client.clientName}
                         </CardTitle>
-                        <p className={`text-sm ${theme.textSecondary} mb-3`}>
+                        <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">
                           Last active: {new Date(client.lastActive).toLocaleDateString()}
                         </p>
                         
-                        <div className="flex items-center gap-2">
-                          <Badge className={`${getAdherenceBgColor(client.overallAdherence)} ${getAdherenceColor(client.overallAdherence)} border-0`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className={`${getAdherenceBgColor(client.overallAdherence)} ${getAdherenceColor(client.overallAdherence)} border border-[color:var(--fc-glass-border)]`}>
                             {client.overallAdherence}% adherence
                           </Badge>
-                          <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-0">
+                          <Badge className="bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-accent-purple)] border border-[color:var(--fc-glass-border)]">
                             <Flame className="w-3 h-3 mr-1" />
                             {client.streak} day streak
                           </Badge>
                           {client.alerts > 0 && (
-                            <Badge className="bg-red-500 text-white border-0">
+                            <Badge className="bg-[color:var(--fc-status-error)] text-white border-0">
                               {client.alerts} alert{client.alerts > 1 ? 's' : ''}
                             </Badge>
                           )}
@@ -466,13 +471,13 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                      <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
                         <Eye className="w-4 h-4" />
                       </Button>
-                      <Button variant="outline" size="sm" className="hover:bg-green-50 dark:hover:bg-green-900/20">
+                      <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
                         <MessageSquare className="w-4 h-4" />
                       </Button>
-                      <Button variant="outline" size="sm" className="hover:bg-purple-50 dark:hover:bg-purple-900/20">
+                      <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
                         <Settings className="w-4 h-4" />
                       </Button>
                     </div>
@@ -484,8 +489,8 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
-                        <Dumbbell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        <span className={`text-sm font-medium ${theme.text}`}>Workouts</span>
+                        <Dumbbell className="w-4 h-4 text-[color:var(--fc-domain-workouts)]" />
+                        <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Workouts</span>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -499,8 +504,8 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                     
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
-                        <Apple className="w-4 h-4 text-green-600 dark:text-green-400" />
-                        <span className={`text-sm font-medium ${theme.text}`}>Nutrition</span>
+                        <Apple className="w-4 h-4 text-[color:var(--fc-domain-meals)]" />
+                        <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Nutrition</span>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -514,8 +519,8 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                     
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        <span className={`text-sm font-medium ${theme.text}`}>Habits</span>
+                        <Zap className="w-4 h-4 text-[color:var(--fc-domain-habits)]" />
+                        <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Habits</span>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -529,8 +534,8 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                     
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                        <span className={`text-sm font-medium ${theme.text}`}>Sessions</span>
+                        <Calendar className="w-4 h-4 text-[color:var(--fc-status-warning)]" />
+                        <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Sessions</span>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -544,32 +549,32 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
                   </div>
 
                   {/* Weekly Adherence Calendar */}
-                  <div className={`${theme.card} rounded-xl p-4 border-2`}>
-                    <h4 className={`font-semibold ${theme.text} mb-4`}>Weekly Adherence Calendar</h4>
+                  <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
+                    <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-4">Weekly Adherence Calendar</h4>
                     <div className="grid grid-cols-7 gap-2">
                       {client.weeklyData.map((day, index) => (
                         <div key={index} className="text-center">
-                          <div className={`text-xs ${theme.textSecondary} mb-1`}>
+                          <div className="text-xs text-[color:var(--fc-text-subtle)] mb-1">
                             {new Date(day.date).toLocaleDateString('en', { weekday: 'short' })}
                           </div>
                           <div className="space-y-1">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                              day.workout ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
+                              day.workout ? 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-domain-workouts)]' : 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-subtle)]'
                             }`}>
                               <Dumbbell className="w-3 h-3" />
                             </div>
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                              day.nutrition ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
+                              day.nutrition ? 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-domain-meals)]' : 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-subtle)]'
                             }`}>
                               <Apple className="w-3 h-3" />
                             </div>
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                              day.habit ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
+                              day.habit ? 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-domain-habits)]' : 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-subtle)]'
                             }`}>
                               <Zap className="w-3 h-3" />
                             </div>
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                              day.session ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
+                              day.session ? 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-status-warning)]' : 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-text-subtle)]'
                             }`}>
                               <Calendar className="w-3 h-3" />
                             </div>
@@ -581,15 +586,15 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
 
                   {/* Quick Actions */}
                   <div className="flex gap-3">
-                    <Button variant="outline" className="flex-1">
+                    <Button variant="outline" className="fc-btn fc-btn-ghost flex-1">
                       <MessageSquare className="w-4 h-4 mr-2" />
                       Send Message
                     </Button>
-                    <Button variant="outline" className="flex-1">
+                    <Button variant="outline" className="fc-btn fc-btn-ghost flex-1">
                       <Calendar className="w-4 h-4 mr-2" />
                       Schedule Check-in
                     </Button>
-                    <Button variant="outline" className="flex-1">
+                    <Button variant="outline" className="fc-btn fc-btn-ghost flex-1">
                       <Settings className="w-4 h-4 mr-2" />
                       Adjust Plan
                     </Button>
@@ -600,11 +605,11 @@ export default function OptimizedAdherenceTracking({ coachId }: OptimizedAdheren
           </div>
 
           {filteredClients.length === 0 && (
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
               <CardContent className="text-center py-12">
-                <Users className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                <h3 className={`text-lg font-medium ${theme.text} mb-2`}>No clients found</h3>
-                <p className={`${theme.textSecondary} mb-4`}>
+                <Users className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-[color:var(--fc-text-primary)] mb-2">No clients found</h3>
+                <p className="text-[color:var(--fc-text-dim)] mb-4">
                   {selectedClient !== 'all'
                     ? 'Try selecting a different client or period'
                     : 'No clients are currently assigned to you'

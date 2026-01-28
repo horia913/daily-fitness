@@ -165,49 +165,32 @@ function ClientManagementContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div>
-                <h1
-                  className="text-3xl font-bold mb-1"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  Client Management
-                </h1>
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  Manage your coaching roster and track progress
-                </p>
-              </div>
-
-              <Link href="/coach/clients/add">
-                <Button
-                  variant="default"
-                  style={{
-                    background: getSemanticColor("trust").gradient,
-                    boxShadow: `0 4px 12px ${
-                      getSemanticColor("trust").primary
-                    }30`,
-                  }}
-                >
-                  <UserPlus className="w-5 h-5 mr-2" />
-                  Add Client
-                </Button>
-              </Link>
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                Client Directory
+              </span>
+              <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                Client Management
+              </h1>
+              <p className="text-sm text-[color:var(--fc-text-dim)]">
+                Manage your roster, compliance, and engagement signals.
+              </p>
             </div>
-          </GlassCard>
-        </div>
 
-        {/* Stats Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-          <GlassCard elevation={2} className="p-6">
+            <Link href="/coach/clients/add">
+              <Button className="fc-btn fc-btn-primary">
+                <UserPlus className="w-5 h-5 mr-2" />
+                Add Client
+              </Button>
+            </Link>
+          </div>
+        </GlassCard>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-5">
             <div className="flex items-center gap-4">
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -226,19 +209,14 @@ function ClientManagementContent() {
                   className="text-3xl font-bold"
                   color={getSemanticColor("success").primary}
                 />
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
                   Active Clients
                 </p>
               </div>
             </div>
           </GlassCard>
 
-          <GlassCard elevation={2} className="p-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-5">
             <div className="flex items-center gap-4">
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -257,19 +235,14 @@ function ClientManagementContent() {
                   className="text-3xl font-bold"
                   color={getSemanticColor("warning").primary}
                 />
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
                   At Risk
                 </p>
               </div>
             </div>
           </GlassCard>
 
-          <GlassCard elevation={2} className="p-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-5">
             <div className="flex items-center gap-4">
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -290,12 +263,7 @@ function ClientManagementContent() {
                   className="text-3xl font-bold"
                   color={getSemanticColor("neutral").primary}
                 />
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
                   Inactive
                 </p>
               </div>
@@ -303,10 +271,8 @@ function ClientManagementContent() {
           </GlassCard>
         </div>
 
-        {/* Search, Filter, and View Toggle */}
-        <div className="mb-6">
-          <GlassCard elevation={2} className="p-4">
-            <div className="flex items-center gap-4 flex-wrap">
+        <GlassCard elevation={2} className="fc-glass fc-card p-4">
+          <div className="flex items-center gap-4 flex-wrap">
               {/* Search */}
               <div className="flex-1 min-w-[250px]">
                 <div className="relative">
@@ -328,7 +294,6 @@ function ClientManagementContent() {
                 </div>
               </div>
 
-              {/* Status Filter */}
               <div className="flex items-center gap-2">
                 <Button
                   variant={statusFilter === "all" ? "default" : "ghost"}
@@ -400,49 +365,26 @@ function ClientManagementContent() {
                   <List className="w-4 h-4" />
                 </Button>
               </div>
-            </div>
-          </GlassCard>
-        </div>
+          </div>
+        </GlassCard>
 
         {/* Client List/Grid */}
         {filteredClients.length === 0 ? (
-          // Empty State
-          <GlassCard elevation={2} className="p-12 text-center">
-            <Users
-              className="w-24 h-24 mx-auto mb-6"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-              }}
-            />
-            <h3
-              className="text-2xl font-bold mb-2"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
+          <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+            <Users className="w-24 h-24 mx-auto mb-6 text-[color:var(--fc-text-subtle)]" />
+            <h3 className="text-2xl font-bold mb-2 text-[color:var(--fc-text-primary)]">
               {searchQuery || statusFilter !== "all"
                 ? "No clients found"
                 : "Build your coaching roster"}
             </h3>
-            <p
-              className="text-sm mb-6"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
-            >
+            <p className="text-sm mb-6 text-[color:var(--fc-text-dim)]">
               {searchQuery || statusFilter !== "all"
                 ? "Try adjusting your search or filters"
                 : "Start by adding your first client to begin tracking their progress"}
             </p>
             <div className="flex items-center justify-center gap-4">
               <Link href="/coach/clients/add">
-                <Button
-                  variant="default"
-                  style={{
-                    background: getSemanticColor("trust").gradient,
-                    boxShadow: `0 4px 12px ${
-                      getSemanticColor("trust").primary
-                    }30`,
-                  }}
-                >
+                <Button className="fc-btn fc-btn-primary">
                   <UserPlus className="w-5 h-5 mr-2" />
                   Add Your First Client
                 </Button>
@@ -450,6 +392,7 @@ function ClientManagementContent() {
               {(searchQuery || statusFilter !== "all") && (
                 <Button
                   variant="ghost"
+                  className="fc-btn fc-btn-ghost"
                   onClick={() => {
                     setSearchQuery("");
                     setStatusFilter("all");
@@ -467,7 +410,7 @@ function ClientManagementContent() {
               <GlassCard
                 key={client.id}
                 elevation={2}
-                className="overflow-hidden transition-all hover:scale-102 hover:shadow-2xl"
+                className="fc-glass fc-card overflow-hidden transition-all hover:scale-102 hover:shadow-2xl"
                 borderColor={getStatusColor(client.status)}
               >
                 {/* Status indicator bar */}
@@ -490,20 +433,10 @@ function ClientManagementContent() {
                         {client.name.charAt(0)}
                       </div>
                       <div>
-                        <h3
-                          className="text-lg font-bold"
-                          style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                        >
+                        <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)]">
                           {client.name}
                         </h3>
-                        <p
-                          className="text-sm"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.6)"
-                              : "rgba(0,0,0,0.6)",
-                          }}
-                        >
+                        <p className="text-sm text-[color:var(--fc-text-dim)]">
                           {client.email}
                         </p>
                       </div>
@@ -522,32 +455,15 @@ function ClientManagementContent() {
                   {/* Stats */}
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                      <p
-                        className="text-xs mb-1"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.5)"
-                            : "rgba(0,0,0,0.5)",
-                        }}
-                      >
+                      <p className="text-xs mb-1 text-[color:var(--fc-text-subtle)]">
                         Workouts This Week
                       </p>
-                      <p
-                        className="text-2xl font-bold"
-                        style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                      >
+                      <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                         {client.workoutsThisWeek}/{client.workoutGoal}
                       </p>
                     </div>
                     <div>
-                      <p
-                        className="text-xs mb-1"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.5)"
-                            : "rgba(0,0,0,0.5)",
-                        }}
-                      >
+                      <p className="text-xs mb-1 text-[color:var(--fc-text-subtle)]">
                         Compliance
                       </p>
                       <p
@@ -580,14 +496,7 @@ function ClientManagementContent() {
                   </div>
 
                   {/* Last Active */}
-                  <p
-                    className="text-xs mb-4"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.5)"
-                        : "rgba(0,0,0,0.5)",
-                    }}
-                  >
+                  <p className="text-xs mb-4 text-[color:var(--fc-text-subtle)]">
                     Last active: {client.lastActive}
                   </p>
 
@@ -597,15 +506,15 @@ function ClientManagementContent() {
                       href={`/coach/clients/${client.id}`}
                       className="flex-1"
                     >
-                      <Button variant="ghost" size="sm" className="w-full">
+                      <Button variant="ghost" size="sm" className="fc-btn fc-btn-secondary w-full">
                         <Eye className="w-4 h-4 mr-2" />
                         View Profile
                       </Button>
                     </Link>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
                       <MessageCircle className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
                       <Dumbbell className="w-4 h-4" />
                     </Button>
                   </div>
@@ -615,16 +524,13 @@ function ClientManagementContent() {
           </div>
         ) : (
           // List View
-          <GlassCard elevation={2} className="p-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6">
             <div className="space-y-4">
               {filteredClients.map((client) => (
                 <div
                   key={client.id}
-                  className="flex items-center gap-4 p-4 rounded-lg transition-all hover:scale-102"
+                  className="flex items-center gap-4 p-4 rounded-lg transition-all hover:scale-102 fc-glass-soft"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.05)"
-                      : "rgba(0,0,0,0.02)",
                     borderLeft: `4px solid ${getStatusColor(client.status)}`,
                   }}
                 >
@@ -642,10 +548,7 @@ function ClientManagementContent() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h4
-                        className="font-semibold truncate"
-                        style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                      >
+                      <h4 className="font-semibold truncate text-[color:var(--fc-text-primary)]">
                         {client.name}
                       </h4>
                       <span
@@ -658,14 +561,7 @@ function ClientManagementContent() {
                         {getStatusLabel(client.status)}
                       </span>
                     </div>
-                    <p
-                      className="text-sm truncate"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <p className="text-sm truncate text-[color:var(--fc-text-dim)]">
                       {client.email}
                     </p>
                   </div>
@@ -673,20 +569,10 @@ function ClientManagementContent() {
                   {/* Stats */}
                   <div className="hidden md:flex items-center gap-6">
                     <div className="text-center">
-                      <p
-                        className="text-lg font-bold"
-                        style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                      >
+                      <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
                         {client.workoutsThisWeek}/{client.workoutGoal}
                       </p>
-                      <p
-                        className="text-xs"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.5)"
-                            : "rgba(0,0,0,0.5)",
-                        }}
-                      >
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">
                         This Week
                       </p>
                     </div>
@@ -697,36 +583,15 @@ function ClientManagementContent() {
                       >
                         {client.compliance}%
                       </p>
-                      <p
-                        className="text-xs"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.5)"
-                            : "rgba(0,0,0,0.5)",
-                        }}
-                      >
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">
                         Compliance
                       </p>
                     </div>
                     <div className="text-center">
-                      <p
-                        className="text-sm"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.7)"
-                            : "rgba(0,0,0,0.7)",
-                        }}
-                      >
+                      <p className="text-sm text-[color:var(--fc-text-primary)]">
                         {client.lastActive}
                       </p>
-                      <p
-                        className="text-xs"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.5)"
-                            : "rgba(0,0,0,0.5)",
-                        }}
-                      >
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">
                         Last Active
                       </p>
                     </div>
@@ -735,14 +600,14 @@ function ClientManagementContent() {
                   {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link href={`/coach/clients/${client.id}`}>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
                         <Eye className="w-4 h-4" />
                       </Button>
                     </Link>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
                       <MessageCircle className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
                       <Dumbbell className="w-4 h-4" />
                     </Button>
                   </div>

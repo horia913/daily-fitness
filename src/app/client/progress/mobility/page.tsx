@@ -6,7 +6,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,6 @@ import {
   Trash2,
   Save,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import {
   MobilityMetricsService,
@@ -33,8 +32,7 @@ import MobilityFormFields from "@/components/progress/MobilityFormFields";
 
 export default function MobilityMetricsPage() {
   const { user, loading: authLoading } = useAuth();
-  const { getThemeStyles, performanceSettings } = useTheme();
-  const theme = getThemeStyles();
+  const { performanceSettings } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<MobilityMetric[]>([]);
@@ -131,15 +129,43 @@ export default function MobilityMetricsPage() {
     setShowAddModal(true);
   };
 
+  const latestAssessment = metrics.reduce<null | MobilityMetric>((latest, metric) => {
+    if (!latest) return metric;
+    return new Date(metric.assessed_date).getTime() >
+      new Date(latest.assessed_date).getTime()
+      ? metric
+      : latest;
+  }, null);
+
+  const assessmentTypes = metrics.reduce((acc, metric) => {
+    if (metric.assessment_type) {
+      acc.add(metric.assessment_type);
+    }
+    return acc;
+  }, new Set<string>());
+
   if (authLoading || loading) {
     return (
       <ProtectedRoute>
-        <div className={`min-h-screen ${theme.background}`}>
-          <div className="animate-pulse p-4">
-            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-4"></div>
-            <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="fc-glass fc-card p-8">
+              <div className="animate-pulse space-y-6">
+                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={`mobility-skeleton-${index}`}
+                      className="h-28 rounded-2xl bg-[color:var(--fc-glass-highlight)]"
+                    ></div>
+                  ))}
+                </div>
+                <div className="h-72 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+              </div>
+            </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -148,117 +174,146 @@ export default function MobilityMetricsPage() {
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen">
-        <div className="max-w-7xl mx-auto p-4 sm:p-6">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
-            <Link href="/client/progress">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <Link href="/client/progress">
+                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                </Link>
+                <div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Progress Hub
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                    Mobility Metrics
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Track flexibility progress and mobility assessments over time.
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => setShowAddModal(true)} className="fc-btn fc-btn-primary">
+                <Plus className="mr-2 h-5 w-5" />
+                New Assessment
               </Button>
-            </Link>
-            <div className="flex items-center gap-3 flex-1">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-green-400 via-green-500 to-green-600 shadow-lg">
-                <Activity className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className={`text-2xl sm:text-3xl font-bold ${theme.text}`}>
-                  Mobility Metrics
-                </h1>
-                <p className={`text-sm ${theme.textSecondary}`}>
-                  Track your flexibility and mobility assessments
-                </p>
-              </div>
             </div>
-            <Button onClick={() => setShowAddModal(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Assessment
-            </Button>
-          </div>
+          </GlassCard>
 
           {/* Metrics List */}
           {metrics.length > 0 ? (
-            <div className="space-y-4">
-              {metrics.map((metric) => (
-                <Card
-                  key={metric.id}
-                  className={`${theme.card} border ${theme.border} rounded-2xl`}
-                >
-                  <CardHeader className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Calendar className="w-5 h-5 text-green-500" />
-                        <CardTitle
-                          className={`text-lg font-bold ${theme.text}`}
-                        >
-                          {new Date(metric.assessed_date).toLocaleDateString(
-                            "en-US",
-                            {
+            <>
+              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-[0_8px_18px_rgba(16,185,129,0.35)]">
+                      <Activity className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Total Assessments</p>
+                      <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                        {metrics.length}
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-white shadow-[0_8px_18px_rgba(59,130,246,0.35)]">
+                      <Calendar className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Latest Assessment</p>
+                      <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
+                        {latestAssessment
+                          ? new Date(latestAssessment.assessed_date).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-[0_8px_18px_rgba(245,158,11,0.35)]">
+                      <TrendingUp className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Assessment Types</p>
+                      <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                        {assessmentTypes.size}
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                {metrics.map((metric) => (
+                  <GlassCard key={metric.id} elevation={2} className="fc-glass fc-card p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-domain-meals)]">
+                          <Calendar className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                            {new Date(metric.assessed_date).toLocaleDateString("en-US", {
                               year: "numeric",
                               month: "long",
                               day: "numeric",
-                            }
-                          )}
-                        </CardTitle>
-                        <Badge variant="outline" className="ml-2 capitalize">
-                          {metric.assessment_type}
-                        </Badge>
+                            })}
+                          </h3>
+                          <div className="mt-1 flex items-center gap-2">
+                            {metric.assessment_type && (
+                              <span className="fc-badge fc-glass-soft capitalize text-[color:var(--fc-text-primary)]">
+                                {metric.assessment_type}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEdit(metric)}
-                        >
-                          <Edit className="w-4 h-4" />
+                        <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10" onClick={() => startEdit(metric)}>
+                          <Edit className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(metric.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
+                        <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10 text-[color:var(--fc-status-error)]" onClick={() => handleDelete(metric.id)}>
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-6 pt-0">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+                    <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4">
                       {/* Shoulder Metrics */}
                       {((metric as any).left_shoulder_flexion ||
                         (metric as any).right_shoulder_flexion) && (
                         <div className="col-span-full">
-                          <h4
-                            className={`text-sm font-semibold ${theme.text} mb-3`}
-                          >
+                          <h4 className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
                             Shoulder Mobility
                           </h4>
                           <div className="grid grid-cols-2 gap-3">
                             {(metric as any).left_shoulder_flexion && (
-                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                <span
-                                  className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
-                                >
+                              <div className="fc-glass-soft fc-card p-3">
+                                <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
                                   Left Flexion
                                 </span>
-                                <p
-                                  className={`text-lg font-bold ${theme.text}`}
-                                >
+                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).left_shoulder_flexion}°
                                 </p>
                               </div>
                             )}
                             {(metric as any).right_shoulder_flexion && (
-                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                <span
-                                  className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
-                                >
+                              <div className="fc-glass-soft fc-card p-3">
+                                <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
                                   Right Flexion
                                 </span>
-                                <p
-                                  className={`text-lg font-bold ${theme.text}`}
-                                >
+                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).right_shoulder_flexion}°
                                 </p>
                               </div>
@@ -271,36 +326,26 @@ export default function MobilityMetricsPage() {
                       {((metric as any).left_hip_flexion ||
                         (metric as any).right_hip_flexion) && (
                         <div className="col-span-full mt-2">
-                          <h4
-                            className={`text-sm font-semibold ${theme.text} mb-3`}
-                          >
+                          <h4 className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
                             Hip Mobility
                           </h4>
                           <div className="grid grid-cols-2 gap-3">
                             {(metric as any).left_hip_flexion && (
-                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                <span
-                                  className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
-                                >
+                              <div className="fc-glass-soft fc-card p-3">
+                                <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
                                   Left Flexion
                                 </span>
-                                <p
-                                  className={`text-lg font-bold ${theme.text}`}
-                                >
+                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).left_hip_flexion}°
                                 </p>
                               </div>
                             )}
                             {(metric as any).right_hip_flexion && (
-                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                <span
-                                  className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
-                                >
+                              <div className="fc-glass-soft fc-card p-3">
+                                <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
                                   Right Flexion
                                 </span>
-                                <p
-                                  className={`text-lg font-bold ${theme.text}`}
-                                >
+                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).right_hip_flexion}°
                                 </p>
                               </div>
@@ -313,36 +358,26 @@ export default function MobilityMetricsPage() {
                       {((metric as any).left_ankle_dorsiflexion ||
                         (metric as any).right_ankle_dorsiflexion) && (
                         <div className="col-span-full mt-2">
-                          <h4
-                            className={`text-sm font-semibold ${theme.text} mb-3`}
-                          >
+                          <h4 className="text-sm font-semibold text-[color:var(--fc-text-primary)] mb-3">
                             Ankle Mobility
                           </h4>
                           <div className="grid grid-cols-2 gap-3">
                             {(metric as any).left_ankle_dorsiflexion && (
-                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                <span
-                                  className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
-                                >
+                              <div className="fc-glass-soft fc-card p-3">
+                                <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
                                   Left Dorsiflexion
                                 </span>
-                                <p
-                                  className={`text-lg font-bold ${theme.text}`}
-                                >
+                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).left_ankle_dorsiflexion}°
                                 </p>
                               </div>
                             )}
                             {(metric as any).right_ankle_dorsiflexion && (
-                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                <span
-                                  className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
-                                >
+                              <div className="fc-glass-soft fc-card p-3">
+                                <span className="text-xs font-medium text-[color:var(--fc-text-subtle)] block mb-1">
                                   Right Dorsiflexion
                                 </span>
-                                <p
-                                  className={`text-lg font-bold ${theme.text}`}
-                                >
+                                <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                                   {(metric as any).right_ankle_dorsiflexion}°
                                 </p>
                               </div>
@@ -354,15 +389,11 @@ export default function MobilityMetricsPage() {
                       {/* Overall Score */}
                       {(metric as any).overall_score && (
                         <div className="col-span-full mt-2">
-                          <div className="p-4 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800">
-                            <span
-                              className={`text-sm font-medium ${theme.textSecondary} block mb-1`}
-                            >
+                          <div className="fc-glass-soft fc-card p-4 border border-[color:var(--fc-status-success)]/30">
+                            <span className="text-sm font-medium text-[color:var(--fc-text-subtle)] block mb-1">
                               Overall Score
                             </span>
-                            <p
-                              className={`text-3xl font-bold text-green-600 dark:text-green-400`}
-                            >
+                            <p className="text-3xl font-bold text-[color:var(--fc-status-success)]">
                               {(metric as any).overall_score}/100
                             </p>
                           </div>
@@ -371,49 +402,43 @@ export default function MobilityMetricsPage() {
                     </div>
 
                     {metric.notes && (
-                      <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                        <p className={`text-sm ${theme.textSecondary}`}>
+                      <div className="mt-4 fc-glass-soft fc-card p-3">
+                        <p className="text-sm text-[color:var(--fc-text-dim)]">
                           {metric.notes}
                         </p>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  </GlassCard>
+                ))}
+              </div>
+            </>
           ) : (
-            <Card
-              className={`${theme.card} border ${theme.border} rounded-2xl`}
-            >
-              <CardContent className="p-12 text-center">
-                <Activity className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                <h3 className={`text-xl font-semibold ${theme.text} mb-2`}>
-                  No assessments yet
-                </h3>
-                <p className={`${theme.textSecondary} mb-6`}>
-                  Start tracking your mobility to monitor improvements over time
-                </p>
-                <Button onClick={() => setShowAddModal(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add First Assessment
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="mt-6 fc-glass fc-card p-10 text-center">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[color:var(--fc-glass-highlight)]">
+                <Activity className="h-10 w-10 text-[color:var(--fc-text-subtle)]" />
+              </div>
+              <h3 className="mt-6 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                No assessments yet
+              </h3>
+              <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+                Start tracking mobility scores to monitor improvements over time.
+              </p>
+              <Button onClick={() => setShowAddModal(true)} className="fc-btn fc-btn-primary mt-6">
+                <Plus className="mr-2 h-5 w-5" />
+                Add First Assessment
+              </Button>
+            </div>
           )}
 
           {/* Add/Edit Modal */}
           <ResponsiveModal
             isOpen={showAddModal}
             onClose={resetForm}
-            title={
-              editingMetric
-                ? "Edit Mobility Assessment"
-                : "New Mobility Assessment"
-            }
+            title={editingMetric ? "Edit Mobility Assessment" : "New Mobility Assessment"}
           >
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label className={`${theme.text} mb-2 block`}>Date</Label>
+                <Label className="mb-2 block text-[color:var(--fc-text-primary)]">Date</Label>
                 <Input
                   type="date"
                   value={formData.assessed_date}
@@ -424,11 +449,12 @@ export default function MobilityMetricsPage() {
                     })
                   }
                   required
+                  variant="fc"
                 />
               </div>
 
               <div>
-                <Label className={`${theme.text} mb-2 block`}>
+                <Label className="mb-2 block text-[color:var(--fc-text-primary)]">
                   Assessment Type
                 </Label>
                 <select
@@ -439,7 +465,7 @@ export default function MobilityMetricsPage() {
                       assessment_type: e.target.value as any,
                     })
                   }
-                  className={`w-full px-3 py-2 rounded-xl border ${theme.border} ${theme.background}`}
+                  className="fc-select w-full px-4 py-3 text-sm"
                 >
                   <option value="shoulder">Shoulder</option>
                   <option value="hip">Hip</option>
@@ -459,7 +485,7 @@ export default function MobilityMetricsPage() {
               />
 
               <div>
-                <Label className={`${theme.text} mb-2 block`}>Notes</Label>
+                <Label className="mb-2 block text-[color:var(--fc-text-primary)]">Notes</Label>
                 <Textarea
                   value={formData.notes || ""}
                   onChange={(e) =>
@@ -467,11 +493,12 @@ export default function MobilityMetricsPage() {
                   }
                   placeholder="Any additional notes..."
                   rows={3}
+                  variant="fc"
                 />
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex-1">
+                <Button type="submit" className="flex-1 fc-btn fc-btn-primary">
                   <Save className="w-4 h-4 mr-2" />
                   {editingMetric ? "Update" : "Save"}
                 </Button>
@@ -479,14 +506,13 @@ export default function MobilityMetricsPage() {
                   type="button"
                   variant="outline"
                   onClick={resetForm}
-                  className="flex-1"
+                  className="flex-1 fc-btn fc-btn-secondary"
                 >
                   Cancel
                 </Button>
               </div>
             </form>
           </ResponsiveModal>
-        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

@@ -20,6 +20,10 @@ export interface ExercisePR {
 
 export async function fetchPersonalRecords(userId: string): Promise<PersonalRecord[]> {
   try {
+    // Ensure user is authenticated before querying
+    const { ensureAuthenticated } = await import('./supabase');
+    await ensureAuthenticated();
+
     // Query workout_logs directly using client_id (workout_sessions is optional/unused)
     const { data: workoutLogs, error: logsError } = await supabase
       .from('workout_logs')

@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { supabase } from "@/lib/supabase";
 import { ArrowLeft, Coffee, Apple, Utensils, Zap } from "lucide-react";
 import Link from "next/link";
@@ -68,10 +68,8 @@ const getMealTypeColor = (mealType: string) => {
 
 export default function MealDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { getThemeStyles, performanceSettings } = useTheme();
-  const theme = getThemeStyles();
+  const { performanceSettings } = useTheme();
 
   const mealId = params.id as string;
   const [meal, setMeal] = useState<Meal | null>(null);
@@ -214,15 +212,16 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="min-h-screen">
-          <div className="p-4 sm:p-6">
-            <div className="max-w-4xl mx-auto">
-              <div className="animate-pulse space-y-4">
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
-                <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-5xl">
+              <div className="fc-glass fc-card p-6 sm:p-10">
+                <div className="animate-pulse space-y-4">
+                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-10 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-48 rounded-3xl bg-[color:var(--fc-glass-highlight)]" />
+                </div>
               </div>
             </div>
-          </div>
           </div>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -234,17 +233,24 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="min-h-screen">
-          <div className="p-4 sm:p-6">
-            <div className="max-w-4xl mx-auto text-center py-12">
-              <h2 className={`text-2xl font-bold ${theme.text} mb-4`}>
-                Meal Not Found
-              </h2>
-              <Link href="/client/nutrition">
-                <Button className="rounded-xl">Back to Nutrition</Button>
-              </Link>
+          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-5xl">
+              <div className="fc-glass fc-card p-10 text-center">
+                <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                  Meal not found
+                </h2>
+                <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+                  This meal is not available or has been removed.
+                </p>
+                <div className="mt-6 flex justify-center">
+                  <Link href="/client/nutrition">
+                    <Button className="fc-btn fc-btn-secondary">
+                      Back to Nutrition
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
-          </div>
           </div>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -253,192 +259,223 @@ export default function MealDetailPage() {
 
   const Icon = getMealIcon(meal.meal_type);
   const colorClass = getMealTypeColor(meal.meal_type);
+  const mealItems = meal.meal_items ?? [];
+  const mealTotals = mealItems.reduce(
+    (acc, item) => {
+      acc.calories += item.quantity * item.calories_per_unit;
+      acc.protein += item.quantity * item.protein_per_unit;
+      acc.carbs += item.quantity * item.carbs_per_unit;
+      acc.fat += item.quantity * item.fat_per_unit;
+      return acc;
+    },
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+  const totalCalories = Math.round(mealTotals.calories);
+  const totalProtein = Math.round(mealTotals.protein);
+  const totalCarbs = Math.round(mealTotals.carbs);
+  const totalFat = Math.round(mealTotals.fat);
+  const macroCalories = totalProtein * 4 + totalCarbs * 4 + totalFat * 9;
+  const proteinPercent =
+    macroCalories > 0 ? (totalProtein * 4) / macroCalories : 0;
+  const carbsPercent = macroCalories > 0 ? (totalCarbs * 4) / macroCalories : 0;
+  const fatPercent = macroCalories > 0 ? (totalFat * 9) / macroCalories : 0;
 
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen">
-        <div className="p-4 sm:p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-6">
+        <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+          <div className="mx-auto w-full max-w-5xl space-y-8">
+            <div className="flex items-center gap-3">
               <Link href="/client/nutrition">
-                <Button variant="outline" size="icon" className="rounded-xl">
-                  <ArrowLeft className="w-4 h-4" />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="fc-btn fc-btn-secondary h-10 w-10 rounded-xl"
+                >
+                  <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
-              <div
-                className={`p-3 rounded-2xl ${colorClass} flex items-center justify-center`}
-              >
-                <Icon className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <h1 className={`text-3xl font-bold ${theme.text}`}>
-                  {meal.name}
-                </h1>
-                <p className={`${theme.textSecondary} capitalize`}>
-                  {meal.meal_type}
-                </p>
-              </div>
+              <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                Nutrition
+              </span>
             </div>
 
-            {/* Meal Items */}
-            {meal.meal_items && meal.meal_items.length > 0 ? (
-              <div className="space-y-6">
-                <div>
-                  <h3 className={`text-xl font-semibold ${theme.text} mb-4`}>
-                    Ingredients
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {meal.meal_items.map((item) => {
-                      const totalCalories = Math.round(
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`flex h-12 w-12 items-center justify-center rounded-2xl ${colorClass}`}
+                  >
+                    <Icon className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                      {meal.name}
+                    </h1>
+                    <p className="text-sm capitalize text-[color:var(--fc-text-dim)]">
+                      {meal.meal_type}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="fc-glass-soft fc-card p-3">
+                    <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                      Calories
+                    </div>
+                    <div className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                      {totalCalories}
+                    </div>
+                  </div>
+                  <div className="fc-glass-soft fc-card p-3">
+                    <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                      Protein
+                    </div>
+                    <div className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                      {totalProtein}g
+                    </div>
+                  </div>
+                  <div className="fc-glass-soft fc-card p-3">
+                    <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                      Carbs
+                    </div>
+                    <div className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                      {totalCarbs}g
+                    </div>
+                  </div>
+                  <div className="fc-glass-soft fc-card p-3">
+                    <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                      Fat
+                    </div>
+                    <div className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                      {totalFat}g
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+
+            {mealItems.length > 0 ? (
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+                <section className="space-y-4">
+                  <div>
+                    <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                      Ingredients
+                    </h3>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Per-item breakdown with macro split.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {mealItems.map((item) => {
+                      const itemCalories = Math.round(
                         item.quantity * item.calories_per_unit
                       );
-                      const totalProtein = Math.round(
+                      const itemProtein = Math.round(
                         item.quantity * item.protein_per_unit
                       );
-                      const totalCarbs = Math.round(
+                      const itemCarbs = Math.round(
                         item.quantity * item.carbs_per_unit
                       );
-                      const totalFat = Math.round(
+                      const itemFat = Math.round(
                         item.quantity * item.fat_per_unit
                       );
-
-                      // Calculate calories from macros
-                      const proteinCals = totalProtein * 4;
-                      const carbsCals = totalCarbs * 4;
-                      const fatCals = totalFat * 9;
-                      const macroCals = proteinCals + carbsCals + fatCals;
-
-                      // Calculate percentages
-                      const proteinPercent =
-                        macroCals > 0 ? (proteinCals / macroCals) * 100 : 0;
-                      const carbsPercent =
-                        macroCals > 0 ? (carbsCals / macroCals) * 100 : 0;
-                      const fatPercent =
-                        macroCals > 0 ? (fatCals / macroCals) * 100 : 0;
+                      const itemMacroCalories =
+                        itemProtein * 4 + itemCarbs * 4 + itemFat * 9;
+                      const itemProteinPercent =
+                        itemMacroCalories > 0
+                          ? (itemProtein * 4) / itemMacroCalories
+                          : 0;
+                      const itemCarbsPercent =
+                        itemMacroCalories > 0
+                          ? (itemCarbs * 4) / itemMacroCalories
+                          : 0;
+                      const itemFatPercent =
+                        itemMacroCalories > 0
+                          ? (itemFat * 9) / itemMacroCalories
+                          : 0;
 
                       return (
-                        <div
-                          key={item.id}
-                          className={`${theme.card} border-2 border-slate-200 dark:border-slate-700 rounded-2xl p-4`}
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <h4
-                              className={`text-lg font-semibold ${theme.text}`}
-                            >
-                              {item.food_name}
-                            </h4>
-                            <span
-                              className={`${theme.textSecondary} font-medium`}
-                            >
-                              {item.quantity}
-                              {item.unit}
+                        <div key={item.id} className="fc-glass fc-card p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h4 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                                {item.food_name}
+                              </h4>
+                              <p className="text-sm text-[color:var(--fc-text-dim)]">
+                                {item.quantity}
+                                {item.unit}
+                              </p>
+                            </div>
+                            <span className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                              {itemCalories} cal
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-4">
-                            {/* Mini Pie Chart */}
+                          <div className="mt-4 grid grid-cols-[96px_1fr] gap-4">
                             <div className="flex items-center justify-center">
-                              {macroCals > 0 ? (
-                                <div className="relative w-20 h-20">
-                                  <div className="relative w-full h-full rounded-full overflow-hidden">
-                                    <div
-                                      className="absolute inset-0 rounded-full"
-                                      style={{
-                                        background: `conic-gradient(
-                                          #3b82f6 0deg ${
-                                            proteinPercent * 3.6
-                                          }deg,
-                                          #eab308 ${proteinPercent * 3.6}deg ${
-                                          (proteinPercent + carbsPercent) * 3.6
-                                        }deg,
-                                          #f97316 ${
-                                            (proteinPercent + carbsPercent) *
-                                            3.6
-                                          }deg 360deg
-                                        )`,
-                                      }}
-                                    />
-                                    <div className="absolute inset-2 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center">
-                                      <div className="text-center">
-                                        <div
-                                          className={`text-sm font-bold ${theme.text}`}
-                                        >
-                                          {totalCalories}
-                                        </div>
-                                        <div
-                                          className={`text-xs ${theme.textSecondary}`}
-                                        >
-                                          cal
-                                        </div>
+                              <div className="relative h-20 w-20">
+                                <div className="relative h-full w-full overflow-hidden rounded-full">
+                                  <div
+                                    className="absolute inset-0 rounded-full"
+                                    style={{
+                                      background: `conic-gradient(
+                                        #3b82f6 0deg ${itemProteinPercent * 360}deg,
+                                        #eab308 ${itemProteinPercent * 360}deg ${
+                                        (itemProteinPercent + itemCarbsPercent) * 360
+                                      }deg,
+                                        #f97316 ${
+                                          (itemProteinPercent + itemCarbsPercent) *
+                                          360
+                                        }deg 360deg
+                                      )`,
+                                    }}
+                                  />
+                                  <div className="absolute inset-2 rounded-full bg-[color:var(--fc-bg-basalt)] flex items-center justify-center">
+                                    <div className="text-center">
+                                      <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
+                                        {itemCalories}
+                                      </div>
+                                      <div className="text-[10px] text-[color:var(--fc-text-dim)]">
+                                        cal
                                       </div>
                                     </div>
                                   </div>
                                 </div>
-                              ) : (
-                                <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
-                                  <div className="text-center">
-                                    <div
-                                      className={`text-sm font-bold ${theme.text}`}
-                                    >
-                                      {totalCalories}
-                                    </div>
-                                    <div
-                                      className={`text-xs ${theme.textSecondary}`}
-                                    >
-                                      cal
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
+                              </div>
                             </div>
 
-                            {/* Macro Breakdown */}
                             <div className="space-y-2">
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                                <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
                                 <div className="flex-1">
-                                  <div
-                                    className={`text-xs font-semibold ${theme.text}`}
-                                  >
+                                  <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
                                     Protein
                                   </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
-                                    {totalProtein}g
+                                  <div className="text-xs text-[color:var(--fc-text-dim)]">
+                                    {itemProtein}g
                                   </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                                <div className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
                                 <div className="flex-1">
-                                  <div
-                                    className={`text-xs font-semibold ${theme.text}`}
-                                  >
+                                  <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
                                     Carbs
                                   </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
-                                    {totalCarbs}g
+                                  <div className="text-xs text-[color:var(--fc-text-dim)]">
+                                    {itemCarbs}g
                                   </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                                <div className="h-2.5 w-2.5 rounded-full bg-orange-500" />
                                 <div className="flex-1">
-                                  <div
-                                    className={`text-xs font-semibold ${theme.text}`}
-                                  >
+                                  <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
                                     Fat
                                   </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
-                                    {totalFat}g
+                                  <div className="text-xs text-[color:var(--fc-text-dim)]">
+                                    {itemFat}g
                                   </div>
                                 </div>
                               </div>
@@ -448,238 +485,117 @@ export default function MealDetailPage() {
                       );
                     })}
                   </div>
-                </div>
+                </section>
 
-                {/* Meal Totals */}
-                <div className="border-t-2 border-slate-200 dark:border-slate-700 pt-6">
-                  <h3 className={`text-xl font-semibold ${theme.text} mb-4`}>
-                    Meal Totals
-                  </h3>
-                  <div
-                    className={`${theme.card} rounded-3xl p-6 border-2 border-slate-200 dark:border-slate-700`}
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Pie Chart */}
-                      <div className="flex items-center justify-center">
-                        {(() => {
-                          const totalCalories = Math.round(
-                            meal.meal_items!.reduce(
-                              (sum, item) =>
-                                sum + item.quantity * item.calories_per_unit,
-                              0
-                            )
-                          );
-                          const totalProtein = Math.round(
-                            meal.meal_items!.reduce(
-                              (sum, item) =>
-                                sum + item.quantity * item.protein_per_unit,
-                              0
-                            )
-                          );
-                          const totalCarbs = Math.round(
-                            meal.meal_items!.reduce(
-                              (sum, item) =>
-                                sum + item.quantity * item.carbs_per_unit,
-                              0
-                            )
-                          );
-                          const totalFat = Math.round(
-                            meal.meal_items!.reduce(
-                              (sum, item) =>
-                                sum + item.quantity * item.fat_per_unit,
-                              0
-                            )
-                          );
-
-                          const proteinCals = totalProtein * 4;
-                          const carbsCals = totalCarbs * 4;
-                          const fatCals = totalFat * 9;
-                          const macroCals = proteinCals + carbsCals + fatCals;
-
-                          const proteinPercent =
-                            (proteinCals / macroCals) * 100;
-                          const carbsPercent = (carbsCals / macroCals) * 100;
-                          const fatPercent = (fatCals / macroCals) * 100;
-
-                          return (
-                            <div className="relative w-40 h-40">
-                              <div className="relative w-full h-full rounded-full overflow-hidden">
-                                <div
-                                  className="absolute inset-0 rounded-full"
-                                  style={{
-                                    background: `conic-gradient(
-                                      #3b82f6 0deg ${proteinPercent * 3.6}deg,
-                                      #eab308 ${proteinPercent * 3.6}deg ${
-                                      (proteinPercent + carbsPercent) * 3.6
-                                    }deg,
-                                      #f97316 ${
-                                        (proteinPercent + carbsPercent) * 3.6
-                                      }deg 360deg
-                                    )`,
-                                  }}
-                                />
-                                <div className="absolute inset-4 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center">
-                                  <div className="text-center">
-                                    <div
-                                      className={`text-xl font-bold ${theme.text}`}
-                                    >
-                                      {totalCalories}
-                                    </div>
-                                    <div
-                                      className={`text-xs ${theme.textSecondary}`}
-                                    >
-                                      calories
-                                    </div>
-                                  </div>
-                                </div>
+                <GlassCard elevation={2} className="fc-glass fc-card p-6">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                        Meal totals
+                      </h3>
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
+                        Macro distribution for the full meal.
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center">
+                      <div className="relative h-40 w-40">
+                        <div className="relative h-full w-full overflow-hidden rounded-full">
+                          <div
+                            className="absolute inset-0 rounded-full"
+                            style={{
+                              background: `conic-gradient(
+                                #3b82f6 0deg ${proteinPercent * 360}deg,
+                                #eab308 ${proteinPercent * 360}deg ${
+                                (proteinPercent + carbsPercent) * 360
+                              }deg,
+                                #f97316 ${
+                                  (proteinPercent + carbsPercent) * 360
+                                }deg 360deg
+                              )`,
+                            }}
+                          />
+                          <div className="absolute inset-4 rounded-full bg-[color:var(--fc-bg-basalt)] flex items-center justify-center">
+                            <div className="text-center">
+                              <div className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                                {totalCalories}
+                              </div>
+                              <div className="text-xs text-[color:var(--fc-text-dim)]">
+                                calories
                               </div>
                             </div>
-                          );
-                        })()}
+                          </div>
+                        </div>
                       </div>
-
-                      {/* Macro Breakdown */}
-                      <div className="space-y-3">
-                        {(() => {
-                          const totalCalories = Math.round(
-                            meal.meal_items!.reduce(
-                              (sum, item) =>
-                                sum + item.quantity * item.calories_per_unit,
-                              0
-                            )
-                          );
-                          const totalProtein = Math.round(
-                            meal.meal_items!.reduce(
-                              (sum, item) =>
-                                sum + item.quantity * item.protein_per_unit,
-                              0
-                            )
-                          );
-                          const totalCarbs = Math.round(
-                            meal.meal_items!.reduce(
-                              (sum, item) =>
-                                sum + item.quantity * item.carbs_per_unit,
-                              0
-                            )
-                          );
-                          const totalFat = Math.round(
-                            meal.meal_items!.reduce(
-                              (sum, item) =>
-                                sum + item.quantity * item.fat_per_unit,
-                              0
-                            )
-                          );
-
-                          return (
-                            <>
-                              <div className="flex items-center gap-3">
-                                <div className="w-4 h-4 rounded-full bg-blue-500"></div>
-                                <div className="flex-1">
-                                  <div className="flex justify-between items-center">
-                                    <span
-                                      className={`text-sm font-semibold ${theme.text}`}
-                                    >
-                                      Protein
-                                    </span>
-                                    <span
-                                      className={`text-base font-bold ${theme.text}`}
-                                    >
-                                      {totalProtein}g
-                                    </span>
-                                  </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
-                                    {Math.round(
-                                      ((totalProtein * 4) / totalCalories) * 100
-                                    )}
-                                    % of calories
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="w-4 h-4 rounded-full bg-yellow-400"></div>
-                                <div className="flex-1">
-                                  <div className="flex justify-between items-center">
-                                    <span
-                                      className={`text-sm font-semibold ${theme.text}`}
-                                    >
-                                      Carbs
-                                    </span>
-                                    <span
-                                      className={`text-base font-bold ${theme.text}`}
-                                    >
-                                      {totalCarbs}g
-                                    </span>
-                                  </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
-                                    {Math.round(
-                                      ((totalCarbs * 4) / totalCalories) * 100
-                                    )}
-                                    % of calories
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="w-4 h-4 rounded-full bg-orange-500"></div>
-                                <div className="flex-1">
-                                  <div className="flex justify-between items-center">
-                                    <span
-                                      className={`text-sm font-semibold ${theme.text}`}
-                                    >
-                                      Fat
-                                    </span>
-                                    <span
-                                      className={`text-base font-bold ${theme.text}`}
-                                    >
-                                      {totalFat}g
-                                    </span>
-                                  </div>
-                                  <div
-                                    className={`text-xs ${theme.textSecondary}`}
-                                  >
-                                    {Math.round(
-                                      ((totalFat * 9) / totalCalories) * 100
-                                    )}
-                                    % of calories
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          );
-                        })()}
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-3 w-3 rounded-full bg-blue-500" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                            <span>Protein</span>
+                            <span>{totalProtein}g</span>
+                          </div>
+                          <div className="text-xs text-[color:var(--fc-text-dim)]">
+                            {macroCalories > 0
+                              ? Math.round((totalProtein * 4 * 100) / macroCalories)
+                              : 0}
+                            % of calories
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="h-3 w-3 rounded-full bg-yellow-400" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                            <span>Carbs</span>
+                            <span>{totalCarbs}g</span>
+                          </div>
+                          <div className="text-xs text-[color:var(--fc-text-dim)]">
+                            {macroCalories > 0
+                              ? Math.round((totalCarbs * 4 * 100) / macroCalories)
+                              : 0}
+                            % of calories
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="h-3 w-3 rounded-full bg-orange-500" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                            <span>Fat</span>
+                            <span>{totalFat}g</span>
+                          </div>
+                          <div className="text-xs text-[color:var(--fc-text-dim)]">
+                            {macroCalories > 0
+                              ? Math.round((totalFat * 9 * 100) / macroCalories)
+                              : 0}
+                            % of calories
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                </GlassCard>
               </div>
             ) : (
-              <div
-                className={`${theme.card} rounded-3xl p-12 text-center border-2 border-slate-200 dark:border-slate-700`}
-              >
-                <p className={`${theme.textSecondary}`}>
+              <div className="fc-glass fc-card p-12 text-center">
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
                   No ingredients added yet.
                 </p>
               </div>
             )}
 
-            {/* Notes */}
             {meal.notes && (
-              <div
-                className={`${theme.card} rounded-3xl p-6 border-2 border-slate-200 dark:border-slate-700`}
-              >
-                <h3 className={`text-lg font-semibold ${theme.text} mb-2`}>
+              <GlassCard elevation={1} className="fc-glass fc-card p-6">
+                <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                   Notes
                 </h3>
-                <p className={`${theme.textSecondary} leading-relaxed`}>
+                <p className="mt-2 text-sm text-[color:var(--fc-text-dim)] leading-relaxed">
                   {meal.notes}
                 </p>
-              </div>
+              </GlassCard>
             )}
           </div>
-        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

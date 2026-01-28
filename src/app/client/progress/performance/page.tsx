@@ -8,7 +8,6 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Timer, Activity, TrendingUp, TrendingDown, Plus, Minus } from "lucide-react";
 import Link from "next/link";
 import { getClientPerformanceTests, PerformanceTest } from "@/lib/performanceTestService";
@@ -16,7 +15,7 @@ import { LogPerformanceTestModal } from "@/components/client/LogPerformanceTestM
 
 function PerformancePageContent() {
   const { user, loading: authLoading } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
 
   const [runTests, setRunTests] = useState<PerformanceTest[]>([]);
   const [stepTests, setStepTests] = useState<PerformanceTest[]>([]);
@@ -93,9 +92,13 @@ function PerformancePageContent() {
   };
 
   const getTrendIcon = (trend: string) => {
-    if (trend === "up") return <TrendingUp className="w-5 h-5" style={{ color: getSemanticColor("success").primary }} />;
-    if (trend === "down") return <TrendingDown className="w-5 h-5" style={{ color: getSemanticColor("critical").primary }} />;
-    return <Minus className="w-5 h-5" style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)" }} />;
+    if (trend === "up") {
+      return <TrendingUp className="h-5 w-5 text-[color:var(--fc-status-success)]" />;
+    }
+    if (trend === "down") {
+      return <TrendingDown className="h-5 w-5 text-[color:var(--fc-status-error)]" />;
+    }
+    return <Minus className="h-5 w-5 text-[color:var(--fc-text-subtle)]" />;
   };
 
   if (authLoading || loading) {
@@ -103,12 +106,16 @@ function PerformancePageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 container mx-auto px-4 py-8">
-            <div className="animate-pulse space-y-6">
-              <div className="h-24 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="h-96 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-                <div className="h-96 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+          <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-6xl">
+              <div className="fc-glass fc-card p-8">
+                <div className="animate-pulse space-y-6">
+                  <div className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div className="h-96 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                    <div className="h-96 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -126,67 +133,53 @@ function PerformancePageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center gap-4">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
               <Link href="/client/progress">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-5 h-5" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="fc-btn fc-btn-ghost h-10 w-10"
+                >
+                  <ArrowLeft className="h-5 w-5" />
                 </Button>
               </Link>
               <div>
-                <h1
-                  className="text-3xl font-bold mb-1"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
+                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                  Performance
+                </span>
+                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
                   Performance Tests
                 </h1>
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  Track your fitness assessments monthly
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  Track your fitness assessments monthly.
                 </p>
               </div>
             </div>
-          </GlassCard>
-        </div>
+            <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+              {runTests.length + stepTests.length} total tests
+            </div>
+          </div>
+        </GlassCard>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* 1km Run Tests */}
-          <GlassCard elevation={2} className="p-6">
-            <div className="flex items-center justify-between mb-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{
-                    background: getSemanticColor("energy").gradient,
-                    boxShadow: `0 4px 12px ${getSemanticColor("energy").primary}30`,
-                  }}
-                >
-                  <Timer className="w-6 h-6 text-white" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-600 shadow-[0_8px_18px_rgba(249,115,22,0.3)]">
+                  <Timer className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2
-                    className="text-xl font-bold"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
+                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                     1km Run
                   </h2>
                   {runDue && (
-                    <Badge
-                      className="mt-1"
-                      style={{
-                        background: getSemanticColor("warning").gradient,
-                        color: "#fff",
-                      }}
-                    >
+                    <span className="fc-badge mt-2 inline-flex bg-[color:var(--fc-status-warning)] text-white">
                       Due this month
-                    </Badge>
+                    </span>
                   )}
                 </div>
               </div>
@@ -195,51 +188,34 @@ function PerformancePageContent() {
 
             <Button
               onClick={() => openLogModal("1km_run")}
-              className="w-full mb-6"
-              style={{
-                background: getSemanticColor("energy").gradient,
-                boxShadow: `0 4px 12px ${getSemanticColor("energy").primary}30`,
-              }}
+              className="fc-btn fc-btn-primary mb-6 w-full"
             >
-              <Plus className="w-5 h-5 mr-2" />
+              <Plus className="mr-2 h-5 w-5" />
               Log New Test
             </Button>
 
             {/* Test History */}
             <div className="space-y-3">
               {runTests.length === 0 ? (
-                <p
-                  className="text-center py-8"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                  }}
-                >
+                <p className="py-8 text-center text-sm text-[color:var(--fc-text-dim)]">
                   No tests logged yet
                 </p>
               ) : (
                 runTests.map((test, index) => (
                   <div
                     key={test.id}
-                    className="p-4 rounded-lg"
-                    style={{
-                      background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
-                      border: index === 0 ? `2px solid ${getSemanticColor("energy").primary}` : "none",
-                    }}
+                    className={`rounded-lg p-4 ${
+                      index === 0
+                        ? "fc-glass-soft border border-[color:var(--fc-domain-workouts)]"
+                        : "fc-glass-soft border border-transparent"
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p
-                          className="text-2xl font-bold"
-                          style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                        >
+                        <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                           {test.time_seconds ? formatRunTime(test.time_seconds) : "N/A"}
                         </p>
-                        <p
-                          className="text-xs mt-1"
-                          style={{
-                            color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                          }}
-                        >
+                        <p className="mt-1 text-xs text-[color:var(--fc-text-subtle)]">
                           {new Date(test.tested_at).toLocaleDateString("en-US", {
                             month: "short",
                             day: "numeric",
@@ -248,23 +224,13 @@ function PerformancePageContent() {
                         </p>
                       </div>
                       {index === 0 && (
-                        <Badge
-                          style={{
-                            background: getSemanticColor("success").gradient,
-                            color: "#fff",
-                          }}
-                        >
+                        <span className="fc-badge bg-[color:var(--fc-status-success)] text-white">
                           Latest
-                        </Badge>
+                        </span>
                       )}
                     </div>
                     {test.notes && (
-                      <p
-                        className="text-sm mt-2"
-                        style={{
-                          color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                        }}
-                      >
+                      <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
                         {test.notes}
                       </p>
                     )}
@@ -275,35 +241,20 @@ function PerformancePageContent() {
           </GlassCard>
 
           {/* Step Tests */}
-          <GlassCard elevation={2} className="p-6">
-            <div className="flex items-center justify-between mb-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{
-                    background: getSemanticColor("trust").gradient,
-                    boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-                  }}
-                >
-                  <Activity className="w-6 h-6 text-white" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-600 shadow-[0_8px_18px_rgba(59,130,246,0.3)]">
+                  <Activity className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2
-                    className="text-xl font-bold"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
+                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                     Step Test
                   </h2>
                   {stepDue && (
-                    <Badge
-                      className="mt-1"
-                      style={{
-                        background: getSemanticColor("warning").gradient,
-                        color: "#fff",
-                      }}
-                    >
+                    <span className="fc-badge mt-2 inline-flex bg-[color:var(--fc-status-warning)] text-white">
                       Due this month
-                    </Badge>
+                    </span>
                   )}
                 </div>
               </div>
@@ -312,59 +263,37 @@ function PerformancePageContent() {
 
             <Button
               onClick={() => openLogModal("step_test")}
-              className="w-full mb-6"
-              style={{
-                background: getSemanticColor("trust").gradient,
-                boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-              }}
+              className="fc-btn fc-btn-primary mb-6 w-full"
             >
-              <Plus className="w-5 h-5 mr-2" />
+              <Plus className="mr-2 h-5 w-5" />
               Log New Test
             </Button>
 
             {/* Test History */}
             <div className="space-y-3">
               {stepTests.length === 0 ? (
-                <p
-                  className="text-center py-8"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                  }}
-                >
+                <p className="py-8 text-center text-sm text-[color:var(--fc-text-dim)]">
                   No tests logged yet
                 </p>
               ) : (
                 stepTests.map((test, index) => (
                   <div
                     key={test.id}
-                    className="p-4 rounded-lg"
-                    style={{
-                      background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
-                      border: index === 0 ? `2px solid ${getSemanticColor("trust").primary}` : "none",
-                    }}
+                    className={`rounded-lg p-4 ${
+                      index === 0
+                        ? "fc-glass-soft border border-[color:var(--fc-accent-cyan)]"
+                        : "fc-glass-soft border border-transparent"
+                    }`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <p
-                          className="text-sm font-medium"
-                          style={{
-                            color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                          }}
-                        >
+                        <p className="text-sm font-medium text-[color:var(--fc-text-dim)]">
                           Recovery Score
                         </p>
-                        <p
-                          className="text-2xl font-bold"
-                          style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                        >
+                        <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                           {test.recovery_score !== null ? test.recovery_score : "N/A"}
                         </p>
-                        <p
-                          className="text-xs mt-1"
-                          style={{
-                            color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                          }}
-                        >
+                        <p className="mt-1 text-xs text-[color:var(--fc-text-subtle)]">
                           {new Date(test.tested_at).toLocaleDateString("en-US", {
                             month: "short",
                             day: "numeric",
@@ -373,91 +302,49 @@ function PerformancePageContent() {
                         </p>
                       </div>
                       {index === 0 && (
-                        <Badge
-                          style={{
-                            background: getSemanticColor("success").gradient,
-                            color: "#fff",
-                          }}
-                        >
+                        <span className="fc-badge bg-[color:var(--fc-status-success)] text-white">
                           Latest
-                        </Badge>
+                        </span>
                       )}
                     </div>
                     {test.heart_rate_pre && (
                       <div className="grid grid-cols-4 gap-2 mt-3">
                         <div className="text-center">
-                          <p
-                            className="text-xs"
-                            style={{
-                              color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                            }}
-                          >
+                          <p className="text-xs text-[color:var(--fc-text-subtle)]">
                             Pre
                           </p>
-                          <p
-                            className="font-semibold"
-                            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                          >
+                          <p className="font-semibold text-[color:var(--fc-text-primary)]">
                             {test.heart_rate_pre}
                           </p>
                         </div>
                         <div className="text-center">
-                          <p
-                            className="text-xs"
-                            style={{
-                              color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                            }}
-                          >
+                          <p className="text-xs text-[color:var(--fc-text-subtle)]">
                             1min
                           </p>
-                          <p
-                            className="font-semibold"
-                            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                          >
+                          <p className="font-semibold text-[color:var(--fc-text-primary)]">
                             {test.heart_rate_1min}
                           </p>
                         </div>
                         <div className="text-center">
-                          <p
-                            className="text-xs"
-                            style={{
-                              color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                            }}
-                          >
+                          <p className="text-xs text-[color:var(--fc-text-subtle)]">
                             2min
                           </p>
-                          <p
-                            className="font-semibold"
-                            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                          >
+                          <p className="font-semibold text-[color:var(--fc-text-primary)]">
                             {test.heart_rate_2min}
                           </p>
                         </div>
                         <div className="text-center">
-                          <p
-                            className="text-xs"
-                            style={{
-                              color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                            }}
-                          >
+                          <p className="text-xs text-[color:var(--fc-text-subtle)]">
                             3min
                           </p>
-                          <p
-                            className="font-semibold"
-                            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                          >
+                          <p className="font-semibold text-[color:var(--fc-text-primary)]">
                             {test.heart_rate_3min}
                           </p>
                         </div>
                       </div>
                     )}
                     {test.notes && (
-                      <p
-                        className="text-sm mt-2"
-                        style={{
-                          color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                        }}
-                      >
+                      <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
                         {test.notes}
                       </p>
                     )}

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/components/ui/toast-provider";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   WorkoutBlock,
   WorkoutBlockType,
@@ -24,6 +24,7 @@ import {
   formatTime,
   calculateSuggestedWeightUtil,
 } from "./workout-execution/BaseBlockExecutor";
+import { fetchApi } from "@/lib/apiClient";
 
 // Import type-specific components
 import { StraightSetExecutor } from "./workout-execution/blocks/StraightSetExecutor";
@@ -37,6 +38,7 @@ import { AmrapExecutor } from "./workout-execution/blocks/AmrapExecutor";
 import { EmomExecutor } from "./workout-execution/blocks/EmomExecutor";
 import { TabataExecutor } from "./workout-execution/blocks/TabataExecutor";
 import { ForTimeExecutor } from "./workout-execution/blocks/ForTimeExecutor";
+import { HRSetExecutor } from "./workout-execution/blocks/HRSetExecutor";
 
 interface LiveWorkoutBlockExecutorProps {
   block: LiveWorkoutBlock;
@@ -51,6 +53,10 @@ interface LiveWorkoutBlockExecutorProps {
   onBlockChange?: (blockIndex: number) => void;
   onSetLogged?: (blockId: string, newCompletedSets: number) => void;
   onExerciseComplete?: (blockId: string) => void;
+  progressionSuggestions?: Map<
+    string,
+    import("@/lib/clientProgressionService").ProgressionSuggestion
+  >;
 }
 
 export default function LiveWorkoutBlockExecutor({
@@ -66,20 +72,31 @@ export default function LiveWorkoutBlockExecutor({
   onBlockChange,
   onSetLogged,
   onExerciseComplete,
+  progressionSuggestions,
 }: LiveWorkoutBlockExecutorProps) {
   const { addToast } = useToast();
-  
+  const { ensureFreshSession, user: authUser } = useAuth();
+
   // Debug: Log assignmentId received as prop
   console.log("📍 LiveWorkoutBlockExecutor received:", {
     assignmentId,
     blockId: block.block.id,
     blockType: (block.block as any).type || block.block.block_type,
   });
-  
+
   useEffect(() => {
-    console.log("🔍 [LiveWorkoutBlockExecutor] assignmentId received:", assignmentId);
-    console.log("🔍 [LiveWorkoutBlockExecutor] assignmentId type:", typeof assignmentId);
-    console.log("🔍 [LiveWorkoutBlockExecutor] assignmentId truthy:", !!assignmentId);
+    console.log(
+      "🔍 [LiveWorkoutBlockExecutor] assignmentId received:",
+      assignmentId
+    );
+    console.log(
+      "🔍 [LiveWorkoutBlockExecutor] assignmentId type:",
+      typeof assignmentId
+    );
+    console.log(
+      "🔍 [LiveWorkoutBlockExecutor] assignmentId truthy:",
+      !!assignmentId
+    );
   }, [assignmentId]);
 
   // Sync local exercise index with block's currentExerciseIndex
@@ -109,7 +126,10 @@ export default function LiveWorkoutBlockExecutor({
   const [showRestTimer, setShowRestTimer] = useState(false);
   const [restDuration, setRestDuration] = useState(0);
   const [restLabel, setRestLabel] = useState("Next Set");
-  const [pendingAction, setPendingAction] = useState<'set' | 'exercise' | null>(null);
+  const [pendingAction, setPendingAction] = useState<"set" | "exercise" | null>(
+    null
+  );
+  const completedBlockRef = useRef<Set<string>>(new Set());
 
   // Load all exercises for alternatives modal
   useEffect(() => {
@@ -178,6 +198,26 @@ export default function LiveWorkoutBlockExecutor({
     setCurrentVideoTitle("");
   };
 
+  const LOG_SET_TIMEOUT_MS = 12_000;
+  const inFlightLogRef = useRef<null | { startedAt: number; abort: () => void }>(null);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!inFlightLogRef.current) return;
+
+      const elapsed = Date.now() - inFlightLogRef.current.startedAt;
+      if (elapsed >= LOG_SET_TIMEOUT_MS) {
+        inFlightLogRef.current.abort();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
   // Log set to database and calculate e1RM
   // Individual sets go to workout_set_logs, not workout_logs
   // workout_logs is for session summary only
@@ -197,145 +237,314 @@ export default function LiveWorkoutBlockExecutor({
 
     const currentExercise = block.block.exercises?.[currentExerciseIndex];
 
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const payloadSummary = {
+      block_id: data?.block_id,
+      block_type: data?.block_type,
+      exercise_id: data?.exercise_id,
+      set_number: data?.set_number,
+    };
+
     try {
-      // Get user ID for client_id
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        return { success: false, error: "User not authenticated" };
+      console.log("[log-set] start", {
+        route: window.location.pathname,
+        assignmentId,
+        blockId: block.block.id,
+        payload: {
+          exercise_id: data?.exercise_id,
+          reps: data?.reps,
+          weight: data?.weight,
+          set_number: data?.set_number,
+        },
+      });
+      console.log("[log-set] ensureFreshSession: begin");
+      try {
+        await Promise.race([
+          ensureFreshSession(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("ensureFreshSession timeout")), 4000)
+          ),
+        ]);
+        console.log("[log-set] ensureFreshSession: done");
+      } catch (refreshError) {
+        console.warn("[log-set] ensureFreshSession failed or timed out", refreshError);
       }
+
+      let resolvedUserId = authUser?.id || null;
+      if (!resolvedUserId) {
+        try {
+          const { data: { user } } = (await Promise.race([
+            supabase.auth.getUser(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("getUser timeout")), 2000)
+            ),
+          ])) as { data: { user: { id: string } | null } };
+          resolvedUserId = user?.id || null;
+        } catch {
+          resolvedUserId = null;
+        }
+      }
+      let activeSession: any = null;
+      try {
+        const {
+          data: { session },
+        } = (await Promise.race([
+          supabase.auth.getSession(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("getSession timeout")), 2000)
+          ),
+        ])) as { data: { session: any } };
+        activeSession = session ?? null;
+      } catch (sessionError) {
+        // Non-blocking: continue without session details if getSession is slow.
+        console.debug("[log-set] getSession timed out; continuing", sessionError);
+      }
+
+      const logSessionInfo = {
+        hasSession: !!activeSession,
+        expiresAt: activeSession?.expires_at ?? null,
+        expiresInSec: activeSession?.expires_at
+          ? Math.round(activeSession.expires_at - Date.now() / 1000)
+          : null,
+        hasAccessToken: !!activeSession?.access_token,
+      };
 
       // Call /api/log-set to:
       // 1. Get/create workout_log_id (for session tracking)
       // 2. Insert into workout_set_logs (individual set data)
       // 3. Calculate and update e1RM in user_exercise_metrics
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const access_token = session?.access_token;
+        // Debug: Log assignmentId before building request
+        console.log(
+          "🔍 [logSetToDatabase] assignmentId from closure:",
+          assignmentId
+        );
+        console.log(
+          "🔍 [logSetToDatabase] assignmentId type:",
+          typeof assignmentId
+        );
+        console.log(
+          "🔍 [logSetToDatabase] assignmentId truthy:",
+          !!assignmentId
+        );
 
-        if (access_token) {
-          // Debug: Log assignmentId before building request
-          console.log("🔍 [logSetToDatabase] assignmentId from closure:", assignmentId);
-          console.log("🔍 [logSetToDatabase] assignmentId type:", typeof assignmentId);
-          console.log("🔍 [logSetToDatabase] assignmentId truthy:", !!assignmentId);
-          
-          // Build request body with all data passed from executor + required fields
-          const requestBody: any = {
-            // Required for workout_set_logs
-            block_id: block.block.id,
-            block_type: data.block_type || (block.block as any).type || block.block.block_type,
-            client_id: user.id,
-            workout_assignment_id: assignmentId || undefined,
-            // For API to get/create workout_log_id (session tracking)
-            session_id: String(sessionId).trim(),
-            template_exercise_id: currentExercise?.id || null,
-            // Backwards compatible
-            access_token: access_token,
-            // Spread all data from executor (block-type-specific fields)
-            ...data,
+        console.log("[log-set] resolvedUserId:", resolvedUserId);
+
+        // Build request body with all data passed from executor + required fields
+        if (!resolvedUserId) {
+          console.warn("[log-set] No client user id available; relying on cookie auth.");
+        }
+
+        const requestBody: any = {
+          // Required for workout_set_logs
+          block_id: block.block.id,
+          block_type:
+            data.block_type ||
+            (block.block as any).type ||
+            block.block.block_type,
+          client_id: resolvedUserId || undefined,
+          workout_assignment_id: assignmentId || undefined,
+          // For API to get/create workout_log_id (session tracking)
+          session_id: String(sessionId).trim(),
+          template_exercise_id: currentExercise?.id || null,
+          // Spread all data from executor (block-type-specific fields)
+          ...data,
+        };
+        console.log("[log-set] requestBody ready", {
+          block_id: requestBody.block_id,
+          workout_assignment_id: requestBody.workout_assignment_id,
+          session_id: requestBody.session_id,
+          exercise_id: requestBody.exercise_id,
+          reps: requestBody.reps,
+          weight: requestBody.weight,
+        });
+
+          const sendLogSet = async (attempt: number) => {
+            console.log("🚀 About to send to /api/log-set:", {
+              requestId,
+              attempt,
+              route: window.location.pathname,
+              session: logSessionInfo,
+              workout_assignment_id: requestBody.workout_assignment_id,
+              block_id: requestBody.block_id,
+              client_id: requestBody.client_id,
+              block_type: requestBody.block_type,
+              exercise_id: requestBody.exercise_id,
+              weight: requestBody.weight,
+              reps: requestBody.reps,
+            });
+
+            const controller = new AbortController();
+            inFlightLogRef.current = {
+              startedAt: Date.now(),
+              abort: () => controller.abort(),
+            };
+
+            const timeoutError = new Error("timeout");
+            (timeoutError as any).name = "TimeoutError";
+
+            let timeoutId: ReturnType<typeof setTimeout> | null = null;
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              timeoutId = setTimeout(() => {
+                controller.abort();
+                reject(timeoutError);
+              }, LOG_SET_TIMEOUT_MS);
+            });
+
+            const response = (await Promise.race([
+              fetch("/api/log-set", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestBody),
+                signal: controller.signal,
+                credentials: "include",
+              }),
+              timeoutPromise,
+            ])) as Response;
+
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+            }
+            inFlightLogRef.current = null;
+
+            const responseText = await response.text().catch(() => "");
+            console.log("[log-set]", {
+              requestId,
+              attempt,
+              status: response.status,
+              payloadSummary,
+              responseText,
+            });
+
+            let parsed: any = {};
+            if (responseText && responseText.trim().length > 0) {
+              try {
+                parsed = JSON.parse(responseText);
+              } catch {
+                parsed = { error: responseText };
+              }
+            }
+
+            return { response, parsed };
           };
 
-          // Debug logging - show all relevant fields
-          console.log('🚀 About to send to /api/log-set:', {
-            workout_assignment_id: requestBody.workout_assignment_id,
-            block_id: requestBody.block_id,
-            client_id: requestBody.client_id,
-            block_type: requestBody.block_type,
-            exercise_id: requestBody.exercise_id,
-            weight: requestBody.weight,
-            reps: requestBody.reps,
-            workout_log_id: requestBody.workout_log_id,
-            ...requestBody,
-          });
+        let attempt = 1;
+        let { response, parsed } = await sendLogSet(attempt);
 
-          const response = await fetch("/api/log-set", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(requestBody),
-          });
-
-          console.log('📊 Response status:', response.status, response.statusText);
+        if ((response.status === 401 || response.status === 403) && attempt === 1) {
+          await ensureFreshSession();
+          const {
+            data: { session: refreshedSession },
+          } = await supabase.auth.getSession();
+          if (!refreshedSession?.access_token) {
+            addToast({
+              title: "Session expired",
+              description: "Please refresh and log in again.",
+              variant: "destructive",
+              duration: 5000,
+            });
+            return { success: false, error: "Session expired" };
+          }
+          attempt = 2;
+          ({ response, parsed } = await sendLogSet(attempt));
+        }
 
           if (response.ok) {
-            const result = await response.json();
+            const result = parsed;
             if (result.success) {
               // Update e1RM in local state (only if exercise_id is present in the data)
-              if (result.e1rm && result.e1rm.stored && onE1rmUpdate && data.exercise_id) {
+              if (
+                result.e1rm &&
+                result.e1rm.stored &&
+                onE1rmUpdate &&
+                data.exercise_id
+              ) {
                 onE1rmUpdate(data.exercise_id, result.e1rm.stored);
               }
 
               // Show PR notification if new personal record
-              if (result.e1rm?.is_new_pr) {
-                addToast({
-                  title: "🎉 New Personal Record!",
-                  description:
-                    result.message || `${result.e1rm.stored}kg estimated 1RM`,
-                  variant: "success",
-                  duration: 4000,
-                });
-              } else if (result.e1rm?.warning) {
-                // Show warning if metrics couldn't be saved
-                addToast({
-                  title: "Set Logged",
-                  description: result.e1rm.warning,
-                  variant: "default",
-                  duration: 3000,
-                });
-              }
+            if (result.pr?.any_weight_pr || result.pr?.any_volume_pr) {
+              addToast({
+                title: "🎉 New Personal Record!",
+                description: result.pr?.message || "New PR achieved!",
+                variant: "success",
+                duration: 4000,
+              });
+            } else if (result.pr?.warning) {
+              addToast({
+                title: "Set Logged",
+                description: result.pr.warning,
+                variant: "default",
+                duration: 3000,
+              });
+            }
 
               return {
                 success: true,
                 e1rm: result.e1rm?.stored || result.e1rm?.calculated,
-                isNewPR: result.e1rm?.is_new_pr || false,
+                isNewPR: !!(result.pr?.any_weight_pr || result.pr?.any_volume_pr),
               };
-            } else {
-              console.error("API returned error:", result.error);
-              addToast({
-                title: "Error",
-                description: result.error || "Failed to log set",
-                variant: "destructive",
-                duration: 5000,
-              });
-              return { success: false, error: result.error };
             }
-          } else {
-            console.error("❌ API returned error status:", response.status);
-            let errorData: any;
-            try {
-              const text = await response.text();
-              console.error("❌ Response text:", text);
-              errorData = JSON.parse(text);
-            } catch (parseError) {
-              console.error("❌ Failed to parse error response:", parseError);
-              errorData = { error: "Unknown error", raw_response: await response.text().catch(() => "Could not read response") };
-            }
-            console.error("❌ API error response:", errorData);
+
+            console.error("API returned error:", parsed?.error);
             addToast({
               title: "Error",
-              description: errorData.error || errorData.details || "Failed to log set",
+              description: parsed?.error || "Failed to log set",
               variant: "destructive",
               duration: 5000,
             });
-            return { success: false, error: errorData.error || errorData.details || "Unknown error" };
+            return { success: false, error: parsed?.error };
           }
-        } else {
-          return { success: false, error: "Not authenticated" };
-        }
-      } catch (apiError) {
-        console.error("Error calling /api/log-set:", apiError);
+
+          if (response.status === 401 || response.status === 403) {
+            addToast({
+              title: "Session expired",
+              description: "Please refresh and log in again.",
+              variant: "destructive",
+              duration: 5000,
+            });
+            return { success: false, error: "Session expired" };
+          }
+
+          if (response.status === 400) {
+            addToast({
+              title: "Error",
+              description: parsed?.error || "Invalid request",
+              variant: "destructive",
+              duration: 5000,
+            });
+            return { success: false, error: parsed?.error || "Invalid request" };
+          }
+
         addToast({
-          title: "Error",
-          description: "Failed to log set. Please try again.",
+          title: "Server slow",
+          description: "Server slow, try again.",
           variant: "destructive",
           duration: 5000,
         });
-        return { success: false, error: apiError };
+        return { success: false, error: "Server slow" };
+      } catch (apiError: any) {
+        const isAbort =
+          apiError?.name === "AbortError" ||
+          apiError?.message?.toLowerCase().includes("abort") ||
+          apiError?.name === "TimeoutError";
+        addToast({
+          title: isAbort ? "Server slow" : "Error",
+          description: isAbort
+            ? "Server slow, try again."
+            : "Failed to log set. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        inFlightLogRef.current = null;
+        return {
+          success: false,
+          error: isAbort ? "Server slow" : apiError,
+        };
       }
     } catch (error) {
       console.error("Error in logSetToDatabase:", error);
+      inFlightLogRef.current = null;
       return { success: false, error };
     }
   };
@@ -353,10 +562,21 @@ export default function LiveWorkoutBlockExecutor({
   const handleSetComplete = (newCompletedSets: number) => {
     // Update parent's completedSets
     onSetLogged?.(block.block.id, newCompletedSets);
+    console.log("[block complete detected]", {
+      blockId: block.block.id,
+      completedSets: newCompletedSets,
+      totalSets:
+        block.block.exercises?.[currentExerciseIndex]?.sets ||
+        block.block.total_sets ||
+        1,
+      currentExerciseIndex,
+      source: "handleSetComplete",
+    });
 
     // Check if all sets of current exercise are complete
     const currentExercise = block.block.exercises?.[currentExerciseIndex];
-    const totalSetsForExercise = currentExercise?.sets || block.block.total_sets || 1;
+    const totalSetsForExercise =
+      currentExercise?.sets || block.block.total_sets || 1;
     const exercises = block.block.exercises || [];
     const nextExerciseIndex = (currentExerciseIndex || 0) + 1;
 
@@ -370,8 +590,14 @@ export default function LiveWorkoutBlockExecutor({
 
         if (restSeconds > 0) {
           setRestDuration(restSeconds);
-          setRestLabel(`Next Exercise: ${nextExercise.exercise?.name || (nextExercise as any).name || 'Exercise'}`);
-          setPendingAction('exercise');
+          setRestLabel(
+            `Next Exercise: ${
+              nextExercise.exercise?.name ||
+              (nextExercise as any).name ||
+              "Exercise"
+            }`
+          );
+          setPendingAction("exercise");
           setShowRestTimer(true);
         } else {
           // No rest, advance immediately
@@ -379,23 +605,76 @@ export default function LiveWorkoutBlockExecutor({
         }
       } else {
         // No more exercises, block is complete
-        // Don't show rest timer between blocks - auto-advance immediately
-        // onBlockComplete will be called by the executor
+        // Guard against duplicate completion calls
+        if (!completedBlockRef.current.has(block.block.id)) {
+          completedBlockRef.current.add(block.block.id);
+          console.log("[block complete detected]", {
+            blockId: block.block.id,
+            completedSets: newCompletedSets,
+            totalSets:
+              currentExercise?.sets || block.block.total_sets || 1,
+            currentExerciseIndex,
+            source: "handleSetComplete-finalExercise",
+          });
+          onBlockComplete?.(block.block.id, []);
+        }
       }
     } else {
       // More sets to do in this exercise
-      const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
+      const restSeconds =
+        currentExercise?.rest_seconds || block.block.rest_seconds || 0;
 
       if (restSeconds > 0) {
         setRestDuration(restSeconds);
         setRestLabel("Next Set");
-        setPendingAction('set');
+        setPendingAction("set");
         setShowRestTimer(true);
         // Don't advance yet - wait for timer
       }
       // If no rest, executor should handle immediate advancement
     }
   };
+
+  useEffect(() => {
+    const exercises = block.block.exercises || [];
+    if (exercises.length === 0) return;
+
+    const currentExIndex = currentExerciseIndex || 0;
+    const currentExercise = exercises[currentExIndex];
+    const totalSetsForExercise =
+      currentExercise?.sets || block.block.total_sets || 1;
+    const completedSets = block.completedSets || 0;
+
+    const isLastExercise = currentExIndex >= exercises.length - 1;
+    const isExerciseComplete = completedSets >= totalSetsForExercise;
+
+    if (!isLastExercise || !isExerciseComplete) return;
+
+    if (completedBlockRef.current.has(block.block.id)) return;
+    completedBlockRef.current.add(block.block.id);
+
+    console.log("✅ Auto-completing block from effect", {
+      blockId: block.block.id,
+      completedSets,
+      totalSetsForExercise,
+      currentExIndex,
+    });
+    console.log("[block complete detected]", {
+      blockId: block.block.id,
+      completedSets,
+      totalSets: totalSetsForExercise,
+      currentExerciseIndex: currentExIndex,
+      source: "completionEffect",
+    });
+    onBlockComplete?.(block.block.id, []);
+  }, [
+    block.block.id,
+    block.block.total_sets,
+    block.block.exercises,
+    block.completedSets,
+    currentExerciseIndex,
+    onBlockComplete,
+  ]);
 
   // Handle rest timer completion
   const handleRestComplete = () => {
@@ -405,10 +684,11 @@ export default function LiveWorkoutBlockExecutor({
     const exercises = block.block.exercises || [];
     const currentExIndex = currentExerciseIndex || 0;
     const currentExercise = exercises[currentExIndex];
-    const totalSetsForExercise = currentExercise?.sets || block.block.total_sets || 1;
+    const totalSetsForExercise =
+      currentExercise?.sets || block.block.total_sets || 1;
     const completedSets = block.completedSets || 0;
 
-    if (pendingAction === 'exercise') {
+    if (pendingAction === "exercise") {
       // Advance to next exercise
       onExerciseComplete?.(block.block.id);
     }
@@ -422,6 +702,13 @@ export default function LiveWorkoutBlockExecutor({
     setShowRestTimer(false);
     handleRestComplete();
   };
+
+  // Get progression suggestion for current exercise
+  const currentExercise = block.block.exercises?.[currentExerciseIndex];
+  const progressionSuggestion =
+    currentExercise?.exercise_id && progressionSuggestions
+      ? progressionSuggestions.get(currentExercise.exercise_id)
+      : undefined;
 
   // Common props for all block executors
   const commonProps: BaseBlockExecutorProps = {
@@ -450,6 +737,7 @@ export default function LiveWorkoutBlockExecutor({
     },
     onRestTimerClick: handleRestTimerClick,
     onSetComplete: handleSetComplete,
+    progressionSuggestion,
   };
 
   // Route to appropriate component based on block type
@@ -540,6 +828,12 @@ export default function LiveWorkoutBlockExecutor({
           console.log("Executor: ForTimeExecutor");
         } catch {}
         return <ForTimeExecutor {...commonProps} />;
+      case "hr_sets":
+        try {
+          // eslint-disable-next-line no-console
+          console.log("Executor: HRSetExecutor");
+        } catch {}
+        return <HRSetExecutor {...commonProps} />;
       // DEPRECATED: ladder block type has been removed
       // case "ladder": - REMOVED
       default:
@@ -552,8 +846,7 @@ export default function LiveWorkoutBlockExecutor({
     }
   };
 
-  // Get current exercise for modals
-  const currentExercise = block.block.exercises?.[currentExerciseIndex];
+  // Note: currentExercise is already defined at line 429, reused here for modals
 
   return (
     <>

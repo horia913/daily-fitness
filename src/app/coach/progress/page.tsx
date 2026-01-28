@@ -6,6 +6,7 @@ import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
@@ -106,6 +107,8 @@ export default function CoachProgress() {
   // Client details state
   const [selectedClient, setSelectedClient] = useState<string | null>(null)
   const [clientDetailPeriod, setClientDetailPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month')
+  const [selectedClientData, setSelectedClientData] = useState<any | null>(null)
+  const [selectedClientLoading, setSelectedClientLoading] = useState(false)
   
   // Analytics state
   const [analyticsPeriod, setAnalyticsPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month')
@@ -117,6 +120,26 @@ export default function CoachProgress() {
       loadProgressData()
     }
   }, [user])
+
+  useEffect(() => {
+    if (!selectedClient) {
+      setSelectedClientData(null)
+      return
+    }
+    let isCancelled = false
+    setSelectedClientLoading(true)
+    ;(async () => {
+      const data = await getClientProgressData(selectedClient)
+      if (!isCancelled) {
+        setSelectedClientData(data)
+      }
+    })().finally(() => {
+      if (!isCancelled) setSelectedClientLoading(false)
+    })
+    return () => {
+      isCancelled = true
+    }
+  }, [selectedClient, clientProgress])
 
   const loadProgressData = useCallback(async () => {
     if (!user) return
@@ -351,11 +374,69 @@ export default function CoachProgress() {
     return clientProgress.find(client => client.id === selectedClient)
   }
 
-  const getClientProgressData = (clientId: string) => {
+  const getClientProgressData = async (clientId: string) => {
     const client = clientProgress.find(c => c.id === clientId)
     if (!client) return null
 
-    // Mock additional data for demonstration
+    // Fetch real recent activity from database
+    const activities: Array<{ type: string; name: string; date: string; status: string }> = []
+    
+    // Fetch recent workout logs
+    const { data: recentWorkouts } = await supabase
+      .from('workout_logs')
+      .select(`
+        id,
+        completed_at,
+        duration_minutes,
+        workout_templates(name)
+      `)
+      .eq('client_id', clientId)
+      .order('completed_at', { ascending: false })
+      .limit(5)
+    
+    if (recentWorkouts) {
+      recentWorkouts.forEach((workout: any) => {
+        if (workout.completed_at) {
+          activities.push({
+            type: 'workout',
+            name: workout.workout_templates?.name || 'Workout',
+            date: workout.completed_at,
+            status: 'completed'
+          })
+        }
+      })
+    }
+    
+    // Fetch recent meal logs (if table exists)
+    try {
+      const { data: recentMeals } = await supabase
+        .from('meal_logs')
+        .select('id, logged_at, meal_name')
+        .eq('client_id', clientId)
+        .order('logged_at', { ascending: false })
+        .limit(3)
+      
+      if (recentMeals) {
+        recentMeals.forEach((meal: any) => {
+          activities.push({
+            type: 'meal',
+            name: meal.meal_name || 'Meal',
+            date: meal.logged_at || new Date().toISOString(),
+            status: 'logged'
+          })
+        })
+      }
+    } catch (error) {
+      // Meal logs table might not exist, skip silently
+      console.log('Meal logs table not available')
+    }
+    
+    // Sort by date (most recent first) and limit to 10
+    const sortedActivities = activities
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10)
+
+    // Return data with real activity
     return {
       ...client,
       weight: {
@@ -375,15 +456,10 @@ export default function CoachProgress() {
       },
       compliance: {
         workouts: client.adherence,
-        nutrition: Math.min(100, client.adherence + 5),
-        habits: Math.min(100, client.adherence - 10)
+        nutrition: 0, // TODO: Calculate from meal logs when available
+        habits: 0 // TODO: Calculate from habit logs when available
       },
-      recentActivity: [
-        { type: 'workout', name: 'Upper Body Strength', date: new Date().toISOString(), status: 'completed' },
-        { type: 'meal', name: 'Post-workout protein shake', date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), status: 'logged' },
-        { type: 'habit', name: 'Drink 8 glasses of water', date: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), status: 'completed' },
-        { type: 'workout', name: 'Cardio Session', date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), status: 'completed' }
-      ]
+      recentActivity: sortedActivities
     }
   }
 
@@ -500,125 +576,105 @@ export default function CoachProgress() {
     )
   }
 
+  const clientData = selectedClientData
+
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div style={{ minHeight: '100vh', paddingBottom: '100px' }}>
-        <div style={{ padding: '24px 20px' }}>
-          <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Enhanced Header */}
-            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-                <div style={{ 
-                  width: '64px', 
-                  height: '64px', 
-                  borderRadius: '18px', 
-                  background: 'linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
-                }}>
-                  <BarChart3 style={{ width: '40px', height: '40px', color: '#FFFFFF' }} />
-                </div>
-                <h1 style={{ 
-                  fontSize: '32px', 
-                  fontWeight: '800', 
-                  color: '#1A1A1A',
-                  margin: 0,
-                  lineHeight: '1.2'
-                }}>
-                  Progress Dashboard
-                </h1>
-              </div>
-              <p style={{ 
-                fontSize: '16px', 
-                fontWeight: '400', 
-                color: '#6B7280',
-                margin: 0,
-                maxWidth: '560px',
-                marginLeft: 'auto',
-                marginRight: 'auto'
-              }}>
-                Monitor your clients' fitness journey and celebrate their achievements
-              </p>
-            </div>
-
-            {/* Enhanced Search and Filters */}
-            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-              <div className="flex flex-col lg:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 ${theme.textSecondary} w-5 h-5`} />
-                  <Input
-                    placeholder="Search clients by name..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`pl-12 h-12 rounded-xl border-2 ${theme.border} ${theme.text} bg-transparent focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500`}
-                  />
-                </div>
-                
-                <div className="flex gap-3">
-                  <Select value={dateRange} onValueChange={setDateRange}>
-                    <SelectTrigger className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}>
-                      <Calendar className="w-4 h-4 mr-2" />
-                      <SelectValue placeholder="Date Range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="week">This Week</SelectItem>
-                      <SelectItem value="month">This Month</SelectItem>
-                      <SelectItem value="quarter">This Quarter</SelectItem>
-                      <SelectItem value="year">This Year</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={metricFilter} onValueChange={setMetricFilter}>
-                    <SelectTrigger className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}>
-                      <Target className="w-4 h-4 mr-2" />
-                      <SelectValue placeholder="Metric" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Metrics</SelectItem>
-                      <SelectItem value="workouts">Workouts</SelectItem>
-                      <SelectItem value="adherence">Adherence</SelectItem>
-                      <SelectItem value="streak">Streak</SelectItem>
-                      <SelectItem value="completion">Completion</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}>
-                      <SortAsc className="w-4 h-4 mr-2" />
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="adherence">Adherence</SelectItem>
-                      <SelectItem value="name">Name</SelectItem>
-                      <SelectItem value="workouts">Total Workouts</SelectItem>
-                      <SelectItem value="streak">Current Streak</SelectItem>
-                      <SelectItem value="completion">Completion Rate</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-            {/* Enhanced Statistics Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className={`${theme.card} ${theme.shadow} hover:scale-105 transition-all duration-300 rounded-2xl overflow-hidden group`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 ${theme.shadow}`}>
-                      <Users className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className={`text-2xl font-bold ${theme.text}`}>{clientProgress.length}</p>
-                      <p className={`text-sm ${theme.textSecondary}`}>Active Clients</p>
+        <div className="min-h-screen pb-24">
+          <div className="px-6 pt-10">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <GlassCard className="p-6 md:p-8">
+                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-3">
+                    <Badge className="fc-badge fc-badge-strong w-fit">Progress Command</Badge>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg">
+                        <BarChart3 className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
+                          Progress Dashboard
+                        </h1>
+                        <p className="text-sm text-[color:var(--fc-text-dim)]">
+                          Monitor client momentum, streaks, and completion metrics.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </GlassCard>
+
+              <GlassCard className="p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-subtle)]" />
+                    <Input
+                      placeholder="Search clients by name..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="fc-input h-12 w-full pl-12"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <Select value={dateRange} onValueChange={setDateRange}>
+                      <SelectTrigger className="fc-select h-12 w-48">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Date Range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="week">This Week</SelectItem>
+                        <SelectItem value="month">This Month</SelectItem>
+                        <SelectItem value="quarter">This Quarter</SelectItem>
+                        <SelectItem value="year">This Year</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={metricFilter} onValueChange={setMetricFilter}>
+                      <SelectTrigger className="fc-select h-12 w-48">
+                        <Target className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Metric" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Metrics</SelectItem>
+                        <SelectItem value="workouts">Workouts</SelectItem>
+                        <SelectItem value="adherence">Adherence</SelectItem>
+                        <SelectItem value="streak">Streak</SelectItem>
+                        <SelectItem value="completion">Completion</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="fc-select h-12 w-48">
+                        <SortAsc className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="adherence">Adherence</SelectItem>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="workouts">Total Workouts</SelectItem>
+                        <SelectItem value="streak">Current Streak</SelectItem>
+                        <SelectItem value="completion">Completion Rate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </GlassCard>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <GlassCard className="p-5">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 p-3 text-white shadow-lg">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">{clientProgress.length}</p>
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">Active Clients</p>
+                    </div>
+                  </div>
+                </GlassCard>
 
               <Card className={`${theme.card} ${theme.shadow} hover:scale-105 transition-all duration-300 rounded-2xl overflow-hidden group`}>
                 <CardContent className="p-6">
@@ -1193,11 +1249,7 @@ export default function CoachProgress() {
                   ) : (
                     /* Individual Client Details View */
                     <div className="space-y-8">
-                      {(() => {
-                        const clientData = getClientProgressData(selectedClient)
-                        if (!clientData) return null
-
-                        return (
+                      {selectedClientData ? (
                           <>
                             {/* Client Header */}
                             <Card className={`${theme.card} ${theme.shadow} rounded-2xl`}>
@@ -1433,8 +1485,9 @@ export default function CoachProgress() {
                               </CardContent>
                             </Card>
                           </>
-                        )
-                      })()}
+                      ) : (
+                        selectedClientLoading ? null : null
+                      )}
                     </div>
                   )}
                 </TabsContent>
@@ -1889,6 +1942,7 @@ export default function CoachProgress() {
                   })()}
                 </TabsContent>
               </Tabs>
+            </div>
           </div>
         </div>
         </div>

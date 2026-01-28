@@ -1,6 +1,9 @@
 'use client'
 
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { FloatingParticles } from '@/components/ui/FloatingParticles'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -24,12 +27,13 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { fetchApi } from '@/lib/apiClient'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 
 export default function AddClient() {
   const { user } = useAuth()
-  const { getThemeStyles } = useTheme()
+  const { getThemeStyles, performanceSettings } = useTheme()
   const router = useRouter()
   const theme = getThemeStyles()
 
@@ -206,7 +210,7 @@ export default function AddClient() {
 
   const sendInviteEmail = async (inviteLink: string, inviteCode: string) => {
     try {
-      const response = await fetch('/api/emails/send-invite', {
+      const response = await fetchApi('/api/emails/send-invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -452,54 +456,42 @@ export default function AddClient() {
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className={`min-h-screen ${theme.background}`}>
-        {/* Enhanced Header */}
-        <div className={`p-6 ${theme.background} relative overflow-hidden`}>
-          {/* Floating background elements */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl"></div>
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl"></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-green-500/10 rounded-full blur-2xl"></div>
-          </div>
-
-          <div className="max-w-4xl mx-auto relative z-10">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
                 <Button
                   variant="ghost"
                   onClick={() => router.push('/coach/clients')}
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
+                  className="fc-btn fc-btn-ghost h-10 w-10"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                  <h1 className={`text-3xl font-bold ${theme.text} mb-2`}>
-                    Add New Client 👥
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Client Onboarding
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    Add New Client
                   </h1>
-                  <p className={`text-lg ${theme.textSecondary}`}>
-                    Generate a signup link for a new client
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Generate a signup link and invite your client.
                   </p>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <Badge className="bg-purple-500 text-white">
-                  Step {currentStep} of {steps.length}
-                </Badge>
-              </div>
+              <Badge className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                Step {currentStep} of {steps.length}
+              </Badge>
             </div>
+          </GlassCard>
 
-            {/* Progress Indicator */}
-            <div className={`${theme.card} ${theme.shadow} rounded-2xl p-6 mb-8`}>
-              <ProgressIndicator steps={steps} currentStep={currentStep} />
-            </div>
-          </div>
-        </div>
+          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <ProgressIndicator steps={steps} currentStep={currentStep} />
+          </GlassCard>
 
-        {/* Main Content */}
-        <div className="p-6">
-          <div className="max-w-4xl mx-auto">
-            {/* Step Content Card */}
+          <div>
             <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
               <CardHeader className="pb-6">
                 <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
@@ -558,7 +550,7 @@ export default function AddClient() {
             )}
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   )
 }

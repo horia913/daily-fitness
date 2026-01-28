@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -248,61 +249,59 @@ export default function CoachNotifications() {
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-green-500/5 rounded-full blur-3xl"></div>
           </div>
 
-          <div className="relative p-6">
-            <div className="max-w-6xl mx-auto space-y-8">
-              {/* Enhanced Header */}
-              <div className="text-center space-y-4">
-                <div className="flex items-center justify-center gap-3 mb-4">
-                  <div
-                    className={`p-3 rounded-2xl ${theme.gradient} ${theme.shadow}`}
-                  >
-                    <Bell className="w-8 h-8 text-white" />
+          <div className="relative px-6 pb-16 pt-10">
+            <div className="max-w-6xl mx-auto space-y-6">
+              <GlassCard className="p-6 md:p-8">
+                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-3">
+                    <Badge className="fc-badge fc-badge-strong w-fit">Notification Hub</Badge>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white shadow-lg">
+                        <Bell className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
+                          Notification Management
+                        </h1>
+                        <p className="text-sm text-[color:var(--fc-text-dim)]">
+                          Send alerts, manage preferences, and review delivery history.
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <h1
-                    className={`text-4xl font-bold ${theme.text} bg-gradient-to-r from-purple-600 via-orange-500 to-green-500 bg-clip-text text-transparent`}
-                  >
-                    Notification Management
-                  </h1>
                 </div>
-                <p
-                  className={`text-lg ${theme.textSecondary} max-w-2xl mx-auto`}
-                >
-                  Send notifications to clients and manage your notification
-                  preferences
-                </p>
-              </div>
+              </GlassCard>
 
-              {/* Enhanced Tabs */}
               <Tabs
                 value={activeTab}
                 onValueChange={setActiveTab}
                 className="w-full"
               >
-                <TabsList
-                  className={`grid w-full grid-cols-3 ${theme.card} ${theme.shadow} rounded-2xl p-2`}
-                >
-                  <TabsTrigger
-                    value="send"
-                    className={`rounded-xl data-[state=active]:${theme.gradient} data-[state=active]:text-white data-[state=active]:${theme.shadow}`}
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Notifications
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="preferences"
-                    className={`rounded-xl data-[state=active]:${theme.gradient} data-[state=active]:text-white data-[state=active]:${theme.shadow}`}
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    Preferences
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="history"
-                    className={`rounded-xl data-[state=active]:${theme.gradient} data-[state=active]:text-white data-[state=active]:${theme.shadow}`}
-                  >
-                    <Clock className="w-4 h-4 mr-2" />
-                    History
-                  </TabsTrigger>
-                </TabsList>
+                <GlassCard className="p-2">
+                  <TabsList className="grid w-full grid-cols-3 bg-transparent h-14">
+                    <TabsTrigger
+                      value="send"
+                      className="rounded-xl text-sm font-semibold text-[color:var(--fc-text-primary)] data-[state=active]:bg-[color:var(--fc-surface)]"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Notifications
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="preferences"
+                      className="rounded-xl text-sm font-semibold text-[color:var(--fc-text-primary)] data-[state=active]:bg-[color:var(--fc-surface)]"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Preferences
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="history"
+                      className="rounded-xl text-sm font-semibold text-[color:var(--fc-text-primary)] data-[state=active]:bg-[color:var(--fc-surface)]"
+                    >
+                      <Clock className="w-4 h-4 mr-2" />
+                      History
+                    </TabsTrigger>
+                  </TabsList>
+                </GlassCard>
 
                 <TabsContent value="send" className="space-y-6">
                   {/* Enhanced Notification Types */}

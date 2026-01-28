@@ -1,8 +1,6 @@
 "use client";
 
 import React from "react";
-import { Badge } from "@/components/ui/badge";
-import { useTheme } from "@/contexts/ThemeContext";
 
 interface ExerciseItemProps {
   exercise: any; // Nested exercise data
@@ -17,9 +15,6 @@ export default function ExerciseItem({
   availableExercises = [],
   blockType,
 }: ExerciseItemProps) {
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
-
   const getExerciseName = (exerciseId?: string) => {
     // First check if exercise object is directly available
     if (exercise.exercise?.name) return exercise.exercise.name;
@@ -135,22 +130,20 @@ export default function ExerciseItem({
 
   return (
     <div
-      className={`flex flex-wrap items-center gap-3 p-2 sm:p-3 rounded-lg ${theme.card} border ${theme.border} bg-opacity-50`}
+      className="flex flex-wrap items-center gap-3 p-2 sm:p-3 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)]"
     >
-      <Badge variant="outline" className="text-xs flex-shrink-0">
+      <span className="fc-pill fc-pill-glass fc-text-workouts text-xs flex-shrink-0">
         {String.fromCharCode(65 + index)} {/* A, B, C, etc. */}
-      </Badge>
+      </span>
       <div className="flex-1 min-w-0 w-full sm:w-auto">
-        <div className={`font-medium ${theme.text} text-sm break-words`}>
+        <div className="font-medium fc-text-primary text-sm break-words">
           {exerciseName}
         </div>
-        <div className={`text-xs ${theme.textSecondary} break-words`}>
+        <div className="text-xs fc-text-subtle break-words">
           {renderDetails()}
         </div>
         {exercise.notes && (
-          <div
-            className={`text-xs ${theme.textSecondary} mt-1 italic break-words`}
-          >
+          <div className="text-xs fc-text-subtle mt-1 italic break-words">
             Note: {exercise.notes}
           </div>
         )}

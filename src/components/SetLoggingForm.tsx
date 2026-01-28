@@ -35,6 +35,7 @@ import {
   Flame
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { fetchApi } from '@/lib/apiClient'
 import { useTheme } from '@/contexts/ThemeContext'
 import { PlateCalculatorWidget } from './PlateCalculatorWidget'
 
@@ -107,7 +108,7 @@ export default function SetLoggingForm({
       }
 
       // Call /api/log-set endpoint
-      const response = await fetch('/api/log-set', {
+      const response = await fetchApi('/api/log-set', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -236,11 +237,11 @@ export default function SetLoggingForm({
   return (
     <>
       {/* Main Set Logging Form */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <Card className={`${theme.card} border ${theme.border} rounded-3xl ${theme.shadow} overflow-hidden`}>
+          <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-3xl ${theme.shadow} overflow-hidden`}>
             {/* Header */}
-            <CardHeader className="p-6 border-b border-slate-200 dark:border-slate-700">
+            <CardHeader className="p-6 border-b border-slate-200 dark:border-slate-700 fc-glass fc-card">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-blue-100'}`}>
@@ -501,8 +502,8 @@ export default function SetLoggingForm({
 
       {/* Video Modal */}
       {showVideoModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 z-60 flex items-center justify-center p-4">
-          <div className={`w-full max-w-md ${theme.card} border ${theme.border} rounded-3xl overflow-hidden`}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-60 flex items-center justify-center p-4">
+          <div className={`w-full max-w-md ${theme.card} fc-glass fc-card border ${theme.border} rounded-3xl overflow-hidden`}>
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
               <h3 className={`text-lg font-semibold ${theme.text}`}>
                 {templateExercise?.exercise?.name || 'Exercise'} Video

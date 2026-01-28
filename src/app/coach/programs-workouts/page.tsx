@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useRouter } from "next/navigation";
 
@@ -20,19 +21,14 @@ export default function ProgramsAndWorkoutsPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div
-          style={{
-            minHeight: "100vh",
-            paddingBottom: "100px",
-          }}
-        >
-          <div style={{ padding: "24px 20px" }} className="container mx-auto">
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-              <p className="text-gray-600 mb-4">
+        <div className="min-h-screen pb-24">
+          <div className="container mx-auto px-4 py-12">
+            <GlassCard elevation={2} className="fc-glass fc-card mx-auto max-w-lg p-10 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[color:var(--fc-text-primary)] mx-auto mb-4"></div>
+              <p className="text-[color:var(--fc-text-dim)]">
                 Redirecting to workout templates...
               </p>
-            </div>
+            </GlassCard>
           </div>
         </div>
       </AnimatedBackground>

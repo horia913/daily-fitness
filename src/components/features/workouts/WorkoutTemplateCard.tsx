@@ -1,8 +1,6 @@
 "use client";
 
 import React from "react";
-import { useTheme } from "@/contexts/ThemeContext";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +17,6 @@ import {
   Activity,
   Award,
   Eye,
-  BarChart3,
 } from "lucide-react";
 import { WorkoutTemplate } from "@/lib/workoutTemplateService";
 
@@ -42,8 +39,6 @@ export default function WorkoutTemplateCard({
   onDuplicate,
   onAssign,
 }: WorkoutTemplateCardProps) {
-  const { isDark, getSemanticColor } = useTheme();
-
   const getCategoryIcon = (categoryName: string) => {
     switch (categoryName?.toLowerCase()) {
       case "strength":
@@ -75,13 +70,13 @@ export default function WorkoutTemplateCard({
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "beginner":
-        return getSemanticColor("success").primary;
+        return "fc-text-success";
       case "intermediate":
-        return getSemanticColor("warning").primary;
+        return "fc-text-warning";
       case "advanced":
-        return getSemanticColor("critical").primary;
+        return "fc-text-error";
       default:
-        return getSemanticColor("neutral").primary;
+        return "fc-text-subtle";
     }
   };
 
@@ -106,64 +101,29 @@ export default function WorkoutTemplateCard({
     (Array.isArray(template.exercises) ? template.exercises.length : 0);
 
   return (
-    <div 
-      onClick={onOpenDetails} 
-      className="cursor-pointer"
-      style={{
-        boxShadow: isDark
-          ? "0 4px 12px rgba(0,0,0,0.3)"
-          : "0 4px 12px rgba(0,0,0,0.1)",
-      }}
+    <div
+      onClick={onOpenDetails}
+      className="cursor-pointer fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden transition-all duration-300 fc-hover-rise"
     >
-    <GlassCard
-      elevation={2}
-      className="overflow-hidden transition-all duration-300 hover:scale-[1.02]"
-    >
-      {/* Header with gradient background */}
-      <div
-        className="relative h-24 flex items-center justify-center"
-        style={{
-          background: getSemanticColor("trust").gradient,
-        }}
-      >
+      {/* Header */}
+      <div className="relative h-24 flex items-center justify-center fc-glass-soft">
         {/* Category Icon */}
-        <div
-          className="w-14 h-14 rounded-xl flex items-center justify-center"
-          style={{
-            background: "rgba(255,255,255,0.25)",
-            backdropFilter: "blur(10px)",
-          }}
-        >
-          <CategoryIcon className="w-7 h-7 text-white" />
+        <div className="fc-icon-tile fc-icon-workouts w-14 h-14">
+          <CategoryIcon className="w-7 h-7" />
         </div>
 
         {/* Difficulty Badge */}
         <div className="absolute top-3 left-3">
-          <span
-            className="px-3 py-1.5 rounded-full text-xs font-semibold capitalize"
-            style={{
-              background: "#FFFFFF",
-              color: difficultyColor,
-            }}
-          >
+          <span className={`fc-pill fc-pill-glass text-xs font-semibold capitalize ${difficultyColor}`}>
             {template.difficulty_level}
           </span>
         </div>
 
         {/* Duration Badge */}
         <div className="absolute top-3 right-3">
-          <div
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-            style={{
-              background: "rgba(255,255,255,0.95)",
-              backdropFilter: "blur(10px)",
-            }}
-          >
-            <Clock className="w-3.5 h-3.5" style={{ color: "#6B7280" }} />
-            <span
-              className="text-xs font-semibold"
-              style={{ color: "#1A1A1A" }}
-            >
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)]">
+            <Clock className="w-3.5 h-3.5 fc-text-subtle" />
+            <span className="text-xs font-semibold fc-text-primary">
               {template.estimated_duration}m
             </span>
           </div>
@@ -174,25 +134,19 @@ export default function WorkoutTemplateCard({
       <div className="p-5 space-y-4">
         {/* Title & Category */}
         <div>
-          <h3
-            className="text-lg font-bold mb-1 line-clamp-2"
-            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-          >
+          <h3 className="text-lg font-bold mb-1 line-clamp-2 fc-text-primary">
             {template.name}
           </h3>
-          <span
-            className="text-sm font-semibold"
-            style={{ color: getSemanticColor("trust").primary }}
-          >
-            {primaryCategory}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+              {primaryCategory}
+            </span>
+            <span className={`fc-pill fc-pill-glass text-xs capitalize ${difficultyColor}`}>
+              {template.difficulty_level}
+            </span>
+          </div>
           {template.description && (
-            <p
-              className="text-sm line-clamp-2 mt-2"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
-            >
+            <p className="text-sm line-clamp-2 mt-2 fc-text-subtle">
               {template.description}
             </p>
           )}
@@ -201,111 +155,55 @@ export default function WorkoutTemplateCard({
         {/* Stats Grid */}
         <div className="grid grid-cols-3 gap-3">
           {/* Exercises */}
-          <div
-            className="flex flex-col items-center p-3 rounded-xl"
-            style={{
-              background: isDark
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.03)",
-            }}
-          >
-            <Dumbbell
-              className="w-5 h-5 mb-2"
-              style={{ color: getSemanticColor("trust").primary }}
-            />
+          <div className="flex flex-col items-center p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+            <Dumbbell className="w-5 h-5 mb-2 fc-text-workouts" />
             <AnimatedNumber
               value={exerciseCount}
-              className="text-xl font-bold"
-              color={isDark ? "#fff" : "#1A1A1A"}
+              className="text-xl font-bold fc-text-primary"
+              color="currentColor"
             />
-            <span
-              className="text-xs"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              }}
-            >
+            <span className="text-xs fc-text-subtle">
               exercises
             </span>
           </div>
 
           {/* Clients */}
-          <div
-            className="flex flex-col items-center p-3 rounded-xl"
-            style={{
-              background: isDark
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.03)",
-            }}
-          >
-            <Users
-              className="w-5 h-5 mb-2"
-              style={{ color: getSemanticColor("success").primary }}
-            />
+          <div className="flex flex-col items-center p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+            <Users className="w-5 h-5 mb-2 fc-text-workouts" />
             <AnimatedNumber
               value={assignmentCount}
-              className="text-xl font-bold"
-              color={isDark ? "#fff" : "#1A1A1A"}
+              className="text-xl font-bold fc-text-primary"
+              color="currentColor"
             />
-            <span
-              className="text-xs"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              }}
-            >
+            <span className="text-xs fc-text-subtle">
               clients
             </span>
           </div>
 
           {/* Rating */}
-          <div
-            className="flex flex-col items-center p-3 rounded-xl"
-            style={{
-              background: isDark
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.03)",
-            }}
-          >
-            <Star
-              className="w-5 h-5 mb-2"
-              style={{ color: getSemanticColor("warning").primary }}
-            />
+          <div className="flex flex-col items-center p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+            <Star className="w-5 h-5 mb-2 fc-text-workouts" />
             <AnimatedNumber
               value={template.rating || 0}
               decimals={1}
-              className="text-xl font-bold"
-              color={isDark ? "#fff" : "#1A1A1A"}
+              className="text-xl font-bold fc-text-primary"
+              color="currentColor"
             />
-            <span
-              className="text-xs"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              }}
-            >
+            <span className="text-xs fc-text-subtle">
               rating
             </span>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div
-          className="flex items-center gap-2 pt-4"
-          style={{
-            borderTop: `1px solid ${
-              isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-            }`,
-          }}
-        >
+        <div className="flex items-center gap-2 pt-4 border-t border-[color:var(--fc-glass-border)]">
           <Button
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
               onOpenDetails();
             }}
-            className="flex-1"
-            style={{
-              background: getSemanticColor("trust").gradient,
-              boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-            }}
+            className="flex-1 fc-btn fc-btn-primary fc-press"
           >
             <Eye className="w-4 h-4 mr-2" />
             View
@@ -319,9 +217,7 @@ export default function WorkoutTemplateCard({
                 e.stopPropagation();
                 onAssign();
               }}
-              style={{
-                color: getSemanticColor("success").primary,
-              }}
+              className="fc-btn fc-btn-ghost fc-press fc-text-workouts"
             >
               <UserPlus className="w-4 h-4" />
             </Button>
@@ -334,6 +230,7 @@ export default function WorkoutTemplateCard({
               e.stopPropagation();
               onEdit();
             }}
+            className="fc-btn fc-btn-ghost fc-press"
           >
             <Edit className="w-4 h-4" />
           </Button>
@@ -345,6 +242,7 @@ export default function WorkoutTemplateCard({
               e.stopPropagation();
               onDuplicate();
             }}
+            className="fc-btn fc-btn-ghost fc-press"
           >
             <Copy className="w-4 h-4" />
           </Button>
@@ -356,15 +254,12 @@ export default function WorkoutTemplateCard({
               e.stopPropagation();
               onDelete();
             }}
-            style={{
-              color: getSemanticColor("critical").primary,
-            }}
+            className="fc-btn fc-btn-ghost fc-press fc-text-error"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
       </div>
-    </GlassCard>
     </div>
   );
 }

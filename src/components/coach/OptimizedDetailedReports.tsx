@@ -321,15 +321,15 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
     return (
       <div className={`min-h-screen ${theme.background}`}>
         <div className="animate-pulse">
-          <div className="h-64 bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className={`${theme.card} rounded-2xl p-6`}>
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+              <div className="fc-glass fc-card rounded-2xl p-6">
+                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
                 </div>
               </div>
             </div>
@@ -344,54 +344,59 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen">
         {/* Enhanced Header */}
-      <div className={`p-6 ${theme.background} relative overflow-hidden`}>
-        {/* Floating background elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-green-500/10 rounded-full blur-2xl"></div>
-        </div>
+        <div className={`p-6 ${theme.background} relative overflow-hidden`}>
+          {/* Floating background elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent-cyan)]/10 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-3xl"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-domain-meals)]/10 rounded-full blur-2xl"></div>
+          </div>
 
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/coach')}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <h1 className={`text-3xl font-bold ${theme.text} mb-2`}>
-                  Detailed Reports 📋
-                </h1>
-                <p className={`text-lg ${theme.textSecondary}`}>
-                  Generate professional client progress reports with comprehensive insights
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setShowPreview(!showPreview)}
-                className="flex items-center gap-2"
-              >
-                <Eye className="w-4 h-4" />
-                {showPreview ? 'Hide Preview' : 'Show Preview'}
-              </Button>
-              <Button
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </Button>
-            </div>
+          <div className="max-w-7xl mx-auto relative z-10">
+            <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+              <CardContent className="p-5 sm:p-6 space-y-4">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="ghost"
+                      onClick={() => router.push('/coach')}
+                      className="fc-btn fc-btn-ghost h-10 w-10"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </Button>
+                    <div className="space-y-2">
+                      <Badge className="fc-badge">Report Builder</Badge>
+                      <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                        Detailed Reports 📋
+                      </h1>
+                      <p className="text-lg text-[color:var(--fc-text-dim)]">
+                        Generate professional client progress reports with comprehensive insights
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowPreview(!showPreview)}
+                      className="fc-btn fc-btn-ghost flex items-center gap-2"
+                    >
+                      <Eye className="w-4 h-4" />
+                      {showPreview ? 'Hide Preview' : 'Show Preview'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="fc-btn fc-btn-ghost flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      </div>
 
       {/* Main Content */}
       <div className="p-6">
@@ -400,11 +405,11 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
             {/* Report Configuration */}
             <div className="lg:col-span-2 space-y-8">
               {/* Client Selection */}
-              <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                 <CardHeader>
-                  <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                      <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                      <User className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
                     </div>
                     Client Selection
                   </CardTitle>
@@ -412,19 +417,19 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                 <CardContent>
                   <div className="space-y-4">
                     <Select value={selectedClient} onValueChange={setSelectedClient}>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="fc-select w-full">
                         <SelectValue placeholder="Select a client for the report" />
                       </SelectTrigger>
                       <SelectContent>
                         {clients.map(client => (
                           <SelectItem key={client.id} value={client.id}>
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                              <div className="w-8 h-8 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold text-sm">
                                 {client.avatar}
                               </div>
                               <div>
-                                <p className="font-medium">{client.name}</p>
-                                <p className="text-sm text-slate-500">{client.program}</p>
+                                <p className="font-medium text-[color:var(--fc-text-primary)]">{client.name}</p>
+                                <p className="text-sm text-[color:var(--fc-text-dim)]">{client.program}</p>
                               </div>
                             </div>
                           </SelectItem>
@@ -433,22 +438,22 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                     </Select>
 
                     {selectedClientData && (
-                      <div className={`${theme.card} rounded-xl p-4 border-2`}>
+                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                          <div className="w-12 h-12 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold text-lg">
                             {selectedClientData.avatar}
                           </div>
                           <div className="flex-1">
-                            <h3 className={`font-semibold ${theme.text}`}>{selectedClientData.name}</h3>
-                            <p className={`text-sm ${theme.textSecondary}`}>{selectedClientData.program}</p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                            <h3 className="font-semibold text-[color:var(--fc-text-primary)]">{selectedClientData.name}</h3>
+                            <p className="text-sm text-[color:var(--fc-text-dim)]">{selectedClientData.program}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-[color:var(--fc-text-subtle)]">
                               <span>Started: {new Date(selectedClientData.startDate).toLocaleDateString()}</span>
                               <span>Last Active: {new Date(selectedClientData.lastActive).toLocaleDateString()}</span>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className={`text-sm font-medium ${theme.text}`}>{selectedClientData.metrics.adherence}%</p>
-                            <p className={`text-xs ${theme.textSecondary}`}>Adherence</p>
+                            <p className="text-sm font-medium text-[color:var(--fc-text-primary)]">{selectedClientData.metrics.adherence}%</p>
+                            <p className="text-xs text-[color:var(--fc-text-dim)]">Adherence</p>
                           </div>
                         </div>
                       </div>
@@ -458,11 +463,11 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
               </Card>
 
               {/* Report Templates */}
-              <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                 <CardHeader>
-                  <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                      <FileText className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                      <FileText className="w-5 h-5 text-[color:var(--fc-domain-meals)]" />
                     </div>
                     Report Templates
                   </CardTitle>
@@ -476,44 +481,44 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                       return (
                         <div
                           key={template.id}
-                          className={`${theme.card} rounded-xl p-4 border-2 cursor-pointer transition-all duration-300 ${
+                          className={`fc-glass rounded-xl p-4 border cursor-pointer transition-all duration-300 ${
                             isSelected 
-                              ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' 
-                              : 'hover:border-slate-300 dark:hover:border-slate-600'
+                              ? 'border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-glass-soft)]' 
+                              : 'border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)]'
                           }`}
                           onClick={() => handleTemplateSelect(template.id)}
                         >
                           <div className="flex items-center gap-3 mb-3">
                             <div className={`p-2 rounded-lg ${
-                              isSelected ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-slate-100 dark:bg-slate-800'
+                              isSelected ? 'bg-[color:var(--fc-glass-soft)]' : 'bg-[color:var(--fc-glass-soft)]'
                             }`}>
                               <Icon className={`w-5 h-5 ${
-                                isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400'
+                                isSelected ? 'text-[color:var(--fc-accent-cyan)]' : 'text-[color:var(--fc-text-subtle)]'
                               }`} />
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <h3 className={`font-semibold ${theme.text}`}>{template.name}</h3>
+                                <h3 className="font-semibold text-[color:var(--fc-text-primary)]">{template.name}</h3>
                                 {template.isPopular && (
-                                  <Badge className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 border-0 text-xs">
+                                  <Badge className="bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-status-warning)] border border-[color:var(--fc-glass-border)] text-xs">
                                     Popular
                                   </Badge>
                                 )}
                                 {isSelected && (
-                                  <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-0 text-xs">
+                                  <Badge className="bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-accent-cyan)] border border-[color:var(--fc-glass-border)] text-xs">
                                     Selected
                                   </Badge>
                                 )}
                               </div>
-                              <p className={`text-sm ${theme.textSecondary}`}>{template.description}</p>
+                              <p className="text-sm text-[color:var(--fc-text-dim)]">{template.description}</p>
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className={`text-xs ${theme.textSecondary}`}>
+                            <span className="text-xs text-[color:var(--fc-text-subtle)]">
                               {template.sections.length} sections included
                             </span>
                             {isSelected && (
-                              <Checkbox checked={true} className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500" />
+                              <Checkbox checked={true} className="data-[state=checked]:bg-[color:var(--fc-accent-cyan)] data-[state=checked]:border-[color:var(--fc-accent-cyan)]" />
                             )}
                           </div>
                         </div>
@@ -524,11 +529,11 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
               </Card>
 
               {/* Report Customization */}
-              <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                 <CardHeader>
-                  <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                      <Settings className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                      <Settings className="w-5 h-5 text-[color:var(--fc-accent-purple)]" />
                     </div>
                     Report Customization
                   </CardTitle>
@@ -536,14 +541,14 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                 <CardContent className="space-y-6">
                   {/* Date Range */}
                   <div>
-                    <h4 className={`font-semibold ${theme.text} mb-3`}>Date Range</h4>
+                    <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-3">Date Range</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {(['month', 'quarter', 'year', 'custom'] as const).map(range => (
                         <Button
                           key={range}
                           variant={dateRange === range ? 'default' : 'outline'}
                           onClick={() => setDateRange(range)}
-                          className="h-12"
+                          className={dateRange === range ? 'fc-btn fc-btn-primary h-12' : 'fc-btn fc-btn-ghost h-12'}
                         >
                           {range.charAt(0).toUpperCase() + range.slice(1)}
                         </Button>
@@ -552,21 +557,21 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                     {dateRange === 'custom' && (
                       <div className="grid grid-cols-2 gap-3 mt-3">
                         <div>
-                          <label className={`text-sm font-medium ${theme.text} mb-1 block`}>Start Date</label>
+                          <label className="text-sm font-medium text-[color:var(--fc-text-primary)] mb-1 block">Start Date</label>
                           <input
                             type="date"
                             value={customStartDate}
                             onChange={(e) => setCustomStartDate(e.target.value)}
-                            className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800"
+                            className="fc-input w-full"
                           />
                         </div>
                         <div>
-                          <label className={`text-sm font-medium ${theme.text} mb-1 block`}>End Date</label>
+                          <label className="text-sm font-medium text-[color:var(--fc-text-primary)] mb-1 block">End Date</label>
                           <input
                             type="date"
                             value={customEndDate}
                             onChange={(e) => setCustomEndDate(e.target.value)}
-                            className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800"
+                            className="fc-input w-full"
                           />
                         </div>
                       </div>
@@ -575,7 +580,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
 
                   {/* Report Sections */}
                   <div>
-                    <h4 className={`font-semibold ${theme.text} mb-3`}>Report Sections</h4>
+                    <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-3">Report Sections</h4>
                     <div className="space-y-3">
                       {reportSections.map(section => {
                         const Icon = section.icon
@@ -585,43 +590,39 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                         return (
                           <div
                             key={section.id}
-                            className={`${theme.card} rounded-xl p-3 border-2 cursor-pointer transition-all duration-300 ${
-                              isSelected ? 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20' : 'hover:border-slate-300 dark:hover:border-slate-600'
+                            className={`fc-glass rounded-xl p-3 border cursor-pointer transition-all duration-300 ${
+                              isSelected ? 'border-[color:var(--fc-accent-purple)]/50 bg-[color:var(--fc-glass-soft)]' : 'border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)]'
                             }`}
                             onClick={() => handleSectionToggle(section.id)}
                           >
                             <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-lg ${
-                                isSelected ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-slate-100 dark:bg-slate-800'
-                              }`}>
-                                <Icon className={`w-4 h-4 ${
-                                  isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-slate-600 dark:text-slate-400'
-                                }`} />
+                              <div className="p-2 rounded-lg bg-[color:var(--fc-glass-soft)]">
+                                <Icon className={`w-4 h-4 ${isSelected ? 'text-[color:var(--fc-accent-purple)]' : 'text-[color:var(--fc-text-subtle)]'}`} />
                               </div>
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                  <h5 className={`font-medium ${theme.text}`}>{section.name}</h5>
+                                  <h5 className="font-medium text-[color:var(--fc-text-primary)]">{section.name}</h5>
                                   {isRequired && (
-                                    <Badge className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-0 text-xs">
+                                    <Badge className="bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-status-error)] border border-[color:var(--fc-glass-border)] text-xs">
                                       Required
                                     </Badge>
                                   )}
                                   {isSelected && (
-                                    <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-0 text-xs">
+                                    <Badge className="bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-accent-purple)] border border-[color:var(--fc-glass-border)] text-xs">
                                       Selected
                                     </Badge>
                                   )}
                                 </div>
-                                <p className={`text-sm ${theme.textSecondary}`}>{section.description}</p>
+                                <p className="text-sm text-[color:var(--fc-text-dim)]">{section.description}</p>
                               </div>
                               <div className="flex items-center gap-2">
                                 {isRequired ? (
-                                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                                  <CheckCircle className="w-5 h-5 text-[color:var(--fc-status-success)]" />
                                 ) : (
                                   <Checkbox
                                     checked={isSelected}
                                     onChange={() => handleSectionToggle(section.id)}
-                                    className="data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                                    className="data-[state=checked]:bg-[color:var(--fc-accent-purple)] data-[state=checked]:border-[color:var(--fc-accent-purple)]"
                                   />
                                 )}
                               </div>
@@ -634,12 +635,12 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
 
                   {/* Coach Notes */}
                   <div>
-                    <h4 className={`font-semibold ${theme.text} mb-3`}>Coach Notes</h4>
+                    <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-3">Coach Notes</h4>
                     <Textarea
                       placeholder="Add personalized comments, insights, or recommendations for this client..."
                       value={coachNotes}
                       onChange={(e) => setCoachNotes(e.target.value)}
-                      className="min-h-24"
+                      className="fc-textarea min-h-24"
                     />
                   </div>
                 </CardContent>
@@ -649,11 +650,11 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
             {/* Report Preview & Actions */}
             <div className="space-y-8">
               {/* Report Summary */}
-              <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                 <CardHeader>
-                  <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                    <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                      <Eye className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                      <Eye className="w-5 h-5 text-[color:var(--fc-status-warning)]" />
                     </div>
                     Report Summary
                   </CardTitle>
@@ -661,36 +662,36 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm ${theme.textSecondary}`}>Client:</span>
-                      <span className={`text-sm font-medium ${theme.text}`}>
+                      <span className="text-sm text-[color:var(--fc-text-dim)]">Client:</span>
+                      <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">
                         {selectedClientData?.name || 'Not selected'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm ${theme.textSecondary}`}>Template:</span>
-                      <span className={`text-sm font-medium ${theme.text}`}>
+                      <span className="text-sm text-[color:var(--fc-text-dim)]">Template:</span>
+                      <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">
                         {selectedTemplateData?.name || 'Not selected'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm ${theme.textSecondary}`}>Sections:</span>
-                      <span className={`text-sm font-medium ${theme.text}`}>
+                      <span className="text-sm text-[color:var(--fc-text-dim)]">Sections:</span>
+                      <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">
                         {selectedSections.length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm ${theme.textSecondary}`}>Date Range:</span>
-                      <span className={`text-sm font-medium ${theme.text}`}>
+                      <span className="text-sm text-[color:var(--fc-text-dim)]">Date Range:</span>
+                      <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">
                         {dateRange.charAt(0).toUpperCase() + dateRange.slice(1)}
                       </span>
                     </div>
                   </div>
                   
-                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <div className="pt-4 border-t border-[color:var(--fc-glass-border)]">
                     <Button
                       onClick={generateReport}
                       disabled={!selectedClient || !selectedTemplate || selectedSections.length === 0 || isGenerating}
-                      className="w-full"
+                      className="fc-btn fc-btn-primary w-full"
                     >
                       {isGenerating ? (
                         <>
@@ -709,11 +710,11 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
               </Card>
 
               {/* Export Options */}
-              <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                 <CardHeader>
-                  <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                      <Download className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                      <Download className="w-5 h-5 text-[color:var(--fc-domain-meals)]" />
                     </div>
                     Export Options
                   </CardTitle>
@@ -723,7 +724,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                     <Button
                       variant="outline"
                       onClick={() => exportReport('pdf')}
-                      className="w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start"
                     >
                       <FileText className="w-4 h-4 mr-2" />
                       Export as PDF
@@ -731,7 +732,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                     <Button
                       variant="outline"
                       onClick={() => exportReport('excel')}
-                      className="w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start"
                     >
                       <BarChart3 className="w-4 h-4 mr-2" />
                       Export as Excel
@@ -739,7 +740,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                     <Button
                       variant="outline"
                       onClick={() => exportReport('csv')}
-                      className="w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start"
                     >
                       <Download className="w-4 h-4 mr-2" />
                       Export as CSV
@@ -749,11 +750,11 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
               </Card>
 
               {/* Share Options */}
-              <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+              <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                 <CardHeader>
-                  <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                      <Share2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                      <Share2 className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
                     </div>
                     Share Options
                   </CardTitle>
@@ -763,21 +764,21 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                     <Button
                       variant="outline"
                       onClick={shareReport}
-                      className="w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start"
                     >
                       <Mail className="w-4 h-4 mr-2" />
                       Email to Client
                     </Button>
                     <Button
                       variant="outline"
-                      className="w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start"
                     >
                       <Send className="w-4 h-4 mr-2" />
                       Send via App
                     </Button>
                     <Button
                       variant="outline"
-                      className="w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start"
                     >
                       <Printer className="w-4 h-4 mr-2" />
                       Print Report

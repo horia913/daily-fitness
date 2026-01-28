@@ -1,10 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { useTheme } from '@/contexts/ThemeContext'
 import { 
   FileText,
   TrendingUp,
@@ -53,27 +50,25 @@ export default function ReportTemplateSelector({
   onCustomize,
   onPreview
 }: ReportTemplateSelectorProps) {
-  const { getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   const getTemplateColor = (color: string) => {
     switch (color) {
-      case 'blue': return 'text-blue-600 dark:text-blue-400'
-      case 'green': return 'text-green-600 dark:text-green-400'
-      case 'purple': return 'text-purple-600 dark:text-purple-400'
-      case 'orange': return 'text-orange-600 dark:text-orange-400'
-      default: return 'text-slate-600 dark:text-slate-400'
+      case 'blue': return 'fc-text-workouts'
+      case 'green': return 'fc-text-success'
+      case 'purple': return 'fc-text-workouts'
+      case 'orange': return 'fc-text-warning'
+      default: return 'fc-text-dim'
     }
   }
 
   const getTemplateBgColor = (color: string) => {
     switch (color) {
-      case 'blue': return 'bg-blue-100 dark:bg-blue-900/30'
-      case 'green': return 'bg-green-100 dark:bg-green-900/30'
-      case 'purple': return 'bg-purple-100 dark:bg-purple-900/30'
-      case 'orange': return 'bg-orange-100 dark:bg-orange-900/30'
-      default: return 'bg-slate-100 dark:bg-slate-800'
+      case 'blue': return 'fc-glass-soft'
+      case 'green': return 'fc-glass-soft'
+      case 'purple': return 'fc-glass-soft'
+      case 'orange': return 'fc-glass-soft'
+      default: return 'fc-glass-soft'
     }
   }
 
@@ -110,36 +105,45 @@ export default function ReportTemplateSelector({
   }
 
   return (
-    <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-      <CardHeader>
+    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+      <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex items-center justify-between">
-          <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <FileText className="w-5 h-5 text-green-600 dark:text-green-400" />
+          <div className="flex items-center gap-3">
+            <div className="fc-icon-tile fc-icon-workouts">
+              <FileText className="w-5 h-5" />
             </div>
-            Report Templates
-          </CardTitle>
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Reports
+              </span>
+              <h2 className="text-lg font-semibold fc-text-primary mt-2">
+                Report Templates
+              </h2>
+            </div>
+          </div>
           
           <div className="flex items-center gap-2">
             <Button
-              variant={viewMode === 'grid' ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
               onClick={() => setViewMode('grid')}
+              className={viewMode === 'grid' ? 'fc-btn fc-btn-primary' : 'fc-btn fc-btn-secondary'}
             >
               Grid
             </Button>
             <Button
-              variant={viewMode === 'list' ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
               onClick={() => setViewMode('list')}
+              className={viewMode === 'list' ? 'fc-btn fc-btn-primary' : 'fc-btn fc-btn-secondary'}
             >
               List
             </Button>
           </div>
         </div>
-      </CardHeader>
+      </div>
       
-      <CardContent>
+      <div className="p-6">
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {templates.map(template => {
@@ -149,61 +153,54 @@ export default function ReportTemplateSelector({
               return (
                 <div
                   key={template.id}
-                  className={`${theme.card} rounded-xl p-4 border-2 cursor-pointer transition-all duration-300 ${
-                    isSelected 
-                      ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' 
-                      : 'hover:border-slate-300 dark:hover:border-slate-600'
+                  className={`fc-glass-soft rounded-2xl p-4 border border-[color:var(--fc-glass-border)] cursor-pointer transition-all duration-300 ${
+                    isSelected ? 'ring-1 ring-[color:var(--fc-domain-workouts)]' : ''
                   }`}
                   onClick={() => onTemplateSelect(template.id)}
                 >
                   <div className="flex items-center gap-3 mb-3">
-                    <div className={`p-2 rounded-lg ${
-                      isSelected ? 'bg-blue-100 dark:bg-blue-900/30' : getTemplateBgColor(template.color)
-                    }`}>
-                      <Icon className={`w-5 h-5 ${
-                        isSelected ? 'text-blue-600 dark:text-blue-400' : getTemplateColor(template.color)
-                      }`} />
+                    <div className={`fc-icon-tile fc-icon-workouts ${getTemplateBgColor(template.color)}`}>
+                      <Icon className={`w-5 h-5 ${getTemplateColor(template.color)}`} />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className={`font-semibold ${theme.text}`}>{template.name}</h3>
+                        <h3 className="font-semibold fc-text-primary">{template.name}</h3>
                         {template.isPopular && (
-                          <Badge className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 border-0 text-xs">
-                            <Star className="w-3 h-3 mr-1" />
+                          <span className="fc-pill fc-pill-glass fc-text-warning text-xs">
                             Popular
-                          </Badge>
+                          </span>
                         )}
                         {template.isCustom && (
-                          <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-0 text-xs">
+                          <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
                             Custom
-                          </Badge>
+                          </span>
                         )}
                         {isSelected && (
-                          <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-0 text-xs">
+                          <span className="fc-pill fc-pill-glass fc-text-success text-xs">
                             Selected
-                          </Badge>
+                          </span>
                         )}
                       </div>
-                      <p className={`text-sm ${theme.textSecondary}`}>{template.description}</p>
+                      <p className="text-sm fc-text-dim">{template.description}</p>
                     </div>
                   </div>
                   
                   <div className="mb-3">
-                    <p className={`text-xs ${theme.textSecondary} mb-2`}>
+                    <p className="text-xs fc-text-subtle mb-2">
                       Includes {template.sections.length} sections:
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {template.sections.slice(0, 3).map(sectionId => {
                         const SectionIcon = getSectionIcon(sectionId)
                         return (
-                          <div key={sectionId} className="flex items-center gap-1 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs">
+                          <div key={sectionId} className="flex items-center gap-1 px-2 py-1 fc-glass border border-[color:var(--fc-glass-border)] rounded text-xs">
                             <SectionIcon className="w-3 h-3" />
                             <span>{getSectionName(sectionId)}</span>
                           </div>
                         )
                       })}
                       {template.sections.length > 3 && (
-                        <div className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs">
+                        <div className="px-2 py-1 fc-glass border border-[color:var(--fc-glass-border)] rounded text-xs">
                           +{template.sections.length - 3} more
                         </div>
                       )}
@@ -211,7 +208,7 @@ export default function ReportTemplateSelector({
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs ${theme.textSecondary}`}>
+                    <span className="text-xs fc-text-subtle">
                       {template.sections.length} sections included
                     </span>
                     <div className="flex items-center gap-1">
@@ -222,6 +219,7 @@ export default function ReportTemplateSelector({
                           e.stopPropagation()
                           onPreview(template.id)
                         }}
+                        className="fc-btn fc-btn-secondary"
                       >
                         <Eye className="w-3 h-3" />
                       </Button>
@@ -232,6 +230,7 @@ export default function ReportTemplateSelector({
                           e.stopPropagation()
                           onCustomize(template.id)
                         }}
+                        className="fc-btn fc-btn-secondary"
                       >
                         <Settings className="w-3 h-3" />
                       </Button>
@@ -250,44 +249,37 @@ export default function ReportTemplateSelector({
               return (
                 <div
                   key={template.id}
-                  className={`${theme.card} rounded-xl p-4 border-2 cursor-pointer transition-all duration-300 ${
-                    isSelected 
-                      ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' 
-                      : 'hover:border-slate-300 dark:hover:border-slate-600'
+                  className={`fc-glass-soft rounded-2xl p-4 border border-[color:var(--fc-glass-border)] cursor-pointer transition-all duration-300 ${
+                    isSelected ? 'ring-1 ring-[color:var(--fc-domain-workouts)]' : ''
                   }`}
                   onClick={() => onTemplateSelect(template.id)}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-lg ${
-                      isSelected ? 'bg-blue-100 dark:bg-blue-900/30' : getTemplateBgColor(template.color)
-                    }`}>
-                      <Icon className={`w-6 h-6 ${
-                        isSelected ? 'text-blue-600 dark:text-blue-400' : getTemplateColor(template.color)
-                      }`} />
+                    <div className={`fc-icon-tile fc-icon-workouts ${getTemplateBgColor(template.color)}`}>
+                      <Icon className={`w-6 h-6 ${getTemplateColor(template.color)}`} />
                     </div>
                     
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`font-semibold ${theme.text}`}>{template.name}</h3>
+                        <h3 className="font-semibold fc-text-primary">{template.name}</h3>
                         {template.isPopular && (
-                          <Badge className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 border-0 text-xs">
-                            <Star className="w-3 h-3 mr-1" />
+                          <span className="fc-pill fc-pill-glass fc-text-warning text-xs">
                             Popular
-                          </Badge>
+                          </span>
                         )}
                         {template.isCustom && (
-                          <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-0 text-xs">
+                          <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
                             Custom
-                          </Badge>
+                          </span>
                         )}
                         {isSelected && (
-                          <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-0 text-xs">
+                          <span className="fc-pill fc-pill-glass fc-text-success text-xs">
                             Selected
-                          </Badge>
+                          </span>
                         )}
                       </div>
-                      <p className={`text-sm ${theme.textSecondary} mb-2`}>{template.description}</p>
-                      <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <p className="text-sm fc-text-dim mb-2">{template.description}</p>
+                      <div className="flex items-center gap-4 text-xs fc-text-subtle">
                         <span>{template.sections.length} sections</span>
                         <span>•</span>
                         <span>Last used: 2 days ago</span>
@@ -302,6 +294,7 @@ export default function ReportTemplateSelector({
                           e.stopPropagation()
                           onPreview(template.id)
                         }}
+                        className="fc-btn fc-btn-secondary"
                       >
                         <Eye className="w-4 h-4 mr-1" />
                         Preview
@@ -313,12 +306,13 @@ export default function ReportTemplateSelector({
                           e.stopPropagation()
                           onCustomize(template.id)
                         }}
+                        className="fc-btn fc-btn-secondary"
                       >
                         <Settings className="w-4 h-4 mr-1" />
                         Customize
                       </Button>
                       {isSelected && (
-                        <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        <CheckCircle className="w-5 h-5 fc-text-success" />
                       )}
                     </div>
                   </div>
@@ -327,7 +321,7 @@ export default function ReportTemplateSelector({
             })}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

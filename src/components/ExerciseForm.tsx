@@ -386,7 +386,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
       data-theme={isDark ? 'dark' : 'light'}
     >
       <div 
-        className={`relative ${theme.card} ${theme.shadow} rounded-3xl border ${theme.border} w-full overflow-hidden transform transition-all duration-300 ease-out flex flex-col`}
+        className={`relative ${theme.card} ${theme.shadow} fc-glass fc-card rounded-3xl border ${theme.border} w-full overflow-hidden transform transition-all duration-300 ease-out flex flex-col`}
         style={{
           animation: 'modalSlideIn 0.3s ease-out',
           maxWidth: 'min(95vw, 50rem)',
@@ -395,7 +395,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
         }}
       >
         {/* Header - Sticky */}
-        <div className={`${theme.card} border-b ${theme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
+        <div className={`${theme.card} fc-glass fc-card border-b ${theme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center shadow-md">
@@ -426,7 +426,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Basic Information */}
-            <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
+            <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
               <CardHeader className="p-6">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-purple-100'}`}>
@@ -491,7 +491,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
             {/* Muscle Groups & Equipment */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Muscle Groups */}
-              <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
+              <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
                 <CardHeader className="p-6">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-orange-100'}`}>
@@ -542,7 +542,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
               </Card>
 
               {/* Equipment */}
-              <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
+              <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
                 <CardHeader className="p-6">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-green-100'}`}>
@@ -594,7 +594,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
             </div>
 
             {/* Instructions */}
-            <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
+            <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
               <CardHeader className="p-6">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-blue-100'}`}>
@@ -650,7 +650,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
             </Card>
 
             {/* Tips */}
-            <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
+            <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
               <CardHeader className="p-6">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-yellow-100'}`}>
@@ -704,7 +704,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
             </Card>
 
             {/* Media Upload */}
-            <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
+            <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
               <CardHeader className="p-6">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-purple-100'}`}>

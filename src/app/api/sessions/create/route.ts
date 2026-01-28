@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { validateApiAuth, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
 
 export async function POST(request: NextRequest) {
-  // Create Supabase client inside function to avoid build-time initialization
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return NextResponse.json(
-      { error: 'Missing Supabase configuration' },
-      { status: 500 }
-    )
-  }
-
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-
   try {
+    // Validate authentication
+    const { user, supabaseAuth, supabaseAdmin } = await validateApiAuth(request)
     const body = await request.json()
     const { coach_id, client_id, scheduled_at, duration_minutes, title, clipcard_id } = body
 
@@ -25,6 +14,25 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: coach_id, client_id, scheduled_at, and duration_minutes are required' },
         { status: 400 }
       )
+    }
+
+    // Verify ownership: user must be the client OR the coach
+    if (user.id !== client_id && user.id !== coach_id) {
+      // If user is coach, verify they have a relationship with this client
+      if (user.id === coach_id) {
+        const { data: relationship } = await supabaseAuth
+          .from('clients')
+          .select('id')
+          .eq('coach_id', coach_id)
+          .eq('client_id', client_id)
+          .single()
+        
+        if (!relationship) {
+          return createForbiddenResponse('Coach does not have relationship with this client')
+        }
+      } else {
+        return createForbiddenResponse('Cannot create session for another user')
+      }
     }
 
     // Check 1 session/day limit
@@ -98,6 +106,16 @@ export async function POST(request: NextRequest) {
       session: sessionData 
     })
   } catch (error: any) {
+    // Handle auth errors specifically
+    if (error.message === 'Missing authorization header' || error.message === 'Invalid or expired token' || error.message === 'User not authenticated') {
+      return createUnauthorizedResponse(error.message)
+    }
+    if (error.message === 'Service role key not configured') {
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      )
+    }
     console.error('Error in create-session API route:', error)
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

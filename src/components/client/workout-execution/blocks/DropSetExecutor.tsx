@@ -13,6 +13,7 @@ import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useLoggingReset } from "../hooks/useLoggingReset";
 
 export function DropSetExecutor({
   block,
@@ -46,6 +47,7 @@ export function DropSetExecutor({
   const [dropWeight, setDropWeight] = useState("");
   const [dropReps, setDropReps] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  useLoggingReset(isLoggingSet, setIsLoggingSet);
   const isManuallyEditingDropWeight = useRef(false);
 
   // Get drop percentage from drop_set table or default to 20% (block_parameters removed)
@@ -201,7 +203,7 @@ export function DropSetExecutor({
       if (dropRepsNum !== undefined && dropRepsNum !== null) logData.dropset_final_reps = dropRepsNum;
       if (dropPercentage !== undefined && dropPercentage !== null) logData.dropset_percentage = dropPercentage;
       
-      const result = await logSetToDatabase(logData);
+    const result = await logSetToDatabase(logData);
 
       if (result.success) {
         const loggedSetsArray: LoggedSet[] = [
@@ -299,6 +301,8 @@ export function DropSetExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <LargeInput
             label="Reps"
@@ -306,6 +310,8 @@ export function DropSetExecutor({
             onChange={setInitialReps}
             placeholder="0"
             step="1"
+            showStepper
+            stepAmount={1}
           />
         </div>
       </GlassCard>
@@ -330,6 +336,8 @@ export function DropSetExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <LargeInput
             label="Reps"
@@ -337,6 +345,8 @@ export function DropSetExecutor({
             onChange={setDropReps}
             placeholder="0"
             step="1"
+            showStepper
+            stepAmount={1}
           />
         </div>
       </GlassCard>

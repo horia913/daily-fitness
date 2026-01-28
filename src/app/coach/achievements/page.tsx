@@ -6,6 +6,7 @@ import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Card, CardContent } from '@/components/ui/card'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -602,125 +603,123 @@ export default function CoachAchievements() {
         <div className="min-h-screen">
         <div className="relative p-6">
           <div className="max-w-7xl mx-auto space-y-8">
-            {/* Header */}
-            <div className="text-center space-y-8">
-              <div className="flex items-center justify-center gap-3 mb-8">
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                  <Award className="w-8 h-8 text-white" />
-                </div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-normal pb-1">
-                  Gamification System
-                </h1>
-              </div>
-              <p className={`text-lg ${theme.textSecondary} max-w-2xl mx-auto`}>
-                Create tiered achievements that automatically reward clients for their progress
-              </p>
-            </div>
-
-            {/* Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className={`${theme.card} ${theme.shadow} hover:scale-105 transition-all duration-300 rounded-2xl overflow-hidden group`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                      <Layers className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className={`text-2xl font-bold ${theme.text}`}>{achievementTemplates.filter(a => a.is_tiered).length}</p>
-                      <p className={`text-sm ${theme.textSecondary}`}>Tiered Achievements</p>
-                    </div>
+          <GlassCard className="p-6 md:p-8">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-3">
+                <Badge className="fc-badge fc-badge-strong w-fit">Achievement Engine</Badge>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg">
+                    <Award className="w-6 h-6" />
                   </div>
-                </CardContent>
-              </Card>
-              <Card className={`${theme.card} ${theme.shadow} hover:scale-105 transition-all duration-300 rounded-2xl overflow-hidden group`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600 shadow-lg">
-                      <Trophy className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className={`text-2xl font-bold ${theme.text}`}>{achievementTemplates.filter(a => !a.is_tiered).length}</p>
-                      <p className={`text-sm ${theme.textSecondary}`}>Single Achievements</p>
-                    </div>
+                  <div>
+                    <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
+                      Gamification System
+                    </h1>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Build tiered achievements that reward consistency and milestones.
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-              <Card className={`${theme.card} ${theme.shadow} hover:scale-105 transition-all duration-300 rounded-2xl overflow-hidden group`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 shadow-lg">
-                      <Zap className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className={`text-2xl font-bold ${theme.text}`}>{achievementTemplates.filter(a => a.is_active).length}</p>
-                      <p className={`text-sm ${theme.textSecondary}`}>Active Templates</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className={`${theme.card} ${theme.shadow} hover:scale-105 transition-all duration-300 rounded-2xl overflow-hidden group`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg">
-                      <Users className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className={`text-2xl font-bold ${theme.text}`}>{clients.length}</p>
-                      <p className={`text-sm ${theme.textSecondary}`}>Active Clients</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Search and Filters */}
-            <div className={`${theme.card} ${theme.shadow} rounded-2xl p-6`}>
-              <div className="flex flex-col lg:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 ${theme.textSecondary} w-5 h-5`} />
-                  <Input
-                    placeholder="Search achievement templates..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`pl-12 h-12 rounded-xl border-2 ${theme.border} ${theme.text} bg-transparent focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500`}
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}>
-                      <SelectValue placeholder="Filter by type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="milestone">Milestone</SelectItem>
-                      <SelectItem value="goal">Goal</SelectItem>
-                      <SelectItem value="streak">Streak</SelectItem>
-                      <SelectItem value="personal_record">Personal Record</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
+              <div className="flex flex-wrap gap-3">
+                <Dialog open={showCreateTemplate} onOpenChange={setShowCreateTemplate}>
+                  <DialogTrigger asChild>
+                    <Button className="fc-btn fc-btn-primary">
+                      <Plus className="w-5 h-5 mr-2" />
+                      Create Achievement
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+                <Button
+                  variant="outline"
+                  onClick={loadData}
+                  className="fc-btn fc-btn-ghost"
+                >
+                  <RefreshCw className="w-5 h-5 mr-2" />
+                  Refresh
+                </Button>
+              </div>
             </div>
+          </GlassCard>
 
-            {/* Action Buttons */}
-            <div className="flex justify-center gap-4">
-              <Dialog open={showCreateTemplate} onOpenChange={setShowCreateTemplate}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg px-6 py-3">
-                    <Plus className="w-5 h-5" />
-                    Create Achievement
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
-              <Button
-                variant="outline"
-                onClick={loadData}
-                className={`${theme.border} ${theme.text} hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400 rounded-xl px-6 py-3`}
-              >
-                <RefreshCw className="w-5 h-5 mr-2" />
-                Refresh
-              </Button>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <GlassCard className="p-5">
+              <div className="flex items-center gap-4">
+                <div className="rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 p-3 text-white shadow-lg">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                    {achievementTemplates.filter(a => a.is_tiered).length}
+                  </p>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">Tiered Achievements</p>
+                </div>
+              </div>
+            </GlassCard>
+            <GlassCard className="p-5">
+              <div className="flex items-center gap-4">
+                <div className="rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 p-3 text-white shadow-lg">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                    {achievementTemplates.filter(a => !a.is_tiered).length}
+                  </p>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">Single Achievements</p>
+                </div>
+              </div>
+            </GlassCard>
+            <GlassCard className="p-5">
+              <div className="flex items-center gap-4">
+                <div className="rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 p-3 text-white shadow-lg">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                    {achievementTemplates.filter(a => a.is_active).length}
+                  </p>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">Active Templates</p>
+                </div>
+              </div>
+            </GlassCard>
+            <GlassCard className="p-5">
+              <div className="flex items-center gap-4">
+                <div className="rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 p-3 text-white shadow-lg">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">{clients.length}</p>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">Active Clients</p>
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+
+          <GlassCard className="p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-subtle)]" />
+                <Input
+                  placeholder="Search achievement templates..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="fc-input h-12 w-full pl-12"
+                />
+              </div>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="fc-select h-12 w-48">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="milestone">Milestone</SelectItem>
+                  <SelectItem value="goal">Goal</SelectItem>
+                  <SelectItem value="streak">Streak</SelectItem>
+                  <SelectItem value="personal_record">Personal Record</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+          </GlassCard>
 
             {/* Achievement Templates Grid */}
             <div className="space-y-6">

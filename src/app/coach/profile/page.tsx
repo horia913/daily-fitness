@@ -8,6 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { DatabaseService } from "@/lib/database";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -350,53 +351,20 @@ export default function CoachProfilePage() {
             className="max-w-5xl mx-auto"
             style={{ display: "flex", flexDirection: "column", gap: "24px" }}
           >
-            {/* Enhanced Header */}
-            <div
-              style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "24px",
-                padding: "32px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                marginBottom: "20px",
-              }}
-            >
+            <GlassCard className="p-6 md:p-8">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div
-                      style={{
-                        width: "64px",
-                        height: "64px",
-                        borderRadius: "18px",
-                        background:
-                          "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                      }}
-                    >
-                      <Sparkles className="w-8 h-8 text-white" />
+                <div className="flex-1 space-y-3">
+                  <Badge className="fc-badge fc-badge-strong w-fit">Coach Profile</Badge>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white shadow-lg">
+                      <Sparkles className="w-6 h-6" />
                     </div>
                     <div>
-                      <h1
-                        style={{
-                          fontSize: "32px",
-                          fontWeight: "800",
-                          color: "#1A1A1A",
-                          lineHeight: "1.2",
-                        }}
-                      >
+                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
                         Coach Profile & Settings
                       </h1>
-                      <p
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: "400",
-                          color: "#6B7280",
-                        }}
-                      >
-                        Manage your professional information and app preferences
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
+                        Manage your professional information and app preferences.
                       </p>
                     </div>
                   </div>
@@ -404,35 +372,24 @@ export default function CoachProfilePage() {
                 <div className="flex gap-3">
                   {editing ? (
                     <>
-                      <Button
-                        variant="outline"
-                        onClick={handleCancel}
-                        className="rounded-2xl"
-                      >
+                      <Button variant="outline" onClick={handleCancel} className="fc-btn fc-btn-ghost">
                         <X className="w-4 h-4 mr-2" />
                         Cancel
                       </Button>
-                      <Button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="bg-blue-600 hover:bg-blue-700 rounded-2xl"
-                      >
+                      <Button onClick={handleSave} disabled={saving} className="fc-btn fc-btn-primary">
                         <Save className="w-4 h-4 mr-2" />
                         {saving ? "Saving..." : "Save Changes"}
                       </Button>
                     </>
                   ) : (
-                    <Button
-                      onClick={() => setEditing(true)}
-                      className="bg-blue-600 hover:bg-blue-700 rounded-2xl"
-                    >
+                    <Button onClick={() => setEditing(true)} className="fc-btn fc-btn-primary">
                       <Edit className="w-4 h-4 mr-2" />
                       Edit Profile
                     </Button>
                   )}
                 </div>
               </div>
-            </div>
+            </GlassCard>
 
             {/* Enhanced Profile Picture Section */}
             <div

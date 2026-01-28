@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { 
   Trophy,
   Medal,
@@ -19,7 +17,6 @@ import {
   Loader2,
   Calendar
 } from 'lucide-react'
-import { useTheme } from '@/contexts/ThemeContext'
 import { cn } from '@/lib/utils'
 import { fetchLeaderboardData, LeaderboardEntry } from '@/lib/leaderboard'
 import { useAuth } from '@/contexts/AuthContext'
@@ -46,8 +43,6 @@ type LeaderboardCategory =
   | 'powerlifting_total' | 'bodyweight_master' | 'strength_endurance'
 
 export function CommunityLeaderboard({ loading: initialLoading = false, currentUserId, currentUserSex = 'M' }: CommunityLeaderboardProps) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const { user } = useAuth()
   
   const [sexFilter, setSexFilter] = useState<SexFilter>(currentUserSex || 'All')
@@ -277,11 +272,11 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
 
   // Get title for rank
   const getTitle = (rank: number, category: string) => {
-    if (rank === 1) return { title: 'Champion', color: 'text-yellow-600 dark:text-yellow-400', icon: Crown }
-    if (rank === 2) return { title: 'Master', color: 'text-slate-400', icon: Medal }
-    if (rank === 3) return { title: 'Expert', color: 'text-orange-600 dark:text-orange-400', icon: Medal }
-    if (rank <= 10) return { title: 'Elite', color: 'text-purple-600 dark:text-purple-400', icon: Trophy }
-    return { title: 'Competitor', color: theme.textSecondary, icon: Target }
+    if (rank === 1) return { title: 'Champion', color: 'fc-text-warning', icon: Crown }
+    if (rank === 2) return { title: 'Master', color: 'fc-text-subtle', icon: Medal }
+    if (rank === 3) return { title: 'Expert', color: 'fc-text-warning', icon: Medal }
+    if (rank <= 10) return { title: 'Elite', color: 'fc-text-habits', icon: Trophy }
+    return { title: 'Competitor', color: 'fc-text-subtle', icon: Target }
   }
 
   // Format score display
@@ -302,15 +297,13 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-          <Card className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}>
-            <CardContent className="p-12">
-              <div className="flex flex-col items-center justify-center gap-4">
-                <Loader2 className="w-12 h-12 animate-spin text-blue-500" />
-                <p className={`text-lg ${theme.text}`}>Loading leaderboard...</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+          <div className="p-12">
+            <div className="flex flex-col items-center justify-center gap-4">
+              <Loader2 className="w-12 h-12 animate-spin fc-text-workouts" />
+              <p className="text-lg fc-text-primary">Loading leaderboard...</p>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -319,136 +312,157 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-        <Card className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}>
-          <CardHeader className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-2xl flex items-center justify-center">
-                <Trophy className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <CardTitle className={`text-2xl font-bold ${theme.text}`}>Community Leaderboard</CardTitle>
-                <p className={`${theme.textSecondary}`}>Compete, earn titles, and rise to the top!</p>
-              </div>
+      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+        <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
+          <div className="flex items-center gap-3">
+            <div className="fc-icon-tile fc-icon-workouts w-12 h-12">
+              <Trophy className="w-6 h-6" />
             </div>
-          </CardHeader>
-        </Card>
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Leaderboard
+              </span>
+              <div className="text-2xl font-bold fc-text-primary mt-2">Community Leaderboard</div>
+              <p className="fc-text-subtle">Compete, earn titles, and rise to the top!</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Sex Filter */}
-      <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-        <Card className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}>
-          <CardContent className="p-6">
-            <h3 className={`text-sm font-semibold ${theme.text} mb-3 flex items-center gap-2`}>
-              <Users className="w-4 h-4" />
-              Filter by Category
-            </h3>
-            <div className="flex gap-3">
-              <Button
-                onClick={() => setSexFilter('All')}
-                className={cn(
-                  "flex-1 rounded-xl transition-all",
-                  sexFilter === 'All'
-                    ? "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg scale-105"
-                    : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
-                )}
-              >
-                All Athletes
-              </Button>
-              <Button
-                onClick={() => setSexFilter('M')}
-                className={cn(
-                  "flex-1 rounded-xl transition-all",
-                  sexFilter === 'M'
-                    ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg scale-105"
-                    : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
-                )}
-              >
-                Men
-              </Button>
-              <Button
-                onClick={() => setSexFilter('F')}
-                className={cn(
-                  "flex-1 rounded-xl transition-all",
-                  sexFilter === 'F'
-                    ? "bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg scale-105"
-                    : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
-                )}
-              >
-                Women
-              </Button>
+      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-4 h-4 fc-text-subtle" />
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Athletes
+              </span>
+              <div className="text-sm font-semibold fc-text-primary mt-2">
+                Filter by Athlete
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => setSexFilter('All')}
+              className={cn(
+                "flex-1 rounded-xl transition-all",
+                sexFilter === 'All'
+                  ? "fc-btn fc-btn-primary"
+                  : "fc-btn fc-btn-secondary"
+              )}
+            >
+              All Athletes
+            </Button>
+            <Button
+              onClick={() => setSexFilter('M')}
+              className={cn(
+                "flex-1 rounded-xl transition-all",
+                sexFilter === 'M'
+                  ? "fc-btn fc-btn-primary"
+                  : "fc-btn fc-btn-secondary"
+              )}
+            >
+              Men
+            </Button>
+            <Button
+              onClick={() => setSexFilter('F')}
+              className={cn(
+                "flex-1 rounded-xl transition-all",
+                sexFilter === 'F'
+                  ? "fc-btn fc-btn-primary"
+                  : "fc-btn fc-btn-secondary"
+              )}
+            >
+              Women
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Time Filter */}
-      <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-        <Card className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}>
-          <CardContent className="p-6">
-            <h3 className={`text-sm font-semibold ${theme.text} mb-3 flex items-center gap-2`}>
-              <Calendar className="w-4 h-4" />
-              Time Period
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Button
-                onClick={() => setTimeFilter('weekly')}
-                className={cn(
-                  "rounded-xl transition-all",
-                  timeFilter === 'weekly'
-                    ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg scale-105"
-                    : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
-                )}
-              >
-                Weekly
-              </Button>
-              <Button
-                onClick={() => setTimeFilter('monthly')}
-                className={cn(
-                  "rounded-xl transition-all",
-                  timeFilter === 'monthly'
-                    ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg scale-105"
-                    : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
-                )}
-              >
-                Monthly
-              </Button>
-              <Button
-                onClick={() => setTimeFilter('yearly')}
-                className={cn(
-                  "rounded-xl transition-all",
-                  timeFilter === 'yearly'
-                    ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg scale-105"
-                    : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
-                )}
-              >
-                Yearly
-              </Button>
-              <Button
-                onClick={() => setTimeFilter('all_time')}
-                className={cn(
-                  "rounded-xl transition-all",
-                  timeFilter === 'all_time'
-                    ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg scale-105"
-                    : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
-                )}
-              >
-                All Time
-              </Button>
+      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar className="w-4 h-4 fc-text-subtle" />
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Timeframe
+              </span>
+              <div className="text-sm font-semibold fc-text-primary mt-2">
+                Time Period
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Button
+              onClick={() => setTimeFilter('weekly')}
+              className={cn(
+                "rounded-xl transition-all",
+                timeFilter === 'weekly'
+                  ? "fc-btn fc-btn-primary"
+                  : "fc-btn fc-btn-secondary"
+              )}
+            >
+              Weekly
+            </Button>
+            <Button
+              onClick={() => setTimeFilter('monthly')}
+              className={cn(
+                "rounded-xl transition-all",
+                timeFilter === 'monthly'
+                  ? "fc-btn fc-btn-primary"
+                  : "fc-btn fc-btn-secondary"
+              )}
+            >
+              Monthly
+            </Button>
+            <Button
+              onClick={() => setTimeFilter('yearly')}
+              className={cn(
+                "rounded-xl transition-all",
+                timeFilter === 'yearly'
+                  ? "fc-btn fc-btn-primary"
+                  : "fc-btn fc-btn-secondary"
+              )}
+            >
+              Yearly
+            </Button>
+            <Button
+              onClick={() => setTimeFilter('all_time')}
+              className={cn(
+                "rounded-xl transition-all",
+                timeFilter === 'all_time'
+                  ? "fc-btn fc-btn-primary"
+                  : "fc-btn fc-btn-secondary"
+              )}
+            >
+              All Time
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Category Selection */}
-      <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-        <Card className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}>
-          <CardContent className="p-6 space-y-4">
+      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+        <div className="p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Award className="w-4 h-4 fc-text-subtle" />
+              <div>
+                <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                  Categories
+                </span>
+                <div className="text-sm font-semibold fc-text-primary mt-2">
+                  Choose a leaderboard
+                </div>
+              </div>
+            </div>
             {/* Absolute Strength */}
             <div>
               <button
                 onClick={() => setShowAbsoluteStrength(!showAbsoluteStrength)}
-                className={`w-full flex items-center justify-between mb-3 ${theme.text}`}
+                className="w-full flex items-center justify-between mb-3 fc-text-primary"
               >
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                   <Dumbbell className="w-4 h-4" />
@@ -465,8 +479,8 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
                       className={cn(
                         "h-auto py-3 px-2 rounded-xl transition-all text-xs",
                         selectedCategory === cat.id
-                          ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
-                          : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
+                          ? "fc-btn fc-btn-primary"
+                          : "fc-btn fc-btn-secondary"
                       )}
                     >
                       <div className="flex flex-col items-center gap-1">
@@ -483,7 +497,7 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
             <div>
               <button
                 onClick={() => setShowRelativeStrength(!showRelativeStrength)}
-                className={`w-full flex items-center justify-between mb-3 ${theme.text}`}
+                className="w-full flex items-center justify-between mb-3 fc-text-primary"
               >
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                   <Zap className="w-4 h-4" />
@@ -500,8 +514,8 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
                       className={cn(
                         "h-auto py-3 px-2 rounded-xl transition-all text-xs",
                         selectedCategory === cat.id
-                          ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg"
-                          : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
+                          ? "fc-btn fc-btn-primary"
+                          : "fc-btn fc-btn-secondary"
                       )}
                     >
                       <div className="flex flex-col items-center gap-1">
@@ -518,7 +532,7 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
             <div>
               <button
                 onClick={() => setShowCompound(!showCompound)}
-                className={`w-full flex items-center justify-between mb-3 ${theme.text}`}
+                className="w-full flex items-center justify-between mb-3 fc-text-primary"
               >
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                   <Award className="w-4 h-4" />
@@ -535,8 +549,8 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
                       className={cn(
                         "h-auto py-3 px-2 rounded-xl transition-all text-xs",
                         selectedCategory === cat.id
-                          ? "bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg"
-                          : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
+                          ? "fc-btn fc-btn-primary"
+                          : "fc-btn fc-btn-secondary"
                       )}
                     >
                       <div className="flex flex-col items-center gap-1">
@@ -553,7 +567,7 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
             <div>
               <button
                 onClick={() => setShowSpecialized(!showSpecialized)}
-                className={`w-full flex items-center justify-between mb-3 ${theme.text}`}
+                className="w-full flex items-center justify-between mb-3 fc-text-primary"
               >
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                   <Trophy className="w-4 h-4" />
@@ -570,8 +584,8 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
                       className={cn(
                         "h-auto py-3 px-2 rounded-xl transition-all text-xs",
                         selectedCategory === cat.id
-                          ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg"
-                          : `${isDark ? 'bg-slate-700' : 'bg-slate-100'} ${theme.text}`
+                          ? "fc-btn fc-btn-primary"
+                          : "fc-btn fc-btn-secondary"
                       )}
                     >
                       <div className="flex flex-col items-center gap-1">
@@ -583,126 +597,123 @@ export function CommunityLeaderboard({ loading: initialLoading = false, currentU
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+        </div>
       </div>
 
       {/* Leaderboard */}
-      <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-        <Card className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}>
-          <CardHeader className="p-6 pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className={`text-xl ${theme.text}`}>
+      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+        <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Rankings
+              </span>
+              <div className="text-xl fc-text-primary font-semibold mt-2">
                 {categoryGroups.absolute.find(c => c.id === selectedCategory)?.label ||
                  categoryGroups.relative.find(c => c.id === selectedCategory)?.label ||
                  categoryGroups.compound.find(c => c.id === selectedCategory)?.label}
-              </CardTitle>
-              <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                {leaderboard.length} athletes
-              </Badge>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className="space-y-3">
-              {leaderboard.map((entry) => {
-                const titleInfo = getTitle(entry.rank, selectedCategory)
-                const TitleIcon = titleInfo.icon
-                const isCurrentUser = entry.id === currentUserId
+            <span className="fc-pill fc-pill-glass fc-text-habits">
+              {leaderboard.length} athletes
+            </span>
+          </div>
+        </div>
+        <div className="p-6 pt-0">
+          <div className="space-y-3">
+            {leaderboard.map((entry) => {
+              const titleInfo = getTitle(entry.rank, selectedCategory)
+              const TitleIcon = titleInfo.icon
+              const isCurrentUser = entry.id === currentUserId
 
-                return (
-                  <div
-                    key={entry.id}
-                    className={cn(
-                      "rounded-2xl p-4 transition-all",
-                      entry.rank === 1 && "bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-300 dark:border-yellow-700",
-                      entry.rank === 2 && "bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-2 border-slate-300 dark:border-slate-600",
-                      entry.rank === 3 && "bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-2 border-orange-300 dark:border-orange-700",
-                      entry.rank > 3 && (isDark ? 'bg-slate-800' : 'bg-slate-50'),
-                      isCurrentUser && "ring-2 ring-blue-500 ring-offset-2"
-                    )}
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Rank */}
-                      <div className="flex flex-col items-center min-w-[60px]">
-                        {entry.rank <= 3 ? (
-                          <div className={cn(
-                            "w-12 h-12 rounded-full flex items-center justify-center",
-                            entry.rank === 1 && "bg-gradient-to-br from-yellow-400 to-orange-500",
-                            entry.rank === 2 && "bg-gradient-to-br from-slate-300 to-slate-400",
-                            entry.rank === 3 && "bg-gradient-to-br from-orange-400 to-red-500"
-                          )}>
-                            {entry.rank === 1 && <Crown className="w-6 h-6 text-white" />}
-                            {entry.rank === 2 && <Medal className="w-6 h-6 text-white" />}
-                            {entry.rank === 3 && <Medal className="w-6 h-6 text-white" />}
-                          </div>
-                        ) : (
-                          <div className={`text-2xl font-bold ${theme.text}`}>
-                            #{entry.rank}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* User Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className={`font-bold ${theme.text} truncate`}>
-                            {entry.name}
-                            {isCurrentUser && <span className="text-blue-500 ml-2">(You)</span>}
-                          </p>
-                          <Badge className={cn(
-                            "text-xs",
-                            entry.sex === 'M' ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400"
-                          )}>
-                            {entry.sex === 'M' ? '♂' : '♀'}
-                          </Badge>
+              return (
+                <div
+                  key={entry.id}
+                  className={cn(
+                    "rounded-2xl p-4 transition-all fc-glass-soft border border-[color:var(--fc-glass-border)]",
+                    entry.rank === 1 && "ring-2 ring-[color:var(--fc-domain-workouts)]",
+                    entry.rank === 2 && "ring-1 ring-[color:var(--fc-glass-border)]",
+                    entry.rank === 3 && "ring-1 ring-[color:var(--fc-glass-border)]",
+                    isCurrentUser && "ring-2 ring-[color:var(--fc-domain-workouts)]"
+                  )}
+                >
+                  <div className="flex items-center gap-4">
+                    {/* Rank */}
+                    <div className="flex flex-col items-center min-w-[60px]">
+                      {entry.rank <= 3 ? (
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center fc-glass border border-[color:var(--fc-glass-border)]">
+                          {entry.rank === 1 && <Crown className="w-6 h-6 fc-text-warning" />}
+                          {entry.rank === 2 && <Medal className="w-6 h-6 fc-text-subtle" />}
+                          {entry.rank === 3 && <Medal className="w-6 h-6 fc-text-warning" />}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <TitleIcon className={`w-3 h-3 ${titleInfo.color}`} />
-                          <p className={`text-xs font-medium ${titleInfo.color}`}>{titleInfo.title}</p>
-                          <span className={`text-xs ${theme.textSecondary}`}>• {entry.bodyweight}kg BW</span>
+                      ) : (
+                        <div className="text-2xl font-bold fc-text-primary">
+                          #{entry.rank}
                         </div>
-                      </div>
+                      )}
+                    </div>
 
-                      {/* Score */}
-                      <div className="text-right">
-                        <p className={`text-2xl font-bold ${theme.text}`}>
-                          {formatScore(entry.score, selectedCategory)}
+                    {/* User Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-bold fc-text-primary truncate">
+                          {entry.name}
+                          {isCurrentUser && <span className="fc-text-workouts ml-2">(You)</span>}
                         </p>
-                        {entry.rank <= 3 && (
-                          <p className={`text-xs ${titleInfo.color} font-medium`}>
-                            🏆 Title Holder
-                          </p>
-                        )}
+                        <span className={cn(
+                          "fc-pill fc-pill-glass text-xs",
+                          entry.sex === 'M' ? "fc-text-workouts" : "fc-text-habits"
+                        )}>
+                          {entry.sex === 'M' ? '♂' : '♀'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <TitleIcon className={`w-3 h-3 ${titleInfo.color}`} />
+                        <p className={`text-xs font-medium ${titleInfo.color}`}>{titleInfo.title}</p>
+                        <span className="text-xs fc-text-subtle">• {entry.bodyweight}kg BW</span>
                       </div>
                     </div>
+
+                    {/* Score */}
+                    <div className="text-right">
+                      <p className="text-2xl font-bold fc-text-primary">
+                        {formatScore(entry.score, selectedCategory)}
+                      </p>
+                      {entry.rank <= 3 && (
+                        <p className={`text-xs ${titleInfo.color} font-medium`}>
+                          🏆 Title Holder
+                        </p>
+                      )}
+                    </div>
                   </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Info Card */}
-      <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-        <Card className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}>
-          <CardContent className="p-6">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <TrendingUp className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className={`font-bold ${theme.text} mb-2`}>How to Compete</h3>
-                <p className={`text-sm ${theme.textSecondary} mb-2`}>
-                  Your personal records are automatically tracked from your workout logs. Keep pushing your limits to climb the ranks!
-                </p>
-                <p className={`text-sm ${theme.textSecondary}`}>
-                  🏆 <strong>Titles Update Live:</strong> Rankings refresh after each workout. Defend your title or challenge the champion!
-                </p>
-              </div>
+      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+        <div className="p-6">
+          <div className="flex items-start gap-3">
+            <div className="fc-icon-tile fc-icon-workouts w-10 h-10 flex-shrink-0">
+              <TrendingUp className="w-5 h-5" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Tips
+              </span>
+              <h3 className="font-bold fc-text-primary mb-2 mt-2">How to Compete</h3>
+              <p className="text-sm fc-text-subtle mb-2">
+                Your personal records are automatically tracked from your workout logs. Keep pushing your limits to climb the ranks!
+              </p>
+              <p className="text-sm fc-text-subtle">
+                🏆 <strong>Titles Update Live:</strong> Rankings refresh after each workout. Defend your title or challenge the champion!
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

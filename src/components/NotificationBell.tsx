@@ -2,17 +2,22 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Bell } from 'lucide-react'
 import { notificationService } from '@/lib/notifications'
 import NotificationCenter from './NotificationCenter'
+import { usePathname } from 'next/navigation'
+import { isLiveWorkoutRoute } from '@/lib/workoutMode'
 
 export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotificationCenter, setShowNotificationCenter] = useState(false)
   const [permissionGranted, setPermissionGranted] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
+    if (isLiveWorkoutRoute(pathname)) {
+      return
+    }
     // Initialize the service for browser environment
     notificationService.initialize()
     
@@ -26,7 +31,7 @@ export default function NotificationBell() {
     const interval = setInterval(updateUnreadCount, 5000)
     
     return () => clearInterval(interval)
-  }, [])
+  }, [pathname])
 
   const updateUnreadCount = async () => {
     const count = await notificationService.getUnreadCount()
@@ -62,16 +67,14 @@ export default function NotificationBell() {
         variant="ghost"
         size="sm"
         onClick={handleBellClick}
-        className="relative p-2 z-50"
+        className="relative p-2 z-50 fc-btn fc-btn-ghost fc-press"
         title={permissionGranted ? 'Notifications' : 'Enable Notifications'}
       >
-        <Bell className={`w-5 h-5 ${permissionGranted ? 'text-slate-600' : 'text-slate-400'}`} />
+        <Bell className={`w-5 h-5 ${permissionGranted ? 'fc-text-primary' : 'fc-text-subtle'}`} />
         {unreadCount > 0 && (
-          <Badge 
-            className="absolute -top-1 -right-1 bg-red-500 text-white text-xs min-w-[18px] h-[18px] flex items-center justify-center p-0"
-          >
+          <span className="absolute -top-1 -right-1 fc-pill fc-pill-glass fc-text-error text-[10px] min-w-[18px] h-[18px] flex items-center justify-center p-0">
             {unreadCount > 99 ? '99+' : unreadCount}
-          </Badge>
+          </span>
         )}
       </Button>
 

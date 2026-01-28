@@ -13,6 +13,7 @@ import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useLoggingReset } from "../hooks/useLoggingReset";
 
 export function ClusterSetExecutor({
   block,
@@ -49,6 +50,7 @@ export function ClusterSetExecutor({
 
   const [weight, setWeight] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  useLoggingReset(isLoggingSet, setIsLoggingSet);
 
   // Pre-fill with suggested weight - recalculate when e1rmMap is populated
   useEffect(() => {
@@ -239,6 +241,8 @@ export function ClusterSetExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <div className="text-sm text-slate-600 dark:text-slate-400">
             Reps per cluster: {repsPerCluster} | Total reps:{" "}

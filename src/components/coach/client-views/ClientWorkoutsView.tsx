@@ -1,31 +1,21 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 import WorkoutTemplateDetails from '../WorkoutTemplateDetails'
 import ProgramDetailsModal from '../ProgramDetailsModal'
-import { 
+import {
   Dumbbell,
   Calendar,
   Clock,
   Target,
-  CheckCircle,
-  XCircle,
-  PlayCircle,
-  TrendingUp,
   X,
-  Edit,
-  Users,
   Star
 } from 'lucide-react'
 
-// Import the existing ProgramDetailsModal from EnhancedProgramManager
-import { Program, WorkoutTemplate, Exercise, ExerciseCategory } from '@/lib/workoutTemplateService'
-
+// Data mapping: workout_assignments -> workout_templates -> workout_blocks ->
+// workout_block_exercises -> protocol tables (workout_time_protocols,
+// workout_cluster_sets, workout_rest_pause_sets, workout_drop_sets, workout_hr_sets)
 interface ClientWorkoutsViewProps {
   clientId: string
 }
@@ -57,8 +47,6 @@ interface ProgramAssignment {
 }
 
 export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const [workouts, setWorkouts] = useState<WorkoutAssignment[]>([])
   const [programs, setPrograms] = useState<ProgramAssignment[]>([])
   const [loading, setLoading] = useState(true)
@@ -79,6 +67,35 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
   const [templates, setTemplates] = useState<any[]>([])
   const [exercises, setExercises] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
+
+  const getWorkoutStatusMeta = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return { label: 'Completed', color: 'fc-text-success' }
+      case 'in_progress':
+        return { label: 'In progress', color: 'fc-text-warning' }
+      case 'skipped':
+        return { label: 'Skipped', color: 'fc-text-error' }
+      case 'assigned':
+      default:
+        return { label: 'Assigned', color: 'fc-text-subtle' }
+    }
+  }
+
+  const getProgramStatusMeta = (status: string) => {
+    switch (status) {
+      case 'active':
+        return { label: 'Active', color: 'fc-text-warning' }
+      case 'paused':
+        return { label: 'Paused', color: 'fc-text-subtle' }
+      case 'completed':
+        return { label: 'Completed', color: 'fc-text-success' }
+      case 'cancelled':
+        return { label: 'Cancelled', color: 'fc-text-error' }
+      default:
+        return { label: status, color: 'fc-text-subtle' }
+    }
+  }
 
   useEffect(() => {
     loadWorkouts()
@@ -180,34 +197,6 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-      case 'in_progress':
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-      case 'assigned':
-        return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-      case 'skipped':
-        return 'bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300'
-      default:
-        return 'bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300'
-    }
-  }
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-      case 'intermediate':
-        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
-      case 'advanced':
-        return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-      default:
-        return 'bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300'
-    }
-  }
-
   const handleUnassignWorkout = async (workoutId: string) => {
     if (!confirm('Are you sure you want to unassign this workout?')) return
 
@@ -264,7 +253,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       const { data: activatedWorkout, error } = await supabase
         .from('workout_assignments')
         .update({ 
-          status: 'active',
+          status: 'in_progress',
           scheduled_date: new Date().toISOString().split('T')[0]
         })
         .eq('id', workoutId)
@@ -273,7 +262,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       console.log('Activated workout:', activatedWorkout)
       if (error) throw error
 
-      alert('This workout is now the ONLY active workout for this client!')
+      alert('This workout is now the ONLY in-progress workout for this client!')
       await loadWorkouts()
       await loadPrograms()
     } catch (error) {
@@ -363,37 +352,98 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
         .single()
 
       if (templateError) throw templateError
-
-      // Fetch exercises separately from workout_template_exercises table
-      const { data: templateExercises, error: exercisesError } = await supabase
-        .from('workout_template_exercises')
-        .select(`
-          *,
-          exercises (
-            id,
-            name,
-            description,
-            category
-          )
-        `)
+      
+      // Fetch blocks and block exercises (block-based system)
+      const { data: blocksData, error: blocksError } = await supabase
+        .from('workout_blocks')
+        .select('*')
         .eq('template_id', workout.workout_templates.id)
-        .order('order_index')
+        .order('block_order')
 
-      if (exercisesError) throw exercisesError
+      if (blocksError) throw blocksError
+
+      const blockIds = (blocksData || []).map((block) => block.id).filter(Boolean)
+
+      let blockExercises: any[] = []
+      let timeProtocols: any[] = []
+      let clusterSets: any[] = []
+      let restPauseSets: any[] = []
+      let dropSets: any[] = []
+      let hrSets: any[] = []
+
+      if (blockIds.length > 0) {
+        const { data: blockExercisesData, error: blockExercisesError } = await supabase
+          .from('workout_block_exercises')
+          .select(`
+            *,
+            exercises (
+              id,
+              name,
+              description,
+              category
+            )
+          `)
+          .in('block_id', blockIds)
+          .order('exercise_order')
+
+        if (blockExercisesError) throw blockExercisesError
+        blockExercises = blockExercisesData || []
+
+        const [
+          { data: timeProtocolsData, error: timeProtocolsError },
+          { data: clusterSetsData, error: clusterSetsError },
+          { data: restPauseSetsData, error: restPauseSetsError },
+          { data: dropSetsData, error: dropSetsError },
+          { data: hrSetsData, error: hrSetsError },
+        ] = await Promise.all([
+          supabase.from('workout_time_protocols').select('*').in('block_id', blockIds),
+          supabase.from('workout_cluster_sets').select('*').in('block_id', blockIds),
+          supabase.from('workout_rest_pause_sets').select('*').in('block_id', blockIds),
+          supabase.from('workout_drop_sets').select('*').in('block_id', blockIds),
+          supabase.from('workout_hr_sets').select('*').in('block_id', blockIds),
+        ])
+
+        if (timeProtocolsError) throw timeProtocolsError
+        if (clusterSetsError) throw clusterSetsError
+        if (restPauseSetsError) throw restPauseSetsError
+        if (dropSetsError) throw dropSetsError
+        if (hrSetsError) throw hrSetsError
+
+        timeProtocols = timeProtocolsData || []
+        clusterSets = clusterSetsData || []
+        restPauseSets = restPauseSetsData || []
+        dropSets = dropSetsData || []
+        hrSets = hrSetsData || []
+      }
+
+      const blocksWithExercises = (blocksData || []).map((block) => {
+        const exercisesForBlock =
+          (blockExercises || []).filter((exercise) => exercise.block_id === block.id) || []
+        return {
+          ...block,
+          exercises: exercisesForBlock,
+          time_protocols:
+            (timeProtocols || []).filter((protocol) => protocol.block_id === block.id) || [],
+          cluster_sets:
+            (clusterSets || []).filter((cluster) => cluster.block_id === block.id) || [],
+          rest_pause_sets:
+            (restPauseSets || []).filter((restPause) => restPause.block_id === block.id) || [],
+          drop_sets:
+            (dropSets || []).filter((drop) => drop.block_id === block.id) || [],
+          hr_sets: (hrSets || []).filter((set) => set.block_id === block.id) || [],
+        }
+      })
 
       console.log('Full template:', fullTemplate)
-      console.log('Template exercises:', templateExercises)
-      console.log('Exercises count:', templateExercises?.length || 0)
-      if (templateExercises && templateExercises.length > 0) {
-        console.log('First exercise sample:', templateExercises[0])
-      }
+      console.log('Template blocks:', blocksWithExercises)
+      console.log('Blocks count:', blocksWithExercises.length)
 
       if (fullTemplate) {
         setSelectedWorkout({
           ...workout,
           workout_templates: {
             ...fullTemplate,
-            exercises: templateExercises || []
+            blocks: blocksWithExercises || []
           }
         })
         setShowWorkoutModal(true)
@@ -459,7 +509,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       <div className="space-y-4">
         {[1, 2, 3].map(i => (
           <div key={i} className="animate-pulse">
-            <div className={`${theme.card} h-32`} style={{ borderRadius: '24px', padding: '24px' }}></div>
+            <div className="h-32 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl p-6"></div>
           </div>
         ))}
       </div>
@@ -469,272 +519,288 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
   return (
     <>
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-[1px] bg-gradient-to-r from-blue-500 to-indigo-600" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-          <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-            <CardContent style={{ padding: '16px' }}>
-              <div className="text-center">
-                <p className={`${theme.text}`} style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.1' }}>{stats.total}</p>
-                <p className={`${theme.textSecondary}`} style={{ fontSize: '14px', fontWeight: '400' }}>Total</p>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Assignments Overview */}
+      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+        <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+          <div className="flex items-center gap-3">
+            <div className="fc-icon-tile fc-icon-workouts">
+              <Dumbbell className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Assignments
+              </span>
+              <h3 className="text-lg font-semibold fc-text-primary mt-2">
+                Overview
+              </h3>
+              <p className="text-sm fc-text-dim">
+                Snapshot of assigned workouts and programs
+              </p>
+            </div>
+          </div>
         </div>
+        <div className="p-4 sm:p-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
+              <p className="text-3xl font-bold fc-text-primary">{stats.total}</p>
+              <p className="text-sm fc-text-dim">Total</p>
+            </div>
 
-        <div className="p-[1px] bg-gradient-to-r from-green-500 to-emerald-600" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-          <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-            <CardContent style={{ padding: '16px' }}>
-              <div className="text-center">
-                <p className={`${theme.text}`} style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.1' }}>{stats.completed}</p>
-                <p className={`${theme.textSecondary}`} style={{ fontSize: '14px', fontWeight: '400' }}>Completed</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
+              <p className="text-3xl font-bold fc-text-primary">{stats.completed}</p>
+              <p className="text-sm fc-text-dim">Completed</p>
+            </div>
 
-        <div className="p-[1px] bg-gradient-to-r from-blue-400 to-blue-500" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-          <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-            <CardContent style={{ padding: '16px' }}>
-              <div className="text-center">
-                <p className={`${theme.text}`} style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.1' }}>{stats.inProgress}</p>
-                <p className={`${theme.textSecondary}`} style={{ fontSize: '14px', fontWeight: '400' }}>In Progress</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
+              <p className="text-3xl font-bold fc-text-primary">{stats.inProgress}</p>
+              <p className="text-sm fc-text-dim">In Progress</p>
+            </div>
 
-        <div className="p-[1px] bg-gradient-to-r from-orange-500 to-amber-600" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-          <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-            <CardContent style={{ padding: '16px' }}>
-              <div className="text-center">
-                <p className={`${theme.text}`} style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.1' }}>{stats.assigned}</p>
-                <p className={`${theme.textSecondary}`} style={{ fontSize: '14px', fontWeight: '400' }}>Assigned</p>
-              </div>
-            </CardContent>
-          </Card>
+            <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
+              <p className="text-3xl font-bold fc-text-primary">{stats.assigned}</p>
+              <p className="text-sm fc-text-dim">Assigned</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Programs Section */}
       {programs.length > 0 && (
-        <>
-          <div className="flex items-center gap-2 mb-2">
-            <Target className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-            <h3 className={`${theme.text}`} style={{ fontSize: '18px', fontWeight: '700' }}>Assigned Programs</h3>
+        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+            <div className="flex items-center gap-3">
+              <div className="fc-icon-tile fc-icon-workouts">
+                <Target className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                  Programs
+                </span>
+                <h3 className="text-lg font-semibold fc-text-primary mt-2">
+                  Assigned Programs
+                </h3>
+              </div>
+              <span className="ml-auto fc-pill fc-pill-glass fc-text-workouts text-xs">
+                {programs.length}
+              </span>
+            </div>
           </div>
-          <div className="space-y-4 mb-6">
-            {programs.map((program) => (
-            <div 
-              key={program.id} 
-              onClick={() => handleProgramClick(program)}
-              className={`p-[1px] ${
-                program.status === 'active' 
-                  ? 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 ring-4 ring-yellow-300/50 dark:ring-yellow-500/30' 
-                  : 'bg-gradient-to-r from-purple-500 to-indigo-600'
-              } hover:shadow-xl transition-all w-full min-h-[7rem] sm:min-h-[8rem] cursor-pointer`}
-              style={{ borderRadius: '24px', boxShadow: program.status === 'active' ? '0 4px 12px rgba(0, 0, 0, 0.12)' : '0 2px 8px rgba(0, 0, 0, 0.08)' }}
-            >
-              <Card className={`${theme.card} border-0 h-full`} style={{ borderRadius: '24px' }}>
-                <CardContent className="flex items-center h-full" style={{ padding: '24px' }}>
+          <div className="p-4 sm:p-6 space-y-4">
+            {programs.map((program) => {
+              const programStatus = getProgramStatusMeta(program.status)
+              return (
+                <div
+                  key={program.id}
+                  onClick={() => handleProgramClick(program)}
+                  className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 transition-all w-full min-h-[7rem] sm:min-h-[8rem] cursor-pointer ${
+                    program.status === 'active' ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
+                  }`}
+                >
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full">
                     {/* Row 1: Icon, Title, Button */}
                     <div className="flex items-center gap-4 w-full">
                       {/* Icon */}
-                      <div className="bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg" style={{ width: '56px', height: '56px', borderRadius: '18px' }}>
-                        <Target className="w-8 h-8 text-white" />
+                      <div className="fc-icon-tile fc-icon-workouts">
+                        <Target className="w-6 h-6" />
                       </div>
 
                       {/* Title */}
-                      <h4 className={`${theme.text} break-words leading-tight flex-1 min-w-0`} style={{ fontSize: '18px', fontWeight: '600' }}>
+                      <h4 className="fc-text-primary break-words leading-tight flex-1 min-w-0 text-lg font-semibold">
                         {program.workout_programs?.name || 'Program'}
                       </h4>
 
                       {/* Action Buttons - Right Side */}
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {/* Set as Active Button */}
-                        <div
+                        <button
+                          type="button"
                           onClick={(e) => {
-                            e.stopPropagation();
-                            setAsActiveProgram(program.id);
+                            e.stopPropagation()
+                            setAsActiveProgram(program.id)
                           }}
-                          className="h-6 w-6 sm:h-7 sm:w-7 border-2 border-yellow-500 text-yellow-600 hover:text-white hover:bg-yellow-500 hover:border-yellow-600 dark:border-yellow-400 dark:text-yellow-400 dark:hover:bg-yellow-500 dark:hover:text-white rounded cursor-pointer flex items-center justify-center transition-colors"
+                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 p-0 fc-text-warning border border-[color:var(--fc-status-warning)]"
                           title="Set as Active Program"
                         >
-                          <Star className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </div>
+                          <Star className="w-4 h-4" />
+                        </button>
 
                         {/* Unassign Button */}
-                        <div
+                        <button
+                          type="button"
                           onClick={(e) => {
-                            e.stopPropagation();
-                            handleUnassignProgram(program.id);
+                            e.stopPropagation()
+                            handleUnassignProgram(program.id)
                           }}
-                          className="h-6 w-6 sm:h-7 sm:w-7 border-2 border-red-500 text-red-600 hover:text-white hover:bg-red-500 hover:border-red-600 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white rounded cursor-pointer flex items-center justify-center transition-colors"
+                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 p-0 fc-text-error border border-[color:var(--fc-status-error)]"
                           title="Unassign Program"
                         >
-                          <X className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </div>
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
 
                     {/* Row 2: Details - Mobile: Full width, Desktop: Side */}
                     <div className="flex items-center gap-2 text-xs sm:ml-0 sm:flex-shrink-0">
                       <div className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-green-600 dark:text-green-400 flex-shrink-0" />
-                        <span className={`${theme.textSecondary} font-medium`}>
+                        <Calendar className="w-3 h-3 fc-text-workouts flex-shrink-0" />
+                        <span className="fc-text-subtle font-medium">
                           {new Date(program.start_date).toLocaleDateString()}
                         </span>
                       </div>
-                      
+
                       {program.workout_programs?.duration_weeks && (
                         <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-                          <span className={`${theme.textSecondary} font-medium`}>
+                          <Clock className="w-3 h-3 fc-text-workouts flex-shrink-0" />
+                          <span className="fc-text-subtle font-medium">
                             {program.workout_programs.duration_weeks}w
                           </span>
                         </div>
                       )}
 
-                      {program.status === 'active' && (
-                        <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full px-3 py-1 text-xs font-bold shadow-lg animate-pulse">
-                          ⭐ ACTIVE
-                        </Badge>
-                      )}
+                      <span className={`fc-pill fc-pill-glass text-xs ${programStatus.color}`}>
+                        {programStatus.label}
+                      </span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-            ))}
+                </div>
+              )
+            })}
           </div>
-        </>
+        </div>
       )}
 
       {/* Workouts List */}
-      <div className="flex items-center gap-2 mb-2">
-        <Dumbbell className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-        <h3 className={`${theme.text}`} style={{ fontSize: '18px', fontWeight: '700' }}>Individual Workouts</h3>
-      </div>
-      <div className="space-y-4">
-        {workouts.length === 0 && programs.length === 0 ? (
-          <Card className={`${theme.card} border-2 ${isDark ? 'border-slate-700' : 'border-slate-200'}`} style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-            <CardContent className="text-center" style={{ padding: '48px 24px' }}>
-              <Dumbbell className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className={`${theme.text} mb-2`} style={{ fontSize: '20px', fontWeight: '700' }}>
+      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+        <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+          <div className="flex items-center gap-3">
+            <div className="fc-icon-tile fc-icon-workouts">
+              <Dumbbell className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Workouts
+              </span>
+              <h3 className="text-lg font-semibold fc-text-primary mt-2">
+                Individual Workouts
+              </h3>
+            </div>
+            <span className="ml-auto fc-pill fc-pill-glass fc-text-workouts text-xs">
+              {workouts.length}
+            </span>
+          </div>
+        </div>
+        <div className="p-4 sm:p-6 space-y-4">
+          {workouts.length === 0 && programs.length === 0 ? (
+            <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl text-center px-6 py-12">
+              <div className="mx-auto mb-4 fc-icon-tile fc-icon-workouts w-16 h-16">
+                <Dumbbell className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold fc-text-primary mb-2">
                 No Workouts Assigned
               </h3>
-              <p className={`${theme.textSecondary}`} style={{ fontSize: '14px' }}>
+              <p className="text-sm fc-text-dim">
                 This client doesn't have any workout or program assignments yet.
               </p>
-            </CardContent>
-          </Card>
-        ) : workouts.length === 0 ? (
-          <Card className={`${theme.card} border-2 ${isDark ? 'border-slate-700' : 'border-slate-200'}`} style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-            <CardContent className="text-center" style={{ padding: '32px 24px' }}>
-              <p className={`${theme.textSecondary}`} style={{ fontSize: '14px' }}>
+            </div>
+          ) : workouts.length === 0 ? (
+            <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl text-center px-6 py-8">
+              <p className="text-sm fc-text-dim">
                 No individual workouts assigned.
               </p>
-            </CardContent>
-          </Card>
-        ) : (
-          workouts.map((workout) => {
-            console.log('Rendering workout card:', { id: workout.id, name: workout.workout_templates?.name, status: workout.status })
-            return (
-            <div 
-              key={workout.id} 
-              data-workout-id={workout.id}
-              onClick={() => handleWorkoutClick(workout)}
-              className={`p-[1px] ${
-                workout.status === 'active' 
-                  ? 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 ring-4 ring-yellow-300/50 dark:ring-yellow-500/30' 
-                  : 'bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600'
-              } hover:shadow-xl transition-all w-full min-h-[7rem] sm:min-h-[8rem] cursor-pointer`}
-              style={{ borderRadius: '24px', boxShadow: workout.status === 'active' ? '0 4px 12px rgba(0, 0, 0, 0.12)' : '0 2px 8px rgba(0, 0, 0, 0.08)' }}
-            >
-              <Card className={`${theme.card} border-0 h-full`} style={{ borderRadius: '24px' }}>
-                <CardContent className="flex items-center h-full" style={{ padding: '24px' }}>
+            </div>
+          ) : (
+            workouts.map((workout) => {
+              const workoutStatus = getWorkoutStatusMeta(workout.status)
+              console.log('Rendering workout card:', { id: workout.id, name: workout.workout_templates?.name, status: workout.status })
+              return (
+                <div 
+                  key={workout.id} 
+                  data-workout-id={workout.id}
+                  onClick={() => handleWorkoutClick(workout)}
+                  className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 transition-all w-full min-h-[7rem] sm:min-h-[8rem] cursor-pointer ${
+                    workout.status === 'in_progress' ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
+                  }`}
+                >
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full">
                     {/* Row 1: Icon, Title, Button */}
                     <div className="flex items-center gap-4 w-full">
                       {/* Icon */}
-                      <div className="bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg" style={{ width: '56px', height: '56px', borderRadius: '18px' }}>
-                        <Dumbbell className="w-8 h-8 text-white" />
+                      <div className="fc-icon-tile fc-icon-workouts">
+                        <Dumbbell className="w-6 h-6" />
                       </div>
 
                       {/* Title */}
-                      <h4 className={`${theme.text} break-words leading-tight flex-1 min-w-0`} style={{ fontSize: '18px', fontWeight: '600' }}>
+                      <h4 className="fc-text-primary break-words leading-tight flex-1 min-w-0 text-lg font-semibold">
                         {workout.workout_templates?.name || 'Workout'}
                       </h4>
 
                       {/* Action Buttons - Right Side */}
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {/* Set as Active Button */}
-                        <div
+                        <button
+                          type="button"
                           onClick={(e) => {
-                            e.stopPropagation();
-                            setAsActiveWorkout(workout.id);
+                            e.stopPropagation()
+                            setAsActiveWorkout(workout.id)
                           }}
-                          className="h-6 w-6 sm:h-7 sm:w-7 border-2 border-yellow-500 text-yellow-600 hover:text-white hover:bg-yellow-500 hover:border-yellow-600 dark:border-yellow-400 dark:text-yellow-400 dark:hover:bg-yellow-500 dark:hover:text-white rounded cursor-pointer flex items-center justify-center transition-colors"
+                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 p-0 fc-text-warning border border-[color:var(--fc-status-warning)]"
                           title="Set as Today's Workout"
                         >
-                          <Star className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </div>
+                          <Star className="w-4 h-4" />
+                        </button>
 
                         {/* Unassign Button */}
-                        <div
+                        <button
+                          type="button"
                           onClick={(e) => {
-                            e.stopPropagation();
-                            handleUnassignWorkout(workout.id);
+                            e.stopPropagation()
+                            handleUnassignWorkout(workout.id)
                           }}
-                          className="h-6 w-6 sm:h-7 sm:w-7 border-2 border-red-500 text-red-600 hover:text-white hover:bg-red-500 hover:border-red-600 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white rounded cursor-pointer flex items-center justify-center transition-colors"
+                          className="fc-btn fc-btn-ghost fc-press h-7 w-7 p-0 fc-text-error border border-[color:var(--fc-status-error)]"
                           title="Unassign Workout"
                         >
-                          <X className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </div>
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
 
                     {/* Row 2: Details - Mobile: Full width, Desktop: Side */}
                     <div className="flex items-center gap-2 text-xs sm:ml-0 sm:flex-shrink-0">
                       <div className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                        <span className={`${theme.textSecondary} font-medium`}>
+                        <Calendar className="w-3 h-3 fc-text-workouts flex-shrink-0" />
+                        <span className="fc-text-subtle font-medium">
                           {new Date(workout.scheduled_date).toLocaleDateString()}
                         </span>
                       </div>
-                      
+
                       {workout.workout_templates?.estimated_duration && (
                         <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-                          <span className={`${theme.textSecondary} font-medium`}>
+                          <Clock className="w-3 h-3 fc-text-workouts flex-shrink-0" />
+                          <span className="fc-text-subtle font-medium">
                             {workout.workout_templates.estimated_duration}m
                           </span>
                         </div>
                       )}
-                      
+
                       {workout.workout_templates?.difficulty_level && (
                         <div className="flex items-center gap-1">
-                          <Dumbbell className="w-3 h-3 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-                          <span className={`${theme.textSecondary} font-medium`}>
+                          <Dumbbell className="w-3 h-3 fc-text-warning flex-shrink-0" />
+                          <span className="fc-text-subtle font-medium">
                             {workout.workout_templates.difficulty_level}
                           </span>
                         </div>
                       )}
 
-                      {workout.status === 'active' && (
-                        <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full px-3 py-1 text-xs font-bold shadow-lg animate-pulse">
-                          ⭐ ACTIVE
-                        </Badge>
-                      )}
+                      <span className={`fc-pill fc-pill-glass text-xs ${workoutStatus.color}`}>
+                        {workoutStatus.label}
+                      </span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          )
-        })
-        )}
+                </div>
+              )
+            })
+          )}
+        </div>
       </div>
     </div>
 

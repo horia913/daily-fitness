@@ -3,32 +3,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { 
   Plus, 
-  Edit, 
   Trash, 
   Calculator, 
   Utensils, 
-  Calendar,
-  Target,
-  Zap,
-  Info,
-  Save,
-  Copy,
-  Users,
-  Clock,
-  CheckCircle,
-  AlertCircle,
   Eye,
   EyeOff
 } from 'lucide-react'
 import MealForm from './MealForm'
-import { useTheme } from '@/contexts/ThemeContext'
 
 interface Meal {
   id: string
@@ -51,8 +34,14 @@ interface MealPlanBuilderProps {
 }
 
 export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilderProps) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
+  const theme = {
+    text: 'fc-text-primary',
+    textSecondary: 'fc-text-subtle',
+    border: 'border-[color:var(--fc-glass-border)]',
+    card: 'fc-glass fc-card',
+    shadow: '',
+    primary: 'fc-btn fc-btn-primary fc-press'
+  }
   
   const [meals, setMeals] = useState<Meal[]>([])
   const [showMealForm, setShowMealForm] = useState(false)
@@ -62,10 +51,10 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
   const [showMealDetails, setShowMealDetails] = useState<Record<string, boolean>>({})
 
   const mealTypes = [
-    { value: 'breakfast', label: 'Breakfast', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 'lunch', label: 'Lunch', color: 'bg-green-100 text-green-800' },
-    { value: 'dinner', label: 'Dinner', color: 'bg-blue-100 text-blue-800' },
-    { value: 'snack', label: 'Snack', color: 'bg-purple-100 text-purple-800' }
+    { value: 'breakfast', label: 'Breakfast' },
+    { value: 'lunch', label: 'Lunch' },
+    { value: 'dinner', label: 'Dinner' },
+    { value: 'snack', label: 'Snack' }
   ]
 
   const toggleMealDetails = (mealId: string) => {
@@ -174,7 +163,7 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
       <div className={`${theme.card} ${theme.shadow} rounded-3xl border ${theme.border} p-6`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-2xl ${isDark ? 'bg-slate-700' : 'bg-gradient-to-br from-green-100 to-orange-100'}`}>
+            <div className="fc-icon-tile fc-icon-workouts">
               <Utensils className={`w-6 h-6 ${theme.text}`} />
             </div>
             <div>
@@ -189,7 +178,7 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
               variant="outline"
               size="sm"
               onClick={() => setShowNutritionSummary(!showNutritionSummary)}
-              className={`rounded-xl ${theme.textSecondary} hover:${theme.text}`}
+              className="fc-btn fc-btn-secondary fc-press"
             >
               {showNutritionSummary ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
               {showNutritionSummary ? 'Hide' : 'Show'} Summary
@@ -200,17 +189,17 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
 
       {/* Daily Nutrition Summary */}
       {showNutritionSummary && (
-        <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
-          <CardHeader className="p-6">
+        <div className={`${theme.card} border ${theme.border} rounded-2xl`}>
+          <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-blue-100'}`}>
-                <Calculator className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+              <div className="fc-icon-tile fc-icon-workouts">
+                <Calculator className="w-5 h-5" />
               </div>
-              <CardTitle className={`text-xl font-bold ${theme.text}`}>Daily Nutrition Summary</CardTitle>
+              <h3 className={`text-xl font-bold ${theme.text}`}>Daily Nutrition Summary</h3>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className={`p-6 border ${theme.border} rounded-2xl ${isDark ? 'bg-slate-800' : 'bg-gradient-to-br from-blue-50 to-green-50'}`}>
+          </div>
+          <div className="p-6 pt-0">
+            <div className={`p-6 border ${theme.border} rounded-2xl fc-glass-soft`}>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                 <div className="text-center">
                   <div className={`text-4xl font-bold ${theme.text}`}>{dailyTotals.calories.toFixed(0)}</div>
@@ -234,8 +223,8 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Meal Types */}
@@ -243,23 +232,23 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
         {mealTypes.map(mealType => {
           const typeMeals = getMealsByType(mealType.value)
           const mealTypeColors = {
-            breakfast: { bg: 'bg-yellow-100', text: 'text-yellow-600', icon: 'text-yellow-500' },
-            lunch: { bg: 'bg-green-100', text: 'text-green-600', icon: 'text-green-500' },
-            dinner: { bg: 'bg-blue-100', text: 'text-blue-600', icon: 'text-blue-500' },
-            snack: { bg: 'bg-purple-100', text: 'text-purple-600', icon: 'text-purple-500' }
+            breakfast: { icon: 'fc-text-warning' },
+            lunch: { icon: 'fc-text-success' },
+            dinner: { icon: 'fc-text-workouts' },
+            snack: { icon: 'fc-text-subtle' }
           }
           const colors = mealTypeColors[mealType.value as keyof typeof mealTypeColors] || mealTypeColors.breakfast
           
           return (
-            <Card key={mealType.value} className={`${theme.card} border ${theme.border} rounded-2xl`}>
-              <CardHeader className="p-6">
+            <div key={mealType.value} className={`${theme.card} border ${theme.border} rounded-2xl`}>
+              <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : colors.bg}`}>
-                      <Utensils className={`w-5 h-5 ${isDark ? colors.icon : colors.icon}`} />
+                    <div className="fc-icon-tile fc-icon-workouts">
+                      <Utensils className={`w-5 h-5 ${colors.icon}`} />
                     </div>
                     <div>
-                      <CardTitle className={`text-xl font-bold ${theme.text}`}>{mealType.label}</CardTitle>
+                      <h3 className={`text-xl font-bold ${theme.text}`}>{mealType.label}</h3>
                       <p className={`text-sm ${theme.textSecondary}`}>
                         {typeMeals.length} meal{typeMeals.length !== 1 ? 's' : ''} • {typeMeals.reduce((sum, meal) => sum + meal.totals.calories, 0).toFixed(0)} calories
                       </p>
@@ -268,18 +257,18 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
                   <Button
                     size="sm"
                     onClick={() => handleAddMeal(mealType.value)}
-                    className={`${theme.primary} rounded-xl flex items-center gap-2`}
+                    className="fc-btn fc-btn-primary fc-press rounded-xl flex items-center gap-2"
                   >
                     <Plus className="h-4 w-4" />
                     Add {mealType.label}
                   </Button>
                 </div>
-              </CardHeader>
+              </div>
 
-              <CardContent className="p-6 pt-0">
+              <div className="p-6 pt-0">
                 {typeMeals.length === 0 ? (
-                  <div className={`text-center py-12 ${theme.textSecondary}`}>
-                    <div className={`p-4 rounded-2xl ${isDark ? 'bg-slate-800' : colors.bg} inline-block mb-4`}>
+                  <div className="text-center py-12 fc-text-subtle">
+                    <div className="p-4 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)] inline-block mb-4">
                       <Utensils className={`w-12 h-12 ${colors.icon}`} />
                     </div>
                     <h3 className={`text-lg font-bold ${theme.text} mb-2`}>No {mealType.label.toLowerCase()} meals yet</h3>
@@ -288,7 +277,7 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
                     </p>
                     <Button
                       onClick={() => handleAddMeal(mealType.value)}
-                      className={`${theme.primary} rounded-xl`}
+                      className="fc-btn fc-btn-primary fc-press rounded-xl"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Your First {mealType.label}
@@ -299,18 +288,15 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
                     {typeMeals.map(meal => (
                       <div
                         key={meal.id}
-                        className={`p-6 border ${theme.border} rounded-2xl ${isDark ? 'bg-slate-800' : 'bg-white'} hover:${isDark ? 'bg-slate-700' : 'bg-slate-50'} transition-all duration-200`}
+                        className="p-6 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl transition-all duration-200 fc-hover-rise"
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-3">
                               <h4 className={`text-lg font-bold ${theme.text}`}>{meal.name}</h4>
-                              <Badge 
-                                variant="outline" 
-                                className={`${colors.text} border-current rounded-xl`}
-                              >
+                              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
                                 {meal.totals.calories.toFixed(0)} cal
-                              </Badge>
+                              </span>
                             </div>
                             
                             {/* Food Items */}
@@ -334,18 +320,18 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
 
                             {/* Meal Totals */}
                             <div className="flex items-center gap-2 flex-wrap">
-                              <Badge variant="outline" className={`${theme.textSecondary} border-current rounded-xl text-xs`}>
+                              <span className="fc-pill fc-pill-glass fc-text-subtle text-xs">
                                 {meal.totals.protein.toFixed(1)}g protein
-                              </Badge>
-                              <Badge variant="outline" className={`${theme.textSecondary} border-current rounded-xl text-xs`}>
+                              </span>
+                              <span className="fc-pill fc-pill-glass fc-text-subtle text-xs">
                                 {meal.totals.carbs.toFixed(1)}g carbs
-                              </Badge>
-                              <Badge variant="outline" className={`${theme.textSecondary} border-current rounded-xl text-xs`}>
+                              </span>
+                              <span className="fc-pill fc-pill-glass fc-text-subtle text-xs">
                                 {meal.totals.fat.toFixed(1)}g fat
-                              </Badge>
-                              <Badge variant="outline" className={`${theme.textSecondary} border-current rounded-xl text-xs`}>
+                              </span>
+                              <span className="fc-pill fc-pill-glass fc-text-subtle text-xs">
                                 {meal.totals.fiber.toFixed(1)}g fiber
-                              </Badge>
+                              </span>
                             </div>
                           </div>
 
@@ -355,7 +341,7 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => toggleMealDetails(meal.id)}
-                                className={`p-2 rounded-xl transition-all duration-200 ${theme.textSecondary} hover:${theme.text} hover:${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}
+                                className="p-2 rounded-xl transition-all duration-200 fc-text-subtle hover:fc-text-primary hover:bg-[color:var(--fc-glass-border)]/30"
                               >
                                 {showMealDetails[meal.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                               </Button>
@@ -364,7 +350,7 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
                               size="sm"
                               variant="ghost"
                               onClick={() => handleDeleteMeal(meal.id)}
-                              className={`p-2 rounded-xl transition-all duration-200 ${theme.textSecondary} hover:text-red-600 hover:${isDark ? 'bg-red-900/20' : 'bg-red-50'}`}
+                              className="p-2 rounded-xl transition-all duration-200 fc-text-error hover:bg-[color:var(--fc-status-error)]/10"
                             >
                               <Trash className="h-4 w-4" />
                             </Button>
@@ -374,8 +360,8 @@ export default function MealPlanBuilder({ mealPlanId, onUpdate }: MealPlanBuilde
                     ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )
         })}
       </div>

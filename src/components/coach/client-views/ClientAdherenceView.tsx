@@ -1,7 +1,5 @@
 'use client'
 
-import { Card, CardContent } from '@/components/ui/card'
-import { useTheme } from '@/contexts/ThemeContext'
 import { BarChart3, CheckCircle, XCircle, Calendar } from 'lucide-react'
 
 interface ClientAdherenceViewProps {
@@ -9,9 +7,6 @@ interface ClientAdherenceViewProps {
 }
 
 export default function ClientAdherenceView({ clientId }: ClientAdherenceViewProps) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
-
   // Sample data - will be replaced with real data
   const adherenceData = {
     workoutAdherence: 85,
@@ -28,88 +23,89 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
     <div className="space-y-6">
       {/* Overview Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="p-[1px] bg-gradient-to-r from-green-500 to-emerald-600" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-          <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-            <CardContent className="text-center" style={{ padding: '20px' }}>
-              <p className={`${theme.text}`} style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.1' }}>{adherenceData.workoutAdherence}%</p>
-              <p className={`${theme.textSecondary}`} style={{ fontSize: '14px', fontWeight: '400' }}>Workout Adherence</p>
-            </CardContent>
-          </Card>
+        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+          <div className="mx-auto mb-3 fc-icon-tile fc-icon-workouts">
+            <CheckCircle className="w-5 h-5" />
+          </div>
+          <p className="text-3xl font-bold fc-text-primary leading-tight">
+            {adherenceData.workoutAdherence}%
+          </p>
+          <p className="text-sm fc-text-dim">Workout Adherence</p>
         </div>
 
-        <div className="p-[1px] bg-gradient-to-r from-teal-500 to-cyan-600" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-          <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-            <CardContent className="text-center" style={{ padding: '20px' }}>
-              <p className={`${theme.text}`} style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.1' }}>{adherenceData.nutritionAdherence}%</p>
-              <p className={`${theme.textSecondary}`} style={{ fontSize: '14px', fontWeight: '400' }}>Nutrition Adherence</p>
-            </CardContent>
-          </Card>
+        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+          <div className="mx-auto mb-3 fc-icon-tile fc-icon-workouts">
+            <BarChart3 className="w-5 h-5" />
+          </div>
+          <p className="text-3xl font-bold fc-text-primary leading-tight">
+            {adherenceData.nutritionAdherence}%
+          </p>
+          <p className="text-sm fc-text-dim">Nutrition Adherence</p>
         </div>
 
-        <div className="p-[1px] bg-gradient-to-r from-blue-500 to-indigo-600" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-          <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-            <CardContent className="text-center" style={{ padding: '20px' }}>
-              <p className={`${theme.text}`} style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.1' }}>{adherenceData.weeklyAverage}%</p>
-              <p className={`${theme.textSecondary}`} style={{ fontSize: '14px', fontWeight: '400' }}>Weekly Average</p>
-            </CardContent>
-          </Card>
+        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5 text-center">
+          <div className="mx-auto mb-3 fc-icon-tile fc-icon-workouts">
+            <Calendar className="w-5 h-5" />
+          </div>
+          <p className="text-3xl font-bold fc-text-primary leading-tight">
+            {adherenceData.weeklyAverage}%
+          </p>
+          <p className="text-sm fc-text-dim">Weekly Average</p>
         </div>
       </div>
 
       {/* This Week Summary */}
-      <div className="p-[1px] bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-        <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-          <CardContent style={{ padding: '24px' }}>
-            <h3 className={`${theme.text} mb-4`} style={{ fontSize: '20px', fontWeight: '700' }}>This Week</h3>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-100 dark:border-green-800/30 text-center" style={{ padding: '16px', borderRadius: '16px' }}>
-                <CheckCircle className="w-8 h-8 mb-2 text-green-600 dark:text-green-400 mx-auto" />
-                <p className="text-slate-800 dark:text-slate-200" style={{ fontSize: '24px', fontWeight: '700' }}>{adherenceData.thisWeek.completed}</p>
-                <p className="text-slate-600 dark:text-slate-400" style={{ fontSize: '14px' }}>Completed</p>
-              </div>
-              
-              <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-100 dark:border-red-800/30 text-center" style={{ padding: '16px', borderRadius: '16px' }}>
-                <XCircle className="w-8 h-8 mb-2 text-red-600 dark:text-red-400 mx-auto" />
-                <p className="text-slate-800 dark:text-slate-200" style={{ fontSize: '24px', fontWeight: '700' }}>{adherenceData.thisWeek.missed}</p>
-                <p className="text-slate-600 dark:text-slate-400" style={{ fontSize: '14px' }}>Missed</p>
-              </div>
-              
-              <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-100 dark:border-blue-800/30 text-center" style={{ padding: '16px', borderRadius: '16px' }}>
-                <Calendar className="w-8 h-8 mb-2 text-blue-600 dark:text-blue-400 mx-auto" />
-                <p className="text-slate-800 dark:text-slate-200" style={{ fontSize: '24px', fontWeight: '700' }}>{adherenceData.thisWeek.total}</p>
-                <p className="text-slate-600 dark:text-slate-400" style={{ fontSize: '14px' }}>Scheduled</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+        <h3 className="text-xl font-semibold fc-text-primary mb-4">This Week</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-4 py-4 text-center">
+            <CheckCircle className="w-7 h-7 mb-2 fc-text-success mx-auto" />
+            <p className="text-2xl font-semibold fc-text-primary">
+              {adherenceData.thisWeek.completed}
+            </p>
+            <p className="text-sm fc-text-subtle">Completed</p>
+          </div>
+
+          <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-4 py-4 text-center">
+            <XCircle className="w-7 h-7 mb-2 fc-text-error mx-auto" />
+            <p className="text-2xl font-semibold fc-text-primary">
+              {adherenceData.thisWeek.missed}
+            </p>
+            <p className="text-sm fc-text-subtle">Missed</p>
+          </div>
+
+          <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-4 py-4 text-center">
+            <Calendar className="w-7 h-7 mb-2 fc-text-workouts mx-auto" />
+            <p className="text-2xl font-semibold fc-text-primary">
+              {adherenceData.thisWeek.total}
+            </p>
+            <p className="text-sm fc-text-subtle">Scheduled</p>
+          </div>
+        </div>
       </div>
 
       {/* Weekly Calendar View */}
-      <div className="p-[1px] bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-        <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-          <CardContent style={{ padding: '24px' }}>
-            <h3 className={`${theme.text} mb-4`} style={{ fontSize: '20px', fontWeight: '700' }}>7-Day Activity</h3>
-            
-            <div className="grid grid-cols-7 gap-2">
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => {
-                const isCompleted = i < 5 // Sample: first 5 days completed
-                return (
-                  <div key={i} className="text-center">
-                    <div className={`w-full aspect-square flex items-center justify-center mb-2 ${
-                      isCompleted 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
-                    }`} style={{ borderRadius: '16px' }}>
-                      <CheckCircle className="w-6 h-6" />
-                    </div>
-                    <p className={`${theme.textSecondary}`} style={{ fontSize: '12px', fontWeight: '600' }}>{day}</p>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6">
+        <h3 className="text-xl font-semibold fc-text-primary mb-4">7-Day Activity</h3>
+        <div className="grid grid-cols-7 gap-2">
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => {
+            const isCompleted = i < 5 // Sample: first 5 days completed
+            return (
+              <div key={i} className="text-center">
+                <div
+                  className={`w-full aspect-square flex items-center justify-center mb-2 rounded-2xl border ${
+                    isCompleted
+                      ? 'bg-[color:var(--fc-domain-workouts)] fc-text-primary border-transparent'
+                      : 'fc-glass-soft border-[color:var(--fc-glass-border)] fc-text-subtle'
+                  }`}
+                >
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-semibold fc-text-subtle">{day}</p>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

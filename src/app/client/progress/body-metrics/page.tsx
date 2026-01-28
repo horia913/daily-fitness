@@ -23,7 +23,7 @@ interface BodyMetric {
 
 function BodyMetricsPageContent() {
   const { user, loading: authLoading } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
 
   const [metrics, setMetrics] = useState<BodyMetric[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,15 +123,20 @@ function BodyMetricsPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 container mx-auto px-4 py-8">
-            <div className="animate-pulse space-y-6">
-              <div className="h-24 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="h-40 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-                <div className="h-40 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-                <div className="h-40 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="fc-glass fc-card p-8">
+              <div className="animate-pulse space-y-6">
+                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={`metrics-skeleton-${index}`}
+                      className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]"
+                    ></div>
+                  ))}
+                </div>
+                <div className="h-72 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
               </div>
-              <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
             </div>
           </div>
         </AnimatedBackground>
@@ -142,145 +147,92 @@ function BodyMetricsPageContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
-        {/* Header */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Link href="/client/progress">
-                  <Button variant="ghost" size="sm">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                </Link>
-                <div>
-                  <h1
-                    className="text-3xl font-bold mb-1"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
-                    Body Metrics
-                  </h1>
-                  <p
-                    className="text-sm"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.6)"
-                        : "rgba(0,0,0,0.6)",
-                    }}
-                  >
-                    Track your physical progress over time
-                  </p>
-                </div>
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <Link href="/client/progress">
+                <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </Link>
+              <div>
+                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                  Progress Hub
+                </span>
+                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                  Body Metrics
+                </h1>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  Track weight, waist, and body fat changes over time.
+                </p>
               </div>
-
-              <Button
-                variant="default"
-                onClick={() => setShowLogModal(true)}
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  boxShadow: `0 4px 12px ${
-                    getSemanticColor("success").primary
-                  }30`,
-                }}
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Log Measurement
-              </Button>
             </div>
-          </GlassCard>
-        </div>
+
+            <Button
+              variant="default"
+              onClick={() => setShowLogModal(true)}
+              className="fc-btn fc-btn-primary"
+            >
+              <Plus className="mr-2 h-5 w-5" />
+              Log Measurement
+            </Button>
+          </div>
+        </GlassCard>
 
         {metrics.length === 0 ? (
-          <GlassCard elevation={2} className="p-12">
-            <div className="text-center">
-              <Scale
-                className="w-24 h-24 mx-auto mb-6"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                }}
-              />
-              <h2
-                className="text-2xl font-bold mb-2"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
-                No Measurements Yet
-              </h2>
-              <p
-                className="text-sm mb-6"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
-                Start tracking your body metrics to see your progress over time
-              </p>
-              <Button
-                variant="default"
-                size="lg"
-                onClick={() => setShowLogModal(true)}
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  boxShadow: `0 4px 12px ${
-                    getSemanticColor("success").primary
-                  }30`,
-                }}
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Log First Measurement
-              </Button>
+          <div className="mt-6 fc-glass fc-card p-10 text-center">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[color:var(--fc-glass-highlight)]">
+              <Scale className="h-10 w-10 text-[color:var(--fc-text-subtle)]" />
             </div>
-          </GlassCard>
+            <h2 className="mt-6 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+              No Measurements Yet
+            </h2>
+            <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+              Start tracking body metrics to see progress trends over time.
+            </p>
+            <Button
+              variant="default"
+              size="lg"
+              onClick={() => setShowLogModal(true)}
+              className="fc-btn fc-btn-primary mt-6"
+            >
+              <Plus className="mr-2 h-5 w-5" />
+              Log First Measurement
+            </Button>
+          </div>
         ) : (
           <>
             {/* Current Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
               {/* Current Weight */}
-              <GlassCard elevation={2} className="p-6">
+              <GlassCard elevation={2} className="fc-glass fc-card p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                      boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
-                    }}
-                  >
-                    <Scale className="w-6 h-6 text-white" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-[0_8px_18px_rgba(16,185,129,0.35)]">
+                    <Scale className="h-6 w-6" />
                   </div>
                   {weightChange !== 0 && (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 text-sm font-semibold">
                       {weightChange < 0 ? (
-                        <TrendingDown
-                          className="w-5 h-5"
-                          style={{ color: getSemanticColor("success").primary }}
-                        />
+                        <TrendingDown className="h-5 w-5 text-[color:var(--fc-status-success)]" />
                       ) : (
-                        <TrendingUp
-                          className="w-5 h-5"
-                          style={{ color: getSemanticColor("warning").primary }}
-                        />
+                        <TrendingUp className="h-5 w-5 text-[color:var(--fc-status-warning)]" />
                       )}
                       <span
-                        className="text-sm font-medium"
-                        style={{
-                          color:
-                            weightChange < 0
-                              ? getSemanticColor("success").primary
-                              : getSemanticColor("warning").primary,
-                        }}
+                        className={
+                          weightChange < 0
+                            ? "text-[color:var(--fc-status-success)]"
+                            : "text-[color:var(--fc-status-warning)]"
+                        }
                       >
-                        {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} kg
+                        {weightChange > 0 ? "+" : ""}
+                        {weightChange.toFixed(1)} kg
                       </span>
                     </div>
                   )}
                 </div>
 
-                <h3
-                  className="text-sm font-medium mb-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <h3 className="text-sm font-medium mb-2 text-[color:var(--fc-text-dim)]">
                   Current Weight
                 </h3>
                 <div className="flex items-baseline gap-2">
@@ -288,24 +240,14 @@ function BodyMetricsPageContent() {
                     value={currentWeight}
                     decimals={1}
                     className="text-4xl font-bold"
-                    color={isDark ? "#fff" : "#1A1A1A"}
+                    color="var(--fc-text-primary)"
                   />
-                  <span
-                    className="text-xl font-medium"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    }}
-                  >
+                  <span className="text-xl font-medium text-[color:var(--fc-text-subtle)]">
                     kg
                   </span>
                 </div>
                 {previous && (
-                  <p
-                    className="text-xs mt-2"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                    }}
-                  >
+                  <p className="text-xs mt-2 text-[color:var(--fc-text-subtle)]">
                     vs last month: {previous.weight.toFixed(1)} kg
                   </p>
                 )}
@@ -313,52 +255,33 @@ function BodyMetricsPageContent() {
 
               {/* Waist */}
               {currentWaist > 0 && (
-                <GlassCard elevation={2} className="p-6">
+                <GlassCard elevation={2} className="fc-glass fc-card p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)",
-                        boxShadow: "0 4px 12px rgba(74, 144, 226, 0.3)",
-                      }}
-                    >
-                      <TrendingUp className="w-6 h-6 text-white" />
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-white shadow-[0_8px_18px_rgba(59,130,246,0.35)]">
+                      <TrendingUp className="h-6 w-6" />
                     </div>
                     {waistChange !== 0 && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 text-sm font-semibold">
                         {waistChange < 0 ? (
-                          <TrendingDown
-                            className="w-5 h-5"
-                            style={{ color: getSemanticColor("success").primary }}
-                          />
+                          <TrendingDown className="h-5 w-5 text-[color:var(--fc-status-success)]" />
                         ) : (
-                          <TrendingUp
-                            className="w-5 h-5"
-                            style={{ color: getSemanticColor("warning").primary }}
-                          />
+                          <TrendingUp className="h-5 w-5 text-[color:var(--fc-status-warning)]" />
                         )}
                         <span
-                          className="text-sm font-medium"
-                          style={{
-                            color:
-                              waistChange < 0
-                                ? getSemanticColor("success").primary
-                                : getSemanticColor("warning").primary,
-                          }}
+                          className={
+                            waistChange < 0
+                              ? "text-[color:var(--fc-status-success)]"
+                              : "text-[color:var(--fc-status-warning)]"
+                          }
                         >
-                          {waistChange > 0 ? "+" : ""}{waistChange.toFixed(1)} cm
+                          {waistChange > 0 ? "+" : ""}
+                          {waistChange.toFixed(1)} cm
                         </span>
                       </div>
                     )}
                   </div>
 
-                  <h3
-                    className="text-sm font-medium mb-2"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    }}
-                  >
+                  <h3 className="text-sm font-medium mb-2 text-[color:var(--fc-text-dim)]">
                     Waist (Iliac Crest)
                   </h3>
                   <div className="flex items-baseline gap-2">
@@ -366,24 +289,14 @@ function BodyMetricsPageContent() {
                       value={currentWaist}
                       decimals={1}
                       className="text-4xl font-bold"
-                      color={isDark ? "#fff" : "#1A1A1A"}
+                      color="var(--fc-text-primary)"
                     />
-                    <span
-                      className="text-xl font-medium"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <span className="text-xl font-medium text-[color:var(--fc-text-subtle)]">
                       cm
                     </span>
                   </div>
                   {previous && previous.waist && (
-                    <p
-                      className="text-xs mt-2"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                      }}
-                    >
+                    <p className="text-xs mt-2 text-[color:var(--fc-text-subtle)]">
                       vs last month: {previous.waist.toFixed(1)} cm
                     </p>
                   )}
@@ -392,52 +305,33 @@ function BodyMetricsPageContent() {
 
               {/* Body Fat */}
               {currentBodyFat > 0 && (
-                <GlassCard elevation={2} className="p-6">
+                <GlassCard elevation={2} className="fc-glass fc-card p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, #FF6B35 0%, #FF4E50 100%)",
-                        boxShadow: "0 4px 12px rgba(255, 107, 53, 0.3)",
-                      }}
-                    >
-                      <TrendingDown className="w-6 h-6 text-white" />
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-rose-500 text-white shadow-[0_8px_18px_rgba(249,115,22,0.35)]">
+                      <TrendingDown className="h-6 w-6" />
                     </div>
                     {bodyFatChange !== 0 && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 text-sm font-semibold">
                         {bodyFatChange < 0 ? (
-                          <TrendingDown
-                            className="w-5 h-5"
-                            style={{ color: getSemanticColor("success").primary }}
-                          />
+                          <TrendingDown className="h-5 w-5 text-[color:var(--fc-status-success)]" />
                         ) : (
-                          <TrendingUp
-                            className="w-5 h-5"
-                            style={{ color: getSemanticColor("warning").primary }}
-                          />
+                          <TrendingUp className="h-5 w-5 text-[color:var(--fc-status-warning)]" />
                         )}
                         <span
-                          className="text-sm font-medium"
-                          style={{
-                            color:
-                              bodyFatChange < 0
-                                ? getSemanticColor("success").primary
-                                : getSemanticColor("warning").primary,
-                          }}
+                          className={
+                            bodyFatChange < 0
+                              ? "text-[color:var(--fc-status-success)]"
+                              : "text-[color:var(--fc-status-warning)]"
+                          }
                         >
-                          {bodyFatChange > 0 ? "+" : ""}{bodyFatChange.toFixed(1)}%
+                          {bodyFatChange > 0 ? "+" : ""}
+                          {bodyFatChange.toFixed(1)}%
                         </span>
                       </div>
                     )}
                   </div>
 
-                  <h3
-                    className="text-sm font-medium mb-2"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    }}
-                  >
+                  <h3 className="text-sm font-medium mb-2 text-[color:var(--fc-text-dim)]">
                     Body Fat
                   </h3>
                   <div className="flex items-baseline gap-2">
@@ -445,24 +339,14 @@ function BodyMetricsPageContent() {
                       value={currentBodyFat}
                       decimals={1}
                       className="text-4xl font-bold"
-                      color={isDark ? "#fff" : "#1A1A1A"}
+                      color="var(--fc-text-primary)"
                     />
-                    <span
-                      className="text-xl font-medium"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <span className="text-xl font-medium text-[color:var(--fc-text-subtle)]">
                       %
                     </span>
                   </div>
                   {previous && previous.bodyFat && (
-                    <p
-                      className="text-xs mt-2"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                      }}
-                    >
+                    <p className="text-xs mt-2 text-[color:var(--fc-text-subtle)]">
                       vs last month: {previous.bodyFat.toFixed(1)}%
                     </p>
                   )}
@@ -471,13 +355,20 @@ function BodyMetricsPageContent() {
             </div>
 
             {/* Weight Chart */}
-            <GlassCard elevation={2} className="p-6">
-              <h3
-                className="text-lg font-bold mb-6"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
-                Weight Trend (Last 12 Weeks)
-              </h3>
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 mt-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                    Weight Trend
+                  </h3>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Last 12 weeks snapshot
+                  </p>
+                </div>
+                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                  {metrics.length} entries
+                </span>
+              </div>
 
               {metrics.length > 0 ? (
                 <div className="flex items-end justify-between gap-2 h-64">
@@ -493,29 +384,16 @@ function BodyMetricsPageContent() {
                           className="w-full rounded-t-lg transition-all hover:opacity-80"
                           style={{
                             height: `${Math.max(height, 10)}%`,
-                            background: getSemanticColor("success").gradient,
+                            background:
+                              "linear-gradient(135deg, var(--fc-domain-meals) 0%, var(--fc-accent-cyan) 100%)",
                             minHeight: "20px",
                           }}
                         />
                         <div className="mt-3 text-center">
-                          <p
-                            className="text-xs font-semibold"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.9)"
-                                : "rgba(0,0,0,0.9)",
-                            }}
-                          >
+                          <p className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
                             {metric.weight.toFixed(1)}
                           </p>
-                          <p
-                            className="text-xs"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.5)"
-                                : "rgba(0,0,0,0.5)",
-                            }}
-                          >
+                          <p className="text-xs text-[color:var(--fc-text-subtle)]">
                             {new Date(metric.date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
@@ -527,12 +405,7 @@ function BodyMetricsPageContent() {
                   })}
                 </div>
               ) : (
-                <p
-                  className="text-center py-12"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                  }}
-                >
+                <p className="text-center py-12 text-sm text-[color:var(--fc-text-dim)]">
                   Not enough data to show chart
                 </p>
               )}

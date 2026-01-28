@@ -65,6 +65,16 @@ export interface ProgramProgressionRule {
   pyramid_order?: number | null
   ladder_order?: number | null
   
+  // HR-specific fields (for hr_sets block type)
+  hr_zone?: number | null
+  hr_percentage_min?: number | null
+  hr_percentage_max?: number | null
+  hr_duration_seconds?: number | null
+  hr_work_duration_seconds?: number | null
+  hr_rest_duration_seconds?: number | null
+  hr_target_rounds?: number | null
+  hr_distance_meters?: number | null
+  
   created_at?: string
   updated_at?: string
 }
@@ -146,14 +156,20 @@ export class ProgramProgressionService {
       // Ensure we never include legacy fields like template_exercise_id
       // Also ensure reps fields are strings (can contain ranges like "12-15")
       // AND ensure integer fields are actually integers (not strings like "12-15")
+      // Map drop_percentage to weight_reduction_percentage (database column name)
       const sanitizedProgressionRules = progressionRules.map((rule: any) => {
-        const { template_exercise_id, ...rest } = rule
+        const { template_exercise_id, drop_percentage, ...rest } = rule
         const sanitized: any = { ...rest }
+        
+        // Map drop_percentage to weight_reduction_percentage (database column name)
+        if (drop_percentage !== undefined && drop_percentage !== null) {
+          sanitized.weight_reduction_percentage = drop_percentage
+        }
         
         // Ensure INTEGER fields are actually integers (not strings or ranges)
         // These fields should only contain numbers
         const integerFields = ['sets', 'rest_seconds', 'rir', 'exercise_order', 'block_order', 'week_number', 
-          'drop_percentage', 'reps_per_cluster', 'clusters_per_set', 'intra_cluster_rest',
+          'weight_reduction_percentage', 'reps_per_cluster', 'clusters_per_set', 'intra_cluster_rest',
           'rest_pause_duration', 'max_rest_pauses', 'duration_minutes', 'target_reps', 'work_seconds', 
           'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise', 'pyramid_order', 'ladder_order',
           'rest_between_pairs']
@@ -223,7 +239,7 @@ export class ProgramProgressionService {
         // Final validation: ensure no integer field has a string rep range
         for (const rule of sanitizedProgressionRules) {
           const integerFields = ['sets', 'rest_seconds', 'rir', 'exercise_order', 'block_order', 'week_number', 
-            'rest_between_pairs', 'drop_percentage', 'reps_per_cluster', 'clusters_per_set', 
+            'rest_between_pairs', 'weight_reduction_percentage', 'reps_per_cluster', 'clusters_per_set', 
             'intra_cluster_rest', 'rest_pause_duration', 'max_rest_pauses', 'duration_minutes', 'target_reps', 
             'work_seconds', 'rounds', 'rest_after_set', 'time_cap_minutes', 'rest_after_exercise', 
             'pyramid_order', 'ladder_order']
@@ -433,13 +449,28 @@ export class ProgramProgressionService {
   }
 
   static async getClientProgressionRules(
-    programAssignmentId: string
+    programAssignmentId: string,
+    weekNumber?: number,
+    blockIds?: string[]
   ): Promise<ProgramProgressionRule[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('client_program_progression_rules')
         .select('*')
         .eq('program_assignment_id', programAssignmentId)
+      
+      if (weekNumber !== undefined) {
+        query = query.eq('week_number', weekNumber)
+      }
+
+      if (blockIds !== undefined) {
+        if (blockIds.length === 0) {
+          return []
+        }
+        query = query.in('block_id', blockIds)
+      }
+      
+      const { data, error } = await query
         .order('week_number')
         .order('block_order')
         .order('exercise_order')
@@ -448,6 +479,212 @@ export class ProgramProgressionService {
       return (data || []) as ProgramProgressionRule[]
     } catch (error) {
       console.error('❌ Error fetching client progression rules:', error)
+      return []
+    }
+  }
+
+  /**
+   * Convert client_program_progression_rules back to WorkoutBlock[] format
+   * Groups rules by block_order to recreate blocks
+   */
+  private static async buildBlocksFromRules(
+    rules: ProgramProgressionRule[],
+    blockMetaById?: Map<
+      string,
+      {
+        total_sets: number | null
+        reps_per_set: string | null
+        rest_seconds: number | null
+        block_name: string | null
+        block_notes: string | null
+        duration_seconds: number | null
+      }
+    >
+  ): Promise<WorkoutBlock[]> {
+    if (!rules || rules.length === 0) {
+      return []
+    }
+
+    // Group rules by block_order
+    const blocksMap = new Map<number, ProgramProgressionRule[]>()
+
+    for (const rule of rules) {
+      const blockOrder = rule.block_order
+      if (!blocksMap.has(blockOrder)) {
+        blocksMap.set(blockOrder, [])
+      }
+      blocksMap.get(blockOrder)!.push(rule)
+    }
+
+    // Convert grouped rules to WorkoutBlock[]
+    const blocks: WorkoutBlock[] = []
+
+    for (const [blockOrder, blockRules] of blocksMap.entries()) {
+      if (blockRules.length === 0) continue
+
+      const firstRule = blockRules[0]
+
+      // Get exercise details for all exercises in this block
+      const exerciseIds = Array.from(
+        new Set(blockRules.map(r => r.exercise_id).filter(Boolean))
+      )
+      const { data: exercises } = await supabase
+        .from('exercises')
+        .select('id, name, description, video_url')
+        .in('id', exerciseIds)
+
+      const exerciseMap = new Map(exercises?.map(e => [e.id, e]) || [])
+
+      // Convert rules to WorkoutBlockExercise[]
+      const blockExercises: WorkoutBlockExercise[] = blockRules
+        .sort((a, b) => a.exercise_order - b.exercise_order)
+        .map((rule) => {
+          const exercise = exerciseMap.get(rule.exercise_id)
+          const exerciseData = {
+            id: rule.id || '',
+            exercise_id: rule.exercise_id,
+            exercise_order: rule.exercise_order,
+            exercise_letter: rule.exercise_letter || null,
+            sets: rule.sets ?? null,
+            reps: rule.reps || null,
+            rest_seconds: rule.rest_seconds || null,
+            tempo: rule.tempo || null,
+            rir: rule.rir || null,
+            weight_kg: rule.weight_kg || null,
+            load_percentage: rule.load_percentage || null,
+            notes: rule.notes || null,
+            exercise: exercise ? {
+              id: exercise.id,
+              name: exercise.name,
+              description: exercise.description || null,
+              video_url: exercise.video_url || null,
+            } : null,
+          } as WorkoutBlockExercise
+
+          // Debug logging for sets values
+          if (rule.sets !== null && rule.sets !== undefined) {
+            console.log(`🔢 [Progression] Exercise ${exercise?.name || rule.exercise_id} - sets from DB:`, rule.sets)
+          } else {
+            console.warn(`⚠️ [Progression] Exercise ${exercise?.name || rule.exercise_id} - sets is null/undefined in DB`)
+          }
+
+          return exerciseData
+        })
+
+      const blockMeta = firstRule.block_id
+        ? blockMetaById?.get(firstRule.block_id)
+        : undefined
+
+      // Create WorkoutBlock
+      const block: WorkoutBlock = {
+        id: firstRule.block_id || `block-${blockOrder}`,
+        template_id: '', // Not needed for program workouts, but required by interface
+        block_type: firstRule.block_type as any,
+        block_order: blockOrder,
+        block_name: blockMeta?.block_name || firstRule.block_name || undefined,
+        block_notes: blockMeta?.block_notes || undefined, // Notes are stored per-exercise in progression rules
+        rest_seconds:
+          blockMeta?.rest_seconds ?? blockRules[0]?.rest_seconds ?? undefined,
+        total_sets: blockMeta?.total_sets ?? undefined,
+        reps_per_set: blockMeta?.reps_per_set ?? undefined,
+        duration_seconds:
+          blockMeta?.duration_seconds ??
+          (firstRule.duration_minutes ? firstRule.duration_minutes * 60 : undefined),
+        exercises: blockExercises.map(ex => ({
+          ...ex,
+          block_id: firstRule.block_id || `block-${blockOrder}`,
+          created_at: firstRule.created_at || new Date().toISOString(),
+          updated_at: firstRule.updated_at || new Date().toISOString(),
+        })),
+        created_at: firstRule.created_at || new Date().toISOString(),
+        updated_at: firstRule.updated_at || new Date().toISOString(),
+      }
+
+      blocks.push(block)
+    }
+
+    // Sort blocks by block_order
+    blocks.sort((a, b) => a.block_order - b.block_order)
+
+    return blocks
+  }
+
+  static async getClientProgressionBlocks(
+    programAssignmentId: string,
+    weekNumber: number
+  ): Promise<WorkoutBlock[]> {
+    try {
+      const rules = await this.getClientProgressionRules(programAssignmentId, weekNumber)
+
+      if (!rules || rules.length === 0) {
+        console.log('No progression rules found for program assignment:', programAssignmentId, 'week:', weekNumber)
+        return []
+      }
+
+      const blockIds = Array.from(
+        new Set(rules.map((rule) => rule.block_id).filter(Boolean))
+      ) as string[]
+      const blockMetaById = new Map<string, any>()
+      if (blockIds.length > 0) {
+        const { data: blockMeta } = await supabase
+          .from('workout_blocks')
+          .select('id, total_sets, reps_per_set, rest_seconds, block_name, block_notes, duration_seconds')
+          .in('id', blockIds)
+        ;(blockMeta || []).forEach((row: any) => {
+          blockMetaById.set(row.id, row)
+        })
+      }
+
+      return await this.buildBlocksFromRules(rules, blockMetaById)
+    } catch (error) {
+      console.error('❌ Error converting progression rules to blocks:', error)
+      return []
+    }
+  }
+
+  static async getClientProgressionBlocksForTemplate(
+    programAssignmentId: string,
+    weekNumber: number,
+    templateId: string
+  ): Promise<WorkoutBlock[]> {
+    try {
+      const { data: templateBlocks, error: blocksError } = await supabase
+        .from('workout_blocks')
+        .select('id, total_sets, reps_per_set, rest_seconds, block_name, block_notes, duration_seconds')
+        .eq('template_id', templateId)
+
+      if (blocksError) throw blocksError
+
+      const blockIds = (templateBlocks || [])
+        .map((b) => b.id)
+        .filter(Boolean)
+
+      const blockMetaById = new Map<string, any>()
+      ;(templateBlocks || []).forEach((row: any) => {
+        if (row?.id) blockMetaById.set(row.id, row)
+      })
+
+      const rules = await this.getClientProgressionRules(
+        programAssignmentId,
+        weekNumber,
+        blockIds
+      )
+
+      if (!rules || rules.length === 0) {
+        console.log(
+          'No progression rules found for program assignment:',
+          programAssignmentId,
+          'week:',
+          weekNumber,
+          'template:',
+          templateId
+        )
+        return []
+      }
+
+      return await this.buildBlocksFromRules(rules, blockMetaById)
+    } catch (error) {
+      console.error('❌ Error converting progression rules to blocks (template):', error)
       return []
     }
   }
@@ -557,10 +794,54 @@ export class ProgramProgressionService {
         for (const exercise of block.exercises) {
           // Check if there are drop sets defined
           const dropSets = exercise.drop_sets || []
-          // Get initial weight/load from first drop set (drop_order = 1) or exercise
+          
+          // DEBUG: Log drop sets data to diagnose RLS/permission issues
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`${blockLogPrefix} [DROP_SET] exercise.drop_sets:`, {
+              exerciseId: exercise.exercise_id,
+              dropSetsCount: dropSets.length,
+              dropSetsSample: dropSets.slice(0, 2).map((ds: any) => ({
+                id: ds.id,
+                drop_order: ds.drop_order,
+                drop_percentage: ds.drop_percentage,
+                reps: ds.reps,
+                weight_kg: ds.weight_kg
+              }))
+            })
+          }
+          
+          // Match WorkoutTemplateForm logic: use first drop set (drop_sets[0]) for drop_percentage
+          // This is the same pattern used in WorkoutTemplateForm line 943 & 1113
+          const dropSet = dropSets[0]
+          // Get initial weight/load from first drop set with drop_order = 1, or first drop set
           const initialDropSet = dropSets.find((ds: any) => ds.drop_order === 1) || dropSets[0]
-          // Get drop_percentage from first drop set
-          const dropPercentage = (initialDropSet as any)?.drop_percentage || undefined
+          
+          // Get drop_percentage from first drop set (same as WorkoutTemplateForm)
+          // WorkoutTemplateForm reads: (dropSet as any)?.drop_percentage?.toString()
+          let dropPercentage = undefined
+          if (dropSet) {
+            dropPercentage = (dropSet as any)?.drop_percentage
+          }
+          
+          // If still not found, check all drop sets as fallback
+          if (dropPercentage === undefined || dropPercentage === null) {
+            for (const ds of dropSets) {
+              const dsDropPercentage = (ds as any)?.drop_percentage
+              if (dsDropPercentage !== undefined && dsDropPercentage !== null) {
+                dropPercentage = dsDropPercentage
+                break
+              }
+            }
+          }
+          
+          // DEBUG: Log final drop_percentage value
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`${blockLogPrefix} [DROP_SET] drop_percentage extracted:`, {
+              exerciseId: exercise.exercise_id,
+              dropPercentage,
+              usedDefault: dropPercentage === undefined || dropPercentage === null
+            })
+          }
           
           rules.push({
             ...baseRule,
@@ -570,7 +851,7 @@ export class ProgramProgressionService {
             // Main reps come from block.reps_per_set (initial/main set reps)
             exercise_reps: block.reps_per_set || exercise.reps || undefined,
             drop_set_reps: dropSets.length > 0 ? dropSets[0].reps : undefined,
-            drop_percentage: dropPercentage || 20, // Use stored value or default
+            drop_percentage: dropPercentage || 20, // Use stored value or default (will be mapped to weight_reduction_percentage)
             rest_seconds: block.rest_seconds || exercise.rest_seconds || undefined,
             tempo: exercise.tempo || undefined,
             rir: exercise.rir || undefined,
@@ -903,7 +1184,12 @@ export class ProgramProgressionService {
       
       // If data exists for this week, return it
       if (data && data.length > 0) {
-        return { rules: data as ProgramProgressionRule[], isPlaceholder: false }
+        // Map database column weight_reduction_percentage to TypeScript interface drop_percentage
+        const mappedRules = data.map((rule: any) => ({
+          ...rule,
+          drop_percentage: rule.weight_reduction_percentage ?? rule.drop_percentage ?? null
+        }))
+        return { rules: mappedRules as ProgramProgressionRule[], isPlaceholder: false }
       }
       
       // No data for this week - load Week 1 as placeholder
@@ -929,8 +1215,14 @@ export class ProgramProgressionService {
         
         if (week1Data && week1Data.length > 0) {
           // Return Week 1 data as placeholders
+          // Map database column weight_reduction_percentage to TypeScript interface drop_percentage
+          const mappedWeek1Rules = week1Data.map((rule: any) => ({
+            ...rule,
+            id: undefined,
+            drop_percentage: rule.weight_reduction_percentage ?? rule.drop_percentage ?? null
+          }))
           return { 
-            rules: week1Data.map(rule => ({ ...rule, id: undefined })) as ProgramProgressionRule[], 
+            rules: mappedWeek1Rules as ProgramProgressionRule[], 
             isPlaceholder: true 
           }
         }

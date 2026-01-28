@@ -96,7 +96,7 @@ interface OptimizedAnalyticsReportingProps {
 }
 
 export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyticsReportingProps) {
-  const { isDark, getThemeStyles, performanceSettings } = useTheme()
+  const { getThemeStyles, performanceSettings } = useTheme()
   const router = useRouter()
   const theme = getThemeStyles()
 
@@ -158,10 +158,10 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
       }
     ],
     workoutTypes: [
-      { type: 'Strength Training', percentage: 45, color: 'bg-blue-500' },
-      { type: 'Cardio', percentage: 30, color: 'bg-green-500' },
-      { type: 'Flexibility', percentage: 15, color: 'bg-purple-500' },
-      { type: 'HIIT', percentage: 10, color: 'bg-orange-500' }
+      { type: 'Strength Training', percentage: 45, color: 'bg-[color:var(--fc-domain-workouts)]' },
+      { type: 'Cardio', percentage: 30, color: 'bg-[color:var(--fc-domain-meals)]' },
+      { type: 'Flexibility', percentage: 15, color: 'bg-[color:var(--fc-accent-purple)]' },
+      { type: 'HIIT', percentage: 10, color: 'bg-[color:var(--fc-status-warning)]' }
     ],
     engagementMetrics: {
       avgSessionTime: 45,
@@ -266,18 +266,18 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
 
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
-      case 'up': return <TrendingUp className="w-4 h-4 text-green-600" />
-      case 'down': return <TrendingDown className="w-4 h-4 text-red-600" />
-      default: return <Activity className="w-4 h-4 text-slate-400" />
+      case 'up': return <TrendingUp className="w-4 h-4 text-[color:var(--fc-status-success)]" />
+      case 'down': return <TrendingDown className="w-4 h-4 text-[color:var(--fc-status-error)]" />
+      default: return <Activity className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
     }
   }
 
   const getAchievementColor = (type: string) => {
     switch (type) {
-      case 'weight_loss': return 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-      case 'strength': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-      case 'endurance': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
-      default: return 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
+      case 'weight_loss': return 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-status-success)]'
+      case 'strength': return 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-domain-workouts)]'
+      case 'endurance': return 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-accent-purple)]'
+      default: return 'bg-[color:var(--fc-glass-soft)] text-[color:var(--fc-status-warning)]'
     }
   }
 
@@ -300,15 +300,15 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
     return (
       <div className={`min-h-screen ${theme.background}`}>
         <div className="animate-pulse">
-          <div className="h-64 bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className={`${theme.card} rounded-2xl p-6`}>
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+              <div className="fc-glass fc-card rounded-2xl p-6">
+                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
                 </div>
               </div>
             </div>
@@ -321,128 +321,129 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div style={{ minHeight: '100vh', paddingBottom: '100px' }}>
+      <div className="min-h-screen pb-24">
         {/* Enhanced Header */}
-      <div style={{ padding: '24px 20px', backgroundColor: '#E8E9F3', borderRadius: '24px' }}>
-        {/* Floating background elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-green-500/10 rounded-full blur-2xl"></div>
-        </div>
+        <div className="p-4 sm:p-6 relative overflow-hidden">
+          {/* Floating background elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent-cyan)]/10 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-3xl"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-domain-meals)]/10 rounded-full blur-2xl"></div>
+          </div>
 
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/coach')}
-                style={{ padding: '8px', borderRadius: '20px' }}
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <BarChart3 style={{ width: '24px', height: '24px', color: '#FFFFFF' }} />
+          <div className="max-w-7xl mx-auto relative z-10">
+            <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+              <CardContent className="p-5 sm:p-6 space-y-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <Button
+                      variant="ghost"
+                      onClick={() => router.push('/coach')}
+                      className="fc-btn fc-btn-ghost h-10 w-10"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </Button>
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center">
+                        <BarChart3 className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h1 className="text-xl sm:text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                          Analytics & Reports
+                        </h1>
+                        <p className="text-sm sm:text-base text-[color:var(--fc-text-dim)]">
+                          Comprehensive insights into client progress and performance
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={generateReport}
+                      className="fc-btn fc-btn-ghost"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      <span className="hidden sm:inline">Generate Report</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="fc-btn fc-btn-ghost"
+                    >
+                      <Share2 className="w-4 h-4 mr-2" />
+                      <span className="hidden sm:inline">Share</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="fc-btn fc-btn-ghost"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      <span className="hidden sm:inline">Export</span>
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <h1 style={{ fontSize: '14px', fontWeight: '700', color: '#1A1A1A', marginBottom: '8px' }}>
-                    Analytics & Reports
-                  </h1>
-                  <p style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>
-                    Comprehensive insights into client progress and performance
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-              <Button
-                variant="outline"
-                onClick={generateReport}
-                className="rounded-2xl px-8 py-4 text-base font-semibold border-2 hover:border-blue-300 transition-all duration-200"
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">Generate Report</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-2xl px-8 py-4 text-base font-semibold border-2 hover:border-blue-300 transition-all duration-200"
-              >
-                <Share2 className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">Share</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-2xl px-8 py-4 text-base font-semibold border-2 hover:border-blue-300 transition-all duration-200"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">Export</span>
-              </Button>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      </div>
 
-      {/* Main Content with Tabs */}
-      <div style={{ padding: '24px 20px', backgroundColor: '#E8E9F3', borderRadius: '24px' }}>
-        <div className="max-w-7xl mx-auto">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" style={{ position: 'relative', zIndex: 10 }}>
-            <TabsList className="flex w-full bg-white rounded-2xl p-1 shadow-lg border-2 border-gray-100 min-h-[56px] overflow-hidden">
-              <TabsTrigger 
-                value="overview" 
-                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=inactive]:bg-gray-50 data-[state=inactive]:text-gray-600 rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 touch-manipulation cursor-pointer select-none hover:bg-blue-100 hover:text-blue-700 flex-1 flex items-center justify-center min-h-[48px]"
-                style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
-              >
-                Overview
-              </TabsTrigger>
-              <TabsTrigger 
-                value="client-progress" 
-                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=inactive]:bg-gray-50 data-[state=inactive]:text-gray-600 rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 touch-manipulation cursor-pointer select-none hover:bg-blue-100 hover:text-blue-700 flex-1 flex items-center justify-center min-h-[48px]"
-                style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
-              >
-                Progress
-              </TabsTrigger>
-              <TabsTrigger 
-                value="compliance" 
-                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=inactive]:bg-gray-50 data-[state=inactive]:text-gray-600 rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 touch-manipulation cursor-pointer select-none hover:bg-blue-100 hover:text-blue-700 flex-1 flex items-center justify-center min-h-[48px]"
-                style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
-              >
-                Compliance
-              </TabsTrigger>
-              <TabsTrigger 
-                value="detailed" 
-                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=inactive]:bg-gray-50 data-[state=inactive]:text-gray-600 rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 touch-manipulation cursor-pointer select-none hover:bg-blue-100 hover:text-blue-700 flex-1 flex items-center justify-center min-h-[48px]"
-                style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
-              >
-                Reports
-              </TabsTrigger>
-            </TabsList>
+        {/* Main Content with Tabs */}
+        <div className="p-4 sm:p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="flex w-full fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-1 min-h-[56px] overflow-hidden">
+                <TabsTrigger 
+                  value="overview" 
+                  className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)] flex-1 flex items-center justify-center min-h-[48px]"
+                >
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="client-progress" 
+                  className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)] flex-1 flex items-center justify-center min-h-[48px]"
+                >
+                  Progress
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="compliance" 
+                  className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)] flex-1 flex items-center justify-center min-h-[48px]"
+                >
+                  Compliance
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="detailed" 
+                  className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)] flex-1 flex items-center justify-center min-h-[48px]"
+                >
+                  Reports
+                </TabsTrigger>
+              </TabsList>
 
             {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-6 mt-24 sm:mt-28">
+            <TabsContent value="overview" className="space-y-6 mt-6">
               <OptimizedAnalyticsOverview coachId={coachId} />
             </TabsContent>
 
             {/* Client Progress Tab */}
-            <TabsContent value="client-progress" className="space-y-6 mt-24 sm:mt-28">
+            <TabsContent value="client-progress" className="space-y-6 mt-6">
               <OptimizedClientProgress coachId={coachId} />
             </TabsContent>
 
             {/* Compliance Analytics Tab */}
-            <TabsContent value="compliance" className="space-y-6 mt-24 sm:mt-28">
+            <TabsContent value="compliance" className="space-y-6 mt-6">
               <OptimizedComplianceAnalytics coachId={coachId} />
             </TabsContent>
 
             {/* Detailed Reports Tab */}
-            <TabsContent value="detailed" className="space-y-6 mt-24 sm:mt-28">
+            <TabsContent value="detailed" className="space-y-6 mt-6">
               {/* Global Filters */}
-              <Card className={`bg-white rounded-3xl p-6 shadow-lg mb-6`}>
+              <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] mb-6">
+                <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex items-center gap-2 flex-1">
-                      <Calendar className="w-4 h-4 text-slate-400" />
+                      <Calendar className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                       <Select value={selectedPeriod} onValueChange={(value: any) => setSelectedPeriod(value)}>
-                        <SelectTrigger className="w-full md:w-48 h-12 rounded-2xl border-2 border-gray-200 bg-white focus:border-blue-500">
+                        <SelectTrigger className="fc-select w-full md:w-48 h-12">
                           <SelectValue placeholder="Select Period" />
                         </SelectTrigger>
                         <SelectContent>
@@ -455,9 +456,9 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-slate-400" />
+                      <Users className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                       <Select value={selectedClientGroup} onValueChange={(value: any) => setSelectedClientGroup(value)}>
-                        <SelectTrigger className="w-48 h-12 rounded-2xl border-2 border-gray-200 bg-white focus:border-blue-500">
+                        <SelectTrigger className="fc-select w-48 h-12">
                           <SelectValue placeholder="Client Group" />
                         </SelectTrigger>
                         <SelectContent>
@@ -470,9 +471,9 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4 text-slate-400" />
+                      <BarChart3 className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                       <Select value={selectedMetric} onValueChange={(value: any) => setSelectedMetric(value)}>
-                        <SelectTrigger className="w-48 h-12 rounded-2xl border-2 border-gray-200 bg-white focus:border-blue-500">
+                        <SelectTrigger className="fc-select w-48 h-12">
                           <SelectValue placeholder="Metric Focus" />
                         </SelectTrigger>
                         <SelectContent>
@@ -484,17 +485,18 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                       </Select>
                     </div>
                   </div>
+                </CardContent>
               </Card>
 
               {/* Detailed Reports Content */}
               <div className="space-y-6">
                 {/* Client Progress Overview */}
-                <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+                <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                          <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                        <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                          <BarChart3 className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
                         </div>
                         Client Progress Overview
                       </CardTitle>
@@ -502,7 +504,7 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                         variant="outline"
                         size="sm"
                         onClick={() => toggleChartExpansion('progress')}
-                        className="rounded-xl"
+                        className="fc-btn fc-btn-ghost"
                       >
                         {expandedCharts.has('progress') ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                       </Button>
@@ -511,27 +513,27 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                   <CardContent>
                     <div className="space-y-4">
                       {analyticsData.clientProgress.map(client => (
-                        <div key={client.clientId} className={`${theme.card} rounded-xl p-4 border-2 hover:shadow-md transition-all duration-300`}>
+                        <div key={client.clientId} className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)] hover:shadow-md transition-all duration-300">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                              <div className="w-10 h-10 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold">
                                 {client.avatar}
                               </div>
                               <div>
-                                <p className={`font-semibold ${theme.text}`}>{client.clientName}</p>
-                                <p className={`text-sm ${theme.textSecondary}`}>{client.program}</p>
+                                <p className="font-semibold text-[color:var(--fc-text-primary)]">{client.clientName}</p>
+                                <p className="text-sm text-[color:var(--fc-text-dim)]">{client.program}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="text-right">
-                                <p className={`text-sm font-medium text-green-600 dark:text-green-400`}>{client.achievement}</p>
-                                <p className={`text-xs ${theme.textSecondary}`}>This period</p>
+                                <p className="text-sm font-medium text-[color:var(--fc-status-success)]">{client.achievement}</p>
+                                <p className="text-xs text-[color:var(--fc-text-subtle)]">This period</p>
                               </div>
                               {getTrendIcon(client.trend)}
                             </div>
                           </div>
                           <Progress value={client.progress} className="h-3 mb-2" />
-                          <div className="flex justify-between text-xs text-slate-500">
+                          <div className="flex justify-between text-xs text-[color:var(--fc-text-subtle)]">
                             <span>Goal: {client.goal}</span>
                             <span>{client.progress}% complete</span>
                           </div>
@@ -544,12 +546,12 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                 {/* Analytics Charts Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Workout Types Distribution */}
-                  <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                          <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                            <PieChart className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                          <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                            <PieChart className="w-5 h-5 text-[color:var(--fc-domain-meals)]" />
                           </div>
                           Workout Types Distribution
                         </CardTitle>
@@ -557,7 +559,7 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                           variant="outline"
                           size="sm"
                           onClick={() => toggleChartExpansion('workout-types')}
-                          className="rounded-xl"
+                          className="fc-btn fc-btn-ghost"
                         >
                           {expandedCharts.has('workout-types') ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                         </Button>
@@ -570,11 +572,11 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <div className={`w-3 h-3 ${type.color} rounded-full`}></div>
-                                <span className={`text-sm font-medium ${theme.text}`}>{type.type}</span>
+                                <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">{type.type}</span>
                               </div>
-                              <span className={`text-sm font-bold ${theme.text}`}>{type.percentage}%</span>
+                              <span className="text-sm font-bold text-[color:var(--fc-text-primary)]">{type.percentage}%</span>
                             </div>
-                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                            <div className="w-full bg-[color:var(--fc-glass-soft)] rounded-full h-2">
                               <div 
                                 className={`h-2 rounded-full ${type.color}`}
                                 style={{ width: `${type.percentage}%` }}
@@ -587,12 +589,12 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                   </Card>
 
                   {/* Engagement Metrics */}
-                  <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                          <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                            <Activity className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                        <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                          <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                            <Activity className="w-5 h-5 text-[color:var(--fc-status-warning)]" />
                           </div>
                           Engagement Metrics
                         </CardTitle>
@@ -600,7 +602,7 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                           variant="outline"
                           size="sm"
                           onClick={() => toggleChartExpansion('engagement')}
-                          className="rounded-xl"
+                          className="fc-btn fc-btn-ghost"
                         >
                           {expandedCharts.has('engagement') ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                         </Button>
@@ -609,35 +611,35 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                     <CardContent>
                       <div className="space-y-6">
                         <div className="grid grid-cols-2 gap-4">
-                          <div className={`${theme.card} rounded-xl p-4 border-2`}>
+                          <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                             <div className="flex items-center gap-2 mb-2">
-                              <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                              <span className={`text-sm font-medium ${theme.text}`}>Avg Session Time</span>
+                              <Clock className="w-4 h-4 text-[color:var(--fc-domain-workouts)]" />
+                              <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Avg Session Time</span>
                             </div>
-                            <p className={`text-2xl font-bold ${theme.text}`}>{analyticsData.engagementMetrics.avgSessionTime} min</p>
+                            <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{analyticsData.engagementMetrics.avgSessionTime} min</p>
                           </div>
                           
-                          <div className={`${theme.card} rounded-xl p-4 border-2`}>
+                          <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                             <div className="flex items-center gap-2 mb-2">
-                              <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-                              <span className={`text-sm font-medium ${theme.text}`}>Sessions/Week</span>
+                              <Calendar className="w-4 h-4 text-[color:var(--fc-domain-meals)]" />
+                              <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Sessions/Week</span>
                             </div>
-                            <p className={`text-2xl font-bold ${theme.text}`}>{analyticsData.engagementMetrics.sessionsPerWeek}</p>
+                            <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{analyticsData.engagementMetrics.sessionsPerWeek}</p>
                           </div>
                         </div>
                         
-                        <div className={`${theme.card} rounded-xl p-4 border-2`}>
+                        <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                              <Target className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                              <span className={`text-sm font-medium ${theme.text}`}>Success Rate</span>
+                              <Target className="w-4 h-4 text-[color:var(--fc-accent-purple)]" />
+                              <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Success Rate</span>
                             </div>
-                            <span className={`text-lg font-bold text-green-600 dark:text-green-400`}>
+                            <span className="text-lg font-bold text-[color:var(--fc-status-success)]">
                               {analyticsData.engagementMetrics.successRate}%
                             </span>
                           </div>
                           <Progress value={analyticsData.engagementMetrics.successRate} className="h-3" />
-                          <div className="flex justify-between text-xs text-slate-500 mt-1">
+                          <div className="flex justify-between text-xs text-[color:var(--fc-text-subtle)] mt-1">
                             <span>{analyticsData.engagementMetrics.goalsAchieved} goals achieved</span>
                             <span>{analyticsData.engagementMetrics.totalGoals} total goals</span>
                           </div>
@@ -648,11 +650,11 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                 </div>
 
                 {/* Recent Achievements */}
-                <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+                <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                   <CardHeader>
-                    <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                      <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                        <Award className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                    <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                      <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                        <Award className="w-5 h-5 text-[color:var(--fc-status-warning)]" />
                       </div>
                       Recent Client Achievements
                     </CardTitle>
@@ -660,19 +662,19 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                   <CardContent>
                     <div className="space-y-4">
                       {analyticsData.achievements.map(achievement => (
-                        <div key={achievement.id} className={`${theme.card} rounded-xl p-4 border-2 hover:shadow-md transition-all duration-300`}>
+                        <div key={achievement.id} className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)] hover:shadow-md transition-all duration-300">
                           <div className="flex items-center gap-3">
                             <div className={`p-2 ${getAchievementColor(achievement.type)} rounded-lg`}>
                               <Award className="w-5 h-5" />
                             </div>
                             <div className="flex-1">
-                              <p className={`font-semibold ${theme.text}`}>{achievement.achievement}</p>
-                              <p className={`text-sm ${theme.textSecondary}`}>
+                              <p className="font-semibold text-[color:var(--fc-text-primary)]">{achievement.achievement}</p>
+                              <p className="text-sm text-[color:var(--fc-text-dim)]">
                                 <strong>{achievement.clientName}:</strong> {achievement.description}
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className={`text-xs ${theme.textSecondary}`}>
+                              <p className="text-xs text-[color:var(--fc-text-subtle)]">
                                 {new Date(achievement.date).toLocaleDateString()}
                               </p>
                               <Badge className={`${getAchievementColor(achievement.type)} border-0 mt-1`}>
@@ -687,54 +689,54 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                 </Card>
 
                 {/* Report Generation Section */}
-                <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+                <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                   <CardHeader>
-                    <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                      <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                        <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
+                      <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                        <FileText className="w-5 h-5 text-[color:var(--fc-accent-purple)]" />
                       </div>
                       Report Generation
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className={`${theme.card} rounded-xl p-4 border-2`}>
+                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                         <div className="flex items-center gap-2 mb-3">
-                          <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          <span className={`font-medium ${theme.text}`}>Summary Report</span>
+                          <FileText className="w-4 h-4 text-[color:var(--fc-domain-workouts)]" />
+                          <span className="font-medium text-[color:var(--fc-text-primary)]">Summary Report</span>
                         </div>
-                        <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                        <p className="text-sm text-[color:var(--fc-text-dim)] mb-4">
                           Generate a comprehensive overview of all client metrics and achievements
                         </p>
-                        <Button className="w-full rounded-xl">
+                        <Button className="fc-btn fc-btn-primary w-full">
                           <FileText className="w-4 h-4 mr-2" />
                           Generate Summary
                         </Button>
                       </div>
                       
-                      <div className={`${theme.card} rounded-xl p-4 border-2`}>
+                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                         <div className="flex items-center gap-2 mb-3">
-                          <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          <span className={`font-medium ${theme.text}`}>Client Report</span>
+                          <Users className="w-4 h-4 text-[color:var(--fc-domain-meals)]" />
+                          <span className="font-medium text-[color:var(--fc-text-primary)]">Client Report</span>
                         </div>
-                        <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                        <p className="text-sm text-[color:var(--fc-text-dim)] mb-4">
                           Create detailed individual client progress reports
                         </p>
-                        <Button variant="outline" className="w-full rounded-xl">
+                        <Button variant="outline" className="fc-btn fc-btn-ghost w-full">
                           <Users className="w-4 h-4 mr-2" />
                           Generate Client Report
                         </Button>
                       </div>
                       
-                      <div className={`${theme.card} rounded-xl p-4 border-2`}>
+                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                         <div className="flex items-center gap-2 mb-3">
-                          <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                          <span className={`font-medium ${theme.text}`}>Analytics Report</span>
+                          <BarChart3 className="w-4 h-4 text-[color:var(--fc-accent-purple)]" />
+                          <span className="font-medium text-[color:var(--fc-text-primary)]">Analytics Report</span>
                         </div>
-                        <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                        <p className="text-sm text-[color:var(--fc-text-dim)] mb-4">
                           Export detailed analytics and performance metrics
                         </p>
-                        <Button variant="outline" className="w-full rounded-xl">
+                        <Button variant="outline" className="fc-btn fc-btn-ghost w-full">
                           <BarChart3 className="w-4 h-4 mr-2" />
                           Generate Analytics
                         </Button>

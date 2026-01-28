@@ -587,131 +587,134 @@ export default function CoachMealsPage() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen">
-        {/* Floating Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-orange-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-green-500/5 rounded-full blur-3xl"></div>
-      </div>
-
-      <div className="relative p-6">
-        <div className="max-w-7xl mx-auto space-y-8">
-          {/* Enhanced Header */}
-          <div className="text-center space-y-4">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div
-                className={`p-3 rounded-2xl ${theme.gradient} ${theme.shadow}`}
-              >
-                <ChefHat className="w-8 h-8 text-white" />
-              </div>
-              <h1
-                className={`text-4xl font-bold ${theme.text} bg-gradient-to-r from-purple-600 via-orange-500 to-green-500 bg-clip-text text-transparent`}
-              >
-                Meal Plan Library
-              </h1>
-            </div>
-            <p className={`text-lg ${theme.textSecondary} max-w-2xl mx-auto`}>
-              Create comprehensive meal plans with macro calculations and assign
-              them to your clients
-            </p>
-          </div>
-
-          {/* Enhanced Search and Filters */}
-          <div className={`${theme.card} ${theme.shadow} rounded-2xl p-6`}>
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search
-                  className={`absolute left-4 top-1/2 transform -translate-y-1/2 ${theme.textSecondary} w-5 h-5`}
-                />
-                <Input
-                  placeholder="Search meal plans, foods, and clients..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`pl-12 h-12 rounded-xl border-2 ${theme.border} ${theme.text} bg-transparent focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500`}
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger
-                    className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                  >
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Filter by type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Plans</SelectItem>
-                    <SelectItem value="high-protein">High Protein</SelectItem>
-                    <SelectItem value="low-carb">Low Carb</SelectItem>
-                    <SelectItem value="weight-loss">Weight Loss</SelectItem>
-                    <SelectItem value="muscle-gain">Muscle Gain</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger
-                    className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                  >
-                    <SortAsc className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest First</SelectItem>
-                    <SelectItem value="oldest">Oldest First</SelectItem>
-                    <SelectItem value="alphabetical">Alphabetical</SelectItem>
-                    <SelectItem value="calories-high">
-                      Calories (High to Low)
-                    </SelectItem>
-                    <SelectItem value="calories-low">
-                      Calories (Low to High)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* Enhanced Tabs */}
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="space-y-6"
-          >
-            <div className={`${theme.card} ${theme.shadow} rounded-2xl p-2`}>
-              <TabsList className="grid w-full grid-cols-3 bg-transparent h-16">
-                <TabsTrigger
-                  value="meal-plans"
-                  className={`flex items-center gap-3 text-lg font-semibold rounded-xl transition-all duration-200 ${theme.text}`}
-                >
-                  <div className={`p-2 rounded-lg ${theme.gradient}`}>
-                    <ChefHat className="w-5 h-5 text-white" />
+        <div className="relative px-6 pb-16 pt-10">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <GlassCard className="p-6 md:p-8">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-3">
+                  <Badge className="fc-badge fc-badge-strong w-fit">
+                    Nutrition Ops
+                  </Badge>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg">
+                      <ChefHat className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
+                        Meal Plan Library
+                      </h1>
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
+                        Build nutrition strategies, macros, and client assignments.
+                      </p>
+                    </div>
                   </div>
-                  Meal Plans
-                </TabsTrigger>
-                <TabsTrigger
-                  value="foods"
-                  className={`flex items-center gap-3 text-lg font-semibold rounded-xl transition-all duration-200 ${theme.text}`}
-                >
-                  <div
-                    className={`p-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600`}
-                  >
-                    <Utensils className="w-5 h-5 text-white" />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface-muted)] p-4">
+                    <p className="text-xs uppercase tracking-wide text-[color:var(--fc-text-subtle)]">
+                      Plans
+                    </p>
+                    <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                      {mealPlans.length}
+                    </p>
                   </div>
-                  Food Database
-                </TabsTrigger>
-                <TabsTrigger
-                  value="assignments"
-                  className={`flex items-center gap-3 text-lg font-semibold rounded-xl transition-all duration-200 ${theme.text}`}
-                >
-                  <div
-                    className={`p-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600`}
-                  >
-                    <Users className="w-5 h-5 text-white" />
+                  <div className="rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface-muted)] p-4">
+                    <p className="text-xs uppercase tracking-wide text-[color:var(--fc-text-subtle)]">
+                      Foods
+                    </p>
+                    <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                      {foods.length}
+                    </p>
                   </div>
-                  Assignments
-                </TabsTrigger>
-              </TabsList>
-            </div>
+                  <div className="rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface-muted)] p-4">
+                    <p className="text-xs uppercase tracking-wide text-[color:var(--fc-text-subtle)]">
+                      Active
+                    </p>
+                    <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                      {assignments.filter((assignment) => assignment.is_active).length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+
+            <GlassCard className="p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-subtle)]" />
+                  <Input
+                    placeholder="Search meal plans, foods, and assignments..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="fc-input h-12 w-full pl-12"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Select value={filterType} onValueChange={setFilterType}>
+                    <SelectTrigger className="fc-select h-12 w-48">
+                      <Filter className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Filter by type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Plans</SelectItem>
+                      <SelectItem value="high-protein">High Protein</SelectItem>
+                      <SelectItem value="low-carb">Low Carb</SelectItem>
+                      <SelectItem value="weight-loss">Weight Loss</SelectItem>
+                      <SelectItem value="muscle-gain">Muscle Gain</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="fc-select h-12 w-48">
+                      <SortAsc className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">Newest First</SelectItem>
+                      <SelectItem value="oldest">Oldest First</SelectItem>
+                      <SelectItem value="alphabetical">Alphabetical</SelectItem>
+                      <SelectItem value="calories-high">
+                        Calories (High to Low)
+                      </SelectItem>
+                      <SelectItem value="calories-low">
+                        Calories (Low to High)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </GlassCard>
+
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="space-y-6"
+            >
+              <GlassCard className="p-2">
+                <TabsList className="grid w-full grid-cols-3 bg-transparent h-14">
+                  <TabsTrigger
+                    value="meal-plans"
+                    className="flex items-center gap-2 rounded-xl text-sm font-semibold text-[color:var(--fc-text-primary)] data-[state=active]:bg-[color:var(--fc-surface)]"
+                  >
+                    <ChefHat className="w-4 h-4" />
+                    Meal Plans
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="foods"
+                    className="flex items-center gap-2 rounded-xl text-sm font-semibold text-[color:var(--fc-text-primary)] data-[state=active]:bg-[color:var(--fc-surface)]"
+                  >
+                    <Utensils className="w-4 h-4" />
+                    Food Database
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="assignments"
+                    className="flex items-center gap-2 rounded-xl text-sm font-semibold text-[color:var(--fc-text-primary)] data-[state=active]:bg-[color:var(--fc-surface)]"
+                  >
+                    <Users className="w-4 h-4" />
+                    Assignments
+                  </TabsTrigger>
+                </TabsList>
+              </GlassCard>
 
             {/* Meal Plans Tab */}
             <TabsContent value="meal-plans" className="space-y-6">

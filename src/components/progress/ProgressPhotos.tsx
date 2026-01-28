@@ -2,9 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { 
   Camera, 
   Calendar, 
@@ -33,7 +31,6 @@ import {
   List,
   MoreHorizontal
 } from 'lucide-react'
-import { useTheme } from '@/contexts/ThemeContext'
 import { cn } from '@/lib/utils'
 
 interface ProgressPhoto {
@@ -66,8 +63,6 @@ export function ProgressPhotos({
   onShare, 
   onDelete 
 }: ProgressPhotosProps) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('grid')
   const [showComparison, setShowComparison] = useState(false)
@@ -140,102 +135,109 @@ export function ProgressPhotos({
 
   if (loading) {
     return (
-      <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
-        <CardHeader className="p-6 pb-4">
+      <div className={cn("fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden")}>
+        <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                <Camera className="w-6 h-6 text-white" />
+              <div className="fc-icon-tile fc-icon-workouts w-12 h-12">
+                <Camera className="w-6 h-6" />
               </div>
               <div>
-                <CardTitle className="text-2xl font-bold text-slate-800 dark:text-slate-200">Progress Photos</CardTitle>
-                <p className="text-slate-600 dark:text-slate-400">Your transformation journey</p>
+                <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                  Progress
+                </span>
+                <div className="text-2xl font-bold fc-text-primary mt-2">Progress Photos</div>
+                <p className="fc-text-subtle">Your transformation journey</p>
               </div>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="p-6 pt-0">
+        </div>
+        <div className="p-6 pt-0">
           <div className="animate-pulse space-y-6">
             {/* Header skeleton */}
             <div className="flex gap-4">
-              <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-xl w-32"></div>
-              <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-xl w-32"></div>
+              <div className="h-10 bg-[color:var(--fc-glass-border)] rounded-xl w-32"></div>
+              <div className="h-10 bg-[color:var(--fc-glass-border)] rounded-xl w-32"></div>
             </div>
             
             {/* Photo grid skeleton */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                <div key={i} className="aspect-[3/4] bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+                <div key={i} className="aspect-[3/4] bg-[color:var(--fc-glass-border)] rounded-2xl"></div>
               ))}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   if (photos.length === 0) {
     return (
-      <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-        <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
-          <CardHeader className="p-6 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <CardTitle className={`text-2xl font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Progress Photos</CardTitle>
-                  <p className={`${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Your transformation journey</p>
-                </div>
+      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+        <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="fc-icon-tile fc-icon-workouts w-12 h-12">
+                <Camera className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                  Progress
+                </span>
+                <div className="text-2xl font-bold fc-text-primary mt-2">Progress Photos</div>
+                <p className="fc-text-subtle">Your transformation journey</p>
               </div>
             </div>
-          </CardHeader>
-        <CardContent className="p-6 pt-0">
+          </div>
+        </div>
+        <div className="p-6 pt-0">
           <div className="text-center py-16">
-            <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <Camera className="w-12 h-12 text-blue-500 dark:text-blue-400" />
+            <div className="w-24 h-24 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <Camera className="w-12 h-12 fc-text-workouts" />
             </div>
-            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-4">
+            <h3 className="text-2xl font-bold fc-text-primary mb-4">
               Start Your Visual Journey
             </h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-8 max-w-md mx-auto text-lg">
+            <p className="fc-text-subtle mb-8 max-w-md mx-auto text-lg">
               Take your first progress photo to begin tracking your amazing transformation!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
                 onClick={onUpload}
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-2xl px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                className="fc-btn fc-btn-primary fc-press px-8 py-4 text-lg font-semibold"
               >
                 <Camera className="w-5 h-5 mr-2" />
                 Take First Photo
               </Button>
               <Button 
                 variant="outline" 
-                className="rounded-2xl px-8 py-4 text-lg font-semibold border-2 hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="fc-btn fc-btn-secondary px-8 py-4 text-lg font-semibold"
               >
                 <Upload className="w-5 h-5 mr-2" />
                 Upload Photo
               </Button>
             </div>
           </div>
-        </CardContent>
-        </Card>
+        </div>
       </div>
     )
   }
 
   return (
-    <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden w-full", isDark ? "bg-slate-800/50" : "bg-white")}>
-      <CardHeader className="p-4 sm:p-6 pb-4">
+    <div className={cn("fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden w-full")}>
+      <div className="p-4 sm:p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <Camera className="w-6 h-6 text-white" />
+            <div className="fc-icon-tile fc-icon-workouts w-12 h-12 flex-shrink-0">
+              <Camera className="w-6 h-6" />
             </div>
             <div>
-              <CardTitle className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-200">Progress Photos</CardTitle>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Progress
+              </span>
+              <div className="text-xl sm:text-2xl font-bold fc-text-primary mt-2">Progress Photos</div>
+              <p className="text-sm fc-text-subtle">
                 {sortedPhotos.length} photo{sortedPhotos.length !== 1 ? 's' : ''} • Your transformation
               </p>
             </div>
@@ -243,7 +245,7 @@ export function ProgressPhotos({
           
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {/* View Mode Toggle */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
+            <div className="flex items-center fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-xl p-1">
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="sm"
@@ -251,8 +253,8 @@ export function ProgressPhotos({
                 className={cn(
                   "rounded-lg",
                   viewMode === 'grid' 
-                    ? "bg-white dark:bg-slate-700 shadow-sm" 
-                    : "hover:bg-transparent"
+                    ? "fc-btn fc-btn-secondary" 
+                    : "fc-btn fc-btn-ghost"
                 )}
               >
                 <Grid3X3 className="w-4 h-4" />
@@ -264,8 +266,8 @@ export function ProgressPhotos({
                 className={cn(
                   "rounded-lg",
                   viewMode === 'timeline' 
-                    ? "bg-white dark:bg-slate-700 shadow-sm" 
-                    : "hover:bg-transparent"
+                    ? "fc-btn fc-btn-secondary" 
+                    : "fc-btn fc-btn-ghost"
                 )}
               >
                 <List className="w-4 h-4" />
@@ -275,7 +277,7 @@ export function ProgressPhotos({
             {/* Upload Button */}
             <Button 
               onClick={onUpload}
-              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl px-4 py-2 shadow-lg hover:shadow-xl transition-all duration-300 flex-shrink-0"
+              className="fc-btn fc-btn-primary fc-press rounded-xl px-4 py-2 flex-shrink-0"
             >
               <Plus className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">Add Photo</span>
@@ -287,7 +289,7 @@ export function ProgressPhotos({
         {/* Filter Tags */}
         {allTags.length > 0 && (
           <div className="flex items-center gap-2 mt-4 w-full overflow-hidden">
-            <Filter className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
+            <Filter className="w-4 h-4 fc-text-subtle flex-shrink-0" />
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
               <Button
                 variant={filterTag === null ? 'default' : 'outline'}
@@ -296,8 +298,8 @@ export function ProgressPhotos({
                 className={cn(
                   "rounded-xl whitespace-nowrap",
                   filterTag === null 
-                    ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white" 
-                    : "hover:bg-slate-100 dark:hover:bg-slate-700"
+                    ? "fc-btn fc-btn-primary" 
+                    : "fc-btn fc-btn-secondary"
                 )}
               >
                 All Photos
@@ -311,8 +313,8 @@ export function ProgressPhotos({
                   className={cn(
                     "rounded-xl whitespace-nowrap",
                     filterTag === tag 
-                      ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white" 
-                      : "hover:bg-slate-100 dark:hover:bg-slate-700"
+                      ? "fc-btn fc-btn-primary" 
+                      : "fc-btn fc-btn-secondary"
                   )}
                 >
                   {tag}
@@ -321,9 +323,9 @@ export function ProgressPhotos({
             </div>
           </div>
         )}
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-6 pt-0">
+      <div className="p-6 pt-0">
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {sortedPhotos.map((photo, index) => (
@@ -357,7 +359,7 @@ export function ProgressPhotos({
             ))}
           </div>
         )}
-      </CardContent>
+      </div>
 
       {/* Comparison Modal */}
       {showComparison && comparisonPhotos.before && comparisonPhotos.after && (
@@ -368,7 +370,7 @@ export function ProgressPhotos({
           formatDate={formatDate}
         />
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -392,8 +394,6 @@ function PhotoCard({
   getTimeAgo: (date: string) => string
   getTransformationMessage: (photo: ProgressPhoto) => string | null
 }) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const [isHovered, setIsHovered] = useState(false)
   const transformationMessage = getTransformationMessage(photo)
 
@@ -424,7 +424,7 @@ function PhotoCard({
               <span className="text-sm font-medium">{getTimeAgo(photo.date)}</span>
             </div>
             {photo.isFavorite && (
-              <Heart className="w-4 h-4 text-red-400 fill-current" />
+              <Heart className="w-4 h-4 fc-text-error fill-current" />
             )}
           </div>
           
@@ -437,8 +437,8 @@ function PhotoCard({
           
           {transformationMessage && (
             <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-4 h-4 text-green-400" />
-              <span className="text-sm font-medium text-green-400">{transformationMessage}</span>
+              <TrendingUp className="w-4 h-4 fc-text-success" />
+              <span className="text-sm font-medium fc-text-success">{transformationMessage}</span>
             </div>
           )}
           
@@ -446,9 +446,9 @@ function PhotoCard({
           {photo.tags && photo.tags.length > 0 && (
             <div className="flex gap-1 mb-2">
               {photo.tags.slice(0, 2).map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
+                <span key={tag} className="fc-pill fc-pill-glass text-xs text-white border border-white/30">
                   {tag}
-                </Badge>
+                </span>
               ))}
             </div>
           )}
@@ -490,7 +490,7 @@ function PhotoCard({
         )}>
           <Button
             size="sm"
-            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl px-3 py-2 shadow-lg"
+            className="fc-btn fc-btn-primary fc-press rounded-xl px-3 py-2"
             onClick={(e) => {
               e.stopPropagation()
               // This would need to be implemented to select another photo for comparison
@@ -525,12 +525,10 @@ function TimelinePhotoCard({
   getTimeAgo: (date: string) => string
   getTransformationMessage: (photo: ProgressPhoto) => string | null
 }) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const transformationMessage = getTransformationMessage(photo)
 
   return (
-    <Card className={cn("rounded-2xl shadow-lg border-0 overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
+    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden">
       <div className="flex flex-col md:flex-row">
         {/* Photo */}
         <div className="relative w-full md:w-48 h-48 md:h-32">
@@ -543,7 +541,7 @@ function TimelinePhotoCard({
           />
           {photo.isFavorite && (
             <div className="absolute top-2 right-2">
-              <Heart className="w-5 h-5 text-red-500 fill-current" />
+              <Heart className="w-5 h-5 fc-text-error fill-current" />
             </div>
           )}
         </div>
@@ -552,10 +550,10 @@ function TimelinePhotoCard({
         <div className="flex-1 p-4">
           <div className="flex items-start justify-between mb-3">
             <div>
-              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">
+              <h3 className="text-lg font-bold fc-text-primary mb-1">
                 {formatDate(photo.date)}
               </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
+              <p className="text-sm fc-text-subtle">
                 {getTimeAgo(photo.date)}
               </p>
             </div>
@@ -564,7 +562,7 @@ function TimelinePhotoCard({
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-xl"
+                className="fc-btn fc-btn-secondary"
                 onClick={onShare}
               >
                 <Share2 className="w-4 h-4 mr-1" />
@@ -573,7 +571,7 @@ function TimelinePhotoCard({
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-xl"
+                className="fc-btn fc-btn-secondary"
                 onClick={onDelete}
               >
                 <MoreHorizontal className="w-4 h-4" />
@@ -585,8 +583,8 @@ function TimelinePhotoCard({
           <div className="flex items-center gap-4 mb-3">
             {photo.bodyweight && (
               <div className="flex items-center gap-2">
-                <Weight className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                <Weight className="w-4 h-4 fc-text-subtle" />
+                <span className="text-sm font-medium fc-text-dim">
                   {photo.bodyweight}kg
                 </span>
               </div>
@@ -594,8 +592,8 @@ function TimelinePhotoCard({
             
             {transformationMessage && (
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-green-500" />
-                <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                <TrendingUp className="w-4 h-4 fc-text-success" />
+                <span className="text-sm font-medium fc-text-success">
                   {transformationMessage}
                 </span>
               </div>
@@ -606,16 +604,16 @@ function TimelinePhotoCard({
           {photo.tags && photo.tags.length > 0 && (
             <div className="flex gap-2 mb-3">
               {photo.tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
+                <span key={tag} className="fc-pill fc-pill-glass text-xs">
                   {tag}
-                </Badge>
+                </span>
               ))}
             </div>
           )}
 
           {/* Notes */}
           {photo.notes && (
-            <p className="text-sm text-slate-600 dark:text-slate-400 italic mb-3">
+            <p className="text-sm fc-text-subtle italic mb-3">
               "{photo.notes}"
             </p>
           )}
@@ -623,7 +621,7 @@ function TimelinePhotoCard({
           {/* Compare Button */}
           <Button
             size="sm"
-            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl"
+            className="fc-btn fc-btn-primary fc-press"
             onClick={() => {
               // This would need to be implemented to select another photo for comparison
             }}
@@ -633,7 +631,7 @@ function TimelinePhotoCard({
           </Button>
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -649,8 +647,6 @@ function ComparisonModal({
   onClose: () => void
   formatDate: (date: string) => string
 }) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const [sliderPosition, setSliderPosition] = useState(50)
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -669,7 +665,7 @@ function ComparisonModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className={cn("relative w-full max-w-4xl h-[80vh] rounded-3xl overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
+      <div className="relative w-full max-w-4xl h-[80vh] fc-modal fc-card overflow-hidden">
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 z-10 p-6 bg-gradient-to-b from-black/80 to-transparent">
           <div className="flex items-center justify-between">
@@ -731,7 +727,7 @@ function ComparisonModal({
             style={{ left: `${sliderPosition}%` }}
           >
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center">
-              <div className="w-3 h-3 bg-slate-600 rounded-full"></div>
+              <div className="w-3 h-3 bg-[color:var(--fc-glass-border)] rounded-full"></div>
             </div>
           </div>
         </div>

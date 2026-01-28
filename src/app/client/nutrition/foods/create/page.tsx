@@ -8,6 +8,9 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
 import {
   Select,
   SelectContent,
@@ -22,8 +25,7 @@ import Link from "next/link";
 export default function AddCustomFoodPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
+  const { performanceSettings } = useTheme();
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -77,228 +79,267 @@ export default function AddCustomFoodPage() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
-        <div className="p-4 sm:p-6">
-          <div className="max-w-2xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-6">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+          <div className="mx-auto w-full max-w-4xl space-y-8">
+            <div className="flex items-center gap-3">
               <Link href="/client/nutrition">
-                <Button variant="outline" size="icon" className="rounded-xl">
-                  <ArrowLeft className="w-4 h-4" />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="fc-btn fc-btn-secondary h-10 w-10 rounded-xl"
+                >
+                  <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center">
-                <Plus className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <h1 className={`text-3xl font-bold ${theme.text}`}>
-                  Add Custom Food
-                </h1>
-                <p className={`${theme.textSecondary}`}>
-                  Add a new food item to the database
-                </p>
-              </div>
+              <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                Nutrition
+              </span>
             </div>
 
-            {/* Form */}
-            <form
-              onSubmit={handleSubmit}
-              className={`${theme.card} ${theme.shadow} rounded-3xl p-6 sm:p-8 space-y-6 border-2 border-slate-200 dark:border-slate-700`}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className={`${theme.text} font-semibold`}>
-                    Food Name *
-                  </Label>
-                  <Input
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    placeholder="e.g., Grilled Chicken Breast"
-                    required
-                    className="rounded-xl"
-                  />
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600">
+                  <Plus className="h-6 w-6 text-white" />
                 </div>
-                <div className="space-y-2">
-                  <Label className={`${theme.text} font-semibold`}>Brand</Label>
-                  <Input
-                    value={formData.brand}
-                    onChange={(e) =>
-                      setFormData({ ...formData, brand: e.target.value })
-                    }
-                    placeholder="e.g., Generic"
-                    className="rounded-xl"
-                  />
+                <div>
+                  <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    Add custom food
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Add a new food item to your nutrition database.
+                  </p>
                 </div>
               </div>
+            </GlassCard>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label className={`${theme.text} font-semibold`}>
-                    Serving Size *
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <GlassCard elevation={1} className="fc-glass fc-card p-6">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                    Food basics
+                  </h2>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Name and brand details for this item.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[color:var(--fc-text-primary)]">
+                      Food Name *
+                    </Label>
+                    <Input
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      placeholder="e.g., Grilled Chicken Breast"
+                      required
+                      className="fc-input rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[color:var(--fc-text-primary)]">
+                      Brand
+                    </Label>
+                    <Input
+                      value={formData.brand}
+                      onChange={(e) =>
+                        setFormData({ ...formData, brand: e.target.value })
+                      }
+                      placeholder="e.g., Generic"
+                      className="fc-input rounded-xl"
+                    />
+                  </div>
+                </div>
+              </GlassCard>
+
+              <GlassCard elevation={1} className="fc-glass fc-card p-6">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                    Serving details
+                  </h2>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Serving size, unit, and food category.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[color:var(--fc-text-primary)]">
+                      Serving Size *
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={formData.serving_size}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          serving_size: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      required
+                      className="fc-input rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[color:var(--fc-text-primary)]">
+                      Unit *
+                    </Label>
+                    <Select
+                      value={formData.serving_unit}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, serving_unit: value })
+                      }
+                    >
+                      <SelectTrigger className="fc-input rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="g">g</SelectItem>
+                        <SelectItem value="ml">ml</SelectItem>
+                        <SelectItem value="cup">cup</SelectItem>
+                        <SelectItem value="tbsp">tbsp</SelectItem>
+                        <SelectItem value="tsp">tsp</SelectItem>
+                        <SelectItem value="piece">piece</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[color:var(--fc-text-primary)]">
+                      Category *
+                    </Label>
+                    <Select
+                      value={formData.category}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, category: value })
+                      }
+                    >
+                      <SelectTrigger className="fc-input rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Fruits">Fruits</SelectItem>
+                        <SelectItem value="Vegetables">Vegetables</SelectItem>
+                        <SelectItem value="Grains">Grains</SelectItem>
+                        <SelectItem value="Protein">Protein</SelectItem>
+                        <SelectItem value="Dairy">Dairy</SelectItem>
+                        <SelectItem value="Snacks">Snacks</SelectItem>
+                        <SelectItem value="Beverages">Beverages</SelectItem>
+                        <SelectItem value="Condiments">Condiments</SelectItem>
+                        <SelectItem value="Desserts">Desserts</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </GlassCard>
+
+              <GlassCard elevation={1} className="fc-glass fc-card p-6">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                    Nutrition facts
+                  </h2>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Calories and macro breakdown per serving.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[color:var(--fc-text-primary)]">
+                      Calories *
+                    </Label>
+                    <Input
+                      type="number"
+                      value={formData.calories_per_serving}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          calories_per_serving: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      required
+                      className="fc-input rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[color:var(--fc-text-primary)]">
+                      Protein (g)
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={formData.protein}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          protein: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="fc-input rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[color:var(--fc-text-primary)]">
+                      Carbs (g)
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={formData.carbs}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          carbs: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="fc-input rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[color:var(--fc-text-primary)]">
+                      Fat (g)
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={formData.fat}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          fat: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="fc-input rounded-xl"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <Label className="font-semibold text-[color:var(--fc-text-primary)]">
+                    Fiber (g)
                   </Label>
                   <Input
                     type="number"
                     step="0.1"
-                    value={formData.serving_size}
+                    value={formData.fiber}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        serving_size: parseFloat(e.target.value) || 0,
+                        fiber: parseFloat(e.target.value) || 0,
                       })
                     }
-                    required
-                    className="rounded-xl"
+                    className="fc-input mt-2 rounded-xl"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className={`${theme.text} font-semibold`}>
-                    Unit *
-                  </Label>
-                  <Select
-                    value={formData.serving_unit}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, serving_unit: value })
-                    }
-                  >
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="g">g</SelectItem>
-                      <SelectItem value="ml">ml</SelectItem>
-                      <SelectItem value="cup">cup</SelectItem>
-                      <SelectItem value="tbsp">tbsp</SelectItem>
-                      <SelectItem value="tsp">tsp</SelectItem>
-                      <SelectItem value="piece">piece</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className={`${theme.text} font-semibold`}>
-                    Category *
-                  </Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, category: value })
-                    }
-                  >
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Fruits">Fruits</SelectItem>
-                      <SelectItem value="Vegetables">Vegetables</SelectItem>
-                      <SelectItem value="Grains">Grains</SelectItem>
-                      <SelectItem value="Protein">Protein</SelectItem>
-                      <SelectItem value="Dairy">Dairy</SelectItem>
-                      <SelectItem value="Snacks">Snacks</SelectItem>
-                      <SelectItem value="Beverages">Beverages</SelectItem>
-                      <SelectItem value="Condiments">Condiments</SelectItem>
-                      <SelectItem value="Desserts">Desserts</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              </GlassCard>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label className={`${theme.text} font-semibold`}>
-                    Calories *
-                  </Label>
-                  <Input
-                    type="number"
-                    value={formData.calories_per_serving}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        calories_per_serving: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    required
-                    className="rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className={`${theme.text} font-semibold`}>
-                    Protein (g)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={formData.protein}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        protein: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className={`${theme.text} font-semibold`}>
-                    Carbs (g)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={formData.carbs}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        carbs: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className={`${theme.text} font-semibold`}>
-                    Fat (g)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={formData.fat}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        fat: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="rounded-xl"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className={`${theme.text} font-semibold`}>
-                  Fiber (g)
-                </Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={formData.fiber}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      fiber: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="rounded-xl"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <Link href="/client/nutrition" className="flex-1">
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full rounded-2xl"
+                    className="fc-btn fc-btn-secondary w-full"
                   >
                     Cancel
                   </Button>
@@ -306,13 +347,13 @@ export default function AddCustomFoodPage() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-2xl"
+                  className="fc-btn fc-btn-primary flex-1"
                 >
                   {loading ? (
                     "Adding..."
                   ) : (
                     <>
-                      <Plus className="w-4 h-4 mr-2" />
+                      <Plus className="mr-2 h-4 w-4" />
                       Add Food
                     </>
                   )}
@@ -321,7 +362,7 @@ export default function AddCustomFoodPage() {
             </form>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

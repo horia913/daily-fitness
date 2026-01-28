@@ -1,0 +1,1168 @@
+table_schema,table_name,column_name,data_type,is_nullable,column_default
+public,achievement_templates,id,uuid,NO,gen_random_uuid()
+public,achievement_templates,name,text,NO,null
+public,achievement_templates,description,text,YES,null
+public,achievement_templates,icon,text,YES,null
+public,achievement_templates,category,text,NO,null
+public,achievement_templates,achievement_type,text,NO,null
+public,achievement_templates,is_tiered,boolean,NO,false
+public,achievement_templates,tier_bronze_threshold,numeric,YES,null
+public,achievement_templates,tier_bronze_label,text,YES,null
+public,achievement_templates,tier_silver_threshold,numeric,YES,null
+public,achievement_templates,tier_silver_label,text,YES,null
+public,achievement_templates,tier_gold_threshold,numeric,YES,null
+public,achievement_templates,tier_gold_label,text,YES,null
+public,achievement_templates,tier_platinum_threshold,numeric,YES,null
+public,achievement_templates,tier_platinum_label,text,YES,null
+public,achievement_templates,single_threshold,numeric,YES,null
+public,achievement_templates,is_active,boolean,NO,true
+public,achievement_templates,created_at,timestamp with time zone,YES,now()
+public,achievement_templates,updated_at,timestamp with time zone,YES,now()
+public,achievements,id,uuid,NO,gen_random_uuid()
+public,achievements,client_id,uuid,NO,null
+public,achievements,title,text,NO,null
+public,achievements,description,text,YES,null
+public,achievements,achievement_type,text,NO,null
+public,achievements,metric_type,text,YES,null
+public,achievements,metric_value,numeric,YES,null
+public,achievements,metric_unit,text,YES,null
+public,achievements,achieved_date,date,NO,CURRENT_DATE
+public,achievements,is_public,boolean,YES,true
+public,achievements,goal_id,uuid,YES,null
+public,achievements,workout_id,uuid,YES,null
+public,achievements,created_at,timestamp with time zone,YES,now()
+public,assigned_meal_plans,id,bigint,NO,null
+public,assigned_meal_plans,client_id,uuid,NO,null
+public,assigned_meal_plans,coach_id,uuid,NO,null
+public,assigned_meal_plans,meal_plan_template_id,bigint,NO,null
+public,assigned_meal_plans,assigned_date,date,NO,null
+public,assigned_workouts,id,bigint,NO,null
+public,assigned_workouts,client_id,uuid,NO,null
+public,assigned_workouts,coach_id,uuid,NO,null
+public,assigned_workouts,workout_template_id,bigint,NO,null
+public,assigned_workouts,assigned_date,date,NO,null
+public,assigned_workouts,status,text,YES,'pending'::text
+public,body_metrics,id,uuid,NO,gen_random_uuid()
+public,body_metrics,client_id,uuid,NO,null
+public,body_metrics,coach_id,uuid,YES,null
+public,body_metrics,weight_kg,numeric,YES,null
+public,body_metrics,body_fat_percentage,numeric,YES,null
+public,body_metrics,muscle_mass_kg,numeric,YES,null
+public,body_metrics,visceral_fat_level,integer,YES,null
+public,body_metrics,left_arm_circumference,numeric,YES,null
+public,body_metrics,right_arm_circumference,numeric,YES,null
+public,body_metrics,torso_circumference,numeric,YES,null
+public,body_metrics,waist_circumference,numeric,YES,null
+public,body_metrics,hips_circumference,numeric,YES,null
+public,body_metrics,left_thigh_circumference,numeric,YES,null
+public,body_metrics,right_thigh_circumference,numeric,YES,null
+public,body_metrics,left_calf_circumference,numeric,YES,null
+public,body_metrics,right_calf_circumference,numeric,YES,null
+public,body_metrics,measured_date,date,NO,CURRENT_DATE
+public,body_metrics,measurement_method,text,YES,null
+public,body_metrics,notes,text,YES,null
+public,body_metrics,created_at,timestamp with time zone,YES,now()
+public,body_metrics,updated_at,timestamp with time zone,YES,now()
+public,booked_sessions,id,uuid,NO,gen_random_uuid()
+public,booked_sessions,time_slot_id,uuid,NO,null
+public,booked_sessions,coach_id,uuid,NO,null
+public,booked_sessions,client_id,uuid,NO,null
+public,booked_sessions,session_type,text,NO,'personal_training'::text
+public,booked_sessions,status,text,NO,'scheduled'::text
+public,booked_sessions,notes,text,YES,null
+public,booked_sessions,coach_notes,text,YES,null
+public,booked_sessions,client_feedback,text,YES,null
+public,booked_sessions,session_rating,integer,YES,null
+public,booked_sessions,actual_start_time,timestamp with time zone,YES,null
+public,booked_sessions,actual_end_time,timestamp with time zone,YES,null
+public,booked_sessions,cancelled_at,timestamp with time zone,YES,null
+public,booked_sessions,cancelled_by,uuid,YES,null
+public,booked_sessions,cancellation_reason,text,YES,null
+public,booked_sessions,created_at,timestamp with time zone,YES,now()
+public,booked_sessions,updated_at,timestamp with time zone,YES,now()
+public,challenge_participants,id,uuid,NO,gen_random_uuid()
+public,challenge_participants,challenge_id,uuid,NO,null
+public,challenge_participants,client_id,uuid,NO,null
+public,challenge_participants,selected_track,text,YES,null
+public,challenge_participants,status,text,NO,'registered'::text
+public,challenge_participants,joined_at,timestamp with time zone,YES,now()
+public,challenge_participants,total_score,numeric,YES,0
+public,challenge_participants,final_rank,integer,YES,null
+public,challenge_participants,is_winner,boolean,YES,false
+public,challenge_participants,award_notes,text,YES,null
+public,challenge_participants,created_at,timestamp with time zone,YES,now()
+public,challenge_participants,updated_at,timestamp with time zone,YES,now()
+public,challenge_scoring_categories,id,uuid,NO,gen_random_uuid()
+public,challenge_scoring_categories,challenge_id,uuid,NO,null
+public,challenge_scoring_categories,category_name,text,NO,null
+public,challenge_scoring_categories,exercise_id,uuid,YES,null
+public,challenge_scoring_categories,scoring_method,text,NO,null
+public,challenge_scoring_categories,weight_percentage,numeric,YES,100.00
+public,challenge_scoring_categories,created_at,timestamp with time zone,YES,now()
+public,challenge_video_submissions,id,uuid,NO,gen_random_uuid()
+public,challenge_video_submissions,participant_id,uuid,NO,null
+public,challenge_video_submissions,scoring_category_id,uuid,NO,null
+public,challenge_video_submissions,video_url,text,NO,null
+public,challenge_video_submissions,video_path,text,NO,null
+public,challenge_video_submissions,submitted_at,timestamp with time zone,YES,now()
+public,challenge_video_submissions,status,text,NO,'pending'::text
+public,challenge_video_submissions,reviewed_by,uuid,YES,null
+public,challenge_video_submissions,reviewed_at,timestamp with time zone,YES,null
+public,challenge_video_submissions,review_notes,text,YES,null
+public,challenge_video_submissions,claimed_weight,numeric,YES,null
+public,challenge_video_submissions,claimed_reps,integer,YES,null
+public,challenge_video_submissions,created_at,timestamp with time zone,YES,now()
+public,challenges,id,uuid,NO,gen_random_uuid()
+public,challenges,created_by,uuid,NO,null
+public,challenges,challenge_type,text,NO,null
+public,challenges,name,text,NO,null
+public,challenges,description,text,YES,null
+public,challenges,start_date,date,NO,null
+public,challenges,end_date,date,NO,null
+public,challenges,program_id,uuid,YES,null
+public,challenges,recomp_track,text,YES,null
+public,challenges,reward_description,text,YES,null
+public,challenges,reward_value,text,YES,null
+public,challenges,requires_video_proof,boolean,YES,false
+public,challenges,max_participants,integer,YES,null
+public,challenges,is_public,boolean,YES,true
+public,challenges,status,text,NO,'draft'::text
+public,challenges,created_at,timestamp with time zone,YES,now()
+public,challenges,updated_at,timestamp with time zone,YES,now()
+public,client_program_progression_rules,id,uuid,NO,gen_random_uuid()
+public,client_program_progression_rules,client_id,uuid,NO,null
+public,client_program_progression_rules,program_assignment_id,uuid,NO,null
+public,client_program_progression_rules,week_number,integer,NO,null
+public,client_program_progression_rules,block_id,uuid,YES,null
+public,client_program_progression_rules,block_type,text,YES,null
+public,client_program_progression_rules,exercise_id,uuid,YES,null
+public,client_program_progression_rules,exercise_order,integer,YES,null
+public,client_program_progression_rules,exercise_letter,character varying,YES,null
+public,client_program_progression_rules,sets,integer,YES,null
+public,client_program_progression_rules,reps,character varying,YES,null
+public,client_program_progression_rules,rest_seconds,integer,YES,null
+public,client_program_progression_rules,tempo,character varying,YES,null
+public,client_program_progression_rules,rir,integer,YES,null
+public,client_program_progression_rules,second_exercise_id,uuid,YES,null
+public,client_program_progression_rules,compound_exercise_id,uuid,YES,null
+public,client_program_progression_rules,first_exercise_reps,character varying,YES,null
+public,client_program_progression_rules,second_exercise_reps,character varying,YES,null
+public,client_program_progression_rules,isolation_reps,character varying,YES,null
+public,client_program_progression_rules,compound_reps,character varying,YES,null
+public,client_program_progression_rules,rest_between_pairs,integer,YES,null
+public,client_program_progression_rules,exercise_reps,character varying,YES,null
+public,client_program_progression_rules,drop_set_reps,character varying,YES,null
+public,client_program_progression_rules,weight_reduction_percentage,integer,YES,null
+public,client_program_progression_rules,reps_per_cluster,integer,YES,null
+public,client_program_progression_rules,clusters_per_set,integer,YES,null
+public,client_program_progression_rules,intra_cluster_rest,integer,YES,null
+public,client_program_progression_rules,rest_pause_duration,integer,YES,null
+public,client_program_progression_rules,max_rest_pauses,integer,YES,null
+public,client_program_progression_rules,rounds,integer,YES,null
+public,client_program_progression_rules,work_seconds,integer,YES,null
+public,client_program_progression_rules,rest_after_exercise,integer,YES,null
+public,client_program_progression_rules,rest_after_set,integer,YES,null
+public,client_program_progression_rules,duration_minutes,integer,YES,null
+public,client_program_progression_rules,emom_mode,character varying,YES,null
+public,client_program_progression_rules,target_reps,integer,YES,null
+public,client_program_progression_rules,time_cap_minutes,integer,YES,null
+public,client_program_progression_rules,notes,text,YES,null
+public,client_program_progression_rules,created_at,timestamp with time zone,YES,now()
+public,client_program_progression_rules,updated_at,timestamp with time zone,YES,now()
+public,client_program_progression_rules,block_order,integer,YES,null
+public,client_program_progression_rules,weight_kg,numeric,YES,null
+public,client_program_progression_rules,pyramid_order,integer,YES,null
+public,client_program_progression_rules,ladder_order,integer,YES,null
+public,client_program_progression_rules,load_percentage,numeric,YES,null
+public,client_program_progression_rules,block_name,text,YES,null
+public,client_workout_block_exercises,id,uuid,NO,gen_random_uuid()
+public,client_workout_block_exercises,client_block_id,uuid,NO,null
+public,client_workout_block_exercises,client_id,uuid,NO,null
+public,client_workout_block_exercises,workout_assignment_id,uuid,NO,null
+public,client_workout_block_exercises,original_block_exercise_id,uuid,YES,null
+public,client_workout_block_exercises,exercise_id,uuid,YES,null
+public,client_workout_block_exercises,exercise_order,integer,YES,null
+public,client_workout_block_exercises,exercise_letter,text,YES,null
+public,client_workout_block_exercises,sets,integer,YES,null
+public,client_workout_block_exercises,reps,text,YES,null
+public,client_workout_block_exercises,rest_seconds,integer,YES,null
+public,client_workout_block_exercises,tempo,text,YES,null
+public,client_workout_block_exercises,rir,integer,YES,null
+public,client_workout_block_exercises,weight_kg,numeric,YES,null
+public,client_workout_block_exercises,notes,text,YES,null
+public,client_workout_block_exercises,drop_sets,jsonb,YES,null
+public,client_workout_block_exercises,cluster_sets,jsonb,YES,null
+public,client_workout_block_exercises,pyramid_sets,jsonb,YES,null
+public,client_workout_block_exercises,ladder_sets,jsonb,YES,null
+public,client_workout_block_exercises,rest_pause_sets,jsonb,YES,null
+public,client_workout_block_exercises,amrap_config,jsonb,YES,null
+public,client_workout_block_exercises,emom_config,jsonb,YES,null
+public,client_workout_block_exercises,tabata_config,jsonb,YES,null
+public,client_workout_block_exercises,circuit_config,jsonb,YES,null
+public,client_workout_block_exercises,created_at,timestamp with time zone,NO,now()
+public,client_workout_block_exercises,updated_at,timestamp with time zone,NO,now()
+public,client_workout_block_exercises,load_percentage,numeric,YES,null
+public,client_workout_blocks,id,uuid,NO,gen_random_uuid()
+public,client_workout_blocks,client_id,uuid,NO,null
+public,client_workout_blocks,workout_assignment_id,uuid,NO,null
+public,client_workout_blocks,original_block_id,uuid,YES,null
+public,client_workout_blocks,block_type,text,NO,null
+public,client_workout_blocks,block_order,integer,NO,null
+public,client_workout_blocks,block_name,text,YES,null
+public,client_workout_blocks,block_notes,text,YES,null
+public,client_workout_blocks,total_sets,integer,YES,null
+public,client_workout_blocks,reps_per_set,text,YES,null
+public,client_workout_blocks,rest_seconds,integer,YES,null
+public,client_workout_blocks,duration_seconds,integer,YES,null
+public,client_workout_blocks,created_at,timestamp with time zone,NO,now()
+public,client_workout_blocks,updated_at,timestamp with time zone,NO,now()
+public,clients,id,uuid,NO,gen_random_uuid()
+public,clients,coach_id,uuid,NO,null
+public,clients,client_id,uuid,NO,null
+public,clients,status,text,NO,'active'::text
+public,clients,created_at,timestamp with time zone,YES,now()
+public,clients,updated_at,timestamp with time zone,YES,now()
+public,clip_cards,id,bigint,NO,null
+public,clip_cards,client_id,uuid,NO,null
+public,clip_cards,coach_id,uuid,NO,null
+public,clip_cards,total_sessions,integer,NO,null
+public,clip_cards,used_sessions,integer,NO,0
+public,clipcard_types,id,uuid,NO,gen_random_uuid()
+public,clipcard_types,coach_id,uuid,NO,null
+public,clipcard_types,name,text,NO,null
+public,clipcard_types,sessions_count,integer,NO,null
+public,clipcard_types,validity_days,integer,NO,null
+public,clipcard_types,price,numeric,NO,null
+public,clipcard_types,is_active,boolean,YES,true
+public,clipcard_types,created_at,timestamp with time zone,YES,now()
+public,clipcard_types,updated_at,timestamp with time zone,YES,now()
+public,clipcards,id,uuid,NO,gen_random_uuid()
+public,clipcards,coach_id,uuid,NO,null
+public,clipcards,client_id,uuid,NO,null
+public,clipcards,clipcard_type_id,uuid,NO,null
+public,clipcards,sessions_total,integer,NO,null
+public,clipcards,sessions_used,integer,YES,0
+public,clipcards,sessions_remaining,integer,YES,null
+public,clipcards,start_date,date,NO,null
+public,clipcards,end_date,date,NO,null
+public,clipcards,is_active,boolean,YES,true
+public,clipcards,created_at,timestamp with time zone,YES,now()
+public,clipcards,updated_at,timestamp with time zone,YES,now()
+public,coach_availability,id,uuid,NO,gen_random_uuid()
+public,coach_availability,coach_id,uuid,NO,null
+public,coach_availability,day_of_week,integer,NO,null
+public,coach_availability,start_time,time without time zone,NO,null
+public,coach_availability,end_time,time without time zone,NO,null
+public,coach_availability,slot_capacity,integer,YES,4
+public,coach_availability,is_active,boolean,YES,true
+public,coach_availability,created_at,timestamp with time zone,YES,now()
+public,coach_availability,updated_at,timestamp with time zone,YES,now()
+public,coach_time_slots,id,uuid,NO,gen_random_uuid()
+public,coach_time_slots,coach_id,uuid,NO,null
+public,coach_time_slots,date,date,NO,null
+public,coach_time_slots,start_time,time without time zone,NO,null
+public,coach_time_slots,end_time,time without time zone,NO,null
+public,coach_time_slots,is_available,boolean,YES,true
+public,coach_time_slots,recurring_pattern,text,YES,null
+public,coach_time_slots,recurring_end_date,date,YES,null
+public,coach_time_slots,notes,text,YES,null
+public,coach_time_slots,created_at,timestamp with time zone,YES,now()
+public,coach_time_slots,updated_at,timestamp with time zone,YES,now()
+public,current_champions,category,character varying,YES,null
+public,current_champions,sex_filter,character varying,YES,null
+public,current_champions,client_id,uuid,YES,null
+public,current_champions,name,text,YES,null
+public,current_champions,sex,character varying,YES,null
+public,current_champions,bodyweight,numeric,YES,null
+public,current_champions,score,numeric,YES,null
+public,current_champions,title,character varying,YES,null
+public,current_champions,calculated_at,timestamp with time zone,YES,null
+public,daily_workout_cache,id,uuid,NO,gen_random_uuid()
+public,daily_workout_cache,client_id,uuid,NO,null
+public,daily_workout_cache,program_id,uuid,NO,null
+public,daily_workout_cache,workout_date,date,NO,null
+public,daily_workout_cache,workout_data,jsonb,NO,null
+public,daily_workout_cache,expires_at,timestamp with time zone,YES,(now() + '7 days'::interval)
+public,daily_workout_cache,created_at,timestamp with time zone,YES,now()
+public,exercise_alternatives,id,uuid,NO,gen_random_uuid()
+public,exercise_alternatives,primary_exercise_id,uuid,NO,null
+public,exercise_alternatives,alternative_exercise_id,uuid,NO,null
+public,exercise_alternatives,reason,text,NO,null
+public,exercise_alternatives,notes,text,YES,null
+public,exercise_alternatives,created_at,timestamp with time zone,YES,now()
+public,exercise_categories,id,uuid,NO,gen_random_uuid()
+public,exercise_categories,name,text,NO,null
+public,exercise_categories,description,text,YES,null
+public,exercise_categories,icon,text,YES,null
+public,exercise_categories,color,text,YES,'#3B82F6'::text
+public,exercise_categories,created_at,timestamp with time zone,YES,now()
+public,exercise_equipment,id,uuid,NO,gen_random_uuid()
+public,exercise_equipment,exercise_id,uuid,NO,null
+public,exercise_equipment,equipment_type,text,NO,null
+public,exercise_equipment,is_required,boolean,YES,true
+public,exercise_equipment,created_at,timestamp with time zone,YES,now()
+public,exercise_instructions,id,uuid,NO,gen_random_uuid()
+public,exercise_instructions,exercise_id,uuid,NO,null
+public,exercise_instructions,instruction_order,integer,NO,null
+public,exercise_instructions,instruction_text,text,NO,null
+public,exercise_instructions,created_at,timestamp with time zone,YES,now()
+public,exercise_muscle_groups,id,uuid,NO,gen_random_uuid()
+public,exercise_muscle_groups,exercise_id,uuid,NO,null
+public,exercise_muscle_groups,muscle_group,text,NO,null
+public,exercise_muscle_groups,is_primary,boolean,YES,false
+public,exercise_muscle_groups,created_at,timestamp with time zone,YES,now()
+public,exercise_tips,id,uuid,NO,gen_random_uuid()
+public,exercise_tips,exercise_id,uuid,NO,null
+public,exercise_tips,tip_order,integer,NO,null
+public,exercise_tips,tip_text,text,NO,null
+public,exercise_tips,created_at,timestamp with time zone,YES,now()
+public,exercises,id,uuid,NO,gen_random_uuid()
+public,exercises,coach_id,uuid,NO,null
+public,exercises,name,text,NO,null
+public,exercises,description,text,YES,null
+public,exercises,category,text,NO,null
+public,exercises,image_url,text,YES,null
+public,exercises,is_active,boolean,YES,true
+public,exercises,created_at,timestamp with time zone,YES,now()
+public,exercises,updated_at,timestamp with time zone,YES,now()
+public,exercises,video_url,text,YES,null
+public,exercises,equipment_types,jsonb,YES,'[]'::jsonb
+public,exercises,instructions,jsonb,YES,'[]'::jsonb
+public,exercises,tips,jsonb,YES,'[]'::jsonb
+public,exercises,primary_muscle_group_id,uuid,YES,null
+public,exercises,secondary_muscle_group_1_id,uuid,YES,null
+public,exercises,secondary_muscle_group_2_id,uuid,YES,null
+public,fms_assessments,id,uuid,NO,gen_random_uuid()
+public,fms_assessments,client_id,uuid,NO,null
+public,fms_assessments,coach_id,uuid,YES,null
+public,fms_assessments,total_score,integer,YES,null
+public,fms_assessments,deep_squat,integer,YES,null
+public,fms_assessments,hurdle_step_left,integer,YES,null
+public,fms_assessments,hurdle_step_right,integer,YES,null
+public,fms_assessments,inline_lunge_left,integer,YES,null
+public,fms_assessments,inline_lunge_right,integer,YES,null
+public,fms_assessments,shoulder_mobility_left,integer,YES,null
+public,fms_assessments,shoulder_mobility_right,integer,YES,null
+public,fms_assessments,active_straight_leg_raise_left,integer,YES,null
+public,fms_assessments,active_straight_leg_raise_right,integer,YES,null
+public,fms_assessments,trunk_stability_pushup,integer,YES,null
+public,fms_assessments,rotary_stability_left,integer,YES,null
+public,fms_assessments,rotary_stability_right,integer,YES,null
+public,fms_assessments,assessed_date,date,NO,CURRENT_DATE
+public,fms_assessments,assessor_certified,boolean,YES,false
+public,fms_assessments,notes,text,YES,null
+public,fms_assessments,pain_points,ARRAY,YES,null
+public,fms_assessments,created_at,timestamp with time zone,YES,now()
+public,fms_assessments,updated_at,timestamp with time zone,YES,now()
+public,foods,id,uuid,NO,gen_random_uuid()
+public,foods,name,text,NO,null
+public,foods,brand,text,YES,null
+public,foods,serving_size,numeric,NO,null
+public,foods,serving_unit,text,NO,'g'::text
+public,foods,calories_per_serving,numeric,NO,null
+public,foods,protein,numeric,YES,0
+public,foods,carbs,numeric,YES,0
+public,foods,fat,numeric,YES,0
+public,foods,fiber,numeric,YES,0
+public,foods,category,text,YES,'General'::text
+public,foods,is_active,boolean,YES,true
+public,foods,created_at,timestamp with time zone,YES,now()
+public,foods,updated_at,timestamp with time zone,YES,now()
+public,foods,sugar,numeric,YES,0
+public,foods,sodium,numeric,YES,0
+public,goals,id,uuid,NO,gen_random_uuid()
+public,goals,client_id,uuid,NO,null
+public,goals,coach_id,uuid,YES,null
+public,goals,title,text,NO,null
+public,goals,description,text,YES,null
+public,goals,category,text,NO,null
+public,goals,target_value,numeric,YES,null
+public,goals,target_date,date,YES,null
+public,goals,current_value,numeric,YES,null
+public,goals,status,text,YES,'active'::text
+public,goals,priority,text,YES,'medium'::text
+public,goals,start_date,date,NO,CURRENT_DATE
+public,goals,completed_date,date,YES,null
+public,goals,progress_percentage,numeric,YES,0.00
+public,goals,is_public,boolean,YES,false
+public,goals,notes,text,YES,null
+public,goals,created_at,timestamp with time zone,YES,now()
+public,goals,updated_at,timestamp with time zone,YES,now()
+public,goals,target_unit,text,YES,null
+public,habit_assignments,id,uuid,NO,gen_random_uuid()
+public,habit_assignments,habit_id,uuid,NO,null
+public,habit_assignments,client_id,uuid,NO,null
+public,habit_assignments,start_date,date,NO,CURRENT_DATE
+public,habit_assignments,end_date,date,YES,null
+public,habit_assignments,is_active,boolean,YES,true
+public,habit_assignments,created_at,timestamp with time zone,YES,now()
+public,habit_assignments,updated_at,timestamp with time zone,YES,now()
+public,habit_logs,id,uuid,NO,gen_random_uuid()
+public,habit_logs,assignment_id,uuid,NO,null
+public,habit_logs,client_id,uuid,NO,null
+public,habit_logs,log_date,date,NO,CURRENT_DATE
+public,habit_logs,completed_at,timestamp with time zone,YES,now()
+public,habit_logs,notes,text,YES,null
+public,habit_logs,created_at,timestamp with time zone,YES,now()
+public,habit_tracking_summary,assignment_id,uuid,YES,null
+public,habit_tracking_summary,client_id,uuid,YES,null
+public,habit_tracking_summary,habit_name,character varying,YES,null
+public,habit_tracking_summary,habit_description,text,YES,null
+public,habit_tracking_summary,frequency_type,character varying,YES,null
+public,habit_tracking_summary,target_days,integer,YES,null
+public,habit_tracking_summary,start_date,date,YES,null
+public,habit_tracking_summary,end_date,date,YES,null
+public,habit_tracking_summary,assignment_active,boolean,YES,null
+public,habit_tracking_summary,total_completions,bigint,YES,null
+public,habit_tracking_summary,expected_completions,numeric,YES,null
+public,habit_tracking_summary,completion_percentage,numeric,YES,null
+public,habits,id,uuid,NO,gen_random_uuid()
+public,habits,coach_id,uuid,NO,null
+public,habits,name,character varying,NO,null
+public,habits,description,text,YES,null
+public,habits,frequency_type,character varying,NO,null
+public,habits,target_days,integer,YES,1
+public,habits,is_active,boolean,YES,true
+public,habits,created_at,timestamp with time zone,YES,now()
+public,habits,updated_at,timestamp with time zone,YES,now()
+public,invite_codes,id,uuid,NO,gen_random_uuid()
+public,invite_codes,code,character varying,NO,null
+public,invite_codes,coach_id,uuid,NO,null
+public,invite_codes,client_email,character varying,YES,null
+public,invite_codes,client_name,character varying,YES,null
+public,invite_codes,expires_at,timestamp with time zone,YES,null
+public,invite_codes,is_used,boolean,YES,false
+public,invite_codes,used_by,uuid,YES,null
+public,invite_codes,used_at,timestamp with time zone,YES,null
+public,invite_codes,created_at,timestamp with time zone,YES,now()
+public,invite_codes,notes,text,YES,null
+public,invite_codes,max_uses,integer,YES,null
+public,invite_codes,used_count,integer,YES,0
+public,invite_codes,last_used_at,timestamp with time zone,YES,null
+public,invite_codes,is_active,boolean,YES,true
+public,latest_body_metrics,id,uuid,YES,null
+public,latest_body_metrics,client_id,uuid,YES,null
+public,latest_body_metrics,coach_id,uuid,YES,null
+public,latest_body_metrics,measured_date,date,YES,null
+public,latest_body_metrics,weight_kg,numeric,YES,null
+public,latest_body_metrics,waist_circumference,numeric,YES,null
+public,latest_body_metrics,body_fat_percentage,numeric,YES,null
+public,latest_body_metrics,muscle_mass_kg,numeric,YES,null
+public,latest_body_metrics,visceral_fat_level,integer,YES,null
+public,latest_body_metrics,left_arm_circumference,numeric,YES,null
+public,latest_body_metrics,right_arm_circumference,numeric,YES,null
+public,latest_body_metrics,torso_circumference,numeric,YES,null
+public,latest_body_metrics,hips_circumference,numeric,YES,null
+public,latest_body_metrics,left_thigh_circumference,numeric,YES,null
+public,latest_body_metrics,right_thigh_circumference,numeric,YES,null
+public,latest_body_metrics,left_calf_circumference,numeric,YES,null
+public,latest_body_metrics,right_calf_circumference,numeric,YES,null
+public,latest_body_metrics,measurement_method,text,YES,null
+public,latest_body_metrics,notes,text,YES,null
+public,latest_body_metrics,created_at,timestamp with time zone,YES,null
+public,latest_body_metrics,updated_at,timestamp with time zone,YES,null
+public,leaderboard_entries,id,uuid,NO,gen_random_uuid()
+public,leaderboard_entries,client_id,uuid,NO,null
+public,leaderboard_entries,leaderboard_type,text,NO,null
+public,leaderboard_entries,exercise_id,uuid,YES,null
+public,leaderboard_entries,rank,integer,NO,null
+public,leaderboard_entries,score,numeric,NO,null
+public,leaderboard_entries,time_window,text,YES,null
+public,leaderboard_entries,display_name,text,YES,null
+public,leaderboard_entries,is_anonymous,boolean,YES,false
+public,leaderboard_entries,last_updated,timestamp with time zone,YES,now()
+public,leaderboard_entries,created_at,timestamp with time zone,YES,now()
+public,leaderboard_rankings,id,uuid,NO,gen_random_uuid()
+public,leaderboard_rankings,client_id,uuid,NO,null
+public,leaderboard_rankings,category,character varying,NO,null
+public,leaderboard_rankings,sex_filter,character varying,YES,null
+public,leaderboard_rankings,time_filter,character varying,NO,'all_time'::character varying
+public,leaderboard_rankings,score,numeric,NO,null
+public,leaderboard_rankings,rank,integer,NO,null
+public,leaderboard_rankings,title,character varying,YES,null
+public,leaderboard_rankings,calculated_at,timestamp with time zone,YES,now()
+public,leaderboard_titles,id,uuid,NO,gen_random_uuid()
+public,leaderboard_titles,client_id,uuid,NO,null
+public,leaderboard_titles,category,character varying,NO,null
+public,leaderboard_titles,sex_filter,character varying,YES,null
+public,leaderboard_titles,rank,integer,NO,null
+public,leaderboard_titles,title,character varying,NO,null
+public,leaderboard_titles,earned_at,timestamp with time zone,YES,now()
+public,leaderboard_titles,lost_at,timestamp with time zone,YES,null
+public,leaderboard_titles,duration_days,integer,YES,null
+public,meal_completions,id,uuid,NO,gen_random_uuid()
+public,meal_completions,meal_id,uuid,NO,null
+public,meal_completions,client_id,uuid,NO,null
+public,meal_completions,completed_at,timestamp with time zone,NO,now()
+public,meal_completions,photo_url,text,YES,null
+public,meal_completions,notes,text,YES,null
+public,meal_completions,created_at,timestamp with time zone,YES,now()
+public,meal_food_items,id,uuid,NO,gen_random_uuid()
+public,meal_food_items,meal_id,uuid,NO,null
+public,meal_food_items,food_id,uuid,NO,null
+public,meal_food_items,quantity,numeric,NO,null
+public,meal_food_items,unit,text,NO,null
+public,meal_food_items,created_at,timestamp with time zone,YES,now()
+public,meal_items,id,uuid,NO,gen_random_uuid()
+public,meal_items,meal_id,uuid,NO,null
+public,meal_items,food_name,character varying,NO,null
+public,meal_items,quantity,numeric,NO,null
+public,meal_items,unit,character varying,NO,null
+public,meal_items,calories_per_unit,numeric,NO,0
+public,meal_items,protein_per_unit,numeric,NO,0
+public,meal_items,carbs_per_unit,numeric,NO,0
+public,meal_items,fat_per_unit,numeric,NO,0
+public,meal_items,order_index,integer,NO,0
+public,meal_items,created_at,timestamp with time zone,YES,now()
+public,meal_items,updated_at,timestamp with time zone,YES,now()
+public,meal_photo_logs,id,uuid,NO,gen_random_uuid()
+public,meal_photo_logs,client_id,uuid,NO,null
+public,meal_photo_logs,meal_id,uuid,NO,null
+public,meal_photo_logs,log_date,date,NO,null
+public,meal_photo_logs,photo_url,text,NO,null
+public,meal_photo_logs,photo_path,text,NO,null
+public,meal_photo_logs,notes,text,YES,null
+public,meal_photo_logs,created_at,timestamp with time zone,YES,now()
+public,meal_photo_logs,updated_at,timestamp with time zone,YES,now()
+public,meal_plan_assignments,id,uuid,NO,gen_random_uuid()
+public,meal_plan_assignments,coach_id,uuid,NO,null
+public,meal_plan_assignments,client_id,uuid,NO,null
+public,meal_plan_assignments,meal_plan_id,uuid,NO,null
+public,meal_plan_assignments,start_date,date,NO,null
+public,meal_plan_assignments,end_date,date,YES,null
+public,meal_plan_assignments,is_active,boolean,YES,true
+public,meal_plan_assignments,notes,text,YES,null
+public,meal_plan_assignments,created_at,timestamp with time zone,YES,now()
+public,meal_plan_assignments,updated_at,timestamp with time zone,YES,now()
+public,meal_plan_items,id,uuid,NO,gen_random_uuid()
+public,meal_plan_items,meal_plan_id,uuid,NO,null
+public,meal_plan_items,food_id,uuid,NO,null
+public,meal_plan_items,meal_type,text,NO,null
+public,meal_plan_items,day_of_week,integer,YES,null
+public,meal_plan_items,quantity,numeric,NO,1
+public,meal_plan_items,notes,text,YES,null
+public,meal_plan_items,created_at,timestamp with time zone,YES,now()
+public,meal_plan_items,coach_id,uuid,NO,null
+public,meal_plans,id,uuid,NO,gen_random_uuid()
+public,meal_plans,coach_id,uuid,NO,null
+public,meal_plans,name,text,NO,null
+public,meal_plans,notes,text,YES,null
+public,meal_plans,target_calories,integer,YES,null
+public,meal_plans,target_protein,numeric,YES,null
+public,meal_plans,target_carbs,numeric,YES,null
+public,meal_plans,target_fat,numeric,YES,null
+public,meal_plans,is_active,boolean,YES,true
+public,meal_plans,created_at,timestamp with time zone,YES,now()
+public,meal_plans,updated_at,timestamp with time zone,YES,now()
+public,meals,id,uuid,NO,gen_random_uuid()
+public,meals,meal_plan_id,uuid,NO,null
+public,meals,name,text,NO,null
+public,meals,meal_type,text,NO,null
+public,meals,order_index,integer,YES,0
+public,meals,created_at,timestamp with time zone,YES,now()
+public,meals,updated_at,timestamp with time zone,YES,now()
+public,meals,notes,text,YES,null
+public,mobility_metrics,id,uuid,NO,gen_random_uuid()
+public,mobility_metrics,client_id,uuid,NO,null
+public,mobility_metrics,coach_id,uuid,YES,null
+public,mobility_metrics,left_shoulder_ir,numeric,YES,null
+public,mobility_metrics,left_shoulder_er,numeric,YES,null
+public,mobility_metrics,left_shoulder_abduction,numeric,YES,null
+public,mobility_metrics,right_shoulder_ir,numeric,YES,null
+public,mobility_metrics,right_shoulder_er,numeric,YES,null
+public,mobility_metrics,right_shoulder_abduction,numeric,YES,null
+public,mobility_metrics,left_hip_ir,numeric,YES,null
+public,mobility_metrics,left_hip_er,numeric,YES,null
+public,mobility_metrics,right_hip_ir,numeric,YES,null
+public,mobility_metrics,right_hip_er,numeric,YES,null
+public,mobility_metrics,left_foot_dorsiflexion,numeric,YES,null
+public,mobility_metrics,right_foot_dorsiflexion,numeric,YES,null
+public,mobility_metrics,assessed_date,date,NO,CURRENT_DATE
+public,mobility_metrics,assessment_type,text,YES,'manual'::text
+public,mobility_metrics,notes,text,YES,null
+public,mobility_metrics,created_at,timestamp with time zone,YES,now()
+public,mobility_metrics,updated_at,timestamp with time zone,YES,now()
+public,mobility_metrics,left_shoulder_flexion,numeric,YES,null
+public,mobility_metrics,right_shoulder_flexion,numeric,YES,null
+public,mobility_metrics,left_hip_straight_leg_raise,numeric,YES,null
+public,mobility_metrics,left_hip_knee_to_chest,numeric,YES,null
+public,mobility_metrics,right_hip_straight_leg_raise,numeric,YES,null
+public,mobility_metrics,right_hip_knee_to_chest,numeric,YES,null
+public,mobility_metrics,left_ankle_plantar_flexion,numeric,YES,null
+public,mobility_metrics,right_ankle_plantar_flexion,numeric,YES,null
+public,mobility_metrics,forward_lean,numeric,YES,null
+public,mobility_metrics,toe_touch,numeric,YES,null
+public,mobility_metrics,squat_depth,numeric,YES,null
+public,mobility_metrics,photos,ARRAY,YES,null
+public,monthly_body_metrics_summary,client_id,uuid,YES,null
+public,monthly_body_metrics_summary,month,timestamp with time zone,YES,null
+public,monthly_body_metrics_summary,measurement_count,bigint,YES,null
+public,monthly_body_metrics_summary,avg_weight_kg,numeric,YES,null
+public,monthly_body_metrics_summary,avg_waist_cm,numeric,YES,null
+public,monthly_body_metrics_summary,avg_body_fat_pct,numeric,YES,null
+public,monthly_body_metrics_summary,avg_muscle_mass_kg,numeric,YES,null
+public,monthly_body_metrics_summary,avg_visceral_fat,numeric,YES,null
+public,monthly_body_metrics_summary,first_measurement,date,YES,null
+public,monthly_body_metrics_summary,last_measurement,date,YES,null
+public,monthly_body_metrics_summary,weight_change_kg,numeric,YES,null
+public,monthly_body_metrics_summary,waist_change_cm,numeric,YES,null
+public,muscle_groups,id,uuid,NO,gen_random_uuid()
+public,muscle_groups,name,text,NO,null
+public,muscle_groups,description,text,YES,null
+public,muscle_groups,created_at,timestamp with time zone,YES,now()
+public,muscle_groups,updated_at,timestamp with time zone,YES,now()
+public,performance_tests,id,uuid,NO,gen_random_uuid()
+public,performance_tests,client_id,uuid,NO,null
+public,performance_tests,tested_at,date,NO,null
+public,performance_tests,test_type,text,NO,null
+public,performance_tests,time_seconds,integer,YES,null
+public,performance_tests,heart_rate_pre,integer,YES,null
+public,performance_tests,heart_rate_1min,integer,YES,null
+public,performance_tests,heart_rate_2min,integer,YES,null
+public,performance_tests,heart_rate_3min,integer,YES,null
+public,performance_tests,recovery_score,numeric,YES,null
+public,performance_tests,notes,text,YES,null
+public,performance_tests,conditions,text,YES,null
+public,performance_tests,perceived_effort,integer,YES,null
+public,performance_tests,tested_by,text,YES,null
+public,performance_tests,created_at,timestamp with time zone,YES,now()
+public,performance_tests,updated_at,timestamp with time zone,YES,now()
+public,personal_records,id,uuid,NO,gen_random_uuid()
+public,personal_records,client_id,uuid,NO,null
+public,personal_records,exercise_id,uuid,NO,null
+public,personal_records,record_type,text,NO,null
+public,personal_records,record_value,numeric,NO,null
+public,personal_records,record_unit,text,NO,null
+public,personal_records,achieved_date,date,NO,CURRENT_DATE
+public,personal_records,workout_assignment_id,uuid,YES,null
+public,personal_records,previous_record_value,numeric,YES,null
+public,personal_records,improvement_percentage,numeric,YES,null
+public,personal_records,is_current_record,boolean,YES,true
+public,personal_records,notes,text,YES,null
+public,personal_records,created_at,timestamp with time zone,YES,now()
+public,personal_records,updated_at,timestamp with time zone,YES,now()
+public,profiles,id,uuid,NO,null
+public,profiles,email,text,NO,null
+public,profiles,role,text,NO,null
+public,profiles,first_name,text,YES,null
+public,profiles,last_name,text,YES,null
+public,profiles,avatar_url,text,YES,null
+public,profiles,created_at,timestamp with time zone,YES,now()
+public,profiles,updated_at,timestamp with time zone,YES,now()
+public,profiles,sex,character varying,YES,null
+public,profiles,bodyweight,numeric,YES,null
+public,profiles,client_type,USER-DEFINED,NO,'online'::client_type
+public,profiles,leaderboard_visibility,USER-DEFINED,NO,'public'::leaderboard_visibility
+public,program_assignment_progress,id,uuid,NO,gen_random_uuid()
+public,program_assignment_progress,assignment_id,uuid,NO,null
+public,program_assignment_progress,client_id,uuid,NO,null
+public,program_assignment_progress,program_id,uuid,NO,null
+public,program_assignment_progress,current_week,integer,NO,1
+public,program_assignment_progress,current_day,integer,NO,1
+public,program_assignment_progress,days_completed_this_week,integer,YES,0
+public,program_assignment_progress,cycle_start_date,date,NO,CURRENT_DATE
+public,program_assignment_progress,last_workout_date,date,YES,null
+public,program_assignment_progress,total_weeks_completed,integer,YES,0
+public,program_assignment_progress,is_program_completed,boolean,YES,false
+public,program_assignment_progress,completed_at,timestamp with time zone,YES,null
+public,program_assignment_progress,created_at,timestamp with time zone,YES,now()
+public,program_assignment_progress,updated_at,timestamp with time zone,YES,now()
+public,program_assignments,id,uuid,NO,gen_random_uuid()
+public,program_assignments,program_id,uuid,NO,null
+public,program_assignments,client_id,uuid,NO,null
+public,program_assignments,coach_id,uuid,NO,null
+public,program_assignments,current_day_number,integer,YES,1
+public,program_assignments,completed_days,integer,YES,0
+public,program_assignments,total_days,integer,NO,null
+public,program_assignments,start_date,date,NO,CURRENT_DATE
+public,program_assignments,preferred_workout_days,ARRAY,YES,null
+public,program_assignments,status,text,YES,'active'::text
+public,program_assignments,is_customized,boolean,YES,false
+public,program_assignments,notes,text,YES,null
+public,program_assignments,created_at,timestamp with time zone,YES,now()
+public,program_assignments,updated_at,timestamp with time zone,YES,now()
+public,program_assignments,name,text,YES,null
+public,program_assignments,description,text,YES,null
+public,program_assignments,duration_weeks,integer,YES,null
+public,program_day_assignments,id,uuid,NO,gen_random_uuid()
+public,program_day_assignments,program_assignment_id,uuid,NO,null
+public,program_day_assignments,program_day_id,uuid,YES,null
+public,program_day_assignments,day_number,integer,NO,null
+public,program_day_assignments,day_type,text,NO,null
+public,program_day_assignments,workout_assignment_id,uuid,YES,null
+public,program_day_assignments,name,text,NO,null
+public,program_day_assignments,description,text,YES,null
+public,program_day_assignments,estimated_duration,integer,YES,null
+public,program_day_assignments,target_muscles,ARRAY,YES,null
+public,program_day_assignments,intensity_level,text,YES,null
+public,program_day_assignments,rest_focus,text,YES,null
+public,program_day_assignments,recommended_activities,ARRAY,YES,null
+public,program_day_assignments,is_completed,boolean,YES,false
+public,program_day_assignments,completed_date,date,YES,null
+public,program_day_assignments,notes,text,YES,null
+public,program_day_assignments,is_customized,boolean,YES,false
+public,program_day_assignments,created_at,timestamp with time zone,YES,now()
+public,program_day_assignments,updated_at,timestamp with time zone,YES,now()
+public,program_day_assignments,program_day,integer,YES,null
+public,program_day_assignments,workout_template_id,uuid,YES,null
+public,program_days,id,uuid,NO,gen_random_uuid()
+public,program_days,program_id,uuid,NO,null
+public,program_days,day_number,integer,NO,null
+public,program_days,day_type,text,NO,null
+public,program_days,workout_template_id,uuid,YES,null
+public,program_days,name,text,NO,null
+public,program_days,description,text,YES,null
+public,program_days,estimated_duration,integer,YES,null
+public,program_days,target_muscles,ARRAY,YES,null
+public,program_days,intensity_level,text,YES,null
+public,program_days,rest_focus,text,YES,null
+public,program_days,recommended_activities,ARRAY,YES,null
+public,program_days,created_at,timestamp with time zone,YES,now()
+public,program_days,updated_at,timestamp with time zone,YES,now()
+public,program_progression_rules,id,uuid,NO,gen_random_uuid()
+public,program_progression_rules,program_id,uuid,NO,null
+public,program_progression_rules,week_number,integer,NO,null
+public,program_progression_rules,sets,integer,YES,null
+public,program_progression_rules,reps,text,YES,null
+public,program_progression_rules,weight_guidance,text,YES,null
+public,program_progression_rules,rest_time,integer,YES,null
+public,program_progression_rules,notes,text,YES,null
+public,program_progression_rules,created_at,timestamp with time zone,YES,now()
+public,program_progression_rules,updated_at,timestamp with time zone,YES,now()
+public,program_progression_rules,field,text,YES,null
+public,program_progression_rules,change_type,text,YES,null
+public,program_progression_rules,amount,text,YES,null
+public,program_progression_rules,program_schedule_id,uuid,YES,null
+public,program_progression_rules,block_id,uuid,YES,null
+public,program_progression_rules,block_type,text,NO,null
+public,program_progression_rules,exercise_id,uuid,YES,null
+public,program_progression_rules,exercise_order,integer,YES,null
+public,program_progression_rules,exercise_letter,character varying,YES,null
+public,program_progression_rules,rest_seconds,integer,YES,null
+public,program_progression_rules,tempo,character varying,YES,null
+public,program_progression_rules,rir,integer,YES,null
+public,program_progression_rules,second_exercise_id,uuid,YES,null
+public,program_progression_rules,compound_exercise_id,uuid,YES,null
+public,program_progression_rules,first_exercise_reps,character varying,YES,null
+public,program_progression_rules,second_exercise_reps,character varying,YES,null
+public,program_progression_rules,isolation_reps,character varying,YES,null
+public,program_progression_rules,compound_reps,character varying,YES,null
+public,program_progression_rules,rest_between_pairs,integer,YES,null
+public,program_progression_rules,exercise_reps,character varying,YES,null
+public,program_progression_rules,drop_set_reps,character varying,YES,null
+public,program_progression_rules,weight_reduction_percentage,integer,YES,null
+public,program_progression_rules,reps_per_cluster,integer,YES,null
+public,program_progression_rules,clusters_per_set,integer,YES,null
+public,program_progression_rules,intra_cluster_rest,integer,YES,null
+public,program_progression_rules,rest_pause_duration,integer,YES,null
+public,program_progression_rules,max_rest_pauses,integer,YES,null
+public,program_progression_rules,rounds,integer,YES,null
+public,program_progression_rules,work_seconds,integer,YES,null
+public,program_progression_rules,rest_after_exercise,integer,YES,null
+public,program_progression_rules,rest_after_set,integer,YES,null
+public,program_progression_rules,duration_minutes,integer,YES,null
+public,program_progression_rules,emom_mode,character varying,YES,null
+public,program_progression_rules,target_reps,integer,YES,null
+public,program_progression_rules,time_cap_minutes,integer,YES,null
+public,program_progression_rules,block_order,integer,NO,null
+public,program_progression_rules,block_name,text,YES,null
+public,program_progression_rules,weight_kg,numeric,YES,null
+public,program_progression_rules,pyramid_order,integer,YES,null
+public,program_progression_rules,ladder_order,integer,YES,null
+public,program_progression_rules,load_percentage,numeric,YES,null
+public,program_schedule,id,uuid,NO,gen_random_uuid()
+public,program_schedule,program_id,uuid,NO,null
+public,program_schedule,template_id,uuid,NO,null
+public,program_schedule,day_of_week,integer,NO,null
+public,program_schedule,week_number,integer,NO,null
+public,program_schedule,created_at,timestamp with time zone,YES,now()
+public,program_schedule,updated_at,timestamp with time zone,YES,now()
+public,program_workout_completions,id,uuid,NO,gen_random_uuid()
+public,program_workout_completions,assignment_progress_id,uuid,NO,null
+public,program_workout_completions,client_id,uuid,NO,null
+public,program_workout_completions,program_id,uuid,NO,null
+public,program_workout_completions,week_number,integer,NO,null
+public,program_workout_completions,program_day,integer,NO,null
+public,program_workout_completions,template_id,uuid,NO,null
+public,program_workout_completions,workout_date,date,NO,CURRENT_DATE
+public,program_workout_completions,completed_at,timestamp with time zone,YES,now()
+public,program_workout_completions,duration_minutes,integer,YES,null
+public,program_workout_completions,notes,text,YES,null
+public,program_workout_completions,created_at,timestamp with time zone,YES,now()
+public,progression_guidelines,id,uuid,NO,gen_random_uuid()
+public,progression_guidelines,category,text,NO,null
+public,progression_guidelines,difficulty,text,NO,null
+public,progression_guidelines,volume_increase_week_min,integer,NO,0
+public,progression_guidelines,volume_increase_week_max,integer,NO,0
+public,progression_guidelines,intensity_increase_week,integer,NO,0
+public,progression_guidelines,deload_frequency_weeks,integer,NO,4
+public,progression_guidelines,deload_volume_reduction,integer,NO,40
+public,progression_guidelines,progress_when,text,YES,null
+public,progression_guidelines,created_at,timestamp with time zone,YES,now()
+public,progression_guidelines,updated_at,timestamp with time zone,YES,now()
+public,rp_volume_landmarks,id,uuid,NO,gen_random_uuid()
+public,rp_volume_landmarks,muscle_group_name,text,NO,null
+public,rp_volume_landmarks,muscle_group_id,uuid,YES,null
+public,rp_volume_landmarks,mv,integer,NO,0
+public,rp_volume_landmarks,mev,integer,NO,0
+public,rp_volume_landmarks,mev_high,integer,NO,0
+public,rp_volume_landmarks,mav_low,integer,NO,0
+public,rp_volume_landmarks,mav_high,integer,NO,0
+public,rp_volume_landmarks,mrv,integer,NO,0
+public,rp_volume_landmarks,frequency,text,YES,null
+public,rp_volume_landmarks,created_at,timestamp with time zone,YES,now()
+public,rp_volume_landmarks,updated_at,timestamp with time zone,YES,now()
+public,sessions,id,uuid,NO,gen_random_uuid()
+public,sessions,coach_id,uuid,NO,null
+public,sessions,client_id,uuid,NO,null
+public,sessions,title,text,NO,null
+public,sessions,description,text,YES,null
+public,sessions,scheduled_at,timestamp with time zone,NO,null
+public,sessions,duration_minutes,integer,YES,60
+public,sessions,status,text,NO,'scheduled'::text
+public,sessions,notes,text,YES,null
+public,sessions,created_at,timestamp with time zone,YES,now()
+public,sessions,updated_at,timestamp with time zone,YES,now()
+public,user_achievements,id,uuid,NO,gen_random_uuid()
+public,user_achievements,user_id,uuid,NO,null
+public,user_achievements,achievement_id,uuid,NO,null
+public,user_achievements,earned_at,timestamp with time zone,YES,now()
+public,user_achievements,client_id,uuid,NO,null
+public,user_achievements,achievement_template_id,uuid,NO,null
+public,user_achievements,tier,text,YES,null
+public,user_achievements,metric_value,numeric,NO,null
+public,user_achievements,achieved_date,date,NO,CURRENT_DATE
+public,user_achievements,is_public,boolean,NO,true
+public,user_exercise_metrics,id,uuid,NO,gen_random_uuid()
+public,user_exercise_metrics,user_id,uuid,NO,null
+public,user_exercise_metrics,exercise_id,uuid,NO,null
+public,user_exercise_metrics,estimated_1rm,numeric,NO,null
+public,user_exercise_metrics,created_at,timestamp with time zone,YES,now()
+public,user_exercise_metrics,updated_at,timestamp with time zone,YES,now()
+public,volume_guidelines,id,uuid,NO,gen_random_uuid()
+public,volume_guidelines,category,text,NO,null
+public,volume_guidelines,difficulty,text,NO,null
+public,volume_guidelines,sets_per_muscle_week_min,integer,NO,null
+public,volume_guidelines,sets_per_muscle_week_optimal,integer,NO,null
+public,volume_guidelines,sets_per_muscle_week_max,integer,NO,null
+public,volume_guidelines,reps_per_set_min,integer,NO,null
+public,volume_guidelines,reps_per_set_max,integer,NO,null
+public,volume_guidelines,rir_min,integer,NO,0
+public,volume_guidelines,rir_max,integer,NO,0
+public,volume_guidelines,load_percent_min,integer,NO,0
+public,volume_guidelines,load_percent_max,integer,NO,0
+public,volume_guidelines,rest_period_sec,integer,NO,60
+public,volume_guidelines,sessions_per_week,text,YES,null
+public,volume_guidelines,created_at,timestamp with time zone,YES,now()
+public,volume_guidelines,updated_at,timestamp with time zone,YES,now()
+public,workout_assignments,id,uuid,NO,gen_random_uuid()
+public,workout_assignments,workout_template_id,uuid,YES,null
+public,workout_assignments,client_id,uuid,NO,null
+public,workout_assignments,coach_id,uuid,NO,null
+public,workout_assignments,name,text,NO,null
+public,workout_assignments,description,text,YES,null
+public,workout_assignments,estimated_duration,integer,YES,60
+public,workout_assignments,assigned_date,date,NO,CURRENT_DATE
+public,workout_assignments,scheduled_date,date,YES,null
+public,workout_assignments,status,text,YES,'assigned'::text
+public,workout_assignments,notes,text,YES,null
+public,workout_assignments,is_customized,boolean,YES,false
+public,workout_assignments,created_at,timestamp with time zone,YES,now()
+public,workout_assignments,updated_at,timestamp with time zone,YES,now()
+public,workout_block_assignments,id,uuid,NO,gen_random_uuid()
+public,workout_block_assignments,workout_assignment_id,uuid,NO,null
+public,workout_block_assignments,workout_block_id,uuid,YES,null
+public,workout_block_assignments,block_order,integer,NO,null
+public,workout_block_assignments,block_name,character varying,YES,null
+public,workout_block_assignments,block_notes,text,YES,null
+public,workout_block_assignments,duration_seconds,integer,YES,null
+public,workout_block_assignments,rest_seconds,integer,YES,null
+public,workout_block_assignments,total_sets,integer,YES,null
+public,workout_block_assignments,reps_per_set,character varying,YES,null
+public,workout_block_assignments,is_customized,boolean,YES,false
+public,workout_block_assignments,is_exercises_customized,boolean,YES,false
+public,workout_block_assignments,created_at,timestamp with time zone,YES,now()
+public,workout_block_assignments,updated_at,timestamp with time zone,YES,now()
+public,workout_block_exercises,id,uuid,NO,gen_random_uuid()
+public,workout_block_exercises,block_id,uuid,NO,null
+public,workout_block_exercises,exercise_id,uuid,NO,null
+public,workout_block_exercises,exercise_order,integer,NO,null
+public,workout_block_exercises,exercise_letter,character varying,YES,null
+public,workout_block_exercises,sets,integer,YES,null
+public,workout_block_exercises,reps,character varying,YES,null
+public,workout_block_exercises,weight_kg,numeric,YES,null
+public,workout_block_exercises,rir,integer,YES,null
+public,workout_block_exercises,tempo,character varying,YES,null
+public,workout_block_exercises,rest_seconds,integer,YES,null
+public,workout_block_exercises,notes,text,YES,null
+public,workout_block_exercises,created_at,timestamp with time zone,YES,now()
+public,workout_block_exercises,updated_at,timestamp with time zone,YES,now()
+public,workout_block_exercises,load_percentage,numeric,YES,null
+public,workout_blocks,id,uuid,NO,gen_random_uuid()
+public,workout_blocks,template_id,uuid,NO,null
+public,workout_blocks,block_order,integer,NO,null
+public,workout_blocks,block_name,character varying,YES,null
+public,workout_blocks,block_notes,text,YES,null
+public,workout_blocks,duration_seconds,integer,YES,null
+public,workout_blocks,rest_seconds,integer,YES,null
+public,workout_blocks,total_sets,integer,YES,null
+public,workout_blocks,reps_per_set,character varying,YES,null
+public,workout_blocks,created_at,timestamp with time zone,YES,now()
+public,workout_blocks,updated_at,timestamp with time zone,YES,now()
+public,workout_blocks,block_type,USER-DEFINED,NO,'straight_set'::workout_block_type
+public,workout_blocks,hr_zone_target,integer,YES,null
+public,workout_blocks,hr_percentage_min,numeric,YES,null
+public,workout_blocks,hr_percentage_max,numeric,YES,null
+public,workout_categories,id,uuid,NO,gen_random_uuid()
+public,workout_categories,coach_id,uuid,YES,null
+public,workout_categories,name,text,NO,null
+public,workout_categories,description,text,YES,null
+public,workout_categories,color,text,YES,'#3B82F6'::text
+public,workout_categories,icon,text,YES,'Dumbbell'::text
+public,workout_categories,is_active,boolean,YES,true
+public,workout_categories,created_at,timestamp with time zone,YES,now()
+public,workout_categories,updated_at,timestamp with time zone,YES,now()
+public,workout_cluster_sets,id,uuid,NO,gen_random_uuid()
+public,workout_cluster_sets,reps_per_cluster,integer,NO,null
+public,workout_cluster_sets,clusters_per_set,integer,NO,null
+public,workout_cluster_sets,intra_cluster_rest,integer,YES,15
+public,workout_cluster_sets,inter_set_rest,integer,YES,120
+public,workout_cluster_sets,created_at,timestamp with time zone,YES,now()
+public,workout_cluster_sets,block_id,uuid,YES,null
+public,workout_cluster_sets,exercise_id,uuid,YES,null
+public,workout_cluster_sets,exercise_order,integer,YES,1
+public,workout_cluster_sets,load_percentage,numeric,YES,null
+public,workout_cluster_sets,weight_kg,numeric,YES,null
+public,workout_drop_sets,id,uuid,NO,gen_random_uuid()
+public,workout_drop_sets,drop_order,integer,NO,null
+public,workout_drop_sets,weight_kg,numeric,YES,null
+public,workout_drop_sets,reps,character varying,YES,null
+public,workout_drop_sets,created_at,timestamp with time zone,YES,now()
+public,workout_drop_sets,block_id,uuid,YES,null
+public,workout_drop_sets,exercise_id,uuid,YES,null
+public,workout_drop_sets,exercise_order,integer,YES,1
+public,workout_drop_sets,load_percentage,numeric,YES,null
+public,workout_drop_sets,drop_percentage,integer,YES,null
+public,workout_exercise_assignments,id,uuid,NO,gen_random_uuid()
+public,workout_exercise_assignments,workout_block_assignment_id,uuid,NO,null
+public,workout_exercise_assignments,workout_block_exercise_id,uuid,YES,null
+public,workout_exercise_assignments,exercise_id,uuid,NO,null
+public,workout_exercise_assignments,exercise_order,integer,NO,null
+public,workout_exercise_assignments,exercise_letter,character varying,YES,null
+public,workout_exercise_assignments,sets,integer,YES,null
+public,workout_exercise_assignments,reps,character varying,YES,null
+public,workout_exercise_assignments,weight_kg,numeric,YES,null
+public,workout_exercise_assignments,rir,integer,YES,null
+public,workout_exercise_assignments,tempo,character varying,YES,null
+public,workout_exercise_assignments,rest_seconds,integer,YES,null
+public,workout_exercise_assignments,notes,text,YES,null
+public,workout_exercise_assignments,is_customized,boolean,YES,false
+public,workout_exercise_assignments,created_at,timestamp with time zone,YES,now()
+public,workout_exercise_assignments,updated_at,timestamp with time zone,YES,now()
+public,workout_exercise_logs,id,uuid,NO,gen_random_uuid()
+public,workout_exercise_logs,workout_log_id,uuid,NO,null
+public,workout_exercise_logs,workout_exercise_assignment_id,uuid,YES,null
+public,workout_exercise_logs,exercise_id,uuid,NO,null
+public,workout_exercise_logs,exercise_order,integer,YES,null
+public,workout_exercise_logs,completed_sets,jsonb,YES,null
+public,workout_exercise_logs,total_sets_planned,integer,YES,null
+public,workout_exercise_logs,total_sets_completed,integer,YES,null
+public,workout_exercise_logs,total_reps_completed,integer,YES,null
+public,workout_exercise_logs,total_weight_lifted,numeric,YES,null
+public,workout_exercise_logs,difficulty_rating,integer,YES,null
+public,workout_exercise_logs,form_quality_rating,integer,YES,null
+public,workout_exercise_logs,notes,text,YES,null
+public,workout_exercise_logs,created_at,timestamp with time zone,YES,now()
+public,workout_giant_set_exercise_logs,id,uuid,NO,gen_random_uuid()
+public,workout_giant_set_exercise_logs,workout_set_log_id,uuid,NO,null
+public,workout_giant_set_exercise_logs,exercise_id,uuid,NO,null
+public,workout_giant_set_exercise_logs,exercise_order,integer,NO,null
+public,workout_giant_set_exercise_logs,weight_kg,numeric,YES,null
+public,workout_giant_set_exercise_logs,reps_completed,integer,YES,null
+public,workout_giant_set_exercise_logs,created_at,timestamp with time zone,YES,now()
+public,workout_hr_sets,id,uuid,NO,gen_random_uuid()
+public,workout_hr_sets,block_id,uuid,NO,null
+public,workout_hr_sets,exercise_id,uuid,NO,null
+public,workout_hr_sets,exercise_order,integer,NO,1
+public,workout_hr_sets,hr_zone,integer,YES,null
+public,workout_hr_sets,hr_percentage_min,numeric,YES,null
+public,workout_hr_sets,hr_percentage_max,numeric,YES,null
+public,workout_hr_sets,is_intervals,boolean,NO,false
+public,workout_hr_sets,duration_seconds,integer,YES,null
+public,workout_hr_sets,work_duration_seconds,integer,YES,null
+public,workout_hr_sets,rest_duration_seconds,integer,YES,null
+public,workout_hr_sets,target_rounds,integer,YES,null
+public,workout_hr_sets,rounds_completed,integer,YES,null
+public,workout_hr_sets,distance_meters,numeric,YES,null
+public,workout_hr_sets,average_hr_percentage,numeric,YES,null
+public,workout_hr_sets,created_at,timestamp with time zone,YES,now()
+public,workout_hr_sets,updated_at,timestamp with time zone,YES,now()
+public,workout_ladder_sets,id,uuid,NO,gen_random_uuid()
+public,workout_ladder_sets,ladder_order,integer,NO,null
+public,workout_ladder_sets,weight_kg,numeric,YES,null
+public,workout_ladder_sets,reps,integer,YES,null
+public,workout_ladder_sets,rest_seconds,integer,YES,null
+public,workout_ladder_sets,created_at,timestamp with time zone,YES,now()
+public,workout_ladder_sets,block_id,uuid,YES,null
+public,workout_ladder_sets,exercise_id,uuid,YES,null
+public,workout_ladder_sets,exercise_order,integer,YES,1
+public,workout_ladder_sets,load_percentage,numeric,YES,null
+public,workout_logs,id,uuid,NO,gen_random_uuid()
+public,workout_logs,workout_assignment_id,uuid,NO,null
+public,workout_logs,client_id,uuid,NO,null
+public,workout_logs,started_at,timestamp with time zone,NO,null
+public,workout_logs,completed_at,timestamp with time zone,YES,null
+public,workout_logs,total_duration_minutes,integer,YES,null
+public,workout_logs,overall_difficulty_rating,integer,YES,null
+public,workout_logs,perceived_effort,integer,YES,null
+public,workout_logs,total_sets_completed,integer,YES,0
+public,workout_logs,total_reps_completed,integer,YES,0
+public,workout_logs,total_weight_lifted,numeric,YES,0
+public,workout_logs,energy_level,integer,YES,null
+public,workout_logs,muscle_fatigue_level,integer,YES,null
+public,workout_logs,notes,text,YES,null
+public,workout_logs,created_at,timestamp with time zone,YES,now()
+public,workout_logs,workout_session_id,uuid,YES,null
+public,workout_logs,total_hr_zone2_minutes,numeric,YES,null
+public,workout_logs,total_hr_zone45_minutes,numeric,YES,null
+public,workout_logs,average_hr_percentage,numeric,YES,null
+public,workout_logs,max_hr_percentage,numeric,YES,null
+public,workout_logs,total_distance_meters,numeric,YES,null
+public,workout_programs,id,uuid,NO,gen_random_uuid()
+public,workout_programs,name,text,NO,null
+public,workout_programs,description,text,YES,null
+public,workout_programs,coach_id,uuid,NO,null
+public,workout_programs,difficulty_level,text,YES,'intermediate'::text
+public,workout_programs,duration_weeks,integer,YES,4
+public,workout_programs,target_audience,text,YES,'general_fitness'::text
+public,workout_programs,is_active,boolean,YES,true
+public,workout_programs,created_at,timestamp with time zone,YES,now()
+public,workout_programs,updated_at,timestamp with time zone,YES,now()
+public,workout_programs,category,text,YES,null
+public,workout_pyramid_sets,id,uuid,NO,gen_random_uuid()
+public,workout_pyramid_sets,pyramid_order,integer,NO,null
+public,workout_pyramid_sets,weight_kg,numeric,YES,null
+public,workout_pyramid_sets,reps,character varying,YES,null
+public,workout_pyramid_sets,rest_seconds,integer,YES,null
+public,workout_pyramid_sets,created_at,timestamp with time zone,YES,now()
+public,workout_pyramid_sets,block_id,uuid,YES,null
+public,workout_pyramid_sets,exercise_id,uuid,YES,null
+public,workout_pyramid_sets,exercise_order,integer,YES,1
+public,workout_pyramid_sets,load_percentage,numeric,YES,null
+public,workout_rest_pause_sets,id,uuid,NO,gen_random_uuid()
+public,workout_rest_pause_sets,weight_kg,numeric,YES,null
+public,workout_rest_pause_sets,rest_pause_duration,integer,YES,15
+public,workout_rest_pause_sets,max_rest_pauses,integer,YES,3
+public,workout_rest_pause_sets,created_at,timestamp with time zone,YES,now()
+public,workout_rest_pause_sets,block_id,uuid,YES,null
+public,workout_rest_pause_sets,exercise_id,uuid,YES,null
+public,workout_rest_pause_sets,exercise_order,integer,YES,1
+public,workout_rest_pause_sets,load_percentage,numeric,YES,null
+public,workout_sessions,id,uuid,NO,gen_random_uuid()
+public,workout_sessions,assignment_id,uuid,NO,null
+public,workout_sessions,client_id,uuid,NO,null
+public,workout_sessions,started_at,timestamp with time zone,YES,now()
+public,workout_sessions,completed_at,timestamp with time zone,YES,null
+public,workout_sessions,total_duration,integer,YES,null
+public,workout_sessions,status,text,YES,'in_progress'::text
+public,workout_sessions,notes,text,YES,null
+public,workout_sessions,created_at,timestamp with time zone,YES,now()
+public,workout_set_details,id,uuid,NO,gen_random_uuid()
+public,workout_set_details,workout_exercise_log_id,uuid,NO,null
+public,workout_set_details,set_number,integer,NO,null
+public,workout_set_details,weight_kg,numeric,YES,null
+public,workout_set_details,reps_completed,integer,YES,null
+public,workout_set_details,rpe,integer,YES,null
+public,workout_set_details,rest_seconds,integer,YES,null
+public,workout_set_details,notes,text,YES,null
+public,workout_set_details,completed_at,timestamp with time zone,YES,null
+public,workout_set_details,created_at,timestamp with time zone,YES,now()
+public,workout_set_logs,id,uuid,NO,gen_random_uuid()
+public,workout_set_logs,workout_log_id,uuid,NO,null
+public,workout_set_logs,client_id,uuid,NO,null
+public,workout_set_logs,block_id,uuid,NO,null
+public,workout_set_logs,exercise_id,uuid,YES,null
+public,workout_set_logs,weight,numeric,YES,null
+public,workout_set_logs,reps,integer,YES,null
+public,workout_set_logs,completed_at,timestamp with time zone,YES,now()
+public,workout_set_logs,created_at,timestamp with time zone,YES,now()
+public,workout_set_logs,block_type,text,YES,null
+public,workout_set_logs,set_number,integer,YES,null
+public,workout_set_logs,superset_exercise_a_id,uuid,YES,null
+public,workout_set_logs,superset_weight_a,numeric,YES,null
+public,workout_set_logs,superset_reps_a,integer,YES,null
+public,workout_set_logs,superset_exercise_b_id,uuid,YES,null
+public,workout_set_logs,superset_weight_b,numeric,YES,null
+public,workout_set_logs,superset_reps_b,integer,YES,null
+public,workout_set_logs,giant_set_exercises,jsonb,YES,null
+public,workout_set_logs,round_number,integer,YES,null
+public,workout_set_logs,dropset_initial_weight,numeric,YES,null
+public,workout_set_logs,dropset_initial_reps,integer,YES,null
+public,workout_set_logs,dropset_final_weight,numeric,YES,null
+public,workout_set_logs,dropset_final_reps,integer,YES,null
+public,workout_set_logs,dropset_percentage,numeric,YES,null
+public,workout_set_logs,cluster_number,integer,YES,null
+public,workout_set_logs,rest_pause_initial_weight,numeric,YES,null
+public,workout_set_logs,rest_pause_initial_reps,integer,YES,null
+public,workout_set_logs,rest_pause_reps_after,integer,YES,null
+public,workout_set_logs,rest_pause_number,integer,YES,null
+public,workout_set_logs,preexhaust_isolation_exercise_id,uuid,YES,null
+public,workout_set_logs,preexhaust_isolation_weight,numeric,YES,null
+public,workout_set_logs,preexhaust_isolation_reps,integer,YES,null
+public,workout_set_logs,preexhaust_compound_exercise_id,uuid,YES,null
+public,workout_set_logs,preexhaust_compound_weight,numeric,YES,null
+public,workout_set_logs,preexhaust_compound_reps,integer,YES,null
+public,workout_set_logs,amrap_total_reps,integer,YES,null
+public,workout_set_logs,amrap_duration_seconds,integer,YES,null
+public,workout_set_logs,amrap_target_reps,integer,YES,null
+public,workout_set_logs,emom_minute_number,integer,YES,null
+public,workout_set_logs,emom_total_reps_this_min,integer,YES,null
+public,workout_set_logs,emom_total_duration_sec,integer,YES,null
+public,workout_set_logs,tabata_rounds_completed,integer,YES,null
+public,workout_set_logs,tabata_total_duration_sec,integer,YES,null
+public,workout_set_logs,fortime_total_reps,integer,YES,null
+public,workout_set_logs,fortime_time_taken_sec,integer,YES,null
+public,workout_set_logs,fortime_time_cap_sec,integer,YES,null
+public,workout_set_logs,fortime_target_reps,integer,YES,null
+public,workout_set_logs,pyramid_step_number,integer,YES,null
+public,workout_set_logs,ladder_rung_number,integer,YES,null
+public,workout_set_logs,ladder_round_number,integer,YES,null
+public,workout_set_logs,rest_pause_duration,integer,YES,null
+public,workout_set_logs,max_rest_pauses,integer,YES,null
+public,workout_set_logs,hr_zone,integer,YES,null
+public,workout_set_logs,hr_percentage,numeric,YES,null
+public,workout_set_logs,hr_duration_seconds,integer,YES,null
+public,workout_set_logs,hr_distance_meters,numeric,YES,null
+public,workout_set_logs,hr_interval_round,integer,YES,null
+public,workout_set_logs,hr_work_duration_seconds,integer,YES,null
+public,workout_set_logs,hr_rest_duration_seconds,integer,YES,null
+public,workout_set_logs,hr_average_percentage,numeric,YES,null
+public,workout_templates,id,uuid,NO,gen_random_uuid()
+public,workout_templates,name,text,NO,null
+public,workout_templates,description,text,YES,null
+public,workout_templates,coach_id,uuid,NO,null
+public,workout_templates,difficulty_level,text,YES,'intermediate'::text
+public,workout_templates,estimated_duration,integer,YES,60
+public,workout_templates,category,text,YES,'general'::text
+public,workout_templates,is_active,boolean,YES,true
+public,workout_templates,created_at,timestamp with time zone,YES,now()
+public,workout_templates,updated_at,timestamp with time zone,YES,now()
+public,workout_time_protocols,id,uuid,NO,gen_random_uuid()
+public,workout_time_protocols,block_id,uuid,NO,null
+public,workout_time_protocols,protocol_type,character varying,NO,null
+public,workout_time_protocols,total_duration_minutes,integer,YES,null
+public,workout_time_protocols,work_seconds,integer,YES,null
+public,workout_time_protocols,rest_seconds,integer,YES,null
+public,workout_time_protocols,rounds,integer,YES,null
+public,workout_time_protocols,reps_per_round,integer,YES,null
+public,workout_time_protocols,rest_after_round_seconds,integer,YES,null
+public,workout_time_protocols,created_at,timestamp with time zone,YES,now()
+public,workout_time_protocols,exercise_id,uuid,YES,null
+public,workout_time_protocols,exercise_order,integer,YES,1
+public,workout_time_protocols,load_percentage,numeric,YES,null
+public,workout_time_protocols,set,integer,YES,null
+public,workout_time_protocols,rest_after_set,integer,YES,null
+public,workout_time_protocols,weight_kg,numeric,YES,null
+public,workout_time_protocols,target_reps,integer,YES,null
+public,workout_time_protocols,time_cap_minutes,integer,YES,null
+public,workout_time_protocols,emom_mode,character varying,YES,null

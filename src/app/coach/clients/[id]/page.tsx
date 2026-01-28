@@ -31,6 +31,7 @@ import {
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { calculateStreak, calculateWeeklyProgress } from "@/lib/clientDashboardService";
+import WorkoutAssignmentModal from "@/components/WorkoutAssignmentModal";
 
 interface ClientData {
   id: string;
@@ -68,6 +69,7 @@ function ClientDetailContent() {
 
   const [activeTab, setActiveTab] = useState<TabView>("overview");
   const [loading, setLoading] = useState(true);
+  const [showAssignWorkoutModal, setShowAssignWorkoutModal] = useState(false);
   
   // Mock client data - Replace with actual API call
   const [client, setClient] = useState<ClientData>({
@@ -175,7 +177,16 @@ function ClientDetailContent() {
       // Get recent activity (workouts + meal photos)
       const { data: recentWorkouts } = await supabase
         .from("workout_logs")
-        .select("completed_at, workout_template:workout_templates(name)")
+        .select(`
+          completed_at,
+          workout_assignment_id,
+          workout_assignments!inner(
+            workout_template_id,
+            workout_templates(
+              name
+            )
+          )
+        `)
         .eq("client_id", clientId)
         .not("completed_at", "is", null)
         .order("completed_at", { ascending: false })
@@ -192,7 +203,12 @@ function ClientDetailContent() {
 
       // Add workouts
       (recentWorkouts || []).forEach((log: any) => {
-        const template = Array.isArray(log.workout_template) ? log.workout_template[0] : log.workout_template;
+        const assignment = Array.isArray(log.workout_assignments) 
+          ? log.workout_assignments[0] 
+          : log.workout_assignments;
+        const template = Array.isArray(assignment?.workout_templates) 
+          ? assignment.workout_templates[0] 
+          : assignment?.workout_templates;
         recentActivity.push({
           type: "workout",
           title: template?.name || "Workout",
@@ -331,19 +347,15 @@ function ClientDetailContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
-        {/* Back Button */}
-        <div className="mb-6">
-          <Link href="/coach/clients">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Clients
-            </Button>
-          </Link>
-        </div>
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+        <Link href="/coach/clients" className="inline-flex">
+          <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Clients
+          </Button>
+        </Link>
 
-        {/* Client Header Card */}
-        <GlassCard elevation={2} className="p-6 mb-8">
+        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
           <div className="flex items-start justify-between flex-wrap gap-4">
             {/* Left: Avatar + Info */}
             <div className="flex items-center gap-4">
@@ -359,10 +371,7 @@ function ClientDetailContent() {
 
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <h1
-                    className="text-3xl font-bold"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
+                  <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
                     {client.name}
                   </h1>
                   <span
@@ -378,86 +387,30 @@ function ClientDetailContent() {
 
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Mail
-                      className="w-4 h-4"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    />
-                    <p
-                      className="text-sm"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <Mail className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
                       {client.email}
                     </p>
                   </div>
                   {client.phone && (
                     <div className="flex items-center gap-2">
-                      <Phone
-                        className="w-4 h-4"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.6)"
-                            : "rgba(0,0,0,0.6)",
-                        }}
-                      />
-                      <p
-                        className="text-sm"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.6)"
-                            : "rgba(0,0,0,0.6)",
-                        }}
-                      >
+                      <Phone className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
                         {client.phone}
                       </p>
                     </div>
                   )}
                   {client.location && (
                     <div className="flex items-center gap-2">
-                      <MapPin
-                        className="w-4 h-4"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.6)"
-                            : "rgba(0,0,0,0.6)",
-                        }}
-                      />
-                      <p
-                        className="text-sm"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.6)"
-                            : "rgba(0,0,0,0.6)",
-                        }}
-                      >
+                      <MapPin className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
                         {client.location}
                       </p>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    <Calendar
-                      className="w-4 h-4"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    />
-                    <p
-                      className="text-sm"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <Calendar className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Client since {client.joinedDate}
                     </p>
                   </div>
@@ -469,6 +422,7 @@ function ClientDetailContent() {
             <div className="flex items-center gap-2">
               <Button
                 variant="default"
+                className="fc-btn fc-btn-secondary"
                 style={{
                   background: getSemanticColor("trust").gradient,
                   boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
@@ -479,6 +433,8 @@ function ClientDetailContent() {
               </Button>
               <Button
                 variant="default"
+                onClick={() => setShowAssignWorkoutModal(true)}
+                className="fc-btn fc-btn-primary"
                 style={{
                   background: getSemanticColor("energy").gradient,
                   boxShadow: `0 4px 12px ${getSemanticColor("energy").primary}30`,
@@ -491,10 +447,9 @@ function ClientDetailContent() {
           </div>
         </GlassCard>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Workouts This Week */}
-          <GlassCard elevation={2} className="p-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6">
             <div className="flex items-center gap-3 mb-4">
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -506,12 +461,7 @@ function ClientDetailContent() {
                 <Dumbbell className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p
-                  className="text-xs"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="text-xs text-[color:var(--fc-text-subtle)]">
                   This Week
                 </p>
                 <div className="flex items-baseline gap-1">
@@ -550,7 +500,7 @@ function ClientDetailContent() {
           </GlassCard>
 
           {/* Compliance */}
-          <GlassCard elevation={2} className="p-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6">
             <div className="flex items-center gap-3 mb-4">
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -564,12 +514,7 @@ function ClientDetailContent() {
                 <BarChart3 className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p
-                  className="text-xs"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="text-xs text-[color:var(--fc-text-subtle)]">
                   Compliance
                 </p>
                 <AnimatedNumber
@@ -597,7 +542,7 @@ function ClientDetailContent() {
           </GlassCard>
 
           {/* Streak */}
-          <GlassCard elevation={2} className="p-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6">
             <div className="flex items-center gap-3 mb-4">
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -609,12 +554,7 @@ function ClientDetailContent() {
                 <Flame className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p
-                  className="text-xs"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="text-xs text-[color:var(--fc-text-subtle)]">
                   Day Streak
                 </p>
                 <AnimatedNumber
@@ -624,18 +564,13 @@ function ClientDetailContent() {
                 />
               </div>
             </div>
-            <p
-              className="text-xs"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              }}
-            >
+            <p className="text-xs text-[color:var(--fc-text-subtle)]">
               {client.stats.streak >= 7 ? "🔥 On fire!" : "Keep it going!"}
             </p>
           </GlassCard>
 
           {/* Total Workouts */}
-          <GlassCard elevation={2} className="p-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6">
             <div className="flex items-center gap-3 mb-4">
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -648,12 +583,7 @@ function ClientDetailContent() {
                 <Award className="w-6 h-6" style={{ color: getSemanticColor("neutral").primary }} />
               </div>
               <div>
-                <p
-                  className="text-xs"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="text-xs text-[color:var(--fc-text-subtle)]">
                   Total Workouts
                 </p>
                 <AnimatedNumber
@@ -663,21 +593,15 @@ function ClientDetailContent() {
                 />
               </div>
             </div>
-            <p
-              className="text-xs"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              }}
-            >
+            <p className="text-xs text-[color:var(--fc-text-subtle)]">
               Last active: {client.stats.lastActive}
             </p>
           </GlassCard>
         </div>
 
         {/* Tabs */}
-        <div className="mb-6">
-          <GlassCard elevation={2} className="p-2">
-            <div className="flex items-center gap-2">
+        <GlassCard elevation={2} className="fc-glass fc-card p-2">
+          <div className="flex items-center gap-2">
               {[
                 { id: "overview", label: "Overview", icon: Activity },
                 { id: "workouts", label: "Workouts", icon: Dumbbell },
@@ -706,9 +630,8 @@ function ClientDetailContent() {
                   </button>
                 );
               })}
-            </div>
-          </GlassCard>
-        </div>
+          </div>
+        </GlassCard>
 
         {/* Tab Content */}
         {activeTab === "overview" && (
@@ -943,6 +866,21 @@ function ClientDetailContent() {
           </GlassCard>
         )}
       </div>
+
+      {/* Workout Assignment Modal */}
+      {showAssignWorkoutModal && (
+        <WorkoutAssignmentModal
+          isOpen={showAssignWorkoutModal}
+          onClose={() => setShowAssignWorkoutModal(false)}
+          onSuccess={() => {
+            setShowAssignWorkoutModal(false);
+            // Reload client data if needed
+            if (clientId) {
+              // You may want to reload client data here
+            }
+          }}
+        />
+      )}
     </AnimatedBackground>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { X, Save, Timer, Activity } from "lucide-react";
 import { createPerformanceTest, TestType } from "@/lib/performanceTestService";
@@ -19,8 +18,6 @@ export function LogPerformanceTestModal({
   onClose,
   onSuccess,
 }: LogPerformanceTestModalProps) {
-  const { isDark, getSemanticColor } = useTheme();
-  
   // 1km Run fields
   const [minutes, setMinutes] = useState("");
   const [seconds, setSeconds] = useState("");
@@ -118,56 +115,37 @@ export function LogPerformanceTestModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-start justify-center p-4"
-      style={{
-        background: "rgba(0,0,0,0.5)",
-      }}
+      className="fixed inset-0 z-[9999] flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm"
     >
       <div
-        className="w-full rounded-2xl shadow-2xl"
-        style={{
-          background: isDark ? "#1E1E1E" : "#FFFFFF",
-          maxWidth: "min(95vw, 500px)",
-          maxHeight: "min(88vh, calc(100vh - 4rem))",
-          height: "min(88vh, calc(100vh - 4rem))",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-        }}
+        className="w-full max-w-[500px] max-h-[88vh] h-[88vh] fc-modal fc-card overflow-hidden flex flex-col"
       >
         {/* Header */}
         <div
-          className="sticky top-0 z-10 flex items-center justify-between px-6 py-5"
-          style={{
-            background: isDark ? "#1E1E1E" : "#FFFFFF",
-            borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
-          }}
+          className="sticky top-0 z-10 flex items-center justify-between px-6 py-5 border-b border-[color:var(--fc-glass-border)]"
         >
           <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{
-                background: getSemanticColor("trust").gradient,
-              }}
-            >
+            <div className="fc-icon-tile fc-icon-neutral">
               {testType === "1km_run" ? (
-                <Timer className="w-5 h-5 text-white" />
+                <Timer className="w-5 h-5" />
               ) : (
-                <Activity className="w-5 h-5 text-white" />
+                <Activity className="w-5 h-5" />
               )}
             </div>
-            <h2
-              className="text-2xl font-bold"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
-              {testType === "1km_run" ? "Log 1km Run" : "Log Step Test"}
-            </h2>
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-neutral">
+                Performance test
+              </span>
+              <h2 className="text-2xl font-bold fc-text-primary mt-2">
+                {testType === "1km_run" ? "Log 1km Run" : "Log Step Test"}
+              </h2>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-opacity-10 hover:bg-white"
+            className="p-2 rounded-full fc-btn fc-btn-ghost"
           >
-            <X className="w-6 h-6" style={{ color: isDark ? "#fff" : "#1A1A1A" }} />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
@@ -178,11 +156,8 @@ export function LogPerformanceTestModal({
               <>
                 {/* 1km Run Time */}
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
-                    Time <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium mb-2 fc-text-primary">
+                    Time <span className="fc-text-error">*</span>
                   </label>
                   <div className="flex gap-3">
                     <div className="flex-1">
@@ -192,12 +167,7 @@ export function LogPerformanceTestModal({
                         value={minutes}
                         onChange={(e) => setMinutes(e.target.value)}
                         placeholder="Minutes"
-                        className="w-full px-4 py-3 rounded-lg text-lg"
-                        style={{
-                          background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                          color: isDark ? "#fff" : "#1A1A1A",
-                          border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                        }}
+                        className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
                         required
                       />
                     </div>
@@ -209,22 +179,12 @@ export function LogPerformanceTestModal({
                         value={seconds}
                         onChange={(e) => setSeconds(e.target.value)}
                         placeholder="Seconds"
-                        className="w-full px-4 py-3 rounded-lg text-lg"
-                        style={{
-                          background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                          color: isDark ? "#fff" : "#1A1A1A",
-                          border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                        }}
+                        className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
                         required
                       />
                     </div>
                   </div>
-                  <p
-                    className="text-xs mt-1"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                    }}
-                  >
+                  <p className="text-xs mt-2 fc-text-subtle">
                     Enter your 1km run time
                   </p>
                 </div>
@@ -233,11 +193,8 @@ export function LogPerformanceTestModal({
               <>
                 {/* Step Test Heart Rates */}
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
-                    Pre-Test Heart Rate (bpm) <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium mb-2 fc-text-primary">
+                    Pre-Test Heart Rate (bpm) <span className="fc-text-error">*</span>
                   </label>
                   <input
                     type="number"
@@ -246,22 +203,14 @@ export function LogPerformanceTestModal({
                     value={heartRatePre}
                     onChange={(e) => setHeartRatePre(e.target.value)}
                     placeholder="Before exercise"
-                    className="w-full px-4 py-3 rounded-lg text-lg"
-                    style={{
-                      background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                      color: isDark ? "#fff" : "#1A1A1A",
-                      border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                    }}
+                    className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
                     required
                   />
                 </div>
 
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
-                    Heart Rate at 1 min (bpm) <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium mb-2 fc-text-primary">
+                    Heart Rate at 1 min (bpm) <span className="fc-text-error">*</span>
                   </label>
                   <input
                     type="number"
@@ -270,22 +219,14 @@ export function LogPerformanceTestModal({
                     value={heartRate1Min}
                     onChange={(e) => setHeartRate1Min(e.target.value)}
                     placeholder="After 1 minute"
-                    className="w-full px-4 py-3 rounded-lg text-lg"
-                    style={{
-                      background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                      color: isDark ? "#fff" : "#1A1A1A",
-                      border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                    }}
+                    className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
                     required
                   />
                 </div>
 
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
-                    Heart Rate at 2 min (bpm) <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium mb-2 fc-text-primary">
+                    Heart Rate at 2 min (bpm) <span className="fc-text-error">*</span>
                   </label>
                   <input
                     type="number"
@@ -294,22 +235,14 @@ export function LogPerformanceTestModal({
                     value={heartRate2Min}
                     onChange={(e) => setHeartRate2Min(e.target.value)}
                     placeholder="After 2 minutes"
-                    className="w-full px-4 py-3 rounded-lg text-lg"
-                    style={{
-                      background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                      color: isDark ? "#fff" : "#1A1A1A",
-                      border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                    }}
+                    className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
                     required
                   />
                 </div>
 
                 <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
-                    Heart Rate at 3 min (bpm) <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium mb-2 fc-text-primary">
+                    Heart Rate at 3 min (bpm) <span className="fc-text-error">*</span>
                   </label>
                   <input
                     type="number"
@@ -318,37 +251,19 @@ export function LogPerformanceTestModal({
                     value={heartRate3Min}
                     onChange={(e) => setHeartRate3Min(e.target.value)}
                     placeholder="After 3 minutes"
-                    className="w-full px-4 py-3 rounded-lg text-lg"
-                    style={{
-                      background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                      color: isDark ? "#fff" : "#1A1A1A",
-                      border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                    }}
+                    className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
                     required
                   />
                 </div>
 
                 {recoveryScore !== null && (
                   <div
-                    className="p-4 rounded-lg"
-                    style={{
-                      background: isDark ? "rgba(16,185,129,0.1)" : "rgba(16,185,129,0.05)",
-                    }}
+                    className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-status-success)]"
                   >
-                    <p
-                      className="text-sm font-medium"
-                      style={{ color: getSemanticColor("success").primary }}
-                    >
-                      Calculated Recovery Score: {recoveryScore}
+                    <p className="text-sm font-medium fc-text-success">
+                      Recovery score: {recoveryScore}
                     </p>
-                    <p
-                      className="text-xs mt-1"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                      }}
-                    >
-                      Lower is better
-                    </p>
+                    <p className="text-xs mt-1 fc-text-subtle">Lower is better</p>
                   </div>
                 )}
               </>
@@ -356,10 +271,7 @@ export function LogPerformanceTestModal({
 
             {/* Notes */}
             <div>
-              <label
-                className="block text-sm font-medium mb-2"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
+              <label className="block text-sm font-medium mb-2 fc-text-primary">
                 Notes (optional)
               </label>
               <textarea
@@ -367,24 +279,13 @@ export function LogPerformanceTestModal({
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Add any notes about this test..."
                 rows={3}
-                className="w-full px-4 py-3 rounded-lg resize-none"
-                style={{
-                  background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                  color: isDark ? "#fff" : "#1A1A1A",
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                }}
+                className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)] resize-none"
               />
             </div>
 
             {/* Error Message */}
             {error && (
-              <div
-                className="p-3 rounded-lg"
-                style={{
-                  background: "rgba(239,68,68,0.1)",
-                  color: "#ef4444",
-                }}
-              >
+              <div className="p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-status-error)] fc-text-error">
                 {error}
               </div>
             )}
@@ -393,22 +294,15 @@ export function LogPerformanceTestModal({
 
         {/* Footer */}
         <div
-          className="flex-shrink-0 px-6 py-4 flex gap-3"
-          style={{
-            borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
-          }}
+          className="flex-shrink-0 px-6 py-4 flex gap-3 border-t border-[color:var(--fc-glass-border)]"
         >
-          <Button variant="ghost" onClick={onClose} className="flex-1">
+          <Button variant="ghost" onClick={onClose} className="flex-1 fc-btn fc-btn-ghost">
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={saving}
-            className="flex-1"
-            style={{
-              background: getSemanticColor("trust").gradient,
-              boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-            }}
+            className="flex-1 fc-btn fc-btn-primary fc-press"
           >
             {saving ? (
               <>

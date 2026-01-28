@@ -14,6 +14,7 @@ import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useLoggingReset } from "../hooks/useLoggingReset";
 
 export function GiantSetExecutor({
   block,
@@ -45,6 +46,7 @@ export function GiantSetExecutor({
   const [weights, setWeights] = useState<string[]>([]);
   const [reps, setReps] = useState<string[]>([]);
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  useLoggingReset(isLoggingSet, setIsLoggingSet);
 
   // Initialize arrays and recalculate suggested weights when exercises or e1rmMap changes
   useEffect(() => {
@@ -168,96 +170,98 @@ export function GiantSetExecutor({
       }
     } catch (e) {}
 
-    // Build giant_set_exercises array - only include valid exercises
-    const giantSetExercises = exercises
-      .map((exercise, idx) => {
-        const weightNum = parseFloat(weights[idx] || "0");
-        const repsNum = parseInt(reps[idx] || "0");
-        if (!exercise?.exercise_id || isNaN(weightNum) || isNaN(repsNum)) {
-          return null;
-        }
-        return {
-          exercise_id: exercise.exercise_id,
-          weight: weightNum,
-          reps: repsNum,
-          order: idx + 1,
-        };
-      })
-      .filter(Boolean);
+    try {
+      // Build giant_set_exercises array - only include valid exercises
+      const giantSetExercises = exercises
+        .map((exercise, idx) => {
+          const weightNum = parseFloat(weights[idx] || "0");
+          const repsNum = parseInt(reps[idx] || "0");
+          if (!exercise?.exercise_id || isNaN(weightNum) || isNaN(repsNum)) {
+            return null;
+          }
+          return {
+            exercise_id: exercise.exercise_id,
+            weight: weightNum,
+            reps: repsNum,
+            order: idx + 1,
+          };
+        })
+        .filter(Boolean);
 
-    // Log giant set as a single call
-    const logData: any = {
-      block_type: 'giant_set',
-      round_number: completedSets + 1,
-    };
-    
-    if (giantSetExercises.length > 0) {
-      logData.giant_set_exercises = giantSetExercises;
-    }
-    
-    const result = await logSetToDatabase(logData);
-
-    // Build logged sets array for UI
-    const loggedSetsArray: LoggedSet[] = exercises.map((exercise, idx) => ({
-      id: `temp-${idx}-${Date.now()}`,
-      exercise_id: exercise.exercise_id,
-      block_id: block.block.id,
-      set_number: completedSets + 1,
-      weight_kg: parseFloat(weights[idx] || "0"),
-      reps_completed: parseInt(reps[idx] || "0"),
-      completed_at: new Date(),
-    } as LoggedSet));
-
-    const allSuccess = result.success;
-
-    if (allSuccess) {
-      addToast({
-        title: "Giant Set Logged!",
-        description: `${exercises.length} exercises completed`,
-        variant: "success",
-        duration: 2000,
-      });
-
-      // Update parent with new completed sets count
-      const newCompletedSets = completedSets + 1;
-      onSetComplete?.(newCompletedSets);
-
-      // Complete block if last set
-      if (newCompletedSets >= totalSets) {
-        onBlockComplete(block.block.id, loggedSetsArray);
-      } else {
-        // Check if rest timer will show - if so, don't clear inputs yet
-        const currentExercise = exercises[currentExerciseIndex || 0];
-        const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-        if (restSeconds === 0) {
-          // No rest timer, clear inputs immediately
-          const newWeights = exercises.map((ex) => {
-            if (ex.load_percentage) {
-              const suggested = calculateSuggestedWeightUtil(
-                ex.exercise_id,
-                ex.load_percentage,
-                e1rmMap
-              );
-              return suggested ? suggested.toString() : "";
-            }
-            return "";
-          });
-          setWeights(newWeights);
-          setReps(new Array(exercises.length).fill(""));
-        }
-        // If restSeconds > 0, rest timer will show and inputs will be cleared
-        // when the timer completes and completedSets updates
+      // Log giant set as a single call
+      const logData: any = {
+        block_type: 'giant_set',
+        round_number: completedSets + 1,
+      };
+      
+      if (giantSetExercises.length > 0) {
+        logData.giant_set_exercises = giantSetExercises;
       }
-    } else {
-      addToast({
-        title: "Failed to Save",
-        description: "Some exercises failed to save. Please try again.",
-        variant: "destructive",
-        duration: 5000,
-      });
-    }
+      
+      const result = await logSetToDatabase(logData);
 
-    setIsLoggingSet(false);
+      // Build logged sets array for UI
+      const loggedSetsArray: LoggedSet[] = exercises.map((exercise, idx) => ({
+        id: `temp-${idx}-${Date.now()}`,
+        exercise_id: exercise.exercise_id,
+        block_id: block.block.id,
+        set_number: completedSets + 1,
+        weight_kg: parseFloat(weights[idx] || "0"),
+        reps_completed: parseInt(reps[idx] || "0"),
+        completed_at: new Date(),
+      } as LoggedSet));
+
+      const allSuccess = result.success;
+
+      if (allSuccess) {
+        addToast({
+          title: "Giant Set Logged!",
+          description: `${exercises.length} exercises completed`,
+          variant: "success",
+          duration: 2000,
+        });
+
+        // Update parent with new completed sets count
+        const newCompletedSets = completedSets + 1;
+        onSetComplete?.(newCompletedSets);
+
+        // Complete block if last set
+        if (newCompletedSets >= totalSets) {
+          onBlockComplete(block.block.id, loggedSetsArray);
+        } else {
+          // Check if rest timer will show - if so, don't clear inputs yet
+          const currentExercise = exercises[currentExerciseIndex || 0];
+          const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
+          if (restSeconds === 0) {
+            // No rest timer, clear inputs immediately
+            const newWeights = exercises.map((ex) => {
+              if (ex.load_percentage) {
+                const suggested = calculateSuggestedWeightUtil(
+                  ex.exercise_id,
+                  ex.load_percentage,
+                  e1rmMap
+                );
+                return suggested ? suggested.toString() : "";
+              }
+              return "";
+            });
+            setWeights(newWeights);
+            setReps(new Array(exercises.length).fill(""));
+          }
+          // If restSeconds > 0, rest timer will show and inputs will be cleared
+          // when the timer completes and completedSets updates
+        }
+      } else {
+        addToast({
+          title: "Failed to Save",
+          description: "Some exercises failed to save. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+    } finally {
+      setIsLoggingSet(false);
+    }
   };
 
   const loggingInputs = (
@@ -268,7 +272,7 @@ export function GiantSetExecutor({
           elevation={1}
           className="p-4"
         >
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h4 className="font-semibold text-slate-800 dark:text-white text-lg">
               {idx + 1}. {exercise.exercise?.name || `Exercise ${idx + 1}`}
               {exercise.exercise_letter && ` (${exercise.exercise_letter})`}
@@ -291,6 +295,8 @@ export function GiantSetExecutor({
               placeholder="0"
               step="0.5"
               unit="kg"
+              showStepper
+              stepAmount={2.5}
             />
             <LargeInput
               label="Reps"
@@ -302,6 +308,8 @@ export function GiantSetExecutor({
               }}
               placeholder="0"
               step="1"
+              showStepper
+              stepAmount={1}
             />
           </div>
         </GlassCard>

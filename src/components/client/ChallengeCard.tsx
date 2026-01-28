@@ -1,9 +1,7 @@
 "use client";
 
 import React from "react";
-import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Trophy, Calendar, Users, Gift } from "lucide-react";
 import { Challenge } from "@/lib/challengeService";
 
@@ -20,13 +18,11 @@ export function ChallengeCard({
   onView,
   isParticipating = false,
 }: ChallengeCardProps) {
-  const { isDark, getSemanticColor } = useTheme();
-
   const getStatusColor = () => {
-    if (challenge.status === "active") return getSemanticColor("success").primary;
-    if (challenge.status === "draft") return getSemanticColor("neutral").primary;
-    if (challenge.status === "completed") return getSemanticColor("trust").primary;
-    return getSemanticColor("critical").primary;
+    if (challenge.status === "active") return "fc-text-success";
+    if (challenge.status === "draft") return "fc-text-subtle";
+    if (challenge.status === "completed") return "fc-text-workouts";
+    return "fc-text-error";
   };
 
   const getChallengeTypeLabel = () => {
@@ -35,85 +31,57 @@ export function ChallengeCard({
   };
 
   return (
-    <div
-      className="p-6 rounded-2xl transition-all hover:scale-[1.02]"
-      style={{
-        background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
-        border: `2px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
-      }}
-    >
+    <div className="p-6 fc-glass fc-card fc-accent-challenges fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)]">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div
-            className="w-12 h-12 rounded-full flex items-center justify-center"
-            style={{
-              background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
-              boxShadow: "0 4px 12px rgba(255, 215, 0, 0.3)",
-            }}
-          >
-            <Trophy className="w-6 h-6 text-white" />
+          <div className="fc-icon-tile fc-icon-challenges">
+            <Trophy className="w-6 h-6" />
           </div>
           <div>
-            <h3
-              className="text-lg font-bold"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="fc-pill fc-pill-glass fc-text-challenges">
+                {getChallengeTypeLabel()}
+              </span>
+            </div>
+            <h3 className="text-lg font-bold fc-text-primary">
               {challenge.name}
             </h3>
-            <p
-              className="text-xs"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              }}
-            >
-              {getChallengeTypeLabel()}
+            <p className="text-xs fc-text-subtle">
+              {new Date(challenge.start_date).toLocaleDateString()} -{" "}
+              {new Date(challenge.end_date).toLocaleDateString()}
             </p>
           </div>
         </div>
-        <Badge
-          style={{
-            background: getStatusColor(),
-            color: "#fff",
-          }}
-        >
+        <span className={`fc-pill fc-pill-glass uppercase ${getStatusColor()}`}>
           {challenge.status}
-        </Badge>
+        </span>
       </div>
 
       {/* Description */}
       {challenge.description && (
-        <p
-          className="text-sm mb-4 line-clamp-2"
-          style={{
-            color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-          }}
-        >
+        <p className="text-sm mb-4 line-clamp-2 fc-text-dim">
           {challenge.description}
         </p>
       )}
 
       {/* Info Row */}
-      <div className="flex items-center gap-4 mb-4">
+      <div className="flex flex-wrap items-center gap-4 mb-5">
         <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4" style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)" }} />
-          <span
-            className="text-xs"
-            style={{
-              color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-            }}
-          >
-            {new Date(challenge.start_date).toLocaleDateString()} - {new Date(challenge.end_date).toLocaleDateString()}
+          <Calendar className="w-4 h-4 fc-text-subtle" />
+          <span className="text-xs fc-text-subtle">Timeline</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 fc-text-subtle" />
+          <span className="text-xs fc-text-subtle">
+            {isParticipating ? "You are in" : "Open to join"}
           </span>
         </div>
         {challenge.reward_description && (
           <div className="flex items-center gap-2">
-            <Gift className="w-4 h-4" style={{ color: getSemanticColor("warning").primary }} />
-            <span
-              className="text-xs font-medium"
-              style={{ color: getSemanticColor("warning").primary }}
-            >
-              Prize
+            <Gift className="w-4 h-4 fc-text-warning" />
+            <span className="text-xs font-medium fc-text-warning">
+              Prize available
             </span>
           </div>
         )}
@@ -124,32 +92,24 @@ export function ChallengeCard({
         <Button
           onClick={() => onView(challenge)}
           variant="ghost"
-          className="flex-1"
+          className="flex-1 fc-btn fc-btn-ghost"
         >
           View Details
         </Button>
         {!isParticipating && challenge.status === "active" && (
           <Button
             onClick={() => onJoin(challenge)}
-            className="flex-1"
-            style={{
-              background: getSemanticColor("success").gradient,
-              boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-            }}
+            className="flex-1 fc-btn fc-btn-primary fc-press"
           >
             Join Challenge
           </Button>
         )}
         {isParticipating && (
-          <Badge
-            className="flex-1 justify-center py-2"
-            style={{
-              background: getSemanticColor("trust").gradient,
-              color: "#fff",
-            }}
+          <div
+            className="flex-1 justify-center py-2 flex items-center fc-pill fc-pill-glass fc-text-primary border border-[color:var(--fc-glass-border)]"
           >
             Participating
-          </Badge>
+          </div>
         )}
       </div>
     </div>

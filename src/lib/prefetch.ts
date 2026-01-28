@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 import { DatabaseService } from './database'
+import { isPrefetchDisabled } from './featureFlags'
+import { isLiveWorkoutRoute } from './workoutMode'
 
 // Cache interface for storing pre-fetched data
 interface CacheEntry<T> {
@@ -71,6 +73,7 @@ export const cache = new PrefetchCache()
 export class PrefetchService {
   // Pre-fetch client dashboard data
   static async prefetchClientDashboard(userId: string): Promise<void> {
+    if (isPrefetchDisabled) return
     const cacheKey = `client_dashboard_${userId}`
     
     if (cache.has(cacheKey)) {
@@ -98,6 +101,7 @@ export class PrefetchService {
 
   // Pre-fetch coach dashboard data
   static async prefetchCoachDashboard(userId: string): Promise<void> {
+    if (isPrefetchDisabled) return
     const cacheKey = `coach_dashboard_${userId}`
     
     if (cache.has(cacheKey)) {
@@ -125,6 +129,7 @@ export class PrefetchService {
 
   // Pre-fetch workout assignments with exercise counts
   static async prefetchWorkoutAssignments(userId: string): Promise<void> {
+    if (isPrefetchDisabled) return
     const cacheKey = `workout_assignments_${userId}`
     
     if (cache.has(cacheKey)) {
@@ -132,6 +137,10 @@ export class PrefetchService {
     }
 
     try {
+      // Ensure user is authenticated before querying
+      const { ensureAuthenticated } = await import('./supabase');
+      await ensureAuthenticated();
+
       const { data, error } = await supabase
         .from('workout_assignments')
         .select(`
@@ -145,26 +154,27 @@ export class PrefetchService {
 
       if (error) throw error
 
-      // Pre-fetch exercise counts for all templates using WorkoutBlockService
+      // Pre-fetch exercise counts for all templates using WorkoutBlockService (batched)
       const { WorkoutBlockService } = await import('./workoutBlockService')
-      const assignmentsWithCounts = await Promise.all(
-        (data || []).map(async (assignment) => {
-          let exercise_count = 0
-          try {
-            if (assignment.template?.id) {
-              const blocks = await WorkoutBlockService.getWorkoutBlocks(assignment.template.id)
-              exercise_count = blocks.reduce((total, block) => total + (block.exercises?.length || 0), 0)
-            }
-          } catch (error) {
-            console.error('Error getting exercise count for template:', error)
-          }
-          
-          return {
-            ...assignment,
-            exercise_count
-          }
-        })
+      const templateIds = Array.from(
+        new Set(
+          (data || [])
+            .map((assignment: any) => assignment.template?.id || assignment.workout_template_id)
+            .filter(Boolean)
+        )
       )
+      const blocksByTemplate = await WorkoutBlockService.getWorkoutBlocksForTemplates(templateIds)
+
+      const assignmentsWithCounts = (data || []).map((assignment: any) => {
+        const templateId = assignment.template?.id || assignment.workout_template_id
+        const blocks = templateId ? blocksByTemplate.get(templateId) || [] : []
+        const exercise_count = blocks.reduce((total, block) => total + (block.exercises?.length || 0), 0)
+
+        return {
+          ...assignment,
+          exercise_count
+        }
+      })
 
       cache.set(cacheKey, assignmentsWithCounts, 5 * 60 * 1000) // 5 minutes TTL
     } catch (error) {
@@ -174,6 +184,7 @@ export class PrefetchService {
 
   // Pre-fetch exercise library for coaches
   static async prefetchExerciseLibrary(userId: string): Promise<void> {
+    if (isPrefetchDisabled) return
     const cacheKey = `exercise_library_${userId}`
     
     if (cache.has(cacheKey)) {
@@ -197,6 +208,7 @@ export class PrefetchService {
 
   // Pre-fetch food library (shared across users)
   static async prefetchFoodLibrary(): Promise<void> {
+    if (isPrefetchDisabled) return
     const cacheKey = 'food_library_global'
     
     if (cache.has(cacheKey)) {
@@ -220,6 +232,7 @@ export class PrefetchService {
 
   // Pre-fetch client list for coaches
   static async prefetchClientList(userId: string): Promise<void> {
+    if (isPrefetchDisabled) return
     const cacheKey = `client_list_${userId}`
     
     if (cache.has(cacheKey)) {
@@ -236,6 +249,7 @@ export class PrefetchService {
 
   // Pre-fetch nutrition data for a specific date
   static async prefetchNutritionData(userId: string, date: string): Promise<void> {
+    if (isPrefetchDisabled) return
     // DISABLED: Using new meal plan system instead of meal_logs
     // Skip prefetching for now - new meal plan system handles data loading
     return
@@ -243,6 +257,8 @@ export class PrefetchService {
 
   // Smart pre-fetching based on user role and current page
   static async smartPrefetch(userId: string, userRole: 'client' | 'coach', currentPage?: string): Promise<void> {
+    if (isPrefetchDisabled) return
+    if (isLiveWorkoutRoute(currentPage)) return
     const prefetchPromises: Promise<void>[] = []
 
     if (userRole === 'client') {
@@ -279,6 +295,7 @@ export class PrefetchService {
 
   // Background refresh for critical data
   static async backgroundRefresh(userId: string, userRole: 'client' | 'coach'): Promise<void> {
+    if (isPrefetchDisabled) return
     // Refresh dashboard data in background
     if (userRole === 'client') {
       await this.prefetchClientDashboard(userId)
@@ -346,6 +363,8 @@ export function useCachedData<T>(
 
 // Utility function to pre-fetch data on route change
 export function prefetchOnRouteChange(userId: string, userRole: 'client' | 'coach', route: string): void {
+  if (isPrefetchDisabled) return
+  if (isLiveWorkoutRoute(route)) return
   // Use requestIdleCallback for non-blocking pre-fetching
   if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
     requestIdleCallback(() => {

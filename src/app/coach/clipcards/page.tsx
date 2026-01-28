@@ -6,6 +6,7 @@ import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -282,38 +283,61 @@ export default function CoachClipCards() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen">
-        <div className="relative p-6">
-          <div className="max-w-7xl mx-auto space-y-8">
-            {/* Header */}
-            <div className="text-center space-y-8">
-              <div className="flex items-center justify-center gap-3 mb-8">
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                  <CreditCard className="w-8 h-8 text-white" />
+        <div className="relative px-6 pb-16 pt-10">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <GlassCard className="p-6 md:p-8">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-3">
+                  <Badge className="fc-badge fc-badge-strong w-fit">ClipCard Control</Badge>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg">
+                      <CreditCard className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
+                        ClipCard Management
+                      </h1>
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
+                        Package sessions, manage balances, and track client usage.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-normal pb-1">
-                  ClipCard Management
-                </h1>
+                <div className="flex flex-wrap gap-3">
+                  <Dialog open={showCreateType} onOpenChange={setShowCreateType}>
+                    <DialogTrigger asChild>
+                      <Button className="fc-btn fc-btn-primary">
+                        <Plus className="w-5 h-5 mr-2" />
+                        Create Package
+                      </Button>
+                    </DialogTrigger>
+                  </Dialog>
+                  <Dialog open={showCreateClipCard} onOpenChange={setShowCreateClipCard}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="fc-btn fc-btn-ghost">
+                        <Users className="w-5 h-5 mr-2" />
+                        Assign ClipCard
+                      </Button>
+                    </DialogTrigger>
+                  </Dialog>
+                </div>
               </div>
-              <p className={`text-lg ${theme.textSecondary} max-w-2xl mx-auto`}>
-                Manage session packages and track client ClipCard usage
-              </p>
-            </div>
+            </GlassCard>
 
-            {/* Search and Filters */}
-            <div className={`${theme.card} ${theme.shadow} rounded-2xl p-6`}>
+            <GlassCard className="p-5">
               <div className="flex flex-col lg:flex-row gap-4">
                 <div className="flex-1 relative">
-                  <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 ${theme.textSecondary} w-5 h-5`} />
+                  <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-subtle)]" />
                   <Input
                     placeholder="Search packages or clients..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`pl-12 h-12 rounded-xl border-2 ${theme.border} ${theme.text} bg-transparent focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500`}
+                    className="fc-input h-12 w-full pl-12"
                   />
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}>
+                    <SelectTrigger className="fc-select h-12 w-48">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -324,7 +348,7 @@ export default function CoachClipCards() {
                     </SelectContent>
                   </Select>
                   <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}>
+                    <SelectTrigger className="fc-select h-12 w-48">
                       <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
                     <SelectContent>
@@ -337,56 +361,32 @@ export default function CoachClipCards() {
                   </Select>
                 </div>
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-center gap-4">
-              <Dialog open={showCreateType} onOpenChange={setShowCreateType}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg px-6 py-3">
-                    <Plus className="w-5 h-5" />
-                    Create Package
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
-              <Dialog open={showCreateClipCard} onOpenChange={setShowCreateClipCard}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className={`${theme.border} ${theme.text} hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400 rounded-xl px-6 py-3`}>
-                    <Users className="w-5 h-5 mr-2" />
-                    Assign ClipCard
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
-          </div>
+            </GlassCard>
 
             {/* Statistics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className={`${theme.card} ${theme.shadow} hover:scale-105 transition-all duration-300 rounded-2xl overflow-hidden group`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 ${theme.shadow}`}>
-                      <Package className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className={`text-2xl font-bold ${theme.text}`}>{clipcardTypes.length}</p>
-                      <p className={`text-sm ${theme.textSecondary}`}>Total Packages</p>
-                    </div>
+              <GlassCard className="p-5">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 p-3 text-white shadow-lg">
+                    <Package className="w-5 h-5" />
                   </div>
-                </CardContent>
-              </Card>
-              <Card className={`${theme.card} ${theme.shadow} hover:scale-105 transition-all duration-300 rounded-2xl overflow-hidden group`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600 ${theme.shadow}`}>
-                      <CreditCard className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className={`text-2xl font-bold ${theme.text}`}>{clipcards.length}</p>
-                      <p className={`text-sm ${theme.textSecondary}`}>Active ClipCards</p>
-                    </div>
+                  <div>
+                    <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">{clipcardTypes.length}</p>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">Total Packages</p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </GlassCard>
+              <GlassCard className="p-5">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 p-3 text-white shadow-lg">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">{clipcards.length}</p>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">Active ClipCards</p>
+                  </div>
+                </div>
+              </GlassCard>
             </div>
 
             {/* Packages Section */}

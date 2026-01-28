@@ -306,122 +306,33 @@ export default function WorkoutCategories() {
           >
             <div
               className="max-w-7xl mx-auto"
-              style={{ display: "flex", flexDirection: "column", gap: "32px" }}
+              style={{ display: "flex", flexDirection: "column", gap: "24px" }}
             >
-              {/* Enhanced Header */}
-              <div
-                style={{
-                  textAlign: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "16px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "16px",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "64px",
-                      height: "64px",
-                      borderRadius: "18px",
-                      background:
-                        "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: isDark
-                        ? "0 4px 12px rgba(0, 0, 0, 0.4)"
-                        : "0 2px 8px rgba(0, 0, 0, 0.08)",
-                    }}
-                  >
-                    <Layers
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        color: "#FFFFFF",
-                      }}
-                    />
+              <div className="fc-glass fc-card p-6 sm:p-10">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                      Program Taxonomy
+                    </span>
+                    <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                      Workout Categories
+                    </h1>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Organize your workout templates with custom categories.
+                    </p>
                   </div>
-                  <h1
-                    style={{
-                      fontSize: "32px",
-                      fontWeight: "800",
-                      color: isDark ? "#FFFFFF" : "#1A1A1A",
-                      margin: 0,
-                      lineHeight: "1.2",
-                    }}
+                  <button
+                    onClick={() => setShowCreateForm(true)}
+                    className="fc-btn fc-btn-primary"
                   >
-                    Workout Categories
-                  </h1>
+                    <Plus style={{ width: "20px", height: "20px" }} />
+                    Create Category
+                    <ArrowRight style={{ width: "20px", height: "20px" }} />
+                  </button>
                 </div>
-                <p
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: "400",
-                    color: isDark ? "#D1D5DB" : "#6B7280",
-                    margin: 0,
-                    maxWidth: "560px",
-                    marginLeft: "auto",
-                    marginRight: "auto",
-                  }}
-                >
-                  Organize your workout templates with custom categories
-                </p>
               </div>
 
-              {/* Action Button */}
-              <div style={{ display: "flex", justifyContent: "center" }}>
-                <button
-                  onClick={() => setShowCreateForm(true)}
-                  style={{
-                    backgroundColor: "#F97316",
-                    color: "#FFFFFF",
-                    fontSize: "16px",
-                    fontWeight: "600",
-                    padding: "16px 32px",
-                    borderRadius: "20px",
-                    border: "none",
-                    boxShadow: isDark
-                      ? "0 4px 12px rgba(249, 115, 22, 0.3)"
-                      : "0 2px 4px rgba(0, 0, 0, 0.1)",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "scale(1.05)";
-                    e.currentTarget.style.backgroundColor = "#EA580C";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "scale(1)";
-                    e.currentTarget.style.backgroundColor = "#F97316";
-                  }}
-                >
-                  <Plus style={{ width: "20px", height: "20px" }} />
-                  Create Category
-                  <ArrowRight style={{ width: "20px", height: "20px" }} />
-                </button>
-              </div>
-
-              {/* Enhanced Search */}
-              <div
-                style={{
-                  backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                  borderRadius: "24px",
-                  padding: "24px",
-                  boxShadow: isDark
-                    ? "0 4px 12px rgba(0, 0, 0, 0.4)"
-                    : "0 2px 8px rgba(0, 0, 0, 0.08)",
-                }}
-              >
+              <div className="fc-glass fc-card p-4">
                 <div style={{ position: "relative" }}>
                   <Search
                     style={{

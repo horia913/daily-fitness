@@ -5,6 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,7 +99,7 @@ export default function FMSAssessmentPage() {
   const router = useRouter();
   const clientId = params.id as string;
   const { user, loading: authLoading } = useAuth();
-  const { getThemeStyles } = useTheme();
+  const { getThemeStyles, performanceSettings } = useTheme();
   const theme = getThemeStyles();
 
   const [loading, setLoading] = useState(true);
@@ -297,44 +300,50 @@ export default function FMSAssessmentPage() {
   if (authLoading || loading) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div className={`min-h-screen ${theme.background}`}>
-          <div className="animate-pulse p-4">
-            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-4"></div>
-            <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <GlassCard elevation={2} className="fc-glass fc-card p-8">
+              <div className="animate-pulse space-y-4">
+                <div className="h-12 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+              </div>
+            </GlassCard>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="max-w-7xl mx-auto p-4 sm:p-6">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
-            <Button variant="outline" size="sm" onClick={() => router.back()}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-            <div className="flex items-center gap-3 flex-1">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 shadow-lg">
-                <ClipboardCheck className="w-6 h-6 text-white" />
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <Button variant="ghost" size="icon" onClick={() => router.back()} className="fc-btn fc-btn-ghost h-10 w-10">
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Movement Screening
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    FMS Assessment
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    {clientName || "Client"} — Functional Movement Screen
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className={`text-2xl sm:text-3xl font-bold ${theme.text}`}>
-                  FMS Assessment
-                </h1>
-                <p className={`text-sm ${theme.textSecondary}`}>
-                  {clientName || "Client"} - Functional Movement Screen
-                </p>
-              </div>
+              <Button className="fc-btn fc-btn-primary" onClick={() => setShowAddModal(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Assessment
+              </Button>
             </div>
-            <Button onClick={() => setShowAddModal(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Assessment
-            </Button>
-          </div>
+          </GlassCard>
 
           {/* Assessments List */}
           {assessments.length > 0 ? (
@@ -345,9 +354,10 @@ export default function FMSAssessmentPage() {
                 const percentage = (totalScore / maxScore) * 100;
 
                 return (
-                  <Card
+                  <GlassCard
                     key={assessment.id}
-                    className={`${theme.card} border ${theme.border} rounded-2xl`}
+                    elevation={2}
+                    className="fc-glass fc-card rounded-2xl"
                   >
                     <CardHeader className="p-6">
                       <div className="flex items-center justify-between">
@@ -490,14 +500,12 @@ export default function FMSAssessmentPage() {
                         </div>
                       )}
                     </CardContent>
-                  </Card>
+                  </GlassCard>
                 );
               })}
             </div>
           ) : (
-            <Card
-              className={`${theme.card} border ${theme.border} rounded-2xl`}
-            >
+            <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl">
               <CardContent className="p-12 text-center">
                 <ClipboardCheck className="w-16 h-16 text-slate-400 mx-auto mb-4" />
                 <h3 className={`text-xl font-semibold ${theme.text} mb-2`}>
@@ -507,12 +515,12 @@ export default function FMSAssessmentPage() {
                   Conduct a Functional Movement Screen assessment for this
                   client
                 </p>
-                <Button onClick={() => setShowAddModal(true)}>
+                <Button className="fc-btn fc-btn-primary" onClick={() => setShowAddModal(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   Create First Assessment
                 </Button>
               </CardContent>
-            </Card>
+            </GlassCard>
           )}
 
           {/* Add/Edit Modal */}
@@ -685,7 +693,7 @@ export default function FMSAssessmentPage() {
             </form>
           </ResponsiveModal>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

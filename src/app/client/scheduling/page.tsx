@@ -5,6 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -122,6 +123,7 @@ import {
   Upload as UploadIcon
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { fetchApi } from '@/lib/apiClient'
 
 interface TimeSlot {
   id: string
@@ -515,7 +517,7 @@ export default function ClientScheduling() {
       })
 
       // Create session via API route to bypass RLS
-      const response = await fetch('/api/sessions/create', {
+      const response = await fetchApi('/api/sessions/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -565,60 +567,23 @@ export default function ClientScheduling() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 dark:from-slate-900 dark:to-slate-800">
-          <div className="p-4">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Header Skeleton */}
-              <div className="text-center space-y-4 py-8">
-                <div className="animate-pulse">
-                  <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded-2xl w-80 mx-auto mb-4"></div>
-                  <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-96 mx-auto mb-6"></div>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="fc-glass fc-card p-8">
+              <div className="animate-pulse space-y-6">
+                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  ))}
                 </div>
-              </div>
-
-              {/* Stats Cards Skeleton */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                        <div>
-                          <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg mb-2"></div>
-                          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Coach Selection Skeleton */}
-              <div className="animate-pulse">
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                  <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-48 mb-4"></div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-24 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Calendar Skeleton */}
-              <div className="animate-pulse">
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                  <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-48 mb-4"></div>
-                  <div className="grid grid-cols-7 gap-2">
-                    {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                      <div key={i} className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                    ))}
-                  </div>
-                </div>
+                <div className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="h-56 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
               </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     )
   }
@@ -629,83 +594,85 @@ export default function ClientScheduling() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen">
-        <div className="p-4">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="text-center space-y-4 py-8">
-              <div className="flex items-center justify-center gap-3 mb-4">
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Calendar className="w-7 h-7 text-white" />
+                  <Calendar className="w-6 h-6 text-white" />
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">
-                  Book Session
-                </h1>
+                <div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Booking Hub
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                    Book Session
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    {getMotivationalMessage()}
+                  </p>
+                </div>
               </div>
-              <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-                {getMotivationalMessage()}
-              </p>
+              <Button
+                onClick={() => setSelectedDate(formatDate(new Date()))}
+                className="fc-btn fc-btn-primary"
+              >
+                <Calendar className="w-5 h-5 mr-2" />
+                Jump to Today
+              </Button>
             </div>
+          </GlassCard>
 
-            {/* Booking Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                      <CreditCard className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Sessions Left</p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.totalSessions}</p>
-                    </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                    <CreditCard className="w-6 h-6 text-white" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-sm text-[color:var(--fc-text-subtle)]">Sessions Left</p>
+                    <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.totalSessions}</p>
+                  </div>
+                </div>
+              </GlassCard>
 
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                      <User className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Active Cards</p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.activeClipCards}</p>
-                    </div>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                    <User className="w-6 h-6 text-white" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-sm text-[color:var(--fc-text-subtle)]">Active Cards</p>
+                    <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.activeClipCards}</p>
+                  </div>
+                </div>
+              </GlassCard>
 
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                      <Clock className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Available</p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.upcomingSessions}</p>
-                    </div>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <Clock className="w-6 h-6 text-white" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-sm text-[color:var(--fc-text-subtle)]">Available</p>
+                    <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.upcomingSessions}</p>
+                  </div>
+                </div>
+              </GlassCard>
 
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                      <Trophy className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Coach</p>
-                      <p className="text-lg font-bold text-slate-800 dark:text-slate-200 truncate">
-                        {stats.selectedCoachName.split(' ')[0]}
-                      </p>
-                    </div>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                    <Trophy className="w-6 h-6 text-white" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-sm text-[color:var(--fc-text-subtle)]">Coach</p>
+                    <p className="text-lg font-bold text-[color:var(--fc-text-primary)] truncate">
+                      {stats.selectedCoachName.split(' ')[0]}
+                    </p>
+                  </div>
+                </div>
+              </GlassCard>
             </div>
 
             {/* Coach Selection */}
@@ -1169,8 +1136,6 @@ export default function ClientScheduling() {
               </div>
             )}
           </div>
-        </div>
-        </div>
       </AnimatedBackground>
     </ProtectedRoute>
   )

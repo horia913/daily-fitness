@@ -1,10 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useTheme } from "@/contexts/ThemeContext";
 import { WorkoutTemplate } from "@/lib/database";
 import { supabase } from "@/lib/supabase";
 import { useExerciseLibrary } from "@/hooks/useCoachData";
@@ -18,13 +15,10 @@ import {
   Users,
   Star,
   Edit,
-  Copy,
-  Trash2,
   Heart,
   Zap,
   Activity,
   Settings,
-  ChevronRight,
 } from "lucide-react";
 
 interface WorkoutTemplateDetailsProps {
@@ -40,9 +34,6 @@ export default function WorkoutTemplateDetails({
   template,
   onEdit,
 }: WorkoutTemplateDetailsProps) {
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
-  const isDark = theme.background.includes("slate-900");
   const { user } = useAuth();
 
   // Load exercises for name lookup
@@ -345,44 +336,35 @@ export default function WorkoutTemplateDetails({
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex items-start justify-center p-4 pt-8 pb-8 ${
-        isDark ? "bg-black/60 backdrop-blur-sm" : "bg-black/50 backdrop-blur-sm"
-      }`}
+      className="fixed inset-0 z-[9999] flex items-start justify-center p-4 pt-8 pb-8 bg-black/60 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      data-theme={isDark ? "dark" : "light"}
     >
       <div
-        className={`relative ${theme.card} ${theme.shadow} rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
+        className="relative fc-modal fc-card max-w-6xl w-full max-h-[95vh] flex flex-col transform transition-all duration-300 ease-out overflow-hidden"
         style={{
           animation: "modalSlideIn 0.3s ease-out",
-          height: "min(90vh, calc(100vh - 2rem))",
-          maxHeight: "min(90vh, calc(100vh - 2rem))",
-          maxWidth: "min(98vw, 90rem)",
+          height: "min(95vh, calc(100vh - 2rem))",
         }}
       >
         {/* Header */}
-        <div
-          className={`sticky top-0 ${theme.card} border-b ${theme.border} px-3 sm:px-6 py-5 rounded-t-3xl`}
-        >
+        <div className="sticky top-0 border-b border-[color:var(--fc-glass-border)] px-3 sm:px-6 py-5 rounded-t-3xl">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-4">
-              <div
-                className={`p-3 rounded-2xl bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-lg`}
-              >
-                <CategoryIcon className={`w-6 h-6 text-white`} />
+              <div className="fc-icon-tile fc-icon-workouts">
+                <CategoryIcon className="w-5 h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h2
-                  className={`text-lg sm:text-2xl font-bold ${theme.text} break-words`}
-                >
+                <span className="fc-pill fc-pill-glass fc-text-workouts">
+                  Template details
+                </span>
+                <h2 className="text-lg sm:text-2xl font-bold fc-text-primary mt-2 break-words">
                   {template.name}
                 </h2>
-                <p
-                  className={`text-xs sm:text-sm ${theme.textSecondary} mt-1 break-words`}
-                >
-                  {typeof (template as any).category === 'string' 
-                    ? (template as any).category 
-                    : (template as any).category?.name || "General"} • {template.difficulty_level}
+                <p className="text-xs sm:text-sm fc-text-dim mt-1 break-words">
+                  {typeof (template as any).category === "string"
+                    ? (template as any).category
+                    : (template as any).category?.name || "General"}{" "}
+                  • {template.difficulty_level}
                 </p>
               </div>
             </div>
@@ -390,11 +372,7 @@ export default function WorkoutTemplateDetails({
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className={`p-2 rounded-xl transition-all duration-200 ${
-                theme.textSecondary
-              } hover:${theme.text} hover:${
-                isDark ? "bg-slate-700" : "bg-slate-100"
-              }`}
+              className="p-2 fc-btn fc-btn-ghost"
               aria-label="Close modal"
             >
               <X className="w-5 h-5" />
@@ -406,75 +384,63 @@ export default function WorkoutTemplateDetails({
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-6 pb-6">
           <div className="space-y-6 w-full">
             {/* Template Overview */}
-            <Card
-              className={`${theme.card} border ${theme.border} rounded-2xl`}
-            >
-              <CardHeader className="p-6">
+            <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+              <div className="p-6">
                 <div className="flex items-center gap-3">
-                  <div
-                    className={`p-2 rounded-xl bg-gradient-to-br from-purple-400 via-purple-500 to-purple-600 shadow-lg`}
-                  >
-                    <Settings className={`w-5 h-5 text-white`} />
+                  <div className="fc-icon-tile fc-icon-workouts">
+                    <Settings className="w-5 h-5" />
                   </div>
-                  <CardTitle className={`text-xl font-bold ${theme.text}`}>
+                  <h3 className="text-xl font-bold fc-text-primary">
                     Template Overview
-                  </CardTitle>
+                  </h3>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
+              </div>
+              <div className="p-6 pt-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div
-                    className={`p-4 rounded-xl ${theme.card} border ${theme.border}`}
-                  >
+                  <div className="p-4 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                     <div className="flex items-center gap-2 mb-2">
-                      <Clock className="w-4 h-4 text-blue-500" />
-                      <span className={`text-sm font-medium ${theme.text}`}>
+                      <Clock className="w-4 h-4 fc-text-workouts" />
+                      <span className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle">
                         Duration
                       </span>
                     </div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>
+                    <p className="text-2xl font-bold fc-text-primary">
                       {template.estimated_duration}m
                     </p>
                   </div>
 
-                  <div
-                    className={`p-4 rounded-xl ${theme.card} border ${theme.border}`}
-                  >
+                  <div className="p-4 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                     <div className="flex items-center gap-2 mb-2">
-                      <Dumbbell className="w-4 h-4 text-green-500" />
-                      <span className={`text-sm font-medium ${theme.text}`}>
+                      <Dumbbell className="w-4 h-4 fc-text-workouts" />
+                      <span className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle">
                         Exercises
                       </span>
                     </div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>
+                    <p className="text-2xl font-bold fc-text-primary">
                       {exercises.length}
                     </p>
                   </div>
 
-                  <div
-                    className={`p-4 rounded-xl ${theme.card} border ${theme.border}`}
-                  >
+                  <div className="p-4 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                     <div className="flex items-center gap-2 mb-2">
-                      <Users className="w-4 h-4 text-orange-500" />
-                      <span className={`text-sm font-medium ${theme.text}`}>
+                      <Users className="w-4 h-4 fc-text-workouts" />
+                      <span className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle">
                         Usage
                       </span>
                     </div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>
+                    <p className="text-2xl font-bold fc-text-primary">
                       {(template as any).usage_count || 0}
                     </p>
                   </div>
 
-                  <div
-                    className={`p-4 rounded-xl ${theme.card} border ${theme.border}`}
-                  >
+                  <div className="p-4 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                     <div className="flex items-center gap-2 mb-2">
-                      <Star className="w-4 h-4 text-yellow-500" />
-                      <span className={`text-sm font-medium ${theme.text}`}>
+                      <Star className="w-4 h-4 fc-text-workouts" />
+                      <span className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle">
                         Rating
                       </span>
                     </div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>
+                    <p className="text-2xl font-bold fc-text-primary">
                       {(template as any).rating || 0}
                     </p>
                   </div>
@@ -482,46 +448,42 @@ export default function WorkoutTemplateDetails({
 
                 {template.description && (
                   <div className="mt-6">
-                    <h4 className={`text-lg font-semibold ${theme.text} mb-2`}>
+                    <h4 className="text-lg font-semibold fc-text-primary mb-2">
                       Description
                     </h4>
-                    <p className={`${theme.textSecondary} leading-relaxed`}>
+                    <p className="fc-text-dim leading-relaxed">
                       {template.description}
                     </p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Exercises */}
-            <Card
-              className={`${theme.card} border ${theme.border} rounded-2xl`}
-            >
-              <CardHeader className="p-6">
+            <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+              <div className="p-6">
                 <div className="flex items-center gap-3">
-                  <div
-                    className={`p-2 rounded-xl bg-gradient-to-br from-green-400 via-green-500 to-green-600 shadow-lg`}
-                  >
-                    <Dumbbell className={`w-5 h-5 text-white`} />
+                  <div className="fc-icon-tile fc-icon-workouts">
+                    <Dumbbell className="w-5 h-5" />
                   </div>
-                  <CardTitle className={`text-xl font-bold ${theme.text}`}>
+                  <h3 className="text-xl font-bold fc-text-primary">
                     Workout Flow ({exercises.length} items)
-                  </CardTitle>
+                  </h3>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
+              </div>
+              <div className="p-6 pt-0">
                 {loading ? (
                   <div className="space-y-4">
                     {[1, 2, 3].map((i) => (
                       <div
                         key={i}
-                        className={`${theme.card} rounded-xl p-4 animate-pulse`}
+                        className="fc-glass-soft rounded-xl p-4 animate-pulse"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-8 h-8 bg-slate-300 dark:bg-slate-600 rounded-lg"></div>
-                          <div className="flex-1">
-                            <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-1/3 mb-2"></div>
-                            <div className="h-3 bg-slate-300 dark:bg-slate-600 rounded w-1/2"></div>
+                          <div className="w-8 h-8 bg-[color:var(--fc-glass-border)] rounded-lg"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-[color:var(--fc-glass-border)] rounded w-1/3"></div>
+                            <div className="h-3 bg-[color:var(--fc-glass-border)] rounded w-1/2"></div>
                           </div>
                         </div>
                       </div>
@@ -552,36 +514,36 @@ export default function WorkoutTemplateDetails({
                     })}
                   </div>
                 ) : (
-                  <div
-                    className={`p-6 text-center rounded-xl border-2 border-dashed ${theme.border} ${theme.textSecondary}`}
-                  >
-                    <Dumbbell className="mx-auto w-12 h-12 mb-3 text-gray-400" />
-                    <h4 className="font-semibold text-lg">No Exercises</h4>
+                  <div className="p-6 text-center rounded-2xl border-2 border-dashed border-[color:var(--fc-glass-border)] fc-text-dim">
+                    <div className="mx-auto w-12 h-12 mb-3 fc-icon-tile fc-icon-workouts">
+                      <Dumbbell className="w-5 h-5" />
+                    </div>
+                    <h4 className="font-semibold text-lg fc-text-primary">
+                      No Exercises
+                    </h4>
                     <p className="text-sm">
                       This workout template doesn't have any exercises yet.
                     </p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div
-          className={`sticky bottom-0 ${theme.card} border-t ${theme.border} px-3 sm:px-6 py-4 rounded-b-3xl flex items-center justify-end gap-3`}
-        >
+        <div className="sticky bottom-0 border-t border-[color:var(--fc-glass-border)] px-3 sm:px-6 py-4 rounded-b-3xl flex items-center justify-end gap-3">
           <Button
             variant="ghost"
             onClick={onClose}
-            className={`${theme.textSecondary} hover:${theme.text}`}
+            className="fc-btn fc-btn-secondary"
           >
             Close
           </Button>
           {onEdit && (
             <Button
               onClick={() => onEdit(template)}
-              className={`${theme.primary} ${theme.shadow} rounded-xl px-6 hover:scale-105 transition-all duration-200`}
+              className="fc-btn fc-btn-primary fc-press"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit Template

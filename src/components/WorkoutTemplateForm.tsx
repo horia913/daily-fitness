@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -53,8 +53,10 @@ import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import WorkoutBlockBuilder from "@/components/coach/WorkoutBlockBuilder";
-import { WorkoutBlock } from "@/types/workoutBlocks";
+import { WorkoutBlock, WorkoutBlockExercise, WorkoutBlockType } from "@/types/workoutBlocks";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
+import VolumeCalculatorWidget from "@/components/coach/VolumeCalculatorWidget";
+import { isGuidelineCategory, getAllowedBlockTypesForVolumeCalculator } from "@/lib/coachGuidelinesService";
 import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
 import ExerciseDetailForm from "@/components/features/workouts/ExerciseDetailForm";
 import {
@@ -77,6 +79,7 @@ const difficultyLevels = [
   { value: "Beginner", label: "Beginner" },
   { value: "Intermediate", label: "Intermediate" },
   { value: "Advanced", label: "Advanced" },
+  { value: "Athlete", label: "Athlete" },
 ];
 
 const durationOptions = [
@@ -178,6 +181,17 @@ export default function WorkoutTemplateForm({
     // EMOM specific
     emom_mode: "",
     emom_reps: "",
+    // HR sets specific
+    hr_is_intervals: false,
+    hr_zone: "",
+    hr_percentage_min: "",
+    hr_percentage_max: "",
+    hr_duration_minutes: "",
+    hr_work_duration_minutes: "",
+    hr_rest_duration_minutes: "",
+    hr_target_rounds: "",
+    hr_distance_meters: "",
+    hr_set_exercises: [] as Array<Record<string, any>>,
     // Tabata specific
     tabata_sets: [] as Array<{ exercises: any[]; rest_between_sets: string }>,
     // Load percentage / Weight toggle
@@ -342,8 +356,249 @@ export default function WorkoutTemplateForm({
 
   // Workout Block System (integrated with exercises)
   const [workoutBlocks, setWorkoutBlocks] = useState<WorkoutBlock[]>([]);
+  const [excludeFromRecommendations, setExcludeFromRecommendations] = useState(false);
+  const [daysPerWeek, setDaysPerWeek] = useState(3);
   const hasLoadedBlocks = useRef(false);
   const previousTemplateId = useRef<string | null>(null);
+
+  // Convert exercises array to WorkoutBlock[] format for volume calculator
+  // This ensures the volume calculator updates in real-time as exercises are added
+  const currentWorkoutBlocks = useMemo(() => {
+    if (exercises.length === 0) return [];
+    
+    const now = new Date().toISOString();
+    const templateId = template?.id || "temp-template";
+    
+    return exercises.map((exercise, index) => {
+      const blockType = (exercise.exercise_type || exercise.block_type || "straight_set") as WorkoutBlockType;
+      
+      // Get the full exercise data (either from exercise.exercise or from availableExercises)
+      let fullExerciseData = exercise.exercise || 
+        (exercise.exercise_id ? availableExercises.find(ex => ex.id === exercise.exercise_id) : null);
+      
+      // If we have exercise_id but no full data, create a minimal exercise object
+      // This ensures the volume calculator can still work even if exercise data isn't fully loaded
+      if (!fullExerciseData && exercise.exercise_id) {
+        fullExerciseData = {
+          id: exercise.exercise_id,
+          name: "Unknown Exercise",
+          primary_muscle_group_id: null,
+          primary_muscle_group: null,
+        };
+      }
+      
+      // Helper function to create a WorkoutBlockExercise from exercise data
+      const createBlockExercise = (
+        exerciseId: string,
+        exerciseLetter: string,
+        exerciseOrder: number,
+        sets?: number,
+        reps?: string
+      ): WorkoutBlockExercise | null => {
+        if (!exerciseId) return null;
+        
+        const exerciseData = availableExercises.find(ex => ex.id === exerciseId);
+        if (!exerciseData) return null;
+        
+        return {
+          id: `temp-exercise-${index}-${exerciseLetter}`,
+          block_id: exercise.id || `temp-block-${index}`,
+          exercise_id: exerciseId,
+          exercise_order: exerciseOrder,
+          exercise_letter: exerciseLetter,
+          sets: sets,
+          reps: reps,
+          weight_kg: undefined,
+          load_percentage: undefined,
+          rir: undefined,
+          tempo: undefined,
+          rest_seconds: undefined,
+          notes: undefined,
+          exercise: {
+            id: exerciseData.id,
+            name: exerciseData.name,
+            description: exerciseData.description,
+            primary_muscle_group: exerciseData.primary_muscle_group || null,
+            primary_muscle_group_id: exerciseData.primary_muscle_group_id,
+            muscle_groups: exerciseData.muscle_groups || 
+              (exerciseData.primary_muscle_group ? [exerciseData.primary_muscle_group] : []),
+            created_at: exerciseData.created_at || now,
+            updated_at: exerciseData.updated_at || now,
+          } as any,
+          created_at: now,
+          updated_at: now,
+        };
+      };
+
+      // Build exercises array based on block type
+      const blockExercises: WorkoutBlockExercise[] = [];
+      
+      if (blockType === "superset") {
+        // Superset: 2 exercises (A and B)
+        if (exercise.exercise_id) {
+          const exA = createBlockExercise(
+            exercise.exercise_id,
+            "A",
+            1,
+            exercise.sets ? parseInt(exercise.sets) : undefined,
+            exercise.reps || undefined
+          );
+          if (exA) blockExercises.push(exA);
+        }
+        if (exercise.superset_exercise_id) {
+          const exB = createBlockExercise(
+            exercise.superset_exercise_id,
+            "B",
+            1,
+            exercise.sets ? parseInt(exercise.sets) : undefined,
+            exercise.superset_reps || exercise.reps || undefined
+          );
+          if (exB) blockExercises.push(exB);
+        }
+      } else if (blockType === "giant_set") {
+        // Giant set: multiple exercises
+        if (exercise.giant_set_exercises && Array.isArray(exercise.giant_set_exercises)) {
+          exercise.giant_set_exercises.forEach((gsEx: any, gsIndex: number) => {
+            if (gsEx.exercise_id) {
+              const ex = createBlockExercise(
+                gsEx.exercise_id,
+                String.fromCharCode(65 + gsIndex), // A, B, C, etc.
+                1,
+                gsEx.sets ? parseInt(gsEx.sets) : (exercise.sets ? parseInt(exercise.sets) : undefined),
+                gsEx.reps || exercise.reps || undefined
+              );
+              if (ex) blockExercises.push(ex);
+            }
+          });
+        }
+      } else if (blockType === "pre_exhaustion") {
+        // Pre-exhaustion: 2 exercises (isolation A, compound B)
+        if (exercise.exercise_id) {
+          const isolationEx = createBlockExercise(
+            exercise.exercise_id,
+            "A",
+            1,
+            exercise.sets ? parseInt(exercise.sets) : undefined,
+            exercise.isolation_reps || exercise.reps || undefined
+          );
+          if (isolationEx) blockExercises.push(isolationEx);
+        }
+        if (exercise.compound_exercise_id) {
+          const compoundEx = createBlockExercise(
+            exercise.compound_exercise_id,
+            "B",
+            1,
+            exercise.sets ? parseInt(exercise.sets) : undefined,
+            exercise.compound_reps || exercise.reps || undefined
+          );
+          if (compoundEx) blockExercises.push(compoundEx);
+        }
+      } else {
+        // All other block types: single exercise
+        if (fullExerciseData) {
+          const singleEx: WorkoutBlockExercise = {
+            id: exercise.id || `temp-exercise-${index}`,
+            block_id: exercise.id || `temp-block-${index}`,
+            exercise_id: exercise.exercise_id || "",
+            exercise_order: 1,
+            exercise_letter: exercise.exercise_letter || "A",
+            sets: exercise.sets ? parseInt(exercise.sets) : undefined,
+            reps: exercise.reps || exercise.isolation_reps || undefined,
+            weight_kg: exercise.weight_kg ? parseFloat(exercise.weight_kg) : undefined,
+            load_percentage: exercise.load_percentage ? parseFloat(exercise.load_percentage) : undefined,
+            rir: exercise.rir ? parseInt(exercise.rir) : undefined,
+            tempo: exercise.tempo || undefined,
+            rest_seconds: exercise.rest_seconds ? parseInt(exercise.rest_seconds) : undefined,
+            notes: exercise.notes || undefined,
+            exercise: {
+              id: fullExerciseData.id,
+              name: fullExerciseData.name,
+              description: fullExerciseData.description,
+              primary_muscle_group: fullExerciseData.primary_muscle_group || 
+                (fullExerciseData.primary_muscle_group_id && availableExercises.find(ex => ex.id === fullExerciseData.id)?.primary_muscle_group) ||
+                null,
+              primary_muscle_group_id: fullExerciseData.primary_muscle_group_id,
+              muscle_groups: fullExerciseData.muscle_groups || 
+                (fullExerciseData.primary_muscle_group ? [fullExerciseData.primary_muscle_group] : []),
+              created_at: fullExerciseData.created_at || now,
+              updated_at: fullExerciseData.updated_at || now,
+            } as any,
+            created_at: now,
+            updated_at: now,
+          };
+          blockExercises.push(singleEx);
+        }
+      }
+
+      // Create WorkoutBlock
+      const block: WorkoutBlock = {
+        id: exercise.id || `temp-block-${index}`,
+        template_id: templateId,
+        block_type: blockType,
+        block_order: exercise.order_index || index + 1,
+        block_name: exercise.block_name || undefined,
+        block_notes: exercise.notes || undefined,
+        rest_seconds: exercise.rest_seconds ? parseInt(exercise.rest_seconds) : undefined,
+        total_sets: exercise.sets ? parseInt(exercise.sets) : undefined,
+        reps_per_set: exercise.reps || exercise.isolation_reps || undefined,
+        exercises: blockExercises,
+        drop_sets: [],
+        cluster_sets: [],
+        pyramid_sets: [],
+        rest_pause_sets: [],
+        time_protocols: [],
+        ladder_sets: [],
+        hr_sets: [],
+        created_at: now,
+        updated_at: now,
+      };
+
+      // For hr_sets block type, convert form data to hr_sets array
+      if (blockType === "hr_sets") {
+        // Support both new array structure (hr_set_exercises) and legacy single exercise
+        const hrExercises = exercise.hr_set_exercises && Array.isArray(exercise.hr_set_exercises) 
+          ? exercise.hr_set_exercises 
+          : (exercise.exercise_id ? [exercise] : []);
+        
+        block.hr_sets = hrExercises
+          .filter((ex: any) => ex.exercise_id) // Only include exercises with an exercise_id
+          .map((ex: any, idx: number) => ({
+            id: ex.id || `temp-hr-${index}-${idx}`,
+            block_id: block.id,
+            exercise_id: ex.exercise_id,
+            exercise_order: idx + 1,
+            hr_zone: ex.hr_zone ? parseInt(ex.hr_zone) : undefined,
+            hr_percentage_min: ex.hr_percentage_min ? parseFloat(ex.hr_percentage_min) : undefined,
+            hr_percentage_max: ex.hr_percentage_max ? parseFloat(ex.hr_percentage_max) : undefined,
+            is_intervals: ex.hr_is_intervals ?? false,
+            duration_seconds: ex.hr_duration_minutes ? ex.hr_duration_minutes * 60 : undefined,
+            work_duration_seconds: ex.hr_work_duration_minutes ? ex.hr_work_duration_minutes * 60 : undefined,
+            rest_duration_seconds: ex.hr_rest_duration_minutes ? ex.hr_rest_duration_minutes * 60 : undefined,
+            target_rounds: ex.hr_target_rounds ? parseInt(ex.hr_target_rounds) : undefined,
+            distance_meters: ex.hr_distance_meters ? parseFloat(ex.hr_distance_meters) : undefined,
+            created_at: now,
+          }));
+      }
+
+      return block;
+    });
+  }, [exercises, template?.id, availableExercises]);
+
+  // Determine if volume calculator is active
+  const isVolumeCalculatorActive = useMemo(() => {
+    return (
+      isGuidelineCategory(formData.category) &&
+      !excludeFromRecommendations
+    );
+  }, [formData.category, excludeFromRecommendations]);
+
+  // Get allowed block types for volume calculator
+  const allowedBlockTypes = useMemo(() => {
+    if (isVolumeCalculatorActive) {
+      return getAllowedBlockTypesForVolumeCalculator();
+    }
+    return undefined;
+  }, [isVolumeCalculatorActive]);
 
   // Save draft to localStorage (debounced)
   const saveDraftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -571,31 +826,44 @@ export default function WorkoutTemplateForm({
 
   const loadAvailableExercises = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      // Load exercises
+      const { data: exercisesData, error: exercisesError } = await supabase
         .from("exercises")
         .select("*")
         .order("name", { ascending: true });
 
-      if (error) throw error;
-      setAvailableExercises(data || []);
+      if (exercisesError) throw exercisesError;
+
+      // Load muscle groups (optional - if table doesn't exist, continue without it)
+      let muscleGroupMap = new Map<string, string>();
+      try {
+        const { data: muscleGroupsData, error: muscleGroupsError } = await supabase
+          .from("muscle_groups")
+          .select("id, name");
+
+        if (!muscleGroupsError && muscleGroupsData) {
+          muscleGroupsData.forEach((mg: any) => {
+            muscleGroupMap.set(mg.id, mg.name);
+          });
+        }
+      } catch (mgError) {
+        // Silently continue if muscle_groups table doesn't exist or query fails
+        console.warn("Could not load muscle groups (this is optional):", mgError);
+      }
+
+      // Transform exercises to include primary_muscle_group name
+      const exercisesWithMuscleGroups = (exercisesData || []).map((exercise: any) => ({
+        ...exercise,
+        primary_muscle_group: exercise.primary_muscle_group_id
+          ? muscleGroupMap.get(exercise.primary_muscle_group_id) || null
+          : null,
+      }));
+
+      setAvailableExercises(exercisesWithMuscleGroups);
     } catch (error) {
       console.error("Error loading exercises:", error);
-      // Fallback exercises
-      setAvailableExercises([
-        {
-          id: "1",
-          name: "Push-ups",
-          description: "Classic bodyweight exercise",
-        },
-        {
-          id: "2",
-          name: "Squats",
-          description: "Fundamental lower body exercise",
-        },
-        { id: "3", name: "Plank", description: "Core strengthening exercise" },
-        { id: "4", name: "Lunges", description: "Single-leg strengthening" },
-        { id: "5", name: "Burpees", description: "Full-body cardio exercise" },
-      ]);
+      // Fallback: just set exercises without muscle groups if main query fails
+      setAvailableExercises([]);
     }
   }, []);
 
@@ -2187,6 +2455,16 @@ export default function WorkoutTemplateForm({
 
         emom_mode: "",
         emom_reps: "",
+        hr_is_intervals: false,
+        hr_zone: "",
+        hr_percentage_min: "",
+        hr_percentage_max: "",
+        hr_duration_minutes: "",
+        hr_work_duration_minutes: "",
+        hr_rest_duration_minutes: "",
+        hr_target_rounds: "",
+        hr_distance_meters: "",
+        hr_set_exercises: [] as Array<Record<string, any>>,
         tabata_sets: [] as Array<{
           exercises: any[];
           rest_between_sets: string;
@@ -2349,6 +2627,17 @@ export default function WorkoutTemplateForm({
       emom_duration: exercise.emom_duration,
       emom_mode: exercise.emom_mode,
       emom_reps: exercise.emom_reps,
+      // HR sets specific
+      hr_is_intervals: (exercise as any).hr_is_intervals ?? false,
+      hr_zone: (exercise as any).hr_zone ?? "",
+      hr_percentage_min: (exercise as any).hr_percentage_min ?? "",
+      hr_percentage_max: (exercise as any).hr_percentage_max ?? "",
+      hr_duration_minutes: (exercise as any).hr_duration_minutes ?? "",
+      hr_work_duration_minutes: (exercise as any).hr_work_duration_minutes ?? "",
+      hr_rest_duration_minutes: (exercise as any).hr_rest_duration_minutes ?? "",
+      hr_target_rounds: (exercise as any).hr_target_rounds ?? "",
+      hr_distance_meters: (exercise as any).hr_distance_meters ?? "",
+      hr_set_exercises: (exercise as any).hr_set_exercises ?? [],
       // Tabata specific
       rounds: exercise.rounds,
       tabata_sets: Array.isArray(exercise.tabata_sets)
@@ -2423,7 +2712,7 @@ export default function WorkoutTemplateForm({
         className={`relative ${
           isPage
             ? ""
-            : `${theme.card} ${theme.shadow} rounded-2xl sm:rounded-3xl border ${theme.border}`
+            : `${theme.card} ${theme.shadow} fc-glass fc-card rounded-2xl sm:rounded-3xl border ${theme.border}`
         } w-full flex flex-col transform transition-all duration-300 ease-out ${
           isPage ? "" : "overflow-hidden"
         }`}
@@ -2437,7 +2726,7 @@ export default function WorkoutTemplateForm({
         {/* Header */}
         <div
           className={`${isPage ? "mb-6" : "sticky top-0"} ${
-            isPage ? "" : `${theme.card} border-b ${theme.border}`
+            isPage ? "" : `${theme.card} fc-glass fc-card border-b ${theme.border}`
           } px-3 py-3 sm:px-6 sm:py-5 ${isPage ? "" : "rounded-t-3xl"}`}
         >
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -2509,7 +2798,7 @@ export default function WorkoutTemplateForm({
 
             {/* Basic Information */}
             <Card
-              className={`${theme.card} border ${theme.border} rounded-2xl`}
+              className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}
             >
               <CardHeader className="p-2">
                 <div className="flex items-center gap-2">
@@ -2727,10 +3016,23 @@ export default function WorkoutTemplateForm({
               </Card>
             </div>
 
+            {/* Volume Calculator Widget */}
+            {isGuidelineCategory(formData.category) && (
+              <VolumeCalculatorWidget
+                blocks={currentWorkoutBlocks}
+                category={formData.category}
+                difficulty={formData.difficulty_level}
+                daysPerWeek={daysPerWeek}
+                excludeFromRecommendations={excludeFromRecommendations}
+                onToggleExclude={setExcludeFromRecommendations}
+                onDaysPerWeekChange={setDaysPerWeek}
+              />
+            )}
+
             {/* Template Preview - Hidden to save space */}
             {false && (
               <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
+                className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}
               >
                 <CardHeader className="p-6">
                   <div className="flex items-center justify-between flex-wrap gap-2">
@@ -3135,6 +3437,9 @@ export default function WorkoutTemplateForm({
                                           availableExercises={
                                             availableExercises
                                           }
+                                          allowedBlockTypes={
+                                            allowedBlockTypes
+                                          }
                                           mode="inline"
                                         />
                                       </ExerciseBlockCard>
@@ -3179,7 +3484,7 @@ export default function WorkoutTemplateForm({
             {/* Add Exercise Modal */}
             {showAddExercise && (
               <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
+                className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}
               >
                 <CardHeader className="p-6">
                   <div className="flex items-center justify-between flex-wrap gap-2">
@@ -3220,12 +3525,19 @@ export default function WorkoutTemplateForm({
                 <CardContent className="p-2 pt-0">
                   <div className="space-y-6">
                     <div>
-                      <Label
-                        htmlFor="exercise-type"
-                        className={`text-sm font-medium ${theme.text}`}
-                      >
-                        Exercise Type
-                      </Label>
+                      <div className="flex items-center justify-between mb-1">
+                        <Label
+                          htmlFor="exercise-type"
+                          className={`text-sm font-medium ${theme.text}`}
+                        >
+                          Exercise Type
+                        </Label>
+                        {isVolumeCalculatorActive && (
+                          <Badge className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                            Volume Calculator Active
+                          </Badge>
+                        )}
+                      </div>
                       <Select
                         value={newExercise.exercise_type || ""}
                         onValueChange={(value) => {
@@ -3240,49 +3552,110 @@ export default function WorkoutTemplateForm({
                           <SelectValue placeholder="Select exercise type" />
                         </SelectTrigger>
                         <SelectContent className="z-[99999] max-h-60">
+                          {/* Informational message when filtering */}
+                          {isVolumeCalculatorActive && allowedBlockTypes && (
+                            <div className="px-2 py-1.5 text-xs text-blue-600 dark:text-blue-400 border-b border-blue-200 dark:border-blue-800">
+                              Volume calculator active - only resistance training blocks shown
+                            </div>
+                          )}
+                          {/* Resistance Training Blocks */}
                           <SelectItem
                             value="straight_set"
                             className="rounded-lg"
+                            disabled={
+                              isVolumeCalculatorActive &&
+                              !allowedBlockTypes?.includes("straight_set")
+                            }
                           >
                             Straight Set
                           </SelectItem>
-                          <SelectItem value="superset" className="rounded-lg">
+                          <SelectItem
+                            value="superset"
+                            className="rounded-lg"
+                            disabled={
+                              isVolumeCalculatorActive &&
+                              !allowedBlockTypes?.includes("superset")
+                            }
+                          >
                             Superset
                           </SelectItem>
-                          <SelectItem value="giant_set" className="rounded-lg">
+                          <SelectItem
+                            value="giant_set"
+                            className="rounded-lg"
+                            disabled={
+                              isVolumeCalculatorActive &&
+                              !allowedBlockTypes?.includes("giant_set")
+                            }
+                          >
                             Giant Set
                           </SelectItem>
-                          <SelectItem value="drop_set" className="rounded-lg">
+                          <SelectItem
+                            value="drop_set"
+                            className="rounded-lg"
+                            disabled={
+                              isVolumeCalculatorActive &&
+                              !allowedBlockTypes?.includes("drop_set")
+                            }
+                          >
                             Drop Set
                           </SelectItem>
                           <SelectItem
                             value="cluster_set"
                             className="rounded-lg"
+                            disabled={
+                              isVolumeCalculatorActive &&
+                              !allowedBlockTypes?.includes("cluster_set")
+                            }
                           >
                             Cluster Set
                           </SelectItem>
-                          <SelectItem value="rest_pause" className="rounded-lg">
+                          <SelectItem
+                            value="rest_pause"
+                            className="rounded-lg"
+                            disabled={
+                              isVolumeCalculatorActive &&
+                              !allowedBlockTypes?.includes("rest_pause")
+                            }
+                          >
                             Rest-Pause
                           </SelectItem>
-
                           <SelectItem
                             value="pre_exhaustion"
                             className="rounded-lg"
+                            disabled={
+                              isVolumeCalculatorActive &&
+                              !allowedBlockTypes?.includes("pre_exhaustion")
+                            }
                           >
                             Pre-Exhaustion
                           </SelectItem>
-                          <SelectItem value="amrap" className="rounded-lg">
-                            AMRAP
+                          <SelectItem
+                            value="hr_sets"
+                            className="rounded-lg"
+                            disabled={
+                              isVolumeCalculatorActive &&
+                              !allowedBlockTypes?.includes("hr_sets")
+                            }
+                          >
+                            HR Sets
                           </SelectItem>
-                          <SelectItem value="emom" className="rounded-lg">
-                            EMOM
-                          </SelectItem>
-                          <SelectItem value="tabata" className="rounded-lg">
-                            Tabata
-                          </SelectItem>
-                          <SelectItem value="for_time" className="rounded-lg">
-                            For Time
-                          </SelectItem>
+                          {/* Time-Based Blocks - Hidden when volume calculator is active */}
+                          {(!isVolumeCalculatorActive || !allowedBlockTypes) && (
+                            <>
+                              <SelectItem value="amrap" className="rounded-lg">
+                                AMRAP
+                              </SelectItem>
+                              <SelectItem value="emom" className="rounded-lg">
+                                EMOM
+                              </SelectItem>
+                              <SelectItem value="tabata" className="rounded-lg">
+                                Tabata
+                              </SelectItem>
+                              <SelectItem value="for_time" className="rounded-lg">
+                                For Time
+                              </SelectItem>
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -4982,14 +5355,283 @@ export default function WorkoutTemplateForm({
                       </div>
                     )}
 
+                    {newExercise.exercise_type === "hr_sets" && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-700">
+                          <h4
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
+                          >
+                            <Activity className="w-4 h-4 text-red-600" />
+                            HR Sets Configuration
+                          </h4>
+                          <p className={`text-sm ${theme.textSecondary} mb-4`}>
+                            Heart rate zone training for aerobic endurance (Zone 2-5)
+                          </p>
+
+                          {/* Session Type: Continuous vs Intervals */}
+                          <div className="mb-4">
+                            <Label className={`text-sm font-medium ${theme.text}`}>
+                              Session Type
+                            </Label>
+                            <Select
+                              value={
+                                newExercise.hr_is_intervals === true
+                                  ? "intervals"
+                                  : newExercise.hr_is_intervals === false
+                                  ? "continuous"
+                                  : ""
+                              }
+                              onValueChange={(value) =>
+                                setNewExercise({
+                                  ...newExercise,
+                                  hr_is_intervals: value === "intervals",
+                                })
+                              }
+                            >
+                              <SelectTrigger className="mt-2 rounded-xl">
+                                <SelectValue placeholder="Select session type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="continuous">Continuous</SelectItem>
+                                <SelectItem value="intervals">Intervals</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* HR Zone or Percentage */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <Label className={`text-sm font-medium ${theme.text}`}>
+                                HR Zone (1-5)
+                              </Label>
+                              <Input
+                                type="number"
+                                value={
+                                  newExercise.hr_zone === ""
+                                    ? ""
+                                    : newExercise.hr_zone || ""
+                                }
+                                onChange={(e) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    hr_zone: handleNumberChange(e.target.value, 0),
+                                    hr_percentage_min: "",
+                                    hr_percentage_max: "",
+                                  })
+                                }
+                                min="1"
+                                max="5"
+                                placeholder="e.g., 2"
+                                className="mt-2 rounded-xl"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label className={`text-sm font-medium ${theme.text}`}>
+                                  HR % Min
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={
+                                    newExercise.hr_percentage_min === ""
+                                      ? ""
+                                      : newExercise.hr_percentage_min || ""
+                                  }
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      hr_percentage_min: handleNumberChange(
+                                        e.target.value,
+                                        0
+                                      ),
+                                      hr_zone: "",
+                                    })
+                                  }
+                                  min="50"
+                                  max="100"
+                                  placeholder="e.g., 60"
+                                  className="mt-2 rounded-xl"
+                                />
+                              </div>
+                              <div>
+                                <Label className={`text-sm font-medium ${theme.text}`}>
+                                  HR % Max
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={
+                                    newExercise.hr_percentage_max === ""
+                                      ? ""
+                                      : newExercise.hr_percentage_max || ""
+                                  }
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      hr_percentage_max: handleNumberChange(
+                                        e.target.value,
+                                        0
+                                      ),
+                                      hr_zone: "",
+                                    })
+                                  }
+                                  min="50"
+                                  max="100"
+                                  placeholder="e.g., 70"
+                                  className="mt-2 rounded-xl"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Continuous Mode Fields */}
+                          {newExercise.hr_is_intervals === false && (
+                            <div className="mb-4">
+                              <Label className={`text-sm font-medium ${theme.text}`}>
+                                Duration (minutes)
+                              </Label>
+                              <Input
+                                type="number"
+                                value={
+                                  newExercise.hr_duration_minutes === ""
+                                    ? ""
+                                    : newExercise.hr_duration_minutes || ""
+                                }
+                                onChange={(e) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    hr_duration_minutes: handleNumberChange(
+                                      e.target.value,
+                                      0
+                                    ),
+                                  })
+                                }
+                                min="1"
+                                placeholder="e.g., 30"
+                                className="mt-2 rounded-xl"
+                              />
+                            </div>
+                          )}
+
+                          {/* Interval Mode Fields */}
+                          {newExercise.hr_is_intervals === true && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                              <div>
+                                <Label className={`text-sm font-medium ${theme.text}`}>
+                                  Work Duration (minutes)
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={
+                                    newExercise.hr_work_duration_minutes === ""
+                                      ? ""
+                                      : newExercise.hr_work_duration_minutes || ""
+                                  }
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      hr_work_duration_minutes: handleNumberChange(
+                                        e.target.value,
+                                        0
+                                      ),
+                                    })
+                                  }
+                                  min="1"
+                                  placeholder="e.g., 5"
+                                  className="mt-2 rounded-xl"
+                                />
+                              </div>
+                              <div>
+                                <Label className={`text-sm font-medium ${theme.text}`}>
+                                  Rest Duration (minutes)
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={
+                                    newExercise.hr_rest_duration_minutes === ""
+                                      ? ""
+                                      : newExercise.hr_rest_duration_minutes || ""
+                                  }
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      hr_rest_duration_minutes: handleNumberChange(
+                                        e.target.value,
+                                        0
+                                      ),
+                                    })
+                                  }
+                                  min="0"
+                                  placeholder="e.g., 3"
+                                  className="mt-2 rounded-xl"
+                                />
+                              </div>
+                              <div>
+                                <Label className={`text-sm font-medium ${theme.text}`}>
+                                  Target Rounds
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={
+                                    newExercise.hr_target_rounds === ""
+                                      ? ""
+                                      : newExercise.hr_target_rounds || ""
+                                  }
+                                  onChange={(e) =>
+                                    setNewExercise({
+                                      ...newExercise,
+                                      hr_target_rounds: handleNumberChange(
+                                        e.target.value,
+                                        0
+                                      ),
+                                    })
+                                  }
+                                  min="1"
+                                  placeholder="e.g., 4"
+                                  className="mt-2 rounded-xl"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Optional Distance Field */}
+                          <div>
+                            <Label className={`text-sm font-medium ${theme.text}`}>
+                              Distance (meters, optional)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={
+                                newExercise.hr_distance_meters === ""
+                                  ? ""
+                                  : newExercise.hr_distance_meters || ""
+                              }
+                              onChange={(e) =>
+                                setNewExercise({
+                                  ...newExercise,
+                                  hr_distance_meters: handleNumberChange(
+                                    e.target.value,
+                                    0
+                                  ),
+                                })
+                              }
+                              min="0"
+                              placeholder="e.g., 5000"
+                              className="mt-2 rounded-xl"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Common fields for all types */}
-                    {/* Load % / Weight Toggle - Only show for block types that support it (all except tabata, superset, giant_set, pre_exhaustion which have their own fields) */}
+                    {/* Load % / Weight Toggle - Only show for block types that support it (all except tabata, superset, giant_set, pre_exhaustion, hr_sets which have their own fields) */}
                     {newExercise.exercise_type &&
                       ![
                         "superset",
                         "giant_set",
                         "pre_exhaustion",
                         "tabata",
+                        "hr_sets",
                       ].includes(newExercise.exercise_type) &&
                       renderLoadWeightField(
                         newExercise.load_percentage,

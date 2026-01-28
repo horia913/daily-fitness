@@ -1,8 +1,6 @@
 "use client";
 
 import React from "react";
-import { useTheme } from "@/contexts/ThemeContext";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,9 +23,10 @@ interface Program {
   name: string;
   description?: string;
   coach_id: string;
-  difficulty_level: "beginner" | "intermediate" | "advanced";
+  difficulty_level: "beginner" | "intermediate" | "advanced" | "athlete";
   duration_weeks: number;
   target_audience: string;
+  category?: string | null; // Training category for volume calculator
   is_public?: boolean; // Optional - not in database schema
   is_active: boolean;
   created_at: string;
@@ -69,83 +68,47 @@ export default function ProgramCard({
   onAssign,
   assignmentCount = 0,
 }: ProgramCardProps) {
-  const { isDark, getSemanticColor } = useTheme();
   const TargetIcon = getTargetAudienceIcon(program.target_audience);
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "beginner":
-        return getSemanticColor("success").primary;
+        return "fc-text-success";
       case "intermediate":
-        return getSemanticColor("warning").primary;
+        return "fc-text-warning";
       case "advanced":
-        return getSemanticColor("critical").primary;
+        return "fc-text-error";
       default:
-        return getSemanticColor("neutral").primary;
+        return "fc-text-subtle";
     }
   };
 
   const difficultyColor = getDifficultyColor(program.difficulty_level);
 
   return (
-      <div 
-        onClick={onOpenDetails} 
-        className="cursor-pointer"
-        style={{
-          boxShadow: isDark
-            ? "0 4px 12px rgba(0,0,0,0.3)"
-            : "0 4px 12px rgba(0,0,0,0.1)",
-        }}
-      >
-      <GlassCard
-        elevation={2}
-        className="overflow-hidden transition-all duration-300 hover:scale-[1.02]"
-      >
-      {/* Header with gradient background */}
-      <div
-        className="relative h-24 flex items-center justify-center"
-        style={{
-          background: getSemanticColor("success").gradient,
-        }}
-      >
+    <div
+      onClick={onOpenDetails}
+      className="cursor-pointer fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden transition-all duration-300 fc-hover-rise"
+    >
+      {/* Header */}
+      <div className="relative h-24 flex items-center justify-center fc-glass-soft">
         {/* Target Audience Icon */}
-        <div
-          className="w-14 h-14 rounded-xl flex items-center justify-center"
-          style={{
-            background: "rgba(255,255,255,0.25)",
-            backdropFilter: "blur(10px)",
-          }}
-        >
-          <TargetIcon className="w-7 h-7 text-white" />
+        <div className="fc-icon-tile fc-icon-workouts w-14 h-14">
+          <TargetIcon className="w-7 h-7" />
         </div>
 
         {/* Difficulty Badge */}
         <div className="absolute top-3 left-3">
-          <span
-            className="px-3 py-1.5 rounded-full text-xs font-semibold capitalize"
-            style={{
-              background: "#FFFFFF",
-              color: difficultyColor,
-            }}
-          >
+          <span className={`fc-pill fc-pill-glass text-xs capitalize ${difficultyColor}`}>
             {program.difficulty_level}
           </span>
         </div>
 
         {/* Duration Badge */}
         <div className="absolute top-3 right-3">
-          <div
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-            style={{
-              background: "rgba(255,255,255,0.95)",
-              backdropFilter: "blur(10px)",
-            }}
-          >
-            <Calendar className="w-3.5 h-3.5" style={{ color: "#6B7280" }} />
-            <span
-              className="text-xs font-semibold"
-              style={{ color: "#1A1A1A" }}
-            >
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)]">
+            <Calendar className="w-3.5 h-3.5 fc-text-subtle" />
+            <span className="text-xs font-semibold fc-text-primary">
               {program.duration_weeks}w
             </span>
           </div>
@@ -154,15 +117,7 @@ export default function ProgramCard({
         {/* Active/Inactive Badge */}
         {!program.is_active && (
           <div className="absolute bottom-3 left-3">
-            <span
-              className="px-3 py-1 rounded-full text-xs font-semibold"
-              style={{
-                background: "#FFFFFF",
-                color: getSemanticColor("neutral").primary,
-              }}
-            >
-              Inactive
-            </span>
+            <span className="fc-pill fc-pill-glass fc-text-subtle text-xs">Inactive</span>
           </div>
         )}
       </div>
@@ -172,23 +127,23 @@ export default function ProgramCard({
         {/* Title & Description */}
         <div>
           <h3
-            className="text-lg font-bold mb-1 line-clamp-2"
-            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+            className="text-lg font-bold mb-1 line-clamp-2 fc-text-primary"
           >
             {program.name}
           </h3>
-          <span
-            className="text-sm font-semibold capitalize"
-            style={{ color: getSemanticColor("success").primary }}
-          >
-            {program.target_audience.replace(/_/g, " ")}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="fc-pill fc-pill-glass fc-text-workouts text-xs capitalize">
+              {program.target_audience.replace(/_/g, " ")}
+            </span>
+            {!program.is_active && (
+              <span className="fc-pill fc-pill-glass fc-text-subtle text-xs">
+                Inactive
+              </span>
+            )}
+          </div>
           {program.description && (
             <p
-              className="text-sm line-clamp-2 mt-2"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
+              className="text-sm line-clamp-2 mt-2 fc-text-subtle"
             >
               {program.description}
             </p>
@@ -198,113 +153,52 @@ export default function ProgramCard({
         {/* Stats Grid */}
         <div className="grid grid-cols-3 gap-3">
           {/* Duration */}
-          <div
-            className="flex flex-col items-center p-3 rounded-xl"
-            style={{
-              background: isDark
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.03)",
-            }}
-          >
-            <Calendar
-              className="w-5 h-5 mb-2"
-              style={{ color: getSemanticColor("trust").primary }}
-            />
+          <div className="flex flex-col items-center p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+            <Calendar className="w-5 h-5 mb-2 fc-text-workouts" />
             <AnimatedNumber
               value={program.duration_weeks}
-              className="text-xl font-bold"
-              color={isDark ? "#fff" : "#1A1A1A"}
+              className="text-xl font-bold fc-text-primary"
+              color="currentColor"
             />
-            <span
-              className="text-xs"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              }}
-            >
+            <span className="text-xs fc-text-subtle">
               weeks
             </span>
           </div>
 
           {/* Clients */}
-          <div
-            className="flex flex-col items-center p-3 rounded-xl"
-            style={{
-              background: isDark
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.03)",
-            }}
-          >
-            <Users
-              className="w-5 h-5 mb-2"
-              style={{ color: getSemanticColor("success").primary }}
-            />
+          <div className="flex flex-col items-center p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+            <Users className="w-5 h-5 mb-2 fc-text-workouts" />
             <AnimatedNumber
               value={assignmentCount}
-              className="text-xl font-bold"
-              color={isDark ? "#fff" : "#1A1A1A"}
+              className="text-xl font-bold fc-text-primary"
+              color="currentColor"
             />
-            <span
-              className="text-xs"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              }}
-            >
+            <span className="text-xs fc-text-subtle">
               clients
             </span>
           </div>
 
           {/* Progress */}
-          <div
-            className="flex flex-col items-center p-3 rounded-xl justify-center"
-            style={{
-              background: isDark
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.03)",
-            }}
-          >
-            <TrendingUp
-              className="w-5 h-5 mb-1"
-              style={{ color: getSemanticColor("warning").primary }}
-            />
-            <span
-              className="text-xs font-semibold text-center"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-              }}
-            >
+          <div className="flex flex-col items-center p-3 rounded-xl justify-center fc-glass-soft border border-[color:var(--fc-glass-border)]">
+            <TrendingUp className="w-5 h-5 mb-1 fc-text-warning" />
+            <span className="text-xs font-semibold text-center fc-text-subtle">
               Progress
             </span>
-            <span
-              className="text-xs text-center"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              }}
-            >
+            <span className="text-xs text-center fc-text-subtle">
               Tracked
             </span>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div
-          className="flex items-center gap-2 pt-4"
-          style={{
-            borderTop: `1px solid ${
-              isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-            }`,
-          }}
-        >
+        <div className="flex items-center gap-2 pt-4 border-t border-[color:var(--fc-glass-border)]">
           <Button
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
               onOpenDetails();
             }}
-            className="flex-1"
-            style={{
-              background: getSemanticColor("success").gradient,
-              boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-            }}
+            className="flex-1 fc-btn fc-btn-primary fc-press"
           >
             <Eye className="w-4 h-4 mr-2" />
             View
@@ -318,9 +212,7 @@ export default function ProgramCard({
                 e.stopPropagation();
                 onAssign();
               }}
-              style={{
-                color: getSemanticColor("trust").primary,
-              }}
+              className="fc-btn fc-btn-ghost fc-press fc-text-workouts"
             >
               <UserPlus className="w-4 h-4" />
             </Button>
@@ -333,6 +225,7 @@ export default function ProgramCard({
               e.stopPropagation();
               onEdit();
             }}
+            className="fc-btn fc-btn-ghost fc-press"
           >
             <Edit className="w-4 h-4" />
           </Button>
@@ -345,16 +238,13 @@ export default function ProgramCard({
                 e.stopPropagation();
                 onDelete();
               }}
-              style={{
-                color: getSemanticColor("critical").primary,
-              }}
+              className="fc-btn fc-btn-ghost fc-press fc-text-error"
             >
               <Trash2 className="w-4 h-4" />
             </Button>
           )}
         </div>
       </div>
-    </GlassCard>
     </div>
   );
 }

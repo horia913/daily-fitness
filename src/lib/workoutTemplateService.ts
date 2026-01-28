@@ -10,7 +10,7 @@ export interface WorkoutTemplate {
   name: string
   description?: string
   coach_id: string
-  difficulty_level: 'beginner' | 'intermediate' | 'advanced'
+  difficulty_level: 'beginner' | 'intermediate' | 'advanced' | 'athlete'
   estimated_duration: number
   category?: string
   is_active: boolean
@@ -69,9 +69,10 @@ export interface Program {
   name: string
   description?: string
   coach_id: string
-  difficulty_level: 'beginner' | 'intermediate' | 'advanced'
+  difficulty_level: 'beginner' | 'intermediate' | 'advanced' | 'athlete'
   duration_weeks: number
-  target_audience: string
+  target_audience?: string | null
+  category?: string | null // Training category for volume calculator
   is_public?: boolean // Optional - not in database schema
   is_active: boolean
   created_at: string
@@ -161,6 +162,7 @@ export interface ProgramDayAssignment {
 export interface DailyWorkout {
   hasWorkout: boolean
   templateId?: string
+  scheduleId?: string
   templateName?: string
   templateDescription?: string
   weekNumber?: number
@@ -168,6 +170,8 @@ export interface DailyWorkout {
   estimatedDuration?: number
   difficultyLevel?: string
   exercises?: DailyWorkoutExercise[]
+  exerciseCount?: number
+  totalSets?: number
   generatedAt?: string
   message?: string
   weekCompleted?: boolean
@@ -247,6 +251,10 @@ export class WorkoutTemplateService {
   
   static async getWorkoutTemplates(coachId: string): Promise<WorkoutTemplate[]> {
     try {
+      // Ensure user is authenticated before querying
+      const { ensureAuthenticated } = await import('./supabase');
+      await ensureAuthenticated();
+      
       const { data, error } = await supabase
         .from('workout_templates')
         .select('*')
@@ -861,21 +869,36 @@ export class WorkoutTemplateService {
 
   static async createProgram(programData: Omit<Program, 'id' | 'created_at' | 'updated_at'>): Promise<Program | null> {
     try {
+      console.log('📝 WorkoutTemplateService.createProgram called with:', programData);
+      
+      const insertData = {
+        ...programData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      console.log('📝 Inserting program data:', insertData);
+      
       const { data, error } = await supabase
         .from('workout_programs')
-        .insert({
-          ...programData,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
+        .insert(insertData)
         .select()
         .single()
 
-      if (error) throw error
-      return data
+      if (error) {
+        console.error('❌ Supabase error creating program:', error);
+        throw error;
+      }
+      
+      console.log('✅ Program created successfully:', data);
+      return data;
     } catch (error) {
-      console.error('Error creating program:', error)
-      return null
+      console.error('❌ Error creating program:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+      return null;
     }
   }
 

@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { createErrorResponse, handleApiError, validateRequiredFields } from '@/lib/apiErrorHandler'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+import { validateApiAuth, validateOwnership, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
 
 export async function POST(req: NextRequest) {
   console.log("📥 /api/complete-workout called");
   
   try {
+    // Validate authentication
+    const { user, supabaseAdmin } = await validateApiAuth(req)
     const body = await req.json()
     console.log("📦 Request body:", body);
     
@@ -36,6 +33,9 @@ export async function POST(req: NextRequest) {
         400
       )
     }
+
+    // SECURITY: Validate that client_id matches authenticated user
+    validateOwnership(user.id, client_id)
 
     // Step 1: Get the workout_log to get started_at
     console.log('🔍 Fetching workout_log:', workout_log_id)
@@ -223,7 +223,14 @@ export async function POST(req: NextRequest) {
         duration_minutes: totalDurationMinutes,
       },
     }, { status: 200 })
-  } catch (error) {
+  } catch (error: any) {
+    // Handle auth errors specifically
+    if (error.message === 'Missing authorization header' || error.message === 'Invalid or expired token' || error.message === 'User not authenticated') {
+      return createUnauthorizedResponse(error.message)
+    }
+    if (error.message === 'Forbidden - Cannot access another user\'s resource') {
+      return createForbiddenResponse(error.message)
+    }
     return handleApiError(error, 'Failed to complete workout')
   }
 }

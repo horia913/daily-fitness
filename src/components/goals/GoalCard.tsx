@@ -1,12 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Edit, Trash, Calendar, Clock, Target, RefreshCw } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
 
 interface Goal {
   id: string;
@@ -44,7 +41,6 @@ interface GoalCardProps {
 }
 
 export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: GoalCardProps) {
-  const { isDark, getSemanticColor } = useTheme();
   const [updateValue, setUpdateValue] = useState<string>(
     goal.current_value?.toString() || "0"
   );
@@ -57,28 +53,28 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "high":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+        return "fc-text-error";
       case "medium":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+        return "fc-text-warning";
       case "low":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+        return "fc-text-success";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+        return "fc-text-subtle";
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+        return "fc-text-success";
       case "active":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+        return "fc-text-workouts";
       case "paused":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+        return "fc-text-warning";
       case "cancelled":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+        return "fc-text-subtle";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+        return "fc-text-subtle";
     }
   };
 
@@ -111,44 +107,34 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
     : null;
 
   return (
-    <div
-      style={{
-        background: isDark
-          ? `rgba(255,255,255,${isCompleted ? "0.08" : "0.05"})`
-          : `rgba(255,255,255,${isCompleted ? "0.95" : "1"})`,
-        border: isDark
-          ? "1px solid rgba(255,255,255,0.1)"
-          : "1px solid rgba(0,0,0,0.1)",
-      }}
-    >
-    <GlassCard
-      elevation={2}
-      className="p-6 transition-all duration-300 hover:shadow-xl"
-    >
+    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 transition-all duration-300 fc-hover-rise">
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 truncate">
+            <h3 className="text-lg font-bold fc-text-primary truncate">
               {goal.title}
             </h3>
-            <Badge className={`${getPriorityColor(goal.priority)} rounded-full px-2 py-0.5 text-xs`}>
+            <span className={`fc-pill fc-pill-glass text-xs ${getPriorityColor(goal.priority)}`}>
               {goal.priority}
-            </Badge>
+            </span>
+            <span className={`fc-pill fc-pill-glass text-xs capitalize ${getStatusColor(goal.status)}`}>
+              {goal.status.replace(/_/g, " ")}
+            </span>
             {isCompleted && (
-              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full px-2 py-0.5 text-xs">
+              <span className="fc-pill fc-pill-glass text-xs fc-text-success">
                 ✓ Completed
-              </Badge>
+              </span>
             )}
             {isAutoTracked && (
-              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full px-2 py-0.5 text-xs flex items-center gap-1">
+              <span className="fc-pill fc-pill-glass text-xs fc-text-workouts flex items-center gap-1">
                 <RefreshCw className="w-3 h-3" />
                 Auto
-              </Badge>
+              </span>
             )}
           </div>
           {goal.description && (
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">
+            <p className="text-sm fc-text-dim mb-2">
               {goal.description}
             </p>
           )}
@@ -158,38 +144,25 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
       {/* Progress Display */}
       <div className="mb-4">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          <span className="text-sm font-medium fc-text-dim">
             {goal.current_value || 0} / {goal.target_value || 0} {goal.target_unit || ""}
           </span>
-          <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+          <span className="text-sm font-bold fc-text-primary">
             {Math.round(progressPercent)}%
           </span>
         </div>
-        <div
-          className="w-full rounded-full h-3 overflow-hidden"
-          style={{
-            background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-          }}
-        >
+        <div className="w-full rounded-full h-3 overflow-hidden fc-progress-track">
           <div
-            className="h-3 rounded-full transition-all duration-500"
+            className="h-3 rounded-full transition-all duration-500 fc-progress-fill"
             style={{
               width: `${Math.min(progressPercent, 100)}%`,
-              background:
-                progressPercent >= 100
-                  ? "linear-gradient(90deg, #10B981, #059669)"
-                  : progressPercent >= 80
-                  ? "linear-gradient(90deg, #8B5CF6, #7C3AED)"
-                  : progressPercent >= 50
-                  ? "linear-gradient(90deg, #3B82F6, #2563EB)"
-                  : "linear-gradient(90deg, #F59E0B, #D97706)",
             }}
           />
         </div>
       </div>
 
       {/* Dates */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400 mb-4">
+      <div className="flex flex-wrap items-center gap-4 text-xs fc-text-subtle mb-4">
         <span className="flex items-center gap-1">
           <Calendar className="w-3 h-3" />
           Started: {new Date(goal.start_date).toLocaleDateString()}
@@ -199,7 +172,7 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
             <Clock className="w-3 h-3" />
             Due: {new Date(goal.target_date).toLocaleDateString()}
             {daysUntilDeadline !== null && daysUntilDeadline > 0 && (
-              <span className="ml-1 text-orange-600 dark:text-orange-400">
+              <span className="ml-1 fc-text-warning">
                 ({daysUntilDeadline} days left)
               </span>
             )}
@@ -208,30 +181,8 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
       </div>
 
       {/* Status Label */}
-      <div
-        className="mb-4 p-3 rounded-lg"
-        style={{
-          background: isAutoTracked
-            ? isDark
-              ? "rgba(59, 130, 246, 0.15)"
-              : "rgba(59, 130, 246, 0.1)"
-            : isDark
-            ? "rgba(139, 92, 246, 0.15)"
-            : "rgba(139, 92, 246, 0.1)",
-        }}
-      >
-        <p
-          className="text-xs font-medium flex items-center gap-2"
-          style={{
-            color: isAutoTracked
-              ? isDark
-                ? "#60A5FA"
-                : "#3B82F6"
-              : isDark
-              ? "#A78BFA"
-              : "#8B5CF6",
-          }}
-        >
+      <div className="mb-4 p-3 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)]">
+        <p className={`text-xs font-medium flex items-center gap-2 ${isAutoTracked ? "fc-text-workouts" : "fc-text-habits"}`}>
           {isAutoTracked ? (
             <>
               <RefreshCw className="w-3 h-3" />
@@ -254,21 +205,14 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
             placeholder="Enter progress"
             value={updateValue}
             onChange={(e) => setUpdateValue(e.target.value)}
-            className="flex-1"
+            className="flex-1 fc-glass-soft border border-[color:var(--fc-glass-border)]"
             min={0}
             max={goal.target_value}
-            style={{
-              background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
-              borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-            }}
           />
           <Button
             onClick={handleUpdate}
             disabled={isUpdating}
-            className="px-4 py-2"
-            style={{
-              background: getSemanticColor("success").gradient,
-            }}
+            className="px-4 py-2 fc-btn fc-btn-primary fc-press"
           >
             {isUpdating ? "Updating..." : "Update"}
           </Button>
@@ -282,7 +226,7 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
             variant="outline"
             size="sm"
             onClick={() => onEdit(goal)}
-            className="flex-1"
+            className="flex-1 fc-btn fc-btn-secondary"
           >
             <Edit className="w-4 h-4 mr-1" />
             Edit
@@ -297,14 +241,13 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
                 onDelete(goal.id);
               }
             }}
-            className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+            className="flex-1 fc-btn fc-btn-secondary fc-text-error"
           >
             <Trash className="w-4 h-4 mr-1" />
             Delete
           </Button>
         )}
       </div>
-    </GlassCard>
     </div>
   );
 }

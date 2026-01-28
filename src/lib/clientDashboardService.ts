@@ -172,6 +172,10 @@ export async function getCoachWhatsAppPhone(clientId: string): Promise<string | 
  */
 export async function getClientType(clientId: string): Promise<'online' | 'in_gym' | null> {
   try {
+    // Ensure user is authenticated before querying
+    const { ensureAuthenticated } = await import('./supabase');
+    await ensureAuthenticated();
+
     const { data, error } = await supabase
       .from('profiles')
       .select('client_type')

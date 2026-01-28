@@ -60,7 +60,8 @@ export class AuthService {
       throw new AuthError('Failed to verify user role')
     }
 
-    if (profile?.role !== 'coach') {
+    // Allow coach or admin roles (admin can function as coach)
+    if (!profile?.role || (profile.role !== 'coach' && profile.role !== 'admin')) {
       throw new ForbiddenError('User must be a coach to perform this action')
     }
 
@@ -121,7 +122,8 @@ export class AuthService {
     }
 
     const isOwner = user.id === resourceOwnerId
-    const isCoach = profile?.role === 'coach'
+    // Allow coach or admin roles (admin can function as coach)
+    const isCoach = profile?.role === 'coach' || profile?.role === 'admin'
 
     if (!isOwner && !isCoach) {
       throw new ForbiddenError('You do not have permission to access this resource')

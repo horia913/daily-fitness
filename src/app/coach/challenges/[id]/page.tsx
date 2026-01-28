@@ -18,7 +18,7 @@ import { supabase } from "@/lib/supabase";
 function CoachChallengeDetailContent() {
   const params = useParams();
   const { user, loading: authLoading } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { getSemanticColor, performanceSettings } = useTheme();
   const challengeId = params.id as string;
 
   const [challenge, setChallenge] = useState<any>(null);
@@ -122,9 +122,7 @@ function CoachChallengeDetailContent() {
           <div className="relative z-10 container mx-auto px-4 py-8">
             <GlassCard elevation={2} className="p-12">
               <div className="text-center">
-                <p style={{ color: isDark ? "#fff" : "#1A1A1A" }}>
-                  Challenge not found
-                </p>
+                <p className="text-[color:var(--fc-text-primary)]">Challenge not found</p>
               </div>
             </GlassCard>
           </div>
@@ -137,74 +135,53 @@ function CoachChallengeDetailContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center gap-4 mb-4">
-              <Link href="/coach/challenges">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              </Link>
-              <div className="flex-1">
-                <h1
-                  className="text-3xl font-bold mb-1"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  {challenge.name}
-                </h1>
-                <div className="flex items-center gap-3 mt-2">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)" }} />
-                    <span
-                      className="text-sm"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl space-y-6">
+        <GlassCard elevation={1} className="p-6 md:p-8">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-3">
+              <Badge className="fc-badge fc-badge-strong w-fit">Challenge Overview</Badge>
+              <div className="flex items-center gap-4">
+                <Link href="/coach/challenges">
+                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                </Link>
+                <div>
+                  <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
+                    {challenge.name}
+                  </h1>
+                  <div className="mt-2 flex flex-wrap gap-4 text-sm text-[color:var(--fc-text-dim)]">
+                    <span className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
                       {new Date(challenge.start_date).toLocaleDateString()} - {new Date(challenge.end_date).toLocaleDateString()}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)" }} />
-                    <span
-                      className="text-sm"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <span className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
                       {participants.length} participants
                     </span>
                   </div>
                 </div>
               </div>
-              <Badge
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  color: "#fff",
-                }}
-              >
-                {challenge.status}
-              </Badge>
             </div>
-
-            {challenge.description && (
-              <p
-                className="text-sm"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                }}
-              >
-                {challenge.description}
-              </p>
-            )}
-          </GlassCard>
-        </div>
+            <Badge
+              style={{
+                background: getSemanticColor("success").gradient,
+                color: "#fff",
+              }}
+            >
+              {challenge.status}
+            </Badge>
+          </div>
+          {challenge.description && (
+            <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
+              {challenge.description}
+            </p>
+          )}
+        </GlassCard>
 
         {/* Pending Video Reviews */}
         {pendingSubmissions.length > 0 && (
-          <GlassCard elevation={2} className="p-6 mb-6">
+          <GlassCard elevation={2} className="p-6">
             <div className="flex items-center gap-3 mb-6">
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -216,18 +193,10 @@ function CoachChallengeDetailContent() {
                 <Video className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2
-                  className="text-xl font-bold"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
+                <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                   Pending Reviews
                 </h2>
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
                   {pendingSubmissions.length} video{pendingSubmissions.length !== 1 ? 's' : ''} awaiting review
                 </p>
               </div>
@@ -237,28 +206,19 @@ function CoachChallengeDetailContent() {
               {pendingSubmissions.map((submission) => (
                 <div
                   key={submission.id}
-                  className="p-4 rounded-lg border"
-                  style={{
-                    background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
-                    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-                  }}
+                  className="rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface-muted)] p-4"
                 >
                   <div className="flex items-start gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <Clock className="w-4 h-4" style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)" }} />
-                        <span
-                          className="text-xs"
-                          style={{
-                            color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                          }}
-                        >
+                        <Clock className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
+                        <span className="text-xs text-[color:var(--fc-text-dim)]">
                           Submitted {new Date(submission.submitted_at).toLocaleDateString()}
                         </span>
                       </div>
                       
                       {submission.claimed_weight && (
-                        <p className="text-sm mb-1" style={{ color: isDark ? "#fff" : "#1A1A1A" }}>
+                        <p className="text-sm mb-1 text-[color:var(--fc-text-primary)]">
                           Claimed: {submission.claimed_weight} kg
                           {submission.claimed_reps && ` × ${submission.claimed_reps} reps`}
                         </p>
@@ -269,13 +229,8 @@ function CoachChallengeDetailContent() {
                           placeholder="Review notes (optional)"
                           value={reviewNotes[submission.id] || ''}
                           onChange={(e) => setReviewNotes((prev) => ({ ...prev, [submission.id]: e.target.value }))}
-                          className="w-full p-2 rounded-lg text-sm mb-2"
+                          className="w-full rounded-xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)] p-2 text-sm text-[color:var(--fc-text-primary)] mb-2"
                           rows={2}
-                          style={{
-                            background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                            border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                            color: isDark ? "#fff" : "#1A1A1A",
-                          }}
                         />
                         <div className="flex gap-2">
                           <Button
@@ -336,18 +291,10 @@ function CoachChallengeDetailContent() {
               <Users className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2
-                className="text-xl font-bold"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
+              <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                 Participants
               </h2>
-              <p
-                className="text-sm"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
+              <p className="text-sm text-[color:var(--fc-text-dim)]">
                 {participants.length} enrolled
               </p>
             </div>
@@ -355,18 +302,8 @@ function CoachChallengeDetailContent() {
 
           {participants.length === 0 ? (
             <div className="text-center py-12">
-              <Users
-                className="w-16 h-16 mx-auto mb-4"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                }}
-              />
-              <p
-                className="text-lg font-semibold"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                }}
-              >
+              <Users className="w-16 h-16 mx-auto mb-4 text-[color:var(--fc-text-subtle)]" />
+              <p className="text-lg font-semibold text-[color:var(--fc-text-dim)]">
                 No participants yet
               </p>
             </div>
@@ -375,51 +312,27 @@ function CoachChallengeDetailContent() {
               {participants.map((participant, index) => (
                 <div
                   key={participant.id}
-                  className="p-4 rounded-lg"
-                  style={{
-                    background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
-                  }}
+                  className="rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface-muted)] p-4"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p
-                        className="font-semibold"
-                        style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                      >
+                      <p className="font-semibold text-[color:var(--fc-text-primary)]">
                         Participant {index + 1}
                       </p>
                       {participant.selected_track && (
-                        <p
-                          className="text-xs"
-                          style={{
-                            color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                          }}
-                        >
+                        <p className="text-xs text-[color:var(--fc-text-subtle)]">
                           {participant.selected_track === "fat_loss" ? "Fat Loss Track" : "Muscle Gain Track"}
                         </p>
                       )}
-                      <p
-                        className="text-xs mt-1"
-                        style={{
-                          color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                        }}
-                      >
+                      <p className="text-xs mt-1 text-[color:var(--fc-text-subtle)]">
                         Joined {new Date(participant.joined_at).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p
-                        className="text-2xl font-bold"
-                        style={{ color: getSemanticColor("energy").primary }}
-                      >
+                      <p className="text-2xl font-bold" style={{ color: getSemanticColor("energy").primary }}>
                         {participant.total_score || 0}
                       </p>
-                      <p
-                        className="text-xs"
-                        style={{
-                          color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                        }}
-                      >
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">
                         points
                       </p>
                     </div>

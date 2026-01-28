@@ -1,6 +1,8 @@
 'use client'
 
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { GlassCard } from '@/components/ui/GlassCard'
+import { Badge } from '@/components/ui/badge'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -242,38 +244,26 @@ export default function AvailabilitySettings() {
         paddingBottom: '100px'
       }}>
         <div className="max-w-4xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Header */}
-          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-              <div style={{ 
-                width: '64px', 
-                height: '64px', 
-                borderRadius: '18px', 
-                background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(0, 0, 0, 0.08)'
-              }}>
-                <Clock style={{ width: '40px', height: '40px', color: '#FFFFFF' }} />
-              </div>
-              <div>
-                <h1 style={{ 
-                  fontSize: '32px', 
-                  fontWeight: '800', 
-                  color: isDark ? '#FFFFFF' : '#1A1A1A',
-                  margin: 0,
-                  lineHeight: '1.2'
-                }}>Availability Settings</h1>
-                <p style={{ 
-                  fontSize: '14px', 
-                  fontWeight: '400', 
-                  color: isDark ? '#D1D5DB' : '#6B7280',
-                  margin: 0
-                }}>Set your availability for client session bookings</p>
+          <GlassCard className="p-6 md:p-8">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-3">
+                <Badge className="fc-badge fc-badge-strong w-fit">Availability Hub</Badge>
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
+                      Availability Settings
+                    </h1>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Set weekly availability and manage time slots for bookings.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </GlassCard>
 
           {/* Message */}
           {message && (

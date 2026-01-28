@@ -14,6 +14,7 @@ import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useLoggingReset } from "../hooks/useLoggingReset";
 
 export function SupersetExecutor({
   block,
@@ -48,6 +49,7 @@ export function SupersetExecutor({
   const [weightB, setWeightB] = useState("");
   const [repsB, setRepsB] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  useLoggingReset(isLoggingSet, setIsLoggingSet);
 
   // Pre-fill with suggested weights
   useEffect(() => {
@@ -173,97 +175,99 @@ export function SupersetExecutor({
       }
     } catch (e) {}
 
-    // Log superset as a single call with both exercises
-    // Calculate set number from current state
-    const setNumber = completedSets + 1;
-    
-    const logData: any = {
-      block_type: 'superset',
-      set_number: setNumber,
-    };
-    
-    // Only add fields if they're defined
-    if (exerciseA?.exercise_id) logData.superset_exercise_a_id = exerciseA.exercise_id;
-    if (weightANum !== undefined && weightANum !== null) logData.superset_weight_a = weightANum;
-    if (repsANum !== undefined && repsANum !== null) logData.superset_reps_a = repsANum;
-    if (exerciseB?.exercise_id) logData.superset_exercise_b_id = exerciseB.exercise_id;
-    if (weightBNum !== undefined && weightBNum !== null) logData.superset_weight_b = weightBNum;
-    if (repsBNum !== undefined && repsBNum !== null) logData.superset_reps_b = repsBNum;
-    
-    const result = await logSetToDatabase(logData);
+    try {
+      // Log superset as a single call with both exercises
+      // Calculate set number from current state
+      const setNumber = completedSets + 1;
+      
+      const logData: any = {
+        block_type: 'superset',
+        set_number: setNumber,
+      };
+      
+      // Only add fields if they're defined
+      if (exerciseA?.exercise_id) logData.superset_exercise_a_id = exerciseA.exercise_id;
+      if (weightANum !== undefined && weightANum !== null) logData.superset_weight_a = weightANum;
+      if (repsANum !== undefined && repsANum !== null) logData.superset_reps_a = repsANum;
+      if (exerciseB?.exercise_id) logData.superset_exercise_b_id = exerciseB.exercise_id;
+      if (weightBNum !== undefined && weightBNum !== null) logData.superset_weight_b = weightBNum;
+      if (repsBNum !== undefined && repsBNum !== null) logData.superset_reps_b = repsBNum;
+      
+      const result = await logSetToDatabase(logData);
 
-    if (result.success) {
-      const loggedSetsArray: LoggedSet[] = [
-        {
-          id: `temp-a-${Date.now()}`,
-          exercise_id: exerciseA.exercise_id,
-          block_id: block.block.id,
-          set_number: setNumber,
-          weight_kg: weightANum,
-          reps_completed: repsANum,
-          completed_at: new Date(),
-        } as LoggedSet,
-        {
-          id: `temp-b-${Date.now()}`,
-          exercise_id: exerciseB.exercise_id,
-          block_id: block.block.id,
-          set_number: setNumber,
-          weight_kg: weightBNum,
-          reps_completed: repsBNum,
-          completed_at: new Date(),
-        } as LoggedSet,
-      ];
+      if (result.success) {
+        const loggedSetsArray: LoggedSet[] = [
+          {
+            id: `temp-a-${Date.now()}`,
+            exercise_id: exerciseA.exercise_id,
+            block_id: block.block.id,
+            set_number: setNumber,
+            weight_kg: weightANum,
+            reps_completed: repsANum,
+            completed_at: new Date(),
+          } as LoggedSet,
+          {
+            id: `temp-b-${Date.now()}`,
+            exercise_id: exerciseB.exercise_id,
+            block_id: block.block.id,
+            set_number: setNumber,
+            weight_kg: weightBNum,
+            reps_completed: repsBNum,
+            completed_at: new Date(),
+          } as LoggedSet,
+        ];
 
-      // Update e1RM for exercise A (API calculates e1RM for exercise A in superset)
-      if (result.e1rm && onE1rmUpdate) {
-        onE1rmUpdate(exerciseA.exercise_id, result.e1rm);
-      }
-
-      addToast({
-        title: "Superset Logged!",
-        description: `Exercise A: ${weightANum}kg × ${repsANum} reps, Exercise B: ${weightBNum}kg × ${repsBNum} reps`,
-        variant: "success",
-        duration: 2000,
-      });
-
-      // Update parent with new completed sets count
-      const newCompletedSets = completedSets + 1;
-      onSetComplete?.(newCompletedSets);
-
-      // Complete block if last set
-      if (newCompletedSets >= totalSets) {
-        onBlockComplete(block.block.id, loggedSetsArray);
-      } else {
-        // Check if rest timer will show - if so, don't clear inputs yet
-        const currentExercise = block.block.exercises?.[currentExerciseIndex];
-        const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-        if (restSeconds === 0) {
-          // No rest timer, clear inputs immediately
-          setWeightA("");
-          setRepsA("");
-          setWeightB("");
-          setRepsB("");
+        // Update e1RM for exercise A (API calculates e1RM for exercise A in superset)
+        if (result.e1rm && onE1rmUpdate) {
+          onE1rmUpdate(exerciseA.exercise_id, result.e1rm);
         }
-        // If restSeconds > 0, rest timer will show and inputs will be cleared
-        // when the timer completes and completedSets updates
-      }
-    } else {
-      addToast({
-        title: "Failed to Save",
-        description: "Failed to save sets. Please try again.",
-        variant: "destructive",
-        duration: 5000,
-      });
-    }
 
-    setIsLoggingSet(false);
+        addToast({
+          title: "Superset Logged!",
+          description: `Exercise A: ${weightANum}kg × ${repsANum} reps, Exercise B: ${weightBNum}kg × ${repsBNum} reps`,
+          variant: "success",
+          duration: 2000,
+        });
+
+        // Update parent with new completed sets count
+        const newCompletedSets = completedSets + 1;
+        onSetComplete?.(newCompletedSets);
+
+        // Complete block if last set
+        if (newCompletedSets >= totalSets) {
+          onBlockComplete(block.block.id, loggedSetsArray);
+        } else {
+          // Check if rest timer will show - if so, don't clear inputs yet
+          const currentExercise = block.block.exercises?.[currentExerciseIndex];
+          const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
+          if (restSeconds === 0) {
+            // No rest timer, clear inputs immediately
+            setWeightA("");
+            setRepsA("");
+            setWeightB("");
+            setRepsB("");
+          }
+          // If restSeconds > 0, rest timer will show and inputs will be cleared
+          // when the timer completes and completedSets updates
+        }
+      } else {
+        addToast({
+          title: "Failed to Save",
+          description: "Failed to save sets. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+    } finally {
+      setIsLoggingSet(false);
+    }
   };
 
   const loggingInputs = (
     <div className="space-y-6">
       {/* Exercise A */}
       <GlassCard elevation={1} className="p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4">
           <h4 className="font-semibold text-blue-800 dark:text-blue-200 text-lg">
             Exercise A: {exerciseA?.exercise?.name || "Exercise A"}
           </h4>
@@ -283,6 +287,8 @@ export function SupersetExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <LargeInput
             label="Reps"
@@ -290,13 +296,15 @@ export function SupersetExecutor({
             onChange={setRepsA}
             placeholder="0"
             step="1"
+            showStepper
+            stepAmount={1}
           />
         </div>
       </GlassCard>
 
       {/* Exercise B */}
       <GlassCard elevation={1} className="p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4">
           <h4 className="font-semibold text-purple-800 dark:text-purple-200 text-lg">
             Exercise B: {exerciseB?.exercise?.name || "Exercise B"}
           </h4>
@@ -316,6 +324,8 @@ export function SupersetExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <LargeInput
             label="Reps"
@@ -323,6 +333,8 @@ export function SupersetExecutor({
             onChange={setRepsB}
             placeholder="0"
             step="1"
+            showStepper
+            stepAmount={1}
           />
         </div>
       </GlassCard>

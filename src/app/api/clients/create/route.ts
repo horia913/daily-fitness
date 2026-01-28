@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { validateApiAuth, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
 
 export async function POST(request: NextRequest) {
-  // Create Supabase client inside function to avoid build-time initialization
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return NextResponse.json(
-      { error: 'Missing Supabase configuration' },
-      { status: 500 }
-    )
-  }
-
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-
   try {
-    const body = await request.json()
+    // Validate authentication
+    const { user, supabaseAuth, supabaseAdmin } = await validateApiAuth(request)
+
+    // Parse body first to get coach_id
+    let body
+    try {
+      body = await request.json()
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      )
+    }
+
     const { coach_id, client_id, status } = body
 
     // Validate required fields
@@ -25,6 +25,22 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: coach_id and client_id are required' },
         { status: 400 }
       )
+    }
+
+    // Verify user is a coach or admin
+    const { data: profile } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || (profile.role !== 'coach' && profile.role !== 'admin')) {
+      return createForbiddenResponse('Only coaches and admins can create client relationships')
+    }
+
+    // Verify coach_id matches authenticated user (unless admin)
+    if (coach_id !== user.id && profile.role !== 'admin') {
+      return createForbiddenResponse('Cannot create relationship for another coach')
     }
 
     // Create client-coach relationship
@@ -53,6 +69,16 @@ export async function POST(request: NextRequest) {
       client: clientData 
     })
   } catch (error: any) {
+    // Handle auth errors specifically
+    if (error.message === 'Missing authorization header' || error.message === 'Invalid or expired token' || error.message === 'User not authenticated') {
+      return createUnauthorizedResponse(error.message)
+    }
+    if (error.message === 'Service role key not configured') {
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      )
+    }
     console.error('Error in create-client API route:', error)
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

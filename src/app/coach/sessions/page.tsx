@@ -324,39 +324,58 @@ export default function CoachSessions() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div style={{ minHeight: '100vh', paddingBottom: '100px' }}>
-        <div style={{ padding: '24px 20px' }}>
-          <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Header */}
-            <div className="text-center space-y-8">
-              <div className="flex items-center justify-center gap-3 mb-8">
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                  <CalendarDays className="w-8 h-8 text-white" />
+        <div className="min-h-screen pb-24">
+        <div className="px-6 pt-10">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <GlassCard className="p-6 md:p-8">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-3">
+                  <Badge className="fc-badge fc-badge-strong w-fit">Session Desk</Badge>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
+                      <CalendarDays className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
+                        Training Sessions
+                      </h1>
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
+                        Schedule, track, and manage coaching appointments.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-normal pb-1">
-                  Training Sessions
-                </h1>
+                <div className="flex flex-wrap gap-3">
+                  <Dialog open={showCreateSession} onOpenChange={setShowCreateSession}>
+                    <DialogTrigger asChild>
+                      <Button className="fc-btn fc-btn-primary">
+                        <Plus className="w-5 h-5 mr-2" />
+                        Schedule Session
+                      </Button>
+                    </DialogTrigger>
+                  </Dialog>
+                  <Button variant="outline" onClick={loadData} className="fc-btn fc-btn-ghost">
+                    <RefreshCw className="w-5 h-5 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
               </div>
-              <p className={`text-lg ${theme.textSecondary} max-w-2xl mx-auto`}>
-                Schedule and manage training sessions with your clients
-              </p>
-            </div>
+            </GlassCard>
 
-            {/* Search and Filters */}
-            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
+            <GlassCard className="p-5">
               <div className="flex flex-col lg:flex-row gap-4">
                 <div className="flex-1 relative">
-                  <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 ${theme.textSecondary} w-5 h-5`} />
+                  <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-subtle)]" />
                   <Input
                     placeholder="Search sessions or clients..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`pl-12 h-12 rounded-xl border-2 ${theme.border} ${theme.text} bg-transparent focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500`}
+                    className="fc-input h-12 w-full pl-12"
                   />
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}>
+                    <SelectTrigger className="fc-select h-12 w-48">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -368,7 +387,7 @@ export default function CoachSessions() {
                     </SelectContent>
                   </Select>
                   <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}>
+                    <SelectTrigger className="fc-select h-12 w-48">
                       <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
                     <SelectContent>
@@ -379,27 +398,7 @@ export default function CoachSessions() {
                   </Select>
                 </div>
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-center gap-4">
-              <Dialog open={showCreateSession} onOpenChange={setShowCreateSession}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg px-6 py-3">
-                    <Plus className="w-5 h-5" />
-                    Schedule Session
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
-              <Button
-                variant="outline"
-                onClick={loadData}
-                className={`${theme.border} ${theme.text} hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400 rounded-xl px-6 py-3`}
-              >
-                <RefreshCw className="w-5 h-5 mr-2" />
-                Refresh
-              </Button>
-            </div>
+            </GlassCard>
 
             {/* Statistics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -19,19 +19,21 @@ export function ExerciseActionButtons({
   className = "",
 }: ExerciseActionButtonsProps) {
   if (!exercise) return null;
+  const videoUrl =
+    exercise.exercise?.video_url ||
+    (exercise as { video_url?: string }).video_url ||
+    "";
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      {exercise.exercise?.video_url && onVideoClick && (
+      {onVideoClick && videoUrl && (
         <Button
           variant="ghost"
           size="sm"
-          onClick={() =>
-            onVideoClick(
-              exercise.exercise?.video_url || "",
-              exercise.exercise?.name
-            )
-          }
+          type="button"
+          onClick={() => {
+            onVideoClick(videoUrl, exercise.exercise?.name);
+          }}
           className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
           title={`Watch ${exercise.exercise?.name} Video`}
         >
@@ -42,6 +44,7 @@ export function ExerciseActionButtons({
         <Button
           variant="ghost"
           size="sm"
+          type="button"
           onClick={() => onAlternativesClick(exercise.exercise_id)}
           className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
           title={`View ${exercise.exercise?.name} Alternatives`}

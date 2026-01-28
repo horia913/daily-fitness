@@ -1,68 +1,23 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { 
   Target,
   Dumbbell,
   Apple,
   Heart,
-  Flame,
   Trophy,
-  Award,
-  Star,
-  Zap,
   TrendingUp,
   TrendingDown,
-  Calendar,
-  Clock,
   BarChart3,
   Activity,
-  Timer,
-  Bell,
-  CheckCircle,
-  CheckCircle2,
-  CircleCheck,
-  CircleX,
-  CircleAlert,
-  CircleMinus,
-  CirclePlus,
-  CircleDot,
-  CirclePause,
-  CirclePlay,
-  CircleStop,
-  CircleHelp,
-  ExternalLink,
   RefreshCw,
   Plus,
   Eye,
   ArrowRight,
-  ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  MoreHorizontal,
-  Settings,
-  Edit,
-  Trash2,
-  Copy,
-  Share2,
-  MessageCircle,
-  Users,
-  User,
-  UserCheck,
-  UserX,
-  UserPlus,
-  UserMinus,
-  UserCog,
-  UserSearch,
-  Sparkles
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { useTheme } from '@/contexts/ThemeContext'
-import Link from 'next/link'
 
 interface ProgressMetric {
   id: string
@@ -72,7 +27,6 @@ interface ProgressMetric {
   bgColor: string
   textColor: string
   borderColor: string
-  glowColor: string
   current: number
   target: number
   percentage: number
@@ -96,8 +50,8 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
   percentage,
   size = 120,
   strokeWidth = 8,
-  color = '#3B82F6',
-  backgroundColor = '#E5E7EB',
+  color = 'var(--fc-domain-workouts)',
+  backgroundColor = 'var(--fc-glass-border)',
   children,
   className = ''
 }) => {
@@ -152,7 +106,6 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
 
 export default function ProgressCircles() {
   const { user } = useAuth()
-  const { getThemeStyles } = useTheme()
   const [loading, setLoading] = useState(true)
   const [progressMetrics, setProgressMetrics] = useState<ProgressMetric[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('week')
@@ -176,11 +129,10 @@ export default function ProgressCircles() {
           id: 'workouts',
           name: 'Workouts',
           icon: Dumbbell,
-          color: '#8B5CF6',
-          bgColor: 'bg-purple-100 dark:bg-purple-900/30',
-          textColor: 'text-purple-600 dark:text-purple-400',
-          borderColor: 'border-purple-200 dark:border-purple-800',
-          glowColor: 'shadow-purple-200 dark:shadow-purple-800',
+          color: 'var(--fc-domain-workouts)',
+          bgColor: 'fc-glass-soft border border-[color:var(--fc-glass-border)]',
+          textColor: 'fc-text-workouts',
+          borderColor: 'border border-[color:var(--fc-glass-border)]',
           current: 4,
           target: 5,
           percentage: 80,
@@ -193,11 +145,10 @@ export default function ProgressCircles() {
           id: 'nutrition',
           name: 'Nutrition',
           icon: Apple,
-          color: '#10B981',
-          bgColor: 'bg-green-100 dark:bg-green-900/30',
-          textColor: 'text-green-600 dark:text-green-400',
-          borderColor: 'border-green-200 dark:border-green-800',
-          glowColor: 'shadow-green-200 dark:shadow-green-800',
+          color: 'var(--fc-status-success)',
+          bgColor: 'fc-glass-soft border border-[color:var(--fc-glass-border)]',
+          textColor: 'fc-text-success',
+          borderColor: 'border border-[color:var(--fc-glass-border)]',
           current: 6,
           target: 7,
           percentage: 86,
@@ -210,11 +161,10 @@ export default function ProgressCircles() {
           id: 'habits',
           name: 'Habits',
           icon: Heart,
-          color: '#F59E0B',
-          bgColor: 'bg-orange-100 dark:bg-orange-900/30',
-          textColor: 'text-orange-600 dark:text-orange-400',
-          borderColor: 'border-orange-200 dark:border-orange-800',
-          glowColor: 'shadow-orange-200 dark:shadow-orange-800',
+          color: 'var(--fc-status-warning)',
+          bgColor: 'fc-glass-soft border border-[color:var(--fc-glass-border)]',
+          textColor: 'fc-text-warning',
+          borderColor: 'border border-[color:var(--fc-glass-border)]',
           current: 3,
           target: 4,
           percentage: 75,
@@ -235,17 +185,17 @@ export default function ProgressCircles() {
   }
 
   const getProgressColor = (percentage: number) => {
-    if (percentage >= 90) return '#10B981' // Green
-    if (percentage >= 70) return '#F59E0B' // Orange
-    if (percentage >= 50) return '#EF4444' // Red
-    return '#6B7280' // Gray
+    if (percentage >= 90) return 'var(--fc-status-success)'
+    if (percentage >= 70) return 'var(--fc-status-warning)'
+    if (percentage >= 50) return 'var(--fc-status-error)'
+    return 'var(--fc-text-subtle)'
   }
 
   const getProgressBackgroundColor = (percentage: number) => {
-    if (percentage >= 90) return '#D1FAE5' // Light green
-    if (percentage >= 70) return '#FEF3C7' // Light orange
-    if (percentage >= 50) return '#FEE2E2' // Light red
-    return '#F3F4F6' // Light gray
+    if (percentage >= 90) return 'var(--fc-glass-border)'
+    if (percentage >= 70) return 'var(--fc-glass-border)'
+    if (percentage >= 50) return 'var(--fc-glass-border)'
+    return 'var(--fc-glass-border)'
   }
 
   const getMotivationalMessage = (percentage: number) => {
@@ -257,9 +207,9 @@ export default function ProgressCircles() {
 
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
-      case 'up': return <TrendingUp className="w-3 h-3 text-green-600 dark:text-green-400" />
-      case 'down': return <TrendingDown className="w-3 h-3 text-red-600 dark:text-red-400" />
-      default: return <Activity className="w-3 h-3 text-slate-400" />
+      case 'up': return <TrendingUp className="w-3 h-3 fc-text-success" />
+      case 'down': return <TrendingDown className="w-3 h-3 fc-text-error" />
+      default: return <Activity className="w-3 h-3 fc-text-subtle" />
     }
   }
 
@@ -278,96 +228,94 @@ export default function ProgressCircles() {
     return Math.round(total / progressMetrics.length)
   }
 
-  const theme = getThemeStyles()
   const overallProgress = calculateOverallProgress()
 
   if (loading) {
     return (
-      <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-        <CardHeader className="pb-4">
-          <CardTitle className={`flex items-center gap-2 ${theme.text}`}>
-            <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-xl">
-              <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+      <div className="fc-glass fc-card">
+        <div className="pb-4 px-6 pt-6">
+          <div className="flex items-center gap-3 fc-text-primary font-semibold">
+            <div className="fc-icon-tile fc-icon-workouts">
+              <BarChart3 className="w-5 h-5" />
             </div>
             Weekly Progress
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </div>
+        </div>
+        <div className="space-y-4 px-6 pb-6">
           <div className="animate-pulse space-y-4">
             <div className="flex justify-center">
-              <div className="w-32 h-32 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+              <div className="w-32 h-32 rounded-full bg-[color:var(--fc-glass-border)]"></div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="text-center">
-                  <div className="w-20 h-20 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-2"></div>
-                  <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mx-auto"></div>
+                  <div className="w-20 h-20 rounded-full mx-auto mb-2 bg-[color:var(--fc-glass-border)]"></div>
+                  <div className="h-4 rounded w-3/4 mx-auto bg-[color:var(--fc-glass-border)]"></div>
                 </div>
               ))}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 relative overflow-hidden`}>
-      {/* Floating background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl"></div>
-      </div>
-
-      <CardHeader className="pb-4 relative z-10">
-        <div className="flex items-center justify-between">
-          <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-            <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-xl">
-              <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+    <div className="fc-glass fc-card fc-accent-workouts relative overflow-hidden">
+      <div className="pb-4 relative z-10 px-4 sm:px-6 pt-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 fc-text-primary">
+            <div className="fc-icon-tile fc-icon-workouts">
+              <BarChart3 className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-bold">Weekly Progress</h2>
-              <p className={`text-sm ${theme.textSecondary}`}>{formatPeriod(selectedPeriod)}</p>
+              <span className="fc-pill fc-pill-glass fc-text-workouts">
+                Progress
+              </span>
+              <h2 className="text-lg sm:text-xl font-bold mt-2">
+                Weekly Progress
+              </h2>
+              <p className="text-sm fc-text-dim">{formatPeriod(selectedPeriod)}</p>
             </div>
-          </CardTitle>
+          </div>
           
           <div className="flex items-center gap-2">
-            <Badge className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-3 py-1">
+            <span className="fc-pill fc-pill-glass fc-text-workouts px-3 py-1">
               {overallProgress}% overall
-            </Badge>
+            </span>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setViewMode(viewMode === 'overview' ? 'detailed' : 'overview')}
-              className="text-xs"
+              className="text-xs fc-btn fc-btn-ghost"
             >
               {viewMode === 'overview' ? 'Detailed' : 'Overview'}
               <Eye className="w-3 h-3 ml-1" />
             </Button>
           </div>
         </div>
-      </CardHeader>
+      </div>
       
-      <CardContent className="p-4 sm:p-6 relative z-10">
+      <div className="p-4 sm:p-6 relative z-10">
         {progressMetrics.length > 0 ? (
           <div className="space-y-6">
             {/* Overall Progress Circle */}
-            <div className={`${theme.card} rounded-2xl p-6 border-2 border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20`}>
+            <div className="fc-glass-soft rounded-2xl p-6 border border-[color:var(--fc-glass-border)]">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                    <Trophy className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  <div className="fc-icon-tile fc-icon-workouts">
+                    <Trophy className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className={`text-lg font-bold ${theme.text}`}>Overall Progress</h3>
-                    <p className={`text-sm ${theme.textSecondary}`}>Your weekly achievements</p>
+                    <h3 className="text-lg font-bold fc-text-primary">Overall Progress</h3>
+                    <p className="text-sm fc-text-dim">Your weekly achievements</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className={`text-3xl font-bold ${theme.text}`}>
+                  <div className="text-3xl font-bold fc-text-primary">
                     {overallProgress}%
                   </div>
-                  <p className={`text-sm ${theme.textSecondary}`}>
+                  <p className="text-sm fc-text-dim">
                     {progressMetrics.reduce((sum, m) => sum + m.current, 0)} of {progressMetrics.reduce((sum, m) => sum + m.target, 0)} goals
                   </p>
                 </div>
@@ -383,25 +331,25 @@ export default function ProgressCircles() {
                   className="transition-all duration-1000"
                 >
                   <div className="text-center">
-                    <div className={`text-2xl font-bold ${theme.text}`}>
+                    <div className="text-2xl font-bold fc-text-primary">
                       {overallProgress}%
                     </div>
-                    <div className={`text-xs ${theme.textSecondary}`}>
+                    <div className="text-xs fc-text-subtle">
                       Complete
                     </div>
                   </div>
                 </CircularProgress>
               </div>
               
-              <p className={`text-sm font-medium text-center ${theme.text} mt-2`}>
+              <p className="text-sm font-medium text-center fc-text-primary mt-2">
                 {getMotivationalMessage(overallProgress)}
               </p>
             </div>
 
             {/* Individual Progress Circles */}
             <div className="space-y-4">
-              <h3 className={`text-lg font-semibold ${theme.text} flex items-center gap-2`}>
-                <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-lg font-semibold fc-text-primary flex items-center gap-2">
+                <Target className="w-5 h-5 fc-text-workouts" />
                 Category Breakdown
               </h3>
               
@@ -413,7 +361,7 @@ export default function ProgressCircles() {
                   return (
                     <div 
                       key={metric.id}
-                      className={`${theme.card} ${theme.shadow} rounded-2xl p-4 border-2 ${metric.borderColor} hover:shadow-xl transition-all duration-300 cursor-pointer group hover:scale-105 hover:${metric.glowColor} hover:shadow-lg`}
+                      className={`fc-list-row rounded-2xl p-4 cursor-pointer group ${metric.borderColor}`}
                       onClick={() => setExpandedMetric(isExpanded ? null : metric.id)}
                     >
                       <div className="text-center">
@@ -428,10 +376,10 @@ export default function ProgressCircles() {
                             className="transition-all duration-1000"
                           >
                             <div className="text-center">
-                              <div className={`text-lg font-bold ${theme.text}`}>
+                              <div className="text-lg font-bold fc-text-primary">
                                 {metric.percentage}%
                               </div>
-                              <div className={`text-xs ${theme.textSecondary}`}>
+                              <div className="text-xs fc-text-subtle">
                                 {metric.current}/{metric.target}
                               </div>
                             </div>
@@ -441,47 +389,47 @@ export default function ProgressCircles() {
                         {/* Metric Info */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-center gap-2">
-                            <div className={`p-2 rounded-lg ${metric.bgColor}`}>
+                    <div className={`p-2 rounded-lg ${metric.bgColor}`}>
                               <Icon className={`w-4 h-4 ${metric.textColor}`} />
                             </div>
-                            <h4 className={`font-bold ${theme.text} text-sm`}>
+                            <h4 className="font-bold fc-text-primary text-sm">
                               {metric.name}
                             </h4>
                           </div>
                           
                           <div className="flex items-center justify-center gap-2">
                             {getTrendIcon(metric.trend)}
-                            <Badge className={`text-xs ${metric.bgColor} ${metric.textColor}`}>
+                    <span className={`fc-pill fc-pill-glass text-xs ${metric.textColor}`}>
                               {metric.trend === 'up' ? 'Improving' : metric.trend === 'down' ? 'Declining' : 'Stable'}
-                            </Badge>
+                    </span>
                           </div>
 
                           {/* Expanded details */}
                           {isExpanded && (
-                            <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                            <div className="mt-3 pt-3 border-t border-[color:var(--fc-glass-border)]">
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs">
-                                  <span className={`${theme.textSecondary}`}>Current</span>
-                                  <span className={`font-medium ${theme.text}`}>{metric.current}</span>
+                                  <span className="fc-text-subtle">Current</span>
+                                  <span className="font-medium fc-text-primary">{metric.current}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-xs">
-                                  <span className={`${theme.textSecondary}`}>Target</span>
-                                  <span className={`font-medium ${theme.text}`}>{metric.target}</span>
+                                  <span className="fc-text-subtle">Target</span>
+                                  <span className="font-medium fc-text-primary">{metric.target}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-xs">
-                                  <span className={`${theme.textSecondary}`}>Last Update</span>
-                                  <span className={`font-medium ${theme.text}`}>{metric.lastUpdate}</span>
+                                  <span className="fc-text-subtle">Last Update</span>
+                                  <span className="font-medium fc-text-primary">{metric.lastUpdate}</span>
                                 </div>
                                 {metric.streak && (
                                   <div className="flex items-center justify-between text-xs">
-                                    <span className={`${theme.textSecondary}`}>Streak</span>
-                                    <span className={`font-medium ${theme.text}`}>{metric.streak} days</span>
+                                    <span className="fc-text-subtle">Streak</span>
+                                    <span className="font-medium fc-text-primary">{metric.streak} days</span>
                                   </div>
                                 )}
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="w-full mt-2 rounded-xl text-xs"
+                                  className="w-full mt-2 rounded-xl text-xs fc-btn fc-btn-secondary"
                                 >
                                   View Details
                                   <ArrowRight className="w-3 h-3 ml-1" />
@@ -503,7 +451,7 @@ export default function ProgressCircles() {
                 variant={selectedPeriod === 'week' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSelectedPeriod('week')}
-                className="rounded-xl"
+                className="rounded-xl fc-btn fc-press"
               >
                 Week
               </Button>
@@ -511,7 +459,7 @@ export default function ProgressCircles() {
                 variant={selectedPeriod === 'month' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSelectedPeriod('month')}
-                className="rounded-xl"
+                className="rounded-xl fc-btn fc-press"
               >
                 Month
               </Button>
@@ -519,64 +467,64 @@ export default function ProgressCircles() {
                 variant={selectedPeriod === 'year' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSelectedPeriod('year')}
-                className="rounded-xl"
+                className="rounded-xl fc-btn fc-press"
               >
                 Year
               </Button>
             </div>
 
             {/* Summary Stats */}
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div className="pt-4 border-t border-[color:var(--fc-glass-border)]">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                <div className={`${theme.card} rounded-xl p-4 border-2`}>
-                  <p className={`text-2xl font-bold ${theme.text}`}>{progressMetrics.length}</p>
-                  <p className={`text-xs ${theme.textSecondary}`}>Categories</p>
+                <div className="fc-glass-soft rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
+                  <p className="text-2xl font-bold fc-text-primary">{progressMetrics.length}</p>
+                  <p className="text-xs fc-text-subtle">Categories</p>
                 </div>
-                <div className={`${theme.card} rounded-xl p-4 border-2 border-green-200 dark:border-green-800`}>
-                  <p className={`text-2xl font-bold text-green-600 dark:text-green-400`}>
+                <div className="fc-glass-soft rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
+                  <p className="text-2xl font-bold fc-text-success">
                     {progressMetrics.filter(m => m.percentage >= 80).length}
                   </p>
-                  <p className={`text-xs ${theme.textSecondary}`}>Excellent</p>
+                  <p className="text-xs fc-text-subtle">Excellent</p>
                 </div>
-                <div className={`${theme.card} rounded-xl p-4 border-2 border-yellow-200 dark:border-yellow-800`}>
-                  <p className={`text-2xl font-bold text-yellow-600 dark:text-yellow-400`}>
+                <div className="fc-glass-soft rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
+                  <p className="text-2xl font-bold fc-text-warning">
                     {progressMetrics.filter(m => m.percentage >= 60 && m.percentage < 80).length}
                   </p>
-                  <p className={`text-xs ${theme.textSecondary}`}>Good</p>
+                  <p className="text-xs fc-text-subtle">Good</p>
                 </div>
-                <div className={`${theme.card} rounded-xl p-4 border-2 border-red-200 dark:border-red-800`}>
-                  <p className={`text-2xl font-bold text-red-600 dark:text-red-400`}>
+                <div className="fc-glass-soft rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
+                  <p className="text-2xl font-bold fc-text-error">
                     {progressMetrics.filter(m => m.percentage < 60).length}
                   </p>
-                  <p className={`text-xs ${theme.textSecondary}`}>Needs Work</p>
+                  <p className="text-xs fc-text-subtle">Needs Work</p>
                 </div>
               </div>
             </div>
           </div>
         ) : (
           <div className="text-center py-12">
-            <div className="p-6 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-2xl w-fit mx-auto mb-6">
-              <BarChart3 className="w-12 h-12 text-blue-600 dark:text-blue-400" />
+            <div className="p-6 fc-icon-tile fc-icon-workouts rounded-2xl w-fit mx-auto mb-6">
+              <BarChart3 className="w-12 h-12 fc-text-workouts" />
             </div>
-            <h3 className={`text-xl font-bold ${theme.text} mb-2`}>
+            <h3 className="text-xl font-bold fc-text-primary mb-2">
               No progress data available
             </h3>
-            <p className={`text-sm ${theme.textSecondary} mb-4`}>
+            <p className="text-sm fc-text-dim mb-4">
               Start tracking your workouts, nutrition, and habits to see your progress here
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button className={`${theme.primary} ${theme.shadow} rounded-xl`}>
+              <Button className="fc-btn fc-btn-primary fc-press rounded-xl">
                 <Plus className="w-4 h-4 mr-2" />
                 Start Tracking
               </Button>
-              <Button variant="outline" className="rounded-xl">
+              <Button variant="outline" className="rounded-xl fc-btn fc-btn-secondary">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh Data
               </Button>
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

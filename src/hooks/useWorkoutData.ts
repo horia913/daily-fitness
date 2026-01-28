@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, ensureAuthenticated } from '@/lib/supabase'
 import { cache, PrefetchService } from '@/lib/prefetch'
 
 interface WorkoutAssignment {
@@ -42,6 +42,9 @@ export function useWorkoutAssignments(userId: string) {
       const cacheKey = `workout_assignments_${userId}`
 
       try {
+        // Ensure user is authenticated before querying
+        await ensureAuthenticated()
+        
         // Try to get from cache first
         const cachedData = cache.get<WorkoutAssignment[]>(cacheKey)
         if (cachedData) {

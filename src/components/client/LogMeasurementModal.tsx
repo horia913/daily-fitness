@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { X, Save } from "lucide-react";
 import { createMeasurement } from "@/lib/measurementService";
@@ -17,8 +16,6 @@ export function LogMeasurementModal({
   onClose,
   onSuccess,
 }: LogMeasurementModalProps) {
-  const { isDark, getSemanticColor } = useTheme();
-  
   const [weight, setWeight] = useState("");
   const [waist, setWaist] = useState("");
   const [bodyFat, setBodyFat] = useState("");
@@ -63,42 +60,28 @@ export function LogMeasurementModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-start justify-center p-4"
-      style={{
-        background: "rgba(0,0,0,0.5)",
-      }}
+      className="fixed inset-0 z-[9999] flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm"
     >
       <div
-        className="w-full rounded-2xl shadow-2xl"
-        style={{
-          background: isDark ? "#1E1E1E" : "#FFFFFF",
-          maxWidth: "min(95vw, 500px)",
-          maxHeight: "min(88vh, calc(100vh - 4rem))",
-          height: "min(88vh, calc(100vh - 4rem))",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-        }}
+        className="w-full max-w-[500px] max-h-[88vh] h-[88vh] fc-modal fc-card overflow-hidden flex flex-col"
       >
         {/* Header */}
         <div
-          className="sticky top-0 z-10 flex items-center justify-between px-6 py-5"
-          style={{
-            background: isDark ? "#1E1E1E" : "#FFFFFF",
-            borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
-          }}
+          className="sticky top-0 z-10 flex items-center justify-between px-6 py-5 border-b border-[color:var(--fc-glass-border)]"
         >
-          <h2
-            className="text-2xl font-bold"
-            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-          >
-            Log Measurement
-          </h2>
+          <div>
+            <span className="fc-pill fc-pill-glass fc-text-habits">
+              Body metrics
+            </span>
+            <h2 className="text-2xl font-bold fc-text-primary mt-2">
+              Log measurement
+            </h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-opacity-10 hover:bg-white"
+            className="p-2 rounded-full fc-btn fc-btn-ghost"
           >
-            <X className="w-6 h-6" style={{ color: isDark ? "#fff" : "#1A1A1A" }} />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
@@ -107,11 +90,8 @@ export function LogMeasurementModal({
           <form onSubmit={handleSubmit} className="space-y-6 mt-6">
             {/* Weight */}
             <div>
-              <label
-                className="block text-sm font-medium mb-2"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
-                Weight (kg) <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium mb-2 fc-text-primary">
+                Weight (kg) <span className="fc-text-error">*</span>
               </label>
               <input
                 type="number"
@@ -119,22 +99,14 @@ export function LogMeasurementModal({
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
                 placeholder="Enter weight in kg"
-                className="w-full px-4 py-3 rounded-lg text-lg"
-                style={{
-                  background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                  color: isDark ? "#fff" : "#1A1A1A",
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                }}
+                className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
                 required
               />
             </div>
 
             {/* Waist */}
             <div>
-              <label
-                className="block text-sm font-medium mb-2"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
+              <label className="block text-sm font-medium mb-2 fc-text-primary">
                 Waist (cm) - Measured at iliac crest
               </label>
               <input
@@ -143,29 +115,16 @@ export function LogMeasurementModal({
                 value={waist}
                 onChange={(e) => setWaist(e.target.value)}
                 placeholder="Optional"
-                className="w-full px-4 py-3 rounded-lg text-lg"
-                style={{
-                  background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                  color: isDark ? "#fff" : "#1A1A1A",
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                }}
+                className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
               />
-              <p
-                className="text-xs mt-1"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                }}
-              >
+              <p className="text-xs mt-2 fc-text-subtle">
                 Measure at the top of the iliac crest (hip bone)
               </p>
             </div>
 
             {/* Body Fat */}
             <div>
-              <label
-                className="block text-sm font-medium mb-2"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
+              <label className="block text-sm font-medium mb-2 fc-text-primary">
                 Body Fat (%)
               </label>
               <input
@@ -174,24 +133,13 @@ export function LogMeasurementModal({
                 value={bodyFat}
                 onChange={(e) => setBodyFat(e.target.value)}
                 placeholder="Optional"
-                className="w-full px-4 py-3 rounded-lg text-lg"
-                style={{
-                  background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                  color: isDark ? "#fff" : "#1A1A1A",
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-                }}
+                className="w-full px-4 py-3 rounded-xl text-base fc-glass-soft fc-text-primary border border-[color:var(--fc-glass-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--fc-accent-cyan)]"
               />
             </div>
 
             {/* Error Message */}
             {error && (
-              <div
-                className="p-3 rounded-lg"
-                style={{
-                  background: "rgba(239,68,68,0.1)",
-                  color: "#ef4444",
-                }}
-              >
+              <div className="p-3 rounded-xl fc-glass-soft border border-[color:var(--fc-status-error)] fc-text-error">
                 {error}
               </div>
             )}
@@ -200,22 +148,15 @@ export function LogMeasurementModal({
 
         {/* Footer */}
         <div
-          className="flex-shrink-0 px-6 py-4 flex gap-3"
-          style={{
-            borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
-          }}
+          className="flex-shrink-0 px-6 py-4 flex gap-3 border-t border-[color:var(--fc-glass-border)]"
         >
-          <Button variant="ghost" onClick={onClose} className="flex-1">
+          <Button variant="ghost" onClick={onClose} className="flex-1 fc-btn fc-btn-ghost">
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={saving}
-            className="flex-1"
-            style={{
-              background: getSemanticColor("success").gradient,
-              boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-            }}
+            className="flex-1 fc-btn fc-btn-primary fc-press"
           >
             {saving ? (
               <>

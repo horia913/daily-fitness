@@ -11,6 +11,7 @@ import {
   Dumbbell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -60,18 +61,48 @@ function ProgramDetailsContent() {
       setLoading(true);
       setError(null);
 
-      // Get program details using direct query (getProgram method doesn't exist, only getPrograms)
-      const { data: programData, error: programError } = await supabase
-        .from("workout_programs")
-        .select("id, name, description, duration_weeks")
-        .eq("id", programId)
-        .single();
+      // Get user ID to check for program assignment
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setError("User not authenticated");
+        return;
+      }
 
-      if (programError || !programData) {
-        console.error("Error fetching program:", programError);
+      // Get program details through program_assignments to respect RLS
+      // Clients should access workout_programs through program_assignments, not directly
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from("program_assignments")
+        .select(
+          `
+          *,
+          program:workout_programs(
+            id,
+            name,
+            description,
+            duration_weeks
+          )
+        `
+        )
+        .eq("program_id", programId)
+        .eq("client_id", user.id)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (assignmentError) {
+        console.error("Error fetching program through assignment:", assignmentError);
         setError("Failed to load program details");
         return;
       }
+
+      if (!assignmentData || !assignmentData.program) {
+        console.error("Program not found or not assigned to you");
+        setError("Program not found or not assigned to you");
+        return;
+      }
+
+      const programData = assignmentData.program as any;
 
       setProgram({
         id: programData.id,
@@ -190,73 +221,49 @@ function ProgramDetailsContent() {
 
   return (
     <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen p-4 sm:p-6">
-        <div className="max-w-6xl mx-auto space-y-6 relative z-10">
+      <div className="relative fc-app-bg isolate">
+        <div className="fc-muted-overlay" />
+        <div className="fc-grain-layer" />
+        <div className="fc-vignette-layer" />
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="min-h-screen p-4 sm:p-6">
+          <div className="max-w-6xl mx-auto space-y-6 relative z-10">
           {/* Back Button */}
           <Button
             onClick={() => router.back()}
             variant="ghost"
-            className="mb-4"
+            className="mb-4 fc-text-dim hover:fc-text-primary"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
 
           {/* Program Header */}
-          <GlassCard elevation={3} className="p-6">
+          <GlassCard elevation={3} className="fc-glass fc-card p-6">
             <div className="flex flex-col sm:flex-row items-start justify-between gap-6">
               <div className="flex items-start gap-4 flex-1">
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{
-                    background: getSemanticColor("success").gradient,
-                    boxShadow: `0 4px 12px ${
-                      getSemanticColor("success").primary
-                    }30`,
-                  }}
-                >
-                  <BookOpen className="w-7 h-7 text-white" />
+                <div className="fc-icon-tile fc-icon-workouts w-14 h-14">
+                  <BookOpen className="w-7 h-7" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h1
-                    className="text-3xl font-bold mb-3 break-words"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
+                  <p className="text-xs uppercase tracking-[0.3em] fc-text-dim mb-2">
+                    Program Overview
+                  </p>
+                  <h1 className="text-3xl font-bold mb-3 break-words fc-text-primary">
                     {program.name}
                   </h1>
                   {program.description && (
-                    <p
-                      className="leading-relaxed"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.7)"
-                          : "rgba(0,0,0,0.7)",
-                      }}
-                    >
+                    <p className="leading-relaxed fc-text-dim">
                       {program.description}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div
-                className="px-4 py-2 rounded-xl flex items-center gap-2 flex-shrink-0"
-                style={{
-                  background: `${getSemanticColor("warning").primary}20`,
-                }}
-              >
-                <Calendar
-                  className="w-5 h-5"
-                  style={{ color: getSemanticColor("warning").primary }}
-                />
-                <span
-                  className="font-semibold"
-                  style={{ color: getSemanticColor("warning").primary }}
-                >
-                  {program.duration_weeks} weeks
-                </span>
-              </div>
+              <Badge variant="fc-outline" className="px-3 py-1 text-xs font-bold uppercase tracking-[0.2em]">
+                <Calendar className="w-4 h-4 mr-2" />
+                {program.duration_weeks} weeks
+              </Badge>
             </div>
           </GlassCard>
 
@@ -511,6 +518,7 @@ function ProgramDetailsContent() {
           </div>
         </div>
       </div>
+    </div>
     </AnimatedBackground>
   );
 }

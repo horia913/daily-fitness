@@ -1,10 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 import { 
   Apple,
@@ -35,8 +32,6 @@ interface MealPlanAssignment {
 }
 
 export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const [mealPlans, setMealPlans] = useState<MealPlanAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
@@ -67,7 +62,7 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
         .order('start_date', { ascending: false })
 
       if (error) {
-        // Table might not exist - show empty state
+        console.error('Error loading meal plans:', error)
         setMealPlans([])
         setLoading(false)
         return
@@ -79,8 +74,8 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
       const active = data?.filter(m => !m.end_date || new Date(m.end_date) >= new Date()).length || 0
       
       setStats({ total, active })
-    } catch {
-      // Silently handle error and show empty state
+    } catch (error) {
+      console.error('Error loading meal plans:', error)
       setMealPlans([])
     } finally {
       setLoading(false)
@@ -111,7 +106,7 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
       <div className="space-y-4">
         {[1, 2].map(i => (
           <div key={i} className="animate-pulse">
-            <div className={`${theme.card} h-32`} style={{ borderRadius: '24px', padding: '24px' }}></div>
+            <div className="h-32 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl p-6"></div>
           </div>
         ))}
       </div>
@@ -120,133 +115,173 @@ export default function ClientMealsView({ clientId }: ClientMealsViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-[1px] bg-gradient-to-r from-teal-500 to-cyan-600" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-          <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-            <CardContent style={{ padding: '16px' }}>
-              <div className="text-center">
-                <p className={`${theme.text}`} style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.1' }}>{stats.total}</p>
-                <p className={`${theme.textSecondary}`} style={{ fontSize: '14px', fontWeight: '400' }}>Total Plans</p>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+        <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+          <div className="flex items-center gap-3">
+            <div className="fc-icon-tile fc-icon-workouts">
+              <Apple className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Nutrition
+              </span>
+              <h3 className="text-lg font-semibold fc-text-primary mt-2">
+                Meal Plan Overview
+              </h3>
+              <p className="text-sm fc-text-dim">
+                Active nutrition assignments and targets
+              </p>
+            </div>
+          </div>
         </div>
+        <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
+            <p className="text-3xl font-bold fc-text-primary">{stats.total}</p>
+            <p className="text-sm fc-text-dim">Total Plans</p>
+          </div>
 
-        <div className="p-[1px] bg-gradient-to-r from-green-500 to-emerald-600" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-          <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-            <CardContent style={{ padding: '16px' }}>
-              <div className="text-center">
-                <p className={`${theme.text}`} style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1.1' }}>{stats.active}</p>
-                <p className={`${theme.textSecondary}`} style={{ fontSize: '14px', fontWeight: '400' }}>Active Now</p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
+            <p className="text-3xl font-bold fc-text-primary">{stats.active}</p>
+            <p className="text-sm fc-text-dim">Active Now</p>
+          </div>
         </div>
       </div>
 
       {/* Meal Plans List */}
-      <div className="space-y-4">
-        {mealPlans.length === 0 ? (
-          <Card className={`${theme.card} border-2 ${isDark ? 'border-slate-700' : 'border-slate-200'}`} style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-            <CardContent className="text-center" style={{ padding: '48px 24px' }}>
-              <Apple className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className={`${theme.text} mb-2`} style={{ fontSize: '20px', fontWeight: '700' }}>
-                No Meal Plans Assigned
+      <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+        <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+          <div className="flex items-center gap-3">
+            <div className="fc-icon-tile fc-icon-workouts">
+              <Apple className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Meal Plans
+              </span>
+              <h3 className="text-lg font-semibold fc-text-primary mt-2">
+                Assigned Plans
               </h3>
-              <p className={`${theme.textSecondary}`} style={{ fontSize: '14px' }}>
-                This client doesn't have any meal plan assignments yet.
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+            <span className="ml-auto fc-pill fc-pill-glass fc-text-workouts text-xs">
+              {mealPlans.length}
+            </span>
+          </div>
+        </div>
+        <div className="p-4 sm:p-6 space-y-4">
+        {mealPlans.length === 0 ? (
+          <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl text-center px-6 py-12">
+            <div className="mx-auto mb-4 fc-icon-tile fc-icon-workouts w-16 h-16">
+              <Apple className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold fc-text-primary mb-2">
+              No Meal Plans Assigned
+            </h3>
+            <p className="text-sm fc-text-dim">
+              This client doesn't have any meal plan assignments yet.
+            </p>
+          </div>
         ) : (
           mealPlans.map((plan) => (
-            <div key={plan.id} className="p-[1px] bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 hover:shadow-lg transition-all" style={{ borderRadius: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-              <Card className={`${theme.card} border-0`} style={{ borderRadius: '24px' }}>
-                <CardContent style={{ padding: '20px' }}>
-                  <div className="flex items-start gap-4">
-                    {/* Icon */}
-                    <div className="bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center flex-shrink-0 shadow-md" style={{ width: '48px', height: '48px', borderRadius: '16px' }}>
-                      <Apple className="w-6 h-6 text-white" />
-                    </div>
+            <div
+              key={plan.id}
+              className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5"
+            >
+              <div className="flex items-start gap-4">
+                {/* Icon */}
+                <div className="fc-icon-tile fc-icon-workouts">
+                  <Apple className="w-6 h-6" />
+                </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <h4 className={`${theme.text} break-words overflow-wrap-anywhere flex-1 min-w-0`} style={{ fontSize: '18px', fontWeight: '600' }}>
-                          {plan.meal_plans?.name || 'Meal Plan'}
-                        </h4>
-                        <Button
-                          onClick={() => handleUnassignMealPlan(plan.id)}
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 flex-shrink-0"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-
-                      {/* Macros */}
-                      {plan.meal_plans && (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-                          <div className="flex flex-col items-center bg-red-50 dark:bg-red-900/20" style={{ padding: '12px', borderRadius: '16px' }}>
-                            <Flame className="w-4 h-4 mb-1 text-red-600 dark:text-red-400" />
-                            <span className="text-slate-800 dark:text-slate-200" style={{ fontSize: '14px', fontWeight: '600' }}>
-                              {plan.meal_plans.target_calories || 0}
-                            </span>
-                            <span className="text-slate-600 dark:text-slate-400" style={{ fontSize: '12px' }}>cal</span>
-                          </div>
-                          
-                          <div className="flex flex-col items-center bg-blue-50 dark:bg-blue-900/20" style={{ padding: '12px', borderRadius: '16px' }}>
-                            <TrendingUp className="w-4 h-4 mb-1 text-blue-600 dark:text-blue-400" />
-                            <span className="text-slate-800 dark:text-slate-200" style={{ fontSize: '14px', fontWeight: '600' }}>
-                              {plan.meal_plans.target_protein || 0}g
-                            </span>
-                            <span className="text-slate-600 dark:text-slate-400" style={{ fontSize: '12px' }}>protein</span>
-                          </div>
-                          
-                          <div className="flex flex-col items-center bg-yellow-50 dark:bg-yellow-900/20" style={{ padding: '12px', borderRadius: '16px' }}>
-                            <TrendingUp className="w-4 h-4 mb-1 text-yellow-600 dark:text-yellow-400" />
-                            <span className="text-slate-800 dark:text-slate-200" style={{ fontSize: '14px', fontWeight: '600' }}>
-                              {plan.meal_plans.target_carbs || 0}g
-                            </span>
-                            <span className="text-slate-600 dark:text-slate-400" style={{ fontSize: '12px' }}>carbs</span>
-                          </div>
-                          
-                          <div className="flex flex-col items-center bg-orange-50 dark:bg-orange-900/20" style={{ padding: '12px', borderRadius: '16px' }}>
-                            <TrendingUp className="w-4 h-4 mb-1 text-orange-600 dark:text-orange-400" />
-                            <span className="text-slate-800 dark:text-slate-200" style={{ fontSize: '14px', fontWeight: '600' }}>
-                              {plan.meal_plans.target_fat || 0}g
-                            </span>
-                            <span className="text-slate-600 dark:text-slate-400" style={{ fontSize: '12px' }}>fat</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Dates */}
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-sm">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Calendar className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                          <span className={`${theme.textSecondary} whitespace-nowrap`}>
-                            Start: {new Date(plan.start_date).toLocaleDateString()}
-                          </span>
-                        </div>
-                        {plan.end_date && (
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Calendar className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
-                            <span className={`${theme.textSecondary} whitespace-nowrap`}>
-                              End: {new Date(plan.end_date).toLocaleDateString()}
-                            </span>
-                          </div>
-                        )}
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="min-w-0">
+                      <h4 className="text-lg font-semibold fc-text-primary break-words">
+                        {plan.meal_plans?.name || 'Meal Plan'}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <span className={`fc-pill fc-pill-glass text-xs ${
+                          !plan.end_date || new Date(plan.end_date) >= new Date()
+                            ? 'fc-text-success'
+                            : 'fc-text-error'
+                        }`}>
+                          {!plan.end_date || new Date(plan.end_date) >= new Date() ? 'Active' : 'Expired'}
+                        </span>
+                        <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                          {plan.meal_plans?.target_calories || 0} kcal
+                        </span>
                       </div>
                     </div>
+                    <Button
+                      onClick={() => handleUnassignMealPlan(plan.id)}
+                      variant="ghost"
+                      size="sm"
+                      className="fc-btn fc-btn-ghost h-8 w-8 p-0 fc-text-error flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
+
+                  {/* Macros */}
+                  {plan.meal_plans && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                      <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3 text-center">
+                        <Flame className="w-4 h-4 mb-1 fc-text-error mx-auto" />
+                        <span className="text-sm font-semibold fc-text-primary">
+                          {plan.meal_plans.target_calories || 0}
+                        </span>
+                        <span className="text-xs fc-text-subtle">cal</span>
+                      </div>
+                      
+                      <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3 text-center">
+                        <TrendingUp className="w-4 h-4 mb-1 fc-text-success mx-auto" />
+                        <span className="text-sm font-semibold fc-text-primary">
+                          {plan.meal_plans.target_protein || 0}g
+                        </span>
+                        <span className="text-xs fc-text-subtle">protein</span>
+                      </div>
+                      
+                      <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3 text-center">
+                        <TrendingUp className="w-4 h-4 mb-1 fc-text-workouts mx-auto" />
+                        <span className="text-sm font-semibold fc-text-primary">
+                          {plan.meal_plans.target_carbs || 0}g
+                        </span>
+                        <span className="text-xs fc-text-subtle">carbs</span>
+                      </div>
+                      
+                      <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3 text-center">
+                        <TrendingUp className="w-4 h-4 mb-1 fc-text-warning mx-auto" />
+                        <span className="text-sm font-semibold fc-text-primary">
+                          {plan.meal_plans.target_fat || 0}g
+                        </span>
+                        <span className="text-xs fc-text-subtle">fat</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dates */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Calendar className="w-4 h-4 fc-text-workouts flex-shrink-0" />
+                      <span className="fc-text-subtle whitespace-nowrap">
+                        Start: {new Date(plan.start_date).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {plan.end_date && (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Calendar className="w-4 h-4 fc-text-subtle flex-shrink-0" />
+                        <span className="fc-text-subtle whitespace-nowrap">
+                          End: {new Date(plan.end_date).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           ))
         )}
+        </div>
       </div>
     </div>
   )

@@ -8,6 +8,7 @@ import {
   WorkoutPyramidSet,
   WorkoutRestPauseSet,
   WorkoutTimeProtocol,
+  WorkoutHRSet,
   WorkoutLadderSet,
   LiveWorkoutBlock,
   LiveWorkoutExercise,
@@ -15,6 +16,353 @@ import {
 } from '@/types/workoutBlocks'
 
 export class WorkoutBlockService {
+  private static blocksCache = new Map<
+    string,
+    { data: WorkoutBlock[]; fetchedAt: number }
+  >()
+  private static readonly CACHE_TTL_MS = 30 * 1000
+
+  private static getCachedBlocks(templateId: string): WorkoutBlock[] | null {
+    const cached = this.blocksCache.get(templateId)
+    if (!cached) return null
+    if (Date.now() - cached.fetchedAt > this.CACHE_TTL_MS) {
+      this.blocksCache.delete(templateId)
+      return null
+    }
+    return cached.data
+  }
+
+  private static setCachedBlocks(templateId: string, data: WorkoutBlock[]) {
+    this.blocksCache.set(templateId, { data, fetchedAt: Date.now() })
+  }
+
+  /** Chunk array to avoid Supabase/Postgres statement timeouts on large .in() lists */
+  private static readonly QUERY_CHUNK_SIZE = 10
+
+  private static chunk<T>(arr: T[], size: number): T[][] {
+    const out: T[][] = []
+    for (let i = 0; i < arr.length; i += size) {
+      out.push(arr.slice(i, i + size))
+    }
+    return out
+  }
+
+  private static async buildBlocksForTemplates(blocks: any[]): Promise<WorkoutBlock[]> {
+    if (!blocks || blocks.length === 0) return []
+
+    const allBlockIds = blocks.map((b: any) => b.id)
+    if (allBlockIds.length === 0) return []
+
+    const blockTypes = new Set((blocks || []).map((b: any) => b.block_type))
+    const needsTimeProtocols =
+      blockTypes.has('amrap') ||
+      blockTypes.has('emom') ||
+      blockTypes.has('for_time') ||
+      blockTypes.has('tabata') ||
+      blockTypes.has('circuit')
+    const needsDropSets = blockTypes.has('drop_set')
+    const needsClusterSets = blockTypes.has('cluster_set')
+    const needsRestPause = blockTypes.has('rest_pause')
+    const needsHRSets = blockTypes.has('hr_sets')
+
+    const blockIdsForExercises = blocks
+      .filter((b: any) => ['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(b.block_type))
+      .map((b: any) => b.id)
+    const blockIdsForTimeProtocols = needsTimeProtocols
+      ? blocks.filter((b: any) => ['amrap', 'emom', 'for_time', 'tabata', 'circuit'].includes(b.block_type)).map((b: any) => b.id)
+      : []
+    const blockIdsForDropSets = needsDropSets
+      ? blocks.filter((b: any) => b.block_type === 'drop_set').map((b: any) => b.id)
+      : []
+    const blockIdsForClusterSets = needsClusterSets
+      ? blocks.filter((b: any) => b.block_type === 'cluster_set').map((b: any) => b.id)
+      : []
+    const blockIdsForRestPause = needsRestPause
+      ? blocks.filter((b: any) => b.block_type === 'rest_pause').map((b: any) => b.id)
+      : []
+    const blockIdsForHRSets = needsHRSets
+      ? blocks.filter((b: any) => b.block_type === 'hr_sets').map((b: any) => b.id)
+      : []
+
+    const safeQuery = async (
+      query: PromiseLike<{ data: any; error: any }>,
+      tableName: string
+    ) => {
+      try {
+        const result = await query
+        if (result.error) {
+          if (
+            result.error.code === '57014' ||
+            result.error.message?.includes('timeout')
+          ) {
+            console.warn(
+              `Query timeout for ${tableName} (skipping table):`,
+              result.error.message
+            )
+          } else {
+            console.error(`Error fetching ${tableName}:`, result.error)
+          }
+          return { data: [], error: result.error }
+        }
+        return { data: result.data || [], error: null }
+      } catch (err) {
+        console.error(`Error fetching ${tableName}:`, err)
+        return { data: [], error: err }
+      }
+    }
+
+    const queryTableInChunks = async (
+      tableName: string,
+      select: string,
+      blockIds: string[]
+    ): Promise<{ data: any[]; error: any }> => {
+      if (blockIds.length === 0) return { data: [], error: null }
+      const chunks = this.chunk(blockIds, this.QUERY_CHUNK_SIZE)
+      const allData: any[] = []
+      for (const chunkIds of chunks) {
+        const result = await safeQuery(
+          supabase.from(tableName).select(select).in('block_id', chunkIds),
+          tableName
+        )
+        if (result.data?.length) allData.push(...result.data)
+        if (result.error && result.error.code !== '57014') return { data: allData, error: result.error }
+      }
+      return { data: allData, error: null }
+    }
+
+    const [exercisesRes, timeProtocolsRes, dropRes, clusterRes, restPauseRes, hrSetsRes] =
+      await Promise.all([
+        queryTableInChunks(
+          'workout_block_exercises',
+          '*',
+          blockIdsForExercises
+        ),
+        needsTimeProtocols
+          ? queryTableInChunks('workout_time_protocols', '*', blockIdsForTimeProtocols)
+          : Promise.resolve({ data: [], error: null }),
+        needsDropSets
+          ? queryTableInChunks('workout_drop_sets', '*', blockIdsForDropSets)
+          : Promise.resolve({ data: [], error: null }),
+        needsClusterSets
+          ? queryTableInChunks('workout_cluster_sets', '*', blockIdsForClusterSets)
+          : Promise.resolve({ data: [], error: null }),
+        needsRestPause
+          ? queryTableInChunks('workout_rest_pause_sets', '*', blockIdsForRestPause)
+          : Promise.resolve({ data: [], error: null }),
+        needsHRSets
+          ? queryTableInChunks('workout_hr_sets', '*', blockIdsForHRSets)
+          : Promise.resolve({ data: [], error: null }),
+      ])
+
+    const allExerciseIds = new Set<string>()
+    ;(exercisesRes.data || []).forEach((ex: any) => allExerciseIds.add(ex.exercise_id))
+    ;(dropRes.data || []).forEach((ds: any) => allExerciseIds.add(ds.exercise_id))
+    ;(clusterRes.data || []).forEach((cs: any) => allExerciseIds.add(cs.exercise_id))
+    ;(restPauseRes.data || []).forEach((rp: any) => allExerciseIds.add(rp.exercise_id))
+    ;(timeProtocolsRes.data || []).forEach((tp: any) => allExerciseIds.add(tp.exercise_id))
+    ;(hrSetsRes.data || []).forEach((hr: any) => allExerciseIds.add(hr.exercise_id))
+
+    let exercisesData: any[] = []
+    if (allExerciseIds.size > 0) {
+      const ids = Array.from(allExerciseIds)
+      const idChunks = this.chunk(ids, this.QUERY_CHUNK_SIZE)
+      for (const idChunk of idChunks) {
+        const { data } = await safeQuery(
+          supabase.from('exercises').select('id, name, description, video_url').in('id', idChunk),
+          'exercises'
+        )
+        if (data?.length) exercisesData = exercisesData.concat(data)
+      }
+    }
+
+    const exercisesMap = new Map<string, any>()
+    ;(exercisesData || []).forEach((ex: any) => {
+      exercisesMap.set(ex.id, ex)
+    })
+
+    const exercisesByBlock = new Map<string, any[]>()
+    ;(exercisesRes.data || []).forEach((ex: any) => {
+      if (!exercisesByBlock.has(ex.block_id)) {
+        exercisesByBlock.set(ex.block_id, [])
+      }
+      const row = { ...ex, exercise: exercisesMap.get(ex.exercise_id) || null }
+      exercisesByBlock.get(ex.block_id)!.push(row)
+    })
+
+    const timeProtocolsByBlock = new Map<string, any[]>()
+    ;(timeProtocolsRes.data || []).forEach((tp: any) => {
+      if (!timeProtocolsByBlock.has(tp.block_id)) {
+        timeProtocolsByBlock.set(tp.block_id, [])
+      }
+      timeProtocolsByBlock.get(tp.block_id)!.push(tp)
+    })
+
+    const createExerciseKey = (blockId: string, exerciseId: string, exerciseOrder: number) => {
+      return `${blockId}:${exerciseId}:${exerciseOrder}`
+    }
+
+    const groupByExercise = (arr: any[], tableName: string) => {
+      const map = new Map<string, any[]>()
+      arr.forEach((row: any) => {
+        const k = createExerciseKey(row.block_id, row.exercise_id, row.exercise_order)
+        if (!map.has(k)) map.set(k, [])
+        map.get(k)!.push(row)
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`WorkoutBlockService -> Grouping ${tableName}: Key '${k}' with data`, row);
+        }
+      })
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`WorkoutBlockService -> ${tableName} Map Keys:`, Array.from(map.keys()));
+      }
+      return map
+    }
+
+    const dropByExercise = groupByExercise(dropRes.data || [], "drop_sets")
+    const clusterByExercise = groupByExercise(clusterRes.data || [], "cluster_sets")
+    const restPauseByExercise = groupByExercise(restPauseRes.data || [], "rest_pause_sets")
+
+    const enriched = (blocks || []).map((block: any) => {
+      const blockType = block.block_type
+
+      const blockTimeProtocols = timeProtocolsByBlock.get(block.id) || []
+      block.time_protocols = blockTimeProtocols
+      block.time_protocol = blockTimeProtocols.length > 0 ? blockTimeProtocols[0] : null
+
+      const usesBlockExercises = ['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(blockType)
+      const usesDropSets = blockType === 'drop_set'
+      const usesClusterSets = blockType === 'cluster_set'
+      const usesRestPause = blockType === 'rest_pause'
+      const usesTimeProtocols = ['amrap', 'emom', 'for_time', 'tabata', 'circuit'].includes(blockType)
+      const usesHRSets = blockType === 'hr_sets'
+
+      if (usesBlockExercises) {
+        const blockExercises = exercisesByBlock.get(block.id) || []
+        let mappedExercises = blockExercises.map((ex: any) => {
+          const exerciseKey = createExerciseKey(block.id, ex.exercise_id, ex.exercise_order)
+          return {
+            ...ex,
+            drop_sets: dropByExercise.get(exerciseKey) || [],
+            cluster_sets: clusterByExercise.get(exerciseKey) || [],
+            rest_pause_sets: restPauseByExercise.get(exerciseKey) || []
+          }
+        })
+
+        if (blockType === 'giant_set') {
+          mappedExercises = mappedExercises.sort((a, b) => {
+            const letterA = a.exercise_letter || "A"
+            const letterB = b.exercise_letter || "A"
+            return letterA.localeCompare(letterB)
+          })
+        }
+
+        block.exercises = mappedExercises
+      } else if (usesDropSets) {
+        const dropSets = dropRes.data?.filter((ds: any) => ds.block_id === block.id) || []
+        const exerciseMap = new Map<string, any>()
+        dropSets.forEach((ds: any) => {
+          const key = `${ds.exercise_id}:${ds.exercise_order}`
+          if (!exerciseMap.has(key)) {
+            exerciseMap.set(key, {
+              id: ds.id,
+              block_id: ds.block_id,
+              exercise_id: ds.exercise_id,
+              exercise_order: ds.exercise_order,
+              exercise: exercisesMap.get(ds.exercise_id) || null,
+              sets: block.total_sets,
+              reps: block.reps_per_set,
+              weight_kg: ds.weight_kg,
+              load_percentage: ds.load_percentage,
+              drop_sets: dropSets.filter((d: any) =>
+                d.exercise_id === ds.exercise_id && d.exercise_order === ds.exercise_order
+              ).sort((a: any, b: any) => a.drop_order - b.drop_order)
+            })
+          }
+        })
+        block.exercises = Array.from(exerciseMap.values()).sort((a, b) => a.exercise_order - b.exercise_order)
+      } else if (usesClusterSets) {
+        const clusterSets = clusterRes.data?.filter((cs: any) => cs.block_id === block.id) || []
+        block.exercises = clusterSets.map((cs: any) => ({
+          id: cs.id,
+          block_id: cs.block_id,
+          exercise_id: cs.exercise_id,
+          exercise_order: cs.exercise_order,
+          exercise: exercisesMap.get(cs.exercise_id) || null,
+          sets: block.total_sets,
+          reps_per_cluster: cs.reps_per_cluster,
+          clusters_per_set: cs.clusters_per_set,
+          intra_cluster_rest: cs.intra_cluster_rest,
+          rest_seconds: block.rest_seconds,
+          weight_kg: cs.weight_kg,
+          load_percentage: cs.load_percentage,
+          cluster_sets: [cs]
+        })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+      } else if (usesRestPause) {
+        const restPauseSets = restPauseRes.data?.filter((rp: any) => rp.block_id === block.id) || []
+        block.exercises = restPauseSets.map((rp: any) => ({
+          id: rp.id,
+          block_id: rp.block_id,
+          exercise_id: rp.exercise_id,
+          exercise_order: rp.exercise_order,
+          exercise: exercisesMap.get(rp.exercise_id) || null,
+          sets: block.total_sets,
+          reps: block.reps_per_set,
+          rest_pause_duration: rp.rest_pause_duration,
+          max_rest_pauses: rp.max_rest_pauses,
+          weight_kg: rp.weight_kg,
+          load_percentage: rp.load_percentage,
+          rest_pause_sets: [rp]
+        })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+      } else if (usesTimeProtocols) {
+        const timeProtocols = timeProtocolsByBlock.get(block.id) || []
+        const exerciseMap = new Map<string, any>()
+        timeProtocols.forEach((tp: any) => {
+          const key = `${tp.exercise_id}:${tp.exercise_order}`
+          if (!exerciseMap.has(key)) {
+            exerciseMap.set(key, {
+              id: tp.id,
+              block_id: tp.block_id,
+              exercise_id: tp.exercise_id,
+              exercise_order: tp.exercise_order,
+              exercise: exercisesMap.get(tp.exercise_id) || null,
+              sets: block.total_sets,
+              weight_kg: tp.weight_kg,
+              load_percentage: tp.load_percentage,
+              time_protocols: timeProtocols.filter((t: any) =>
+                t.exercise_id === tp.exercise_id && t.exercise_order === tp.exercise_order
+              )
+            })
+          }
+        })
+        block.exercises = Array.from(exerciseMap.values()).sort((a, b) => a.exercise_order - b.exercise_order)
+      } else if (usesHRSets) {
+        const hrSets = hrSetsRes.data?.filter((hr: any) => hr.block_id === block.id) || []
+        block.exercises = hrSets.map((hr: any) => ({
+          id: hr.id,
+          block_id: hr.block_id,
+          exercise_id: hr.exercise_id,
+          exercise_order: hr.exercise_order,
+          exercise: exercisesMap.get(hr.exercise_id) || null,
+          hr_zone: hr.hr_zone,
+          hr_percentage_min: hr.hr_percentage_min,
+          hr_percentage_max: hr.hr_percentage_max,
+          hr_is_intervals: hr.is_intervals,
+          hr_duration_minutes: hr.duration_seconds ? Math.round(hr.duration_seconds / 60) : undefined,
+          hr_work_duration_minutes: hr.work_duration_seconds ? Math.round(hr.work_duration_seconds / 60) : undefined,
+          hr_rest_duration_minutes: hr.rest_duration_seconds ? Math.round(hr.rest_duration_seconds / 60) : undefined,
+          hr_target_rounds: hr.target_rounds,
+          hr_distance_meters: hr.distance_meters,
+          hr_sets: [hr]
+        })).sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+        block.hr_sets = hrSets.sort((a: any, b: any) => a.exercise_order - b.exercise_order)
+      } else {
+        block.exercises = []
+      }
+
+      return block
+    })
+
+    return enriched
+  }
   // Create a new workout block
   static async createWorkoutBlock(
     templateId: string,
@@ -72,6 +420,13 @@ export class WorkoutBlockService {
   // Get all blocks for a workout template
   static async getWorkoutBlocks(templateId: string): Promise<WorkoutBlock[]> {
     try {
+      const cached = this.getCachedBlocks(templateId)
+      if (cached) return cached
+
+      // Ensure user is authenticated before querying
+      const { ensureAuthenticated } = await import('./supabase');
+      await ensureAuthenticated();
+      
       // 1) Fetch blocks first (without exercises - we'll add them based on block type)
       const { data: blocks, error } = await supabase
         .from('workout_blocks')
@@ -82,240 +437,67 @@ export class WorkoutBlockService {
       if (error) throw error
       if (!blocks || blocks.length === 0) return []
 
-      // 2) Collect IDs for batch queries
-      const allBlockIds = blocks.map((b: any) => b.id)
-
-      // If no blocks, return early
-      if (allBlockIds.length === 0) return []
-
-      // 3) Run related-table queries in parallel (batched)
-      // NOTE: Special tables now use block_id, exercise_id, exercise_order (NOT block_exercise_id)
-      const [
-        exercisesRes, // workout_block_exercises (ONLY for straight_set, superset, giant_set, pre_exhaustion)
-        timeProtocolsRes, // workout_time_protocols (ONLY for amrap, emom, for_time, tabata)
-        dropRes, // workout_drop_sets (ONLY for drop_set)
-        clusterRes, // workout_cluster_sets (ONLY for cluster_set)
-        pyramidRes, // workout_pyramid_sets (deprecated)
-        ladderRes, // workout_ladder_sets (deprecated)
-        restPauseRes // workout_rest_pause_sets (ONLY for rest_pause)
-      ] = await Promise.all([
-        supabase.from('workout_block_exercises')
-          .select('*, exercise:exercises(id, name, description, video_url)')
-          .in('block_id', allBlockIds),
-        supabase.from('workout_time_protocols').select('*').in('block_id', allBlockIds),
-        supabase.from('workout_drop_sets').select('*').in('block_id', allBlockIds),
-        supabase.from('workout_cluster_sets').select('*').in('block_id', allBlockIds),
-        supabase.from('workout_pyramid_sets').select('*').in('block_id', allBlockIds),
-        supabase.from('workout_ladder_sets').select('*').in('block_id', allBlockIds),
-        supabase.from('workout_rest_pause_sets').select('*').in('block_id', allBlockIds)
-      ])
-
-      // Fetch exercise details for special tables
-      const allExerciseIds = new Set<string>()
-      ;(dropRes.data || []).forEach((ds: any) => allExerciseIds.add(ds.exercise_id))
-      ;(clusterRes.data || []).forEach((cs: any) => allExerciseIds.add(cs.exercise_id))
-      ;(restPauseRes.data || []).forEach((rp: any) => allExerciseIds.add(rp.exercise_id))
-      ;(timeProtocolsRes.data || []).forEach((tp: any) => allExerciseIds.add(tp.exercise_id))
-
-      const { data: exercisesData } = await supabase
-        .from('exercises')
-        .select('id, name, description, video_url')
-        .in('id', Array.from(allExerciseIds))
-
-      const exercisesMap = new Map<string, any>()
-      ;(exercisesData || []).forEach((ex: any) => {
-        exercisesMap.set(ex.id, ex)
-      })
-
-      // 4) Build lookup maps
-      // Group exercises by block_id (for blocks that use workout_block_exercises)
-      const exercisesByBlock = new Map<string, any[]>()
-      ;(exercisesRes.data || []).forEach((ex: any) => {
-        if (!exercisesByBlock.has(ex.block_id)) {
-          exercisesByBlock.set(ex.block_id, [])
-        }
-        exercisesByBlock.get(ex.block_id)!.push(ex)
-      })
-
-      // Time protocols: multiple per block for tabata/circuit, single for others
-      const timeProtocolsByBlock = new Map<string, any[]>()
-      if (timeProtocolsRes.error) {
-        console.error('Error fetching time_protocols:', timeProtocolsRes.error)
-      }
-      ;(timeProtocolsRes.data || []).forEach((tp: any) => {
-        if (!timeProtocolsByBlock.has(tp.block_id)) {
-          timeProtocolsByBlock.set(tp.block_id, [])
-        }
-        timeProtocolsByBlock.get(tp.block_id)!.push(tp)
-      })
-
-      // Helper to create composite key for matching: block_id + exercise_id + exercise_order
-      const createExerciseKey = (blockId: string, exerciseId: string, exerciseOrder: number) => {
-        return `${blockId}:${exerciseId}:${exerciseOrder}`
-      }
-
-      // Group special table data by composite key
-      const groupByExercise = (arr: any[], tableName: string) => {
-        const map = new Map<string, any[]>()
-        arr.forEach((row: any) => {
-          const k = createExerciseKey(row.block_id, row.exercise_id, row.exercise_order)
-          if (!map.has(k)) map.set(k, [])
-          map.get(k)!.push(row)
-          if (process.env.NODE_ENV !== "production") {
-            console.log(`WorkoutBlockService -> Grouping ${tableName}: Key '${k}' with data`, row);
-          }
-        })
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`WorkoutBlockService -> ${tableName} Map Keys:`, Array.from(map.keys()));
-        }
-        return map
-      }
-
-      const dropByExercise = groupByExercise(dropRes.data || [], "drop_sets")
-      const clusterByExercise = groupByExercise(clusterRes.data || [], "cluster_sets")
-      const pyramidByExercise = groupByExercise(pyramidRes.data || [], "pyramid_sets")
-      const ladderByExercise = groupByExercise(ladderRes.data || [], "ladder_sets")
-      const restPauseByExercise = groupByExercise(restPauseRes.data || [], "rest_pause_sets")
-
-      // 5) Attach exercises to blocks based on block type
-      const enriched = (blocks || []).map((block: any) => {
-        const blockType = block.block_type
-        
-        // Attach time protocols (array for circuit/tabata, single for others)
-        const blockTimeProtocols = timeProtocolsByBlock.get(block.id) || []
-        block.time_protocols = blockTimeProtocols
-        block.time_protocol = blockTimeProtocols.length > 0 ? blockTimeProtocols[0] : null // Keep for backward compatibility
-
-        // Determine which table to use based on block type
-        const usesBlockExercises = ['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(blockType)
-        const usesDropSets = blockType === 'drop_set'
-        const usesClusterSets = blockType === 'cluster_set'
-        const usesRestPause = blockType === 'rest_pause'
-        const usesTimeProtocols = ['amrap', 'emom', 'for_time', 'tabata', 'circuit'].includes(blockType)
-
-        if (usesBlockExercises) {
-          // Blocks that use workout_block_exercises
-          const blockExercises = exercisesByBlock.get(block.id) || []
-          let mappedExercises = blockExercises.map((ex: any) => {
-            const exerciseKey = createExerciseKey(block.id, ex.exercise_id, ex.exercise_order)
-            return {
-              ...ex,
-              // Attach special table data for complex blocks (superset, giant_set, pre_exhaustion)
-              drop_sets: dropByExercise.get(exerciseKey) || [],
-              cluster_sets: clusterByExercise.get(exerciseKey) || [],
-              pyramid_sets: pyramidByExercise.get(exerciseKey) || [],
-              ladder_sets: ladderByExercise.get(exerciseKey) || [],
-              rest_pause_sets: restPauseByExercise.get(exerciseKey) || []
-            }
-          })
-          
-          // For giant_set, sort by exercise_letter (A, B, C, D) to ensure correct order
-          if (blockType === 'giant_set') {
-            mappedExercises = mappedExercises.sort((a, b) => {
-              const letterA = a.exercise_letter || "A"
-              const letterB = b.exercise_letter || "A"
-              return letterA.localeCompare(letterB)
-            })
-          }
-          
-          block.exercises = mappedExercises
-        } else if (usesDropSets) {
-          // drop_set: Create exercises from workout_drop_sets
-          const dropSets = dropRes.data?.filter((ds: any) => ds.block_id === block.id) || []
-          // Group by exercise_id and exercise_order to create unique exercises
-          const exerciseMap = new Map<string, any>()
-          dropSets.forEach((ds: any) => {
-            const key = `${ds.exercise_id}:${ds.exercise_order}`
-            if (!exerciseMap.has(key)) {
-              exerciseMap.set(key, {
-                id: ds.id, // Use drop_set id as exercise id
-                block_id: ds.block_id,
-                exercise_id: ds.exercise_id,
-                exercise_order: ds.exercise_order,
-                exercise: exercisesMap.get(ds.exercise_id) || null,
-                sets: block.total_sets,
-                reps: block.reps_per_set,
-                weight_kg: ds.weight_kg, // From workout_drop_sets (initial weight in drop_order=1)
-                load_percentage: ds.load_percentage, // From workout_drop_sets (initial load in drop_order=1)
-                drop_sets: dropSets.filter((d: any) => 
-                  d.exercise_id === ds.exercise_id && d.exercise_order === ds.exercise_order
-                ).sort((a: any, b: any) => a.drop_order - b.drop_order)
-              })
-            }
-          })
-          block.exercises = Array.from(exerciseMap.values()).sort((a, b) => a.exercise_order - b.exercise_order)
-        } else if (usesClusterSets) {
-          // cluster_set: Create exercises from workout_cluster_sets
-          const clusterSets = clusterRes.data?.filter((cs: any) => cs.block_id === block.id) || []
-          block.exercises = clusterSets.map((cs: any) => ({
-            id: cs.id,
-            block_id: cs.block_id,
-            exercise_id: cs.exercise_id,
-            exercise_order: cs.exercise_order,
-            exercise: exercisesMap.get(cs.exercise_id) || null,
-            sets: block.total_sets,
-            reps_per_cluster: cs.reps_per_cluster,
-            clusters_per_set: cs.clusters_per_set,
-            intra_cluster_rest: cs.intra_cluster_rest,
-            rest_seconds: block.rest_seconds, // Inter-set rest from block
-            weight_kg: cs.weight_kg, // From workout_cluster_sets
-            load_percentage: cs.load_percentage, // From workout_cluster_sets
-            cluster_sets: [cs] // Wrap in array for consistency
-          })).sort((a, b) => a.exercise_order - b.exercise_order)
-        } else if (usesRestPause) {
-          // rest_pause: Create exercises from workout_rest_pause_sets
-          const restPauseSets = restPauseRes.data?.filter((rp: any) => rp.block_id === block.id) || []
-          block.exercises = restPauseSets.map((rp: any) => ({
-            id: rp.id,
-            block_id: rp.block_id,
-            exercise_id: rp.exercise_id,
-            exercise_order: rp.exercise_order,
-            exercise: exercisesMap.get(rp.exercise_id) || null,
-            sets: block.total_sets,
-            reps: block.reps_per_set,
-            rest_pause_duration: rp.rest_pause_duration,
-            max_rest_pauses: rp.max_rest_pauses,
-            weight_kg: rp.weight_kg, // From workout_rest_pause_sets
-            load_percentage: rp.load_percentage, // From workout_rest_pause_sets
-            rest_pause_sets: [rp] // Wrap in array for consistency
-          })).sort((a, b) => a.exercise_order - b.exercise_order)
-        } else if (usesTimeProtocols) {
-          // amrap, emom, for_time, tabata: Create exercises from workout_time_protocols
-          const timeProtocols = timeProtocolsByBlock.get(block.id) || []
-          // Group by exercise_id and exercise_order to create unique exercises
-          const exerciseMap = new Map<string, any>()
-          timeProtocols.forEach((tp: any) => {
-            const key = `${tp.exercise_id}:${tp.exercise_order}`
-            if (!exerciseMap.has(key)) {
-              exerciseMap.set(key, {
-                id: tp.id,
-                block_id: tp.block_id,
-                exercise_id: tp.exercise_id,
-                exercise_order: tp.exercise_order,
-                exercise: exercisesMap.get(tp.exercise_id) || null,
-                sets: block.total_sets,
-                weight_kg: tp.weight_kg, // From workout_time_protocols
-                load_percentage: tp.load_percentage, // From workout_time_protocols (null for tabata)
-                // Attach all time protocols for this exercise
-                time_protocols: timeProtocols.filter((t: any) => 
-                  t.exercise_id === tp.exercise_id && t.exercise_order === tp.exercise_order
-                )
-              })
-            }
-          })
-          block.exercises = Array.from(exerciseMap.values()).sort((a, b) => a.exercise_order - b.exercise_order)
-        } else {
-          // Unknown block type - return empty exercises
-          block.exercises = []
-        }
-
-        return block
-      })
-
+      const enriched = await this.buildBlocksForTemplates(blocks)
+      this.setCachedBlocks(templateId, enriched)
       return enriched
     } catch (error) {
       console.error('Error fetching workout blocks:', error)
       return []
+    }
+  }
+
+  static async getWorkoutBlocksForTemplates(templateIds: string[]): Promise<Map<string, WorkoutBlock[]>> {
+    const result = new Map<string, WorkoutBlock[]>()
+    const uniqueIds = Array.from(new Set(templateIds.filter(Boolean)))
+    if (uniqueIds.length === 0) return result
+
+    const uncachedTemplateIds: string[] = []
+    uniqueIds.forEach((templateId) => {
+      const cached = this.getCachedBlocks(templateId)
+      if (cached) {
+        result.set(templateId, cached)
+      } else {
+        uncachedTemplateIds.push(templateId)
+      }
+    })
+
+    if (uncachedTemplateIds.length === 0) return result
+
+    try {
+      const { ensureAuthenticated } = await import('./supabase')
+      await ensureAuthenticated()
+
+      const { data: blocks, error } = await supabase
+        .from('workout_blocks')
+        .select('*')
+        .in('template_id', uncachedTemplateIds)
+        .order('block_order')
+
+      if (error) throw error
+
+      const enriched = await this.buildBlocksForTemplates(blocks || [])
+      const blocksByTemplate = new Map<string, WorkoutBlock[]>()
+      ;(enriched || []).forEach((block: any) => {
+        const templateId = block.template_id
+        if (!blocksByTemplate.has(templateId)) {
+          blocksByTemplate.set(templateId, [])
+        }
+        blocksByTemplate.get(templateId)!.push(block)
+      })
+
+      uncachedTemplateIds.forEach((templateId) => {
+        const templateBlocks = blocksByTemplate.get(templateId) || []
+        this.setCachedBlocks(templateId, templateBlocks)
+        result.set(templateId, templateBlocks)
+      })
+
+      return result
+    } catch (error) {
+      console.error('Error fetching workout blocks (batched):', error)
+      uncachedTemplateIds.forEach((templateId) => {
+        result.set(templateId, [])
+      })
+      return result
     }
   }
 
@@ -467,34 +649,6 @@ export class WorkoutBlockService {
     }
   }
 
-  // Create pyramid set configuration
-  static async createPyramidSet(
-    blockExerciseId: string,
-    pyramidOrder: number,
-    weightKg: number,
-    reps: string,
-    restSeconds: number
-  ): Promise<WorkoutPyramidSet | null> {
-    try {
-      const { data, error } = await supabase
-        .from('workout_pyramid_sets')
-        .insert({
-          block_exercise_id: blockExerciseId,
-          pyramid_order: pyramidOrder,
-          weight_kg: weightKg,
-          reps: reps,
-          rest_seconds: restSeconds
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Error creating pyramid set:', error)
-      return null
-    }
-  }
 
   // Create rest-pause set configuration
   static async createRestPauseSet(
@@ -589,31 +743,45 @@ export class WorkoutBlockService {
     }
   }
 
-  // Create ladder set configuration
-  static async createLadderSet(
-    blockExerciseId: string,
-    ladderOrder: number,
-    weightKg: number,
-    reps: number,
-    restSeconds: number
-  ): Promise<WorkoutLadderSet | null> {
+
+  // Create HR set configuration (one per exercise)
+  static async createHRSet(
+    blockId: string,
+    exerciseId: string,
+    exerciseOrder: number,
+    hrSetData: Partial<WorkoutHRSet>
+  ): Promise<WorkoutHRSet | null> {
     try {
+      // Build insert object - only include fields that are defined (not undefined)
+      const insertData: any = {
+        block_id: blockId,
+        exercise_id: exerciseId,
+        exercise_order: exerciseOrder,
+        is_intervals: hrSetData.is_intervals ?? false,
+      };
+
+      // Only add fields that are defined (not undefined)
+      if (hrSetData.hr_zone !== undefined) insertData.hr_zone = hrSetData.hr_zone;
+      if (hrSetData.hr_percentage_min !== undefined) insertData.hr_percentage_min = hrSetData.hr_percentage_min;
+      if (hrSetData.hr_percentage_max !== undefined) insertData.hr_percentage_max = hrSetData.hr_percentage_max;
+      if (hrSetData.duration_seconds !== undefined) insertData.duration_seconds = hrSetData.duration_seconds;
+      if (hrSetData.work_duration_seconds !== undefined) insertData.work_duration_seconds = hrSetData.work_duration_seconds;
+      if (hrSetData.rest_duration_seconds !== undefined) insertData.rest_duration_seconds = hrSetData.rest_duration_seconds;
+      if (hrSetData.target_rounds !== undefined) insertData.target_rounds = hrSetData.target_rounds;
+      if (hrSetData.rounds_completed !== undefined) insertData.rounds_completed = hrSetData.rounds_completed;
+      if (hrSetData.distance_meters !== undefined) insertData.distance_meters = hrSetData.distance_meters;
+      if (hrSetData.average_hr_percentage !== undefined) insertData.average_hr_percentage = hrSetData.average_hr_percentage;
+
       const { data, error } = await supabase
-        .from('workout_ladder_sets')
-        .insert({
-          block_exercise_id: blockExerciseId,
-          ladder_order: ladderOrder,
-          weight_kg: weightKg,
-          reps: reps,
-          rest_seconds: restSeconds
-        })
+        .from('workout_hr_sets')
+        .insert(insertData)
         .select()
         .single()
 
       if (error) throw error
       return data
     } catch (error) {
-      console.error('Error creating ladder set:', error)
+      console.error('Error creating HR set:', error)
       return null
     }
   }
@@ -646,9 +814,9 @@ export class WorkoutBlockService {
     await supabase.from('workout_drop_sets').delete().eq('block_id', blockId);
     await supabase.from('workout_cluster_sets').delete().eq('block_id', blockId);
     await supabase.from('workout_rest_pause_sets').delete().eq('block_id', blockId);
-    await supabase.from('workout_pyramid_sets').delete().eq('block_id', blockId);
-    await supabase.from('workout_ladder_sets').delete().eq('block_id', blockId);
     await supabase.from('workout_time_protocols').delete().eq('block_id', blockId);
+    await supabase.from('workout_hr_sets').delete().eq('block_id', blockId);
+    // REMOVED: workout_pyramid_sets and workout_ladder_sets (deprecated block types)
   }
 
   // Delete workout block (and all related special table data)
@@ -773,19 +941,6 @@ export class WorkoutBlockService {
         supportsClusterSets: false,
         supportsPyramidSets: false,
         supportsRestPause: true,
-        supportsLadder: false
-      },
-      pyramid_set: {
-        name: 'Pyramid Set',
-        description: 'Progressive weight/rep schemes',
-        icon: '🔺',
-        color: 'green',
-        requiresMultipleExercises: false,
-        supportsTimeProtocols: false,
-        supportsDropSets: false,
-        supportsClusterSets: false,
-        supportsPyramidSets: true,
-        supportsRestPause: false,
         supportsLadder: false
       },
       pre_exhaustion: {

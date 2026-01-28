@@ -343,15 +343,15 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
     return (
       <div className={`min-h-screen ${theme.background}`}>
         <div className="animate-pulse">
-          <div className="h-64 bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className={`${theme.card} rounded-2xl p-6`}>
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+              <div className="fc-glass fc-card rounded-2xl p-6">
+                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
                 </div>
               </div>
             </div>
@@ -378,15 +378,15 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
               <Button
                 variant="ghost"
                 onClick={() => router.push('/coach')}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all duration-200"
+                className="fc-btn fc-btn-ghost h-10 w-10"
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className={`text-2xl sm:text-3xl font-bold ${theme.text} mb-1 sm:mb-2`}>
+                <h1 className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] mb-1 sm:mb-2">
                   Workout Templates 🏋️
                 </h1>
-                <p className={`text-base sm:text-lg ${theme.textSecondary}`}>
+                <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)]">
                   Create and manage professional workout templates for your clients
                 </p>
               </div>
@@ -396,7 +396,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
               <Button
                 variant="outline"
                 onClick={loadTemplates}
-                className="flex items-center gap-2 rounded-xl border-2 hover:border-blue-300 transition-all duration-200"
+                className="fc-btn fc-btn-ghost flex items-center gap-2"
                 size="sm"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -404,7 +404,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
               </Button>
               <Button
                 onClick={() => setShowCreateForm(true)}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex-1 sm:flex-none"
+                className="fc-btn fc-btn-primary flex items-center gap-2 flex-1 sm:flex-none"
                 size="sm"
               >
                 <Plus className="w-4 h-4" />
@@ -416,66 +416,66 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
 
           {/* Stats Overview */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-blue-300 transition-all duration-300 hover:scale-105`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                    <Dumbbell className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
+                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                    <Dumbbell className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
                   </div>
                   <div className="min-w-0">
-                    <p className={`text-lg sm:text-2xl font-bold ${theme.text}`}>{templates.length}</p>
-                    <p className={`text-xs sm:text-sm ${theme.textSecondary} truncate`}>Templates</p>
+                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{templates.length}</p>
+                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Templates</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-green-300 transition-all duration-300 hover:scale-105`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
-                    <Users className="w-4 h-4 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
+                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                    <Users className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
                   </div>
                   <div className="min-w-0">
-                    <p className={`text-lg sm:text-2xl font-bold ${theme.text}`}>
+                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       {templates.reduce((sum, t) => sum + (t.usage_count || 0), 0)}
                     </p>
-                    <p className={`text-xs sm:text-sm ${theme.textSecondary} truncate`}>Assignments</p>
+                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Assignments</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-purple-300 transition-all duration-300 hover:scale-105`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
-                    <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
+                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                    <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
                   </div>
                   <div className="min-w-0">
-                    <p className={`text-lg sm:text-2xl font-bold ${theme.text}`}>
+                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       {Math.round(templates.reduce((sum, t) => sum + t.estimated_duration, 0) / templates.length) || 0}
                     </p>
-                    <p className={`text-xs sm:text-sm ${theme.textSecondary} truncate`}>Avg Duration</p>
+                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Avg Duration</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-orange-300 transition-all duration-300 hover:scale-105`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
-                    <Star className="w-4 h-4 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400" />
+                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                    <Star className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
                   </div>
                   <div className="min-w-0">
-                    <p className={`text-lg sm:text-2xl font-bold ${theme.text}`}>
+                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       {templates.length > 0 
                         ? (templates.reduce((sum, t) => sum + (t.rating || 0), 0) / templates.length).toFixed(1)
                         : '0.0'
                       }
                     </p>
-                    <p className={`text-xs sm:text-sm ${theme.textSecondary} truncate`}>Avg Rating</p>
+                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Avg Rating</p>
                   </div>
                 </div>
               </CardContent>
@@ -488,24 +488,24 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
           {/* Enhanced Search and Filters */}
-          <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
             <CardContent className="p-4 sm:p-6">
               <div className="space-y-4 sm:space-y-6">
                 {/* Search Bar */}
                 <div className="relative">
-                  <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-5 sm:h-5" />
+                  <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-[color:var(--fc-text-subtle)] w-4 h-4 sm:w-5 sm:h-5" />
                   <Input
                     placeholder="Search templates..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 sm:pl-12 h-10 sm:h-12 rounded-xl border-2 text-base sm:text-lg focus:border-blue-500 transition-all duration-200"
+                    className="fc-input pl-10 sm:pl-12 h-10 sm:h-12 text-base sm:text-lg"
                   />
                 </div>
 
                 {/* Filters - Mobile First */}
                 <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
                   <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 focus:border-blue-500 transition-all duration-200">
+                  <SelectTrigger className="fc-select h-10 sm:h-12">
                       <SelectValue placeholder="Category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -525,7 +525,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                   </Select>
 
                   <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-                    <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 focus:border-blue-500 transition-all duration-200">
+                  <SelectTrigger className="fc-select h-10 sm:h-12">
                       <SelectValue placeholder="Difficulty" />
                     </SelectTrigger>
                     <SelectContent>
@@ -552,7 +552,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                   </Select>
 
                   <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-                    <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 focus:border-blue-500 transition-all duration-200">
+                    <SelectTrigger className="fc-select h-10 sm:h-12">
                       <SelectValue placeholder="Duration" />
                     </SelectTrigger>
                     <SelectContent>
@@ -570,7 +570,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
 
                   <div className="flex gap-2">
                     <Select value={sortBy} onValueChange={(value: 'name' | 'created' | 'usage' | 'rating' | 'duration') => setSortBy(value)}>
-                      <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 flex-1 focus:border-blue-500 transition-all duration-200">
+                      <SelectTrigger className="fc-select h-10 sm:h-12 flex-1">
                         <SelectValue placeholder="Sort by" />
                       </SelectTrigger>
                       <SelectContent>
@@ -584,7 +584,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                     <Button
                       variant="outline"
                       onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                      className="h-10 sm:h-12 px-3 rounded-xl border-2 hover:border-blue-300 transition-all duration-200"
+                      className="fc-btn fc-btn-ghost h-10 sm:h-12 px-3"
                     >
                       {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
                     </Button>
@@ -594,12 +594,12 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                 {/* View Controls and Selection */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm ${theme.textSecondary}`}>View:</span>
+                    <span className="text-sm text-[color:var(--fc-text-dim)]">View:</span>
                     <Button
                       variant={viewMode === 'grid' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setViewMode('grid')}
-                      className="rounded-xl"
+                      className={viewMode === 'grid' ? 'fc-btn fc-btn-primary' : 'fc-btn fc-btn-ghost'}
                     >
                       <Grid3X3 className="w-4 h-4" />
                     </Button>
@@ -607,7 +607,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                       variant={viewMode === 'list' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setViewMode('list')}
-                      className="rounded-xl"
+                      className={viewMode === 'list' ? 'fc-btn fc-btn-primary' : 'fc-btn fc-btn-ghost'}
                     >
                       <List className="w-4 h-4" />
                     </Button>
@@ -616,13 +616,13 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                   <div className="flex items-center gap-2">
                     {selectedTemplates.size > 0 && (
                       <>
-                        <span className={`text-sm ${theme.textSecondary}`}>
+                        <span className="text-sm text-[color:var(--fc-text-dim)]">
                           {selectedTemplates.size} selected
                         </span>
-                        <Button variant="outline" size="sm" onClick={clearSelection} className="rounded-xl">
+                        <Button variant="outline" size="sm" onClick={clearSelection} className="fc-btn fc-btn-ghost">
                           Clear
                         </Button>
-                        <Button variant="outline" size="sm" onClick={selectAllTemplates} className="rounded-xl">
+                        <Button variant="outline" size="sm" onClick={selectAllTemplates} className="fc-btn fc-btn-ghost">
                           Select All
                         </Button>
                       </>
@@ -642,13 +642,13 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                 return (
                   <Card 
                     key={template.id} 
-                    className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-xl transition-all duration-300 cursor-pointer group ${
-                      isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 scale-105' : 'hover:border-slate-300 dark:hover:border-slate-600 hover:scale-105'
+                    className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] transition-all duration-300 cursor-pointer group ${
+                      isSelected ? 'border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-glass-soft)] scale-105' : 'hover:border-[color:var(--fc-glass-border-strong)] hover:scale-105'
                     }`}
                     onClick={() => toggleTemplateSelection(template.id)}
                   >
                     {/* Template Header */}
-                    <div className="relative h-24 sm:h-32 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-t-2xl overflow-hidden">
+                    <div className="relative h-24 sm:h-32 bg-gradient-to-br from-[color:var(--fc-glass-soft)] to-[color:var(--fc-glass-base)] rounded-t-2xl overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20"></div>
                       
                       {/* Category Color Indicator */}
@@ -675,7 +675,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
 
                       {/* Duration */}
                       <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3">
-                        <div className="flex items-center gap-1 px-2 py-1 bg-white/90 dark:bg-slate-800/90 rounded-lg shadow-sm">
+                        <div className="flex items-center gap-1 px-2 py-1 bg-[color:var(--fc-glass-base)] rounded-lg shadow-sm border border-[color:var(--fc-glass-border)]">
                           <Clock className="w-3 h-3" />
                           <span className="text-xs font-medium">{template.estimated_duration}m</span>
                         </div>
@@ -686,12 +686,12 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                       {/* Template Name and Category */}
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <h3 className={`font-semibold ${theme.text} text-base sm:text-lg mb-1 truncate`}>
+                          <h3 className="font-semibold text-[color:var(--fc-text-primary)] text-base sm:text-lg mb-1 truncate">
                             {template.name}
                           </h3>
                           <div className="flex items-center gap-2">
-                            <Dumbbell className="w-3 h-3 sm:w-4 sm:h-4 text-slate-400 flex-shrink-0" />
-                            <span className={`text-xs sm:text-sm ${theme.textSecondary} truncate`}>
+                            <Dumbbell className="w-3 h-3 sm:w-4 sm:h-4 text-[color:var(--fc-text-subtle)] flex-shrink-0" />
+                            <span className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">
                               {template.category?.name || 'Uncategorized'}
                             </span>
                           </div>
@@ -700,13 +700,13 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
 
                       {/* Description */}
                       {template.description && (
-                        <p className={`text-xs sm:text-sm ${theme.textSecondary} line-clamp-2`}>
+                        <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] line-clamp-2">
                           {template.description}
                         </p>
                       )}
 
                       {/* Stats */}
-                      <div className="flex items-center justify-between text-xs text-slate-500">
+                      <div className="flex items-center justify-between text-xs text-[color:var(--fc-text-subtle)]">
                         <div className="flex items-center gap-1">
                           <Dumbbell className="w-3 h-3" />
                           <span>{template.exercise_count || 0}</span>
@@ -722,7 +722,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                       </div>
 
                       {/* Quick Actions */}
-                      <div className="flex items-center gap-1 sm:gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-1 sm:gap-2 pt-2 border-t border-[color:var(--fc-glass-border)]">
                         <Button
                           variant="outline"
                           size="sm"
@@ -731,7 +731,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                             setSelectedTemplateForDetail(template)
                             setShowDetailModal(true)
                           }}
-                          className="flex-1 text-xs sm:text-sm rounded-xl"
+                          className="flex-1 text-xs sm:text-sm fc-btn fc-btn-ghost"
                         >
                           <Play className="w-3 h-3 mr-1" />
                           <span className="hidden sm:inline">View</span>
@@ -744,7 +744,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                             setEditingTemplate(template)
                             setShowCreateForm(true)
                           }}
-                          className="text-blue-600 hover:text-blue-700 rounded-xl p-2"
+                          className="fc-btn fc-btn-ghost text-[color:var(--fc-accent-cyan)] p-2"
                         >
                           <Edit className="w-3 h-3" />
                         </Button>
@@ -755,7 +755,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                             e.stopPropagation()
                             duplicateTemplate(template)
                           }}
-                          className="text-green-600 hover:text-green-700 rounded-xl p-2"
+                          className="fc-btn fc-btn-ghost text-[color:var(--fc-status-success)] p-2"
                         >
                           <Copy className="w-3 h-3" />
                         </Button>
@@ -784,18 +784,18 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                 return (
                   <Card 
                     key={template.id} 
-                    className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-xl transition-all duration-300 cursor-pointer group ${
-                      isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' : 'hover:border-slate-300 dark:hover:border-slate-600'
+                    className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] transition-all duration-300 cursor-pointer group ${
+                      isSelected ? 'border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-glass-soft)]' : 'hover:border-[color:var(--fc-glass-border-strong)]'
                     }`}
                     onClick={() => toggleTemplateSelection(template.id)}
                   >
                     <CardContent className="p-4 sm:p-6">
                       <div className="flex items-center gap-3 sm:gap-4">
                         {/* Template Image */}
-                        <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl overflow-hidden flex-shrink-0">
+                        <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-[color:var(--fc-glass-soft)] to-[color:var(--fc-glass-base)] rounded-xl overflow-hidden flex-shrink-0">
                           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20"></div>
                           <div className="w-full h-full flex items-center justify-center">
-                            <Dumbbell className="w-6 h-6 sm:w-8 sm:h-8 text-slate-400" />
+                            <Dumbbell className="w-6 h-6 sm:w-8 sm:h-8 text-[color:var(--fc-text-subtle)]" />
                           </div>
                           {template.category && (
                             <div 
@@ -809,17 +809,17 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1 min-w-0">
-                              <h3 className={`font-semibold ${theme.text} text-base sm:text-lg mb-1 truncate`}>
+                              <h3 className="font-semibold text-[color:var(--fc-text-primary)] text-base sm:text-lg mb-1 truncate">
                                 {template.name}
                               </h3>
                               <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <span className={`text-xs sm:text-sm ${theme.textSecondary}`}>
+                                <span className="text-xs sm:text-sm text-[color:var(--fc-text-dim)]">
                                   {template.category?.name || 'Uncategorized'}
                                 </span>
                                 <Badge className={`${difficultyColors[template.difficulty_level as keyof typeof difficultyColors]} border-0 text-xs px-2 py-1`}>
                                   {difficultyLabels[template.difficulty_level as keyof typeof difficultyLabels]}
                                 </Badge>
-                                <div className="flex items-center gap-1 text-xs text-slate-500">
+                                <div className="flex items-center gap-1 text-xs text-[color:var(--fc-text-subtle)]">
                                   <Clock className="w-3 h-3" />
                                   <span>{template.estimated_duration}m</span>
                                 </div>
@@ -833,12 +833,12 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                           </div>
 
                           {template.description && (
-                            <p className={`text-xs sm:text-sm ${theme.textSecondary} mb-3 line-clamp-2`}>
+                            <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mb-3 line-clamp-2">
                               {template.description}
                             </p>
                           )}
 
-                          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-slate-500">
+                          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-[color:var(--fc-text-subtle)]">
                             <span>{template.exercise_count || 0} exercises</span>
                             <div className="flex items-center gap-1">
                               <Users className="w-3 h-3" />
@@ -862,7 +862,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                               setSelectedTemplateForAssignment(template)
                               setShowAssignmentModal(true)
                             }}
-                            className="rounded-xl p-2"
+                            className="fc-btn fc-btn-ghost p-2"
                           >
                             <UserPlus className="w-3 h-3 sm:w-4 sm:h-4" />
                           </Button>
@@ -874,7 +874,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                               setSelectedTemplateForDetail(template)
                               setShowDetailModal(true)
                             }}
-                            className="rounded-xl p-2"
+                            className="fc-btn fc-btn-ghost p-2"
                           >
                             <Play className="w-3 h-3 sm:w-4 sm:h-4" />
                           </Button>
@@ -886,7 +886,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                               setEditingTemplate(template)
                               setShowCreateForm(true)
                             }}
-                            className="rounded-xl p-2"
+                            className="fc-btn fc-btn-ghost p-2"
                           >
                             <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                           </Button>
@@ -897,7 +897,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                               e.stopPropagation()
                               duplicateTemplate(template)
                             }}
-                            className="text-green-600 hover:text-green-700 rounded-xl p-2"
+                            className="fc-btn fc-btn-ghost text-[color:var(--fc-status-success)] p-2"
                           >
                             <Copy className="w-3 h-3 sm:w-4 sm:h-4" />
                           </Button>
@@ -908,7 +908,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                               e.stopPropagation()
                               deleteTemplate(template.id)
                             }}
-                            className="text-red-600 hover:text-red-700 rounded-xl p-2"
+                            className="fc-btn fc-btn-ghost text-[color:var(--fc-status-error)] p-2"
                           >
                             <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                           </Button>
@@ -923,18 +923,18 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
 
           {/* Empty State */}
           {filteredAndSortedTemplates.length === 0 && (
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
               <CardContent className="text-center py-12 sm:py-16">
                 <div className="relative">
-                  <Dumbbell className="w-16 h-16 sm:w-20 sm:h-20 text-slate-400 mx-auto mb-6" />
+                  <Dumbbell className="w-16 h-16 sm:w-20 sm:h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />
                   <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                     <Plus className="w-3 h-3 text-white" />
                   </div>
                 </div>
-                <h3 className={`text-xl sm:text-2xl font-semibold ${theme.text} mb-3`}>
+                <h3 className="text-xl sm:text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-3">
                   {templates.length === 0 ? 'No templates yet' : 'No templates found'}
                 </h3>
-                <p className={`text-base sm:text-lg ${theme.textSecondary} mb-8 max-w-md mx-auto`}>
+                <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)] mb-8 max-w-md mx-auto">
                   {templates.length === 0 
                     ? 'Start creating professional workout templates for your clients with comprehensive exercise programming.'
                     : 'Try adjusting your search or filter criteria to find the templates you\'re looking for.'
@@ -942,7 +942,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                 </p>
                 <Button 
                   onClick={() => setShowCreateForm(true)}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="fc-btn fc-btn-primary"
                 >
                   <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   <span className="sm:hidden">Create</span>
@@ -956,7 +956,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
           <div className="fixed bottom-6 right-6 z-50">
             <Button
               onClick={() => setShowCreateForm(true)}
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110"
+              className="fc-btn fc-btn-primary w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-2xl transition-all duration-300 hover:scale-110"
             >
               <Plus className="w-6 h-6 sm:w-7 sm:h-7" />
             </Button>

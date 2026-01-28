@@ -75,7 +75,7 @@ export function AchievementUnlockModal({
 
       {/* Modal content */}
       <div
-        className="relative max-w-md w-full rounded-3xl p-8 text-center"
+        className="relative max-w-md w-full rounded-3xl p-8 text-center fc-glass fc-card"
         style={{
           background: isDark
             ? "rgba(28, 28, 30, 0.95)"

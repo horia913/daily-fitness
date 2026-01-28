@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { useTheme } from "@/contexts/ThemeContext";
 import { GlassCard } from "@/components/ui/GlassCard";
 import {
   ArrowLeft,
@@ -22,8 +21,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationTriggers from "@/lib/notificationTriggers";
-import { WorkoutBlockService } from "@/lib/workoutBlockService";
 import { PersonalRecordsService } from "@/lib/progressTrackingService";
+import { fetchApi } from "@/lib/apiClient";
 
 interface WorkoutAssignment {
   id: string;
@@ -117,10 +116,12 @@ interface BlockGroup {
 export default function WorkoutComplete() {
   const params = useParams();
   const router = useRouter();
-  const { isDark } = useTheme();
   const assignmentId = params.id as string;
 
   const [assignment, setAssignment] = useState<WorkoutAssignment | null>(null);
+  const [resolvedAssignmentId, setResolvedAssignmentId] = useState<string | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [workoutLog, setWorkoutLog] = useState<any>(null);
@@ -135,6 +136,12 @@ export default function WorkoutComplete() {
   const [workoutLogIdForSummary, setWorkoutLogIdForSummary] = useState<
     string | null
   >(null);
+  const [workoutLogIdOverride, setWorkoutLogIdOverride] = useState<string | null>(
+    null
+  );
+  const [workoutSessionIdOverride, setWorkoutSessionIdOverride] = useState<
+    string | null
+  >(null);
   const [personalRecords, setPersonalRecords] = useState<any[]>([]);
   const [nextWorkout, setNextWorkout] = useState<any | null>(null);
 
@@ -143,7 +150,10 @@ export default function WorkoutComplete() {
       loadAssignment()
         .then(async (assignmentData: WorkoutAssignment | null) => {
           if (assignmentData) {
-            await updateWorkoutTotals(assignmentData.workout_template_id);
+            await updateWorkoutTotals(
+              assignmentData.workout_template_id,
+              assignmentData.id
+            );
           }
         })
         .catch((error) => {
@@ -152,8 +162,43 @@ export default function WorkoutComplete() {
     }
   }, [assignmentId]);
 
-  const updateWorkoutTotals = async (templateId: string | null = null) => {
-    if (!assignmentId) return;
+  useEffect(() => {
+    const storedWorkoutLogId = localStorage.getItem("workoutLogIdForComplete");
+    if (storedWorkoutLogId) {
+      setWorkoutLogIdOverride(storedWorkoutLogId);
+      localStorage.removeItem("workoutLogIdForComplete");
+    }
+    const storedWorkoutSessionId = localStorage.getItem(
+      "workoutSessionIdForComplete"
+    );
+    if (storedWorkoutSessionId) {
+      setWorkoutSessionIdOverride(storedWorkoutSessionId);
+      localStorage.removeItem("workoutSessionIdForComplete");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (workoutLogIdOverride) {
+      updateWorkoutTotals(
+        assignment?.workout_template_id || null,
+        assignment?.id || null,
+        workoutLogIdOverride
+      ).catch((error) => {
+        console.error("Error loading workout totals from workout_log_id:", error);
+      });
+    }
+  }, [workoutLogIdOverride, assignment]);
+
+  const updateWorkoutTotals = async (
+    templateId: string | null = null,
+    assignmentIdOverride: string | null = null,
+    workoutLogIdOverrideParam: string | null = null
+  ) => {
+    const effectiveAssignmentId =
+      assignmentIdOverride || resolvedAssignmentId || assignment?.id || null;
+    const effectiveWorkoutLogId =
+      workoutLogIdOverrideParam || workoutLogIdOverride || null;
+    if (!effectiveAssignmentId && !effectiveWorkoutLogId) return;
 
     try {
       const {
@@ -164,35 +209,61 @@ export default function WorkoutComplete() {
         return;
       }
 
-      // Find workout_log_id - first try completed, then active
+      // Find workout_log_id - prefer explicit workout_log_id override
       let workoutLog = null;
-      const { data: completedLog } = await supabase
-        .from("workout_logs")
-        .select(
-          "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
-        )
-        .eq("workout_assignment_id", assignmentId)
-        .eq("client_id", user.id)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (completedLog) {
-        workoutLog = completedLog;
-      } else {
-        const { data: activeLog } = await supabase
+      if (effectiveWorkoutLogId) {
+        const { data: logById } = await supabase
           .from("workout_logs")
           .select(
             "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
           )
-          .eq("workout_assignment_id", assignmentId)
+          .eq("id", effectiveWorkoutLogId)
           .eq("client_id", user.id)
-          .is("completed_at", null)
-          .order("started_at", { ascending: false })
+          .maybeSingle();
+        workoutLog = logById;
+      }
+
+      if (!workoutLog && workoutSessionIdOverride) {
+        const { data: logBySession } = await supabase
+          .from("workout_logs")
+          .select(
+            "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
+          )
+          .eq("workout_session_id", workoutSessionIdOverride)
+          .eq("client_id", user.id)
+          .maybeSingle();
+        workoutLog = logBySession;
+      }
+
+      if (!workoutLog && effectiveAssignmentId) {
+        const { data: completedLog } = await supabase
+          .from("workout_logs")
+          .select(
+            "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
+          )
+          .eq("workout_assignment_id", effectiveAssignmentId)
+          .eq("client_id", user.id)
+          .not("completed_at", "is", null)
+          .order("completed_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        workoutLog = activeLog;
+
+        if (completedLog) {
+          workoutLog = completedLog;
+        } else {
+          const { data: activeLog } = await supabase
+            .from("workout_logs")
+            .select(
+              "id, started_at, completed_at, total_duration_minutes, total_sets_completed, total_reps_completed, total_weight_lifted"
+            )
+            .eq("workout_assignment_id", effectiveAssignmentId)
+            .eq("client_id", user.id)
+            .is("completed_at", null)
+            .order("started_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          workoutLog = activeLog;
+        }
       }
 
       let workoutLogId = workoutLog?.id;
@@ -201,13 +272,13 @@ export default function WorkoutComplete() {
         setWorkoutLogIdForSummary(workoutLogId);
       }
 
-      if (!workoutLogId) {
-        const { data: newLog, error: createError } = await supabase
+      if (!workoutLogId && effectiveAssignmentId) {
+          const { data: newLog, error: createError } = await supabase
           .from("workout_logs")
           .insert([
             {
               client_id: user.id,
-              workout_assignment_id: assignmentId,
+                workout_assignment_id: effectiveAssignmentId,
               started_at: new Date().toISOString(),
               completed_at: null,
             },
@@ -231,11 +302,8 @@ export default function WorkoutComplete() {
             totalWeight: workoutLog.total_weight_lifted || 0,
           });
           setWorkoutLog(workoutLog);
-          await loadBlocksAndSets(
-            workoutLogId,
-            templateId || assignment?.workout_template_id || null,
-            user.id
-          );
+          await loadBlocksAndSets(workoutLogId, user.id);
+              await loadBlocksAndSets(workoutLogId, user.id);
         } else {
           // Complete the workout
           const storedDuration = localStorage.getItem("workoutDurationMinutes");
@@ -243,7 +311,7 @@ export default function WorkoutComplete() {
             ? parseInt(storedDuration, 10)
             : undefined;
 
-          const completeResponse = await fetch("/api/complete-workout", {
+          const completeResponse = await fetchApi("/api/complete-workout", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -283,11 +351,7 @@ export default function WorkoutComplete() {
               setWorkoutLog(updatedLog);
 
               // Load blocks and sets
-              await loadBlocksAndSets(
-                workoutLogId,
-                assignment?.workout_template_id || null,
-                user.id
-              );
+              await loadBlocksAndSets(workoutLogId, user.id);
 
               // Fetch personal records for this workout (optional)
               try {
@@ -346,32 +410,9 @@ export default function WorkoutComplete() {
     }
   };
 
-  const loadBlocksAndSets = async (
-    workoutLogId: string,
-    templateId: string | null,
-    userId: string
-  ) => {
-    if (!templateId) {
-      console.warn("⚠️ No template_id available, cannot load blocks and sets");
-      return;
-    }
-
+  const loadBlocksAndSets = async (workoutLogId: string, userId: string) => {
     try {
-      console.log(
-        "📊 Loading blocks and sets for workout_log_id:",
-        workoutLogId,
-        "template_id:",
-        templateId
-      );
-      // Get all blocks from template with full exercise data
-      // Use WorkoutBlockService to get complete block data including exercises
-      const templateBlocks = await WorkoutBlockService.getWorkoutBlocks(templateId);
-
-      if (!templateBlocks || templateBlocks.length === 0) {
-        console.error("Error: No blocks found for template");
-        return;
-      }
-
+      console.log("📊 Loading blocks and sets for workout_log_id:", workoutLogId);
       // Get all set logs with special columns
       const { data: sets, error: setsError } = await supabase
         .from("workout_set_logs")
@@ -465,39 +506,25 @@ export default function WorkoutComplete() {
         exerciseMap.set(ex.id, ex.name);
       });
 
-      // Group sets by block and populate exercise names from template
+      // Group sets by block using workout_set_logs only
       const blocksMap = new Map<string, BlockGroup>();
-
-      templateBlocks?.forEach((block) => {
-        // Initialize exercise names map from template exercises
-        const templateExerciseNames = new Map<string, string>();
-        
-        // Add exercise names from template block exercises (for all block types)
-        if (block.exercises && Array.isArray(block.exercises)) {
-          block.exercises.forEach((ex: any) => {
-            if (ex.exercise_id && ex.exercise?.name) {
-              templateExerciseNames.set(ex.exercise_id, ex.exercise.name);
-            }
-            // For giant_set, superset, pre_exhaustion - each exercise has exercise_letter
-            // For time-based blocks (tabata, amrap, etc.) - exercises come from time_protocols
-          });
-        }
-        
-        blocksMap.set(block.id, {
-          block_id: block.id,
-          block_type: block.block_type || "straight_set",
-          block_name: block.block_name || `Block ${block.block_order}`,
-          block_order: block.block_order || 0,
-          sets: [],
-          exerciseNames: templateExerciseNames, // Initialize with template exercise names
-          templateBlock: block, // Store full template block data for displaying exercises when no sets logged
-        });
-      });
 
       sets?.forEach((set: any) => {
         if (!set.block_id) return;
-        const blockGroup = blocksMap.get(set.block_id);
-        if (!blockGroup) return;
+        let blockGroup = blocksMap.get(set.block_id);
+        if (!blockGroup) {
+          const fallbackOrder = blocksMap.size + 1;
+          blockGroup = {
+            block_id: set.block_id,
+            block_type: set.block_type || "straight_set",
+            block_name: `Block ${fallbackOrder}`,
+            block_order: fallbackOrder,
+            sets: [],
+            exerciseNames: new Map<string, string>(),
+            templateBlock: undefined,
+          };
+          blocksMap.set(set.block_id, blockGroup);
+        }
 
         blockGroup.sets.push(set as WorkoutSetLog);
         
@@ -596,6 +623,54 @@ export default function WorkoutComplete() {
     }
   };
 
+  const resolveWorkoutAssignmentId = async (
+    inputId: string,
+    userId: string
+  ): Promise<string | null> => {
+    try {
+      // TASK B: Support program_day_assignments.id
+      // First check if inputId is a program_day_assignments.id
+      const { data: programDayAssignment } = await supabase
+        .from("program_day_assignments")
+        .select("id, workout_assignment_id, program_assignment_id")
+        .eq("id", inputId)
+        .maybeSingle();
+
+      if (programDayAssignment) {
+        // Verify ownership through program_assignment
+        const { data: programAssignment } = await supabase
+          .from("program_assignments")
+          .select("id, client_id")
+          .eq("id", programDayAssignment.program_assignment_id)
+          .eq("client_id", userId)
+          .maybeSingle();
+
+        if (programAssignment && programDayAssignment.workout_assignment_id) {
+          return programDayAssignment.workout_assignment_id;
+        }
+      }
+
+      // Check if it's a workout_assignments.id
+      const { data: workoutAssignment } = await supabase
+        .from("workout_assignments")
+        .select("id")
+        .eq("id", inputId)
+        .eq("client_id", userId)
+        .maybeSingle();
+
+      if (workoutAssignment) {
+        return workoutAssignment.id;
+      }
+
+      // TASK 3: No legacy fallbacks - only support program_day_assignments.id and workout_assignments.id
+
+      return null;
+    } catch (error) {
+      console.warn("Error resolving workout assignment id:", error);
+      return null;
+    }
+  };
+
   const loadAssignment = async (): Promise<WorkoutAssignment | null> => {
     try {
       const {
@@ -603,10 +678,21 @@ export default function WorkoutComplete() {
       } = await supabase.auth.getUser();
       if (!user) return null;
 
+      const actualAssignmentId = await resolveWorkoutAssignmentId(
+        assignmentId,
+        user.id
+      );
+
+      if (!actualAssignmentId) {
+        throw new Error("Workout assignment not found");
+      }
+
+      setResolvedAssignmentId(actualAssignmentId);
+
       const { data: assignmentData, error: assignmentError } = await supabase
         .from("workout_assignments")
         .select("*")
-        .eq("id", assignmentId)
+        .eq("id", actualAssignmentId)
         .eq("client_id", user.id)
         .maybeSingle();
 
@@ -624,7 +710,8 @@ export default function WorkoutComplete() {
   };
 
   const markWorkoutComplete = async () => {
-    if (!assignment) return;
+    const targetAssignmentId = assignment?.id || resolvedAssignmentId || null;
+    if (!assignment || !targetAssignmentId) return;
 
     setCompleting(true);
     try {
@@ -637,16 +724,58 @@ export default function WorkoutComplete() {
         throw new Error("User not authenticated");
       }
 
-      const { error } = await supabase
+      // TASK C: Update workout_assignments.status to 'completed'
+      const { error: assignmentUpdateError } = await supabase
         .from("workout_assignments")
         .update({
           status: "completed",
         })
-        .eq("id", assignmentId);
+        .eq("id", targetAssignmentId);
 
-      if (error) {
-        console.error("❌ Error updating assignment status:", error);
-        throw error;
+      if (assignmentUpdateError) {
+        console.error("❌ Error updating assignment status:", assignmentUpdateError);
+        throw assignmentUpdateError;
+      }
+
+      // TASK C: If workout came from program_day_assignments, update it
+      // Find program_day_assignments that references this workout_assignment_id
+      const { data: programDayAssignment, error: programDayError } = await supabase
+        .from("program_day_assignments")
+        .select("id, program_assignment_id")
+        .eq("workout_assignment_id", targetAssignmentId)
+        .maybeSingle();
+
+      if (programDayError) {
+        console.warn("Error checking program_day_assignments:", programDayError);
+      } else if (programDayAssignment) {
+        // Verify this program_assignment belongs to the current user
+        const { data: programAssignment, error: programAssignmentError } = await supabase
+          .from("program_assignments")
+          .select("id, client_id")
+          .eq("id", programDayAssignment.program_assignment_id)
+          .eq("client_id", user.id)
+          .maybeSingle();
+
+        if (programAssignmentError) {
+          console.warn("Error verifying program_assignment ownership:", programAssignmentError);
+        } else if (programAssignment) {
+          // Update program_day_assignments.is_completed and completed_date
+          const today = new Date().toISOString().split("T")[0]; // Date only, not timestamp
+          const { error: programDayUpdateError } = await supabase
+            .from("program_day_assignments")
+            .update({
+              is_completed: true,
+              completed_date: today,
+            })
+            .eq("id", programDayAssignment.id);
+
+          if (programDayUpdateError) {
+            console.error("❌ Error updating program_day_assignments:", programDayUpdateError);
+            // Don't throw - workout_assignments is already updated, this is secondary
+          } else {
+            console.log("✅ Updated program_day_assignments completion:", programDayAssignment.id);
+          }
+        }
       }
 
       if (assignment.name) {
@@ -711,13 +840,13 @@ export default function WorkoutComplete() {
               {set.amrap_total_reps || set.reps || 0} reps
             </span>
             {set.amrap_target_reps && (
-              <span className="text-gray-600 ml-2">
+              <span className="ml-2 text-[color:var(--fc-text-dim)]">
                 (target: {set.amrap_target_reps} reps)
               </span>
             )}
             {set.amrap_duration_seconds !== null &&
               set.amrap_duration_seconds !== undefined && (
-                <span className="text-gray-600 ml-2">
+                <span className="ml-2 text-[color:var(--fc-text-dim)]">
                   (completed in {set.amrap_duration_seconds} sec)
                 </span>
               )}
@@ -725,6 +854,7 @@ export default function WorkoutComplete() {
         );
 
       case "for_time":
+      case "fortime":
         const fortimeExerciseName = set.exercise_id
           ? exerciseNames.get(set.exercise_id) || "Exercise"
           : "Exercise";
@@ -735,13 +865,13 @@ export default function WorkoutComplete() {
               {set.fortime_total_reps || set.reps || 0} reps
             </span>
             {set.fortime_target_reps && (
-              <span className="text-gray-600 ml-2">
+              <span className="ml-2 text-[color:var(--fc-text-dim)]">
                 (target: {set.fortime_target_reps} reps)
               </span>
             )}
             {set.fortime_time_taken_sec !== null &&
               set.fortime_time_taken_sec !== undefined && (
-                <span className="text-gray-600 ml-2">
+                <span className="ml-2 text-[color:var(--fc-text-dim)]">
                   (completed in {Math.floor(set.fortime_time_taken_sec / 60)}:{(set.fortime_time_taken_sec % 60).toString().padStart(2, '0')}
                   {set.fortime_time_cap_sec
                     ? ` / cap: ${Math.floor(set.fortime_time_cap_sec / 60)}:${(set.fortime_time_cap_sec % 60).toString().padStart(2, '0')}`
@@ -753,6 +883,7 @@ export default function WorkoutComplete() {
         );
 
       case "drop_set":
+      case "dropset":
         const dropsetExerciseName = set.exercise_id
           ? exerciseNames.get(set.exercise_id) || "Exercise"
           : "Exercise";
@@ -771,11 +902,12 @@ export default function WorkoutComplete() {
                     {set.dropset_final_weight} kg ×{" "}
                     {set.dropset_final_reps || 0}
                   </span>
-                  {set.dropset_percentage && (
-                    <span className="text-gray-600 ml-2">
-                      ({set.dropset_percentage}% drop)
-                    </span>
-                  )}
+                  {set.dropset_percentage !== null &&
+                    set.dropset_percentage !== undefined && (
+                      <span className="ml-2 text-[color:var(--fc-text-dim)]">
+                        ({Math.round(set.dropset_percentage)}% drop)
+                      </span>
+                    )}
                 </>
               )}
           </div>
@@ -870,13 +1002,16 @@ export default function WorkoutComplete() {
                     {set.rest_pause_initial_weight || set.weight || 0} kg ×{" "}
                     {set.rest_pause_reps_after} reps
                   </span>
-                  <span className="text-gray-600 ml-2">(after rest-pause #{set.rest_pause_number || 1})</span>
+                  <span className="ml-2 text-[color:var(--fc-text-dim)]">
+                    (after rest-pause #{set.rest_pause_number || 1})
+                  </span>
                 </>
               )}
           </div>
         );
 
       case "pre_exhaustion":
+      case "preexhaust":
         const isolationName = set.preexhaust_isolation_exercise_id
           ? exerciseNames.get(set.preexhaust_isolation_exercise_id)
           : "Isolation";
@@ -909,7 +1044,7 @@ export default function WorkoutComplete() {
               {set.emom_total_reps_this_min || set.reps || 0} reps
             </span>
             {set.emom_total_duration_sec && (
-              <span className="text-gray-600 ml-2">
+              <span className="ml-2 text-[color:var(--fc-text-dim)]">
                 (duration: {Math.floor(set.emom_total_duration_sec / 60)}:{(set.emom_total_duration_sec % 60).toString().padStart(2, '0')})
               </span>
             )}
@@ -926,15 +1061,28 @@ export default function WorkoutComplete() {
               • {tabataExerciseName} - Round {set.set_number || 1}
             </span>
             {set.tabata_rounds_completed && (
-              <span className="text-gray-600 ml-2">
+              <span className="ml-2 text-[color:var(--fc-text-dim)]">
                 ({set.tabata_rounds_completed} rounds completed)
               </span>
             )}
             {set.tabata_total_duration_sec && (
-              <span className="text-gray-600 ml-2">
+              <span className="ml-2 text-[color:var(--fc-text-dim)]">
                 (duration: {Math.floor(set.tabata_total_duration_sec / 60)}:{(set.tabata_total_duration_sec % 60).toString().padStart(2, '0')})
               </span>
             )}
+          </div>
+        );
+
+      case "hr_sets":
+        const hrExerciseName = set.exercise_id
+          ? exerciseNames.get(set.exercise_id) || "Exercise"
+          : "Exercise";
+        return (
+          <div className="text-sm">
+            <span className="font-semibold">
+              • {hrExerciseName} - Set {set.set_number || 1}: {set.weight || 0} kg ×{" "}
+              {set.reps || 0} reps
+            </span>
           </div>
         );
 
@@ -956,7 +1104,7 @@ export default function WorkoutComplete() {
   ) => {
     if (!block.templateBlock) {
       return (
-        <div className="pl-4 border-l-2 border-slate-200 text-sm text-slate-500 italic">
+        <div className="pl-4 border-l-2 border-[color:var(--fc-glass-border)] text-sm text-[color:var(--fc-text-subtle)] italic">
           No template data available for this block.
         </div>
       );
@@ -1029,18 +1177,21 @@ export default function WorkoutComplete() {
         if (setsMap.size > 0) {
           return (
             <div className="space-y-3">
-              <div className="text-sm font-semibold text-slate-700 mb-2">
+              <div className="mb-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
                 Rounds: {rounds}
               </div>
               {Array.from(setsMap.entries()).map(([setNum, setExercises]) => (
-                <div key={setNum} className="pl-4 border-l-2 border-slate-200">
-                  <div className="text-xs font-semibold text-slate-500 mb-1">
+                <div
+                  key={setNum}
+                  className="pl-4 border-l-2 border-[color:var(--fc-glass-border)]"
+                >
+                  <div className="mb-1 text-xs font-semibold text-[color:var(--fc-text-subtle)]">
                     Set {setNum}:
                   </div>
                   {setExercises.map((ex, idx) => (
                     <div key={ex.exerciseId || idx} className="text-sm ml-2 mb-1">
                       <span className="font-medium">{ex.exerciseName}</span>
-                      <span className="ml-2 text-slate-600">
+                      <span className="ml-2 text-[color:var(--fc-text-dim)]">
                         Work: {ex.work_seconds}s • Rest: {ex.rest_seconds}s
                       </span>
                     </div>
@@ -1048,11 +1199,11 @@ export default function WorkoutComplete() {
                 </div>
               ))}
               {restAfterSet && (
-                <div className="text-xs text-slate-500 mt-2">
+                <div className="mt-2 text-xs text-[color:var(--fc-text-subtle)]">
                   Rest after set: {restAfterSet}s
                 </div>
               )}
-              <div className="text-xs text-slate-500 italic mt-2">
+              <div className="mt-2 text-xs italic text-[color:var(--fc-text-subtle)]">
                 (No sets logged for this block)
               </div>
             </div>
@@ -1073,28 +1224,28 @@ export default function WorkoutComplete() {
 
         return (
           <div className="space-y-3">
-            <div className="text-sm font-semibold text-slate-700 mb-2">
+            <div className="mb-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
               Rounds: {rounds}
             </div>
-            <div className="pl-4 border-l-2 border-slate-200">
-              <div className="text-xs font-semibold text-slate-500 mb-1">
+            <div className="pl-4 border-l-2 border-[color:var(--fc-glass-border)]">
+              <div className="mb-1 text-xs font-semibold text-[color:var(--fc-text-subtle)]">
                 Exercises:
               </div>
               {allExercises.map((ex, idx) => (
                 <div key={ex.exerciseId || idx} className="text-sm ml-2 mb-1">
                   <span className="font-medium">{ex.exerciseName}</span>
-                  <span className="ml-2 text-slate-600">
+                  <span className="ml-2 text-[color:var(--fc-text-dim)]">
                     Work: {ex.work_seconds}s • Rest: {ex.rest_seconds}s
                   </span>
                 </div>
               ))}
             </div>
             {restAfterSet && (
-              <div className="text-xs text-slate-500 mt-2">
+              <div className="mt-2 text-xs text-[color:var(--fc-text-subtle)]">
                 Rest after set: {restAfterSet}s
               </div>
             )}
-            <div className="text-xs text-slate-500 italic mt-2">
+            <div className="mt-2 text-xs italic text-[color:var(--fc-text-subtle)]">
               (No sets logged for this block)
             </div>
           </div>
@@ -1103,7 +1254,7 @@ export default function WorkoutComplete() {
 
       // Fallback if no exercise names found
       return (
-        <div className="pl-4 border-l-2 border-slate-200 text-sm text-slate-500 italic">
+        <div className="pl-4 border-l-2 border-[color:var(--fc-glass-border)] text-sm text-[color:var(--fc-text-subtle)] italic">
           No exercises configured for this Tabata block.
         </div>
       );
@@ -1113,7 +1264,7 @@ export default function WorkoutComplete() {
     const exercises = templateBlock.exercises || [];
     if (exercises.length === 0) {
       return (
-        <div className="pl-4 border-l-2 border-slate-200 text-sm text-slate-500 italic">
+        <div className="pl-4 border-l-2 border-[color:var(--fc-glass-border)] text-sm text-[color:var(--fc-text-subtle)] italic">
           No exercises configured for this block.
         </div>
       );
@@ -1124,21 +1275,30 @@ export default function WorkoutComplete() {
         {exercises.map((ex: any, idx: number) => {
           const exerciseName = exerciseNames.get(ex.exercise_id) || "Exercise";
           return (
-            <div key={idx} className="pl-4 border-l-2 border-slate-200 text-sm">
+            <div
+              key={idx}
+              className="pl-4 border-l-2 border-[color:var(--fc-glass-border)] text-sm"
+            >
               <span className="font-semibold">{exerciseName}</span>
               {ex.reps && (
-                <span className="text-slate-600 ml-2">• Reps: {ex.reps}</span>
+                <span className="ml-2 text-[color:var(--fc-text-dim)]">
+                  • Reps: {ex.reps}
+                </span>
               )}
               {ex.load_percentage && (
-                <span className="text-slate-600 ml-2">• Load: {ex.load_percentage}%</span>
+                <span className="ml-2 text-[color:var(--fc-text-dim)]">
+                  • Load: {ex.load_percentage}%
+                </span>
               )}
               {ex.weight_kg && (
-                <span className="text-slate-600 ml-2">• Weight: {ex.weight_kg} kg</span>
+                <span className="ml-2 text-[color:var(--fc-text-dim)]">
+                  • Weight: {ex.weight_kg} kg
+                </span>
               )}
             </div>
           );
         })}
-        <div className="pl-4 border-l-2 border-slate-200 text-xs text-slate-500 italic mt-2">
+        <div className="pl-4 border-l-2 border-[color:var(--fc-glass-border)] mt-2 text-xs italic text-[color:var(--fc-text-subtle)]">
           (No sets logged for this block)
         </div>
       </div>
@@ -1148,16 +1308,19 @@ export default function WorkoutComplete() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="p-4">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <div className="bg-white rounded-lg border border-slate-200 p-6">
-              <div className="animate-pulse">
-                <div className="h-8 bg-slate-200 rounded mb-2"></div>
-                <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-              </div>
+        <AnimatedBackground>
+          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-4xl">
+              <GlassCard elevation={1} className="fc-glass fc-card p-6 sm:p-10">
+                <div className="animate-pulse space-y-4">
+                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-10 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-4 w-3/4 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+                </div>
+              </GlassCard>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -1165,25 +1328,33 @@ export default function WorkoutComplete() {
   if (!assignment) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="p-4">
-          <div className="max-w-7xl mx-auto">
-            <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
-              <h3 className="text-lg font-medium text-slate-800 mb-2">
-                Workout not found
-              </h3>
-              <p className="text-slate-500 mb-6">
-                This workout doesn't exist or you don't have access to it.
-              </p>
-              <Button
-                onClick={() => router.push("/client/workouts")}
-                variant="outline"
+        <AnimatedBackground>
+          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-4xl">
+              <GlassCard
+                elevation={1}
+                className="fc-glass fc-card p-10 text-center"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Workouts
-              </Button>
+                <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                  Workout not found
+                </h3>
+                <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+                  This workout does not exist or you do not have access to it.
+                </p>
+                <div className="mt-6 flex justify-center">
+                  <Button
+                    onClick={() => router.push("/client/workouts")}
+                    variant="outline"
+                    className="fc-btn fc-btn-secondary"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to Workouts
+                  </Button>
+                </div>
+              </GlassCard>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -1215,236 +1386,96 @@ export default function WorkoutComplete() {
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
-        <div
-          className="relative z-10 min-h-screen"
-          style={{ padding: "64px 32px", paddingBottom: "120px" }}
-        >
-          <div
-            style={{
-              maxWidth: "900px",
-              margin: "0 auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: "40px",
-            }}
-          >
-            {/* Header */}
-            <header style={{ textAlign: "center", marginBottom: "32px" }}>
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "8px 19.2px",
-                  background: isDark
-                    ? "rgba(255, 255, 255, 0.1)"
-                    : "rgba(255, 255, 255, 0.4)",
-                  backdropFilter: "blur(10px)",
-                  WebkitBackdropFilter: "blur(10px)",
-                  border: `1px solid ${
-                    isDark ? "rgba(255, 255, 255, 0.125)" : "rgba(255, 255, 255, 0.2)"
-                  }`,
-                  borderRadius: "100px",
-                  fontFamily: "monospace",
-                  fontSize: "12px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  marginBottom: "24px",
-                  color: isDark ? "#FFFFFF" : "#1A1A1A",
-                }}
-              >
-                Session Verified • Complete
-              </span>
-              <h1
-                style={{
-                  fontSize: "clamp(48px, 10vw, 80px)",
-                  fontWeight: 900,
-                  letterSpacing: "-0.04em",
-                  lineHeight: 0.9,
-                  background: "linear-gradient(180deg, #FFFFFF 0%, rgba(255,255,255,0.4) 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  margin: 0,
-                  color: isDark ? "#FFFFFF" : "#1A1A1A",
-                }}
-              >
-                {assignment.name || "Workout"}<br />Complete.
-              </h1>
-            </header>
+        <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
+            <GlassCard elevation={2} className="fc-glass fc-card fc-card-hero p-6 sm:p-10">
+              <div className="flex flex-col items-center text-center gap-4">
+                <span className="fc-badge fc-glass-soft px-3 py-1 text-[color:var(--fc-text-primary)]">
+                  Session verified
+                </span>
+                <h1 className="text-4xl sm:text-6xl font-black tracking-tight bg-[linear-gradient(180deg,var(--fc-text-primary),var(--fc-text-subtle))] text-transparent bg-clip-text">
+                  {assignment.name || "Workout"}
+                  <br />
+                  Complete
+                </h1>
+                <div className="flex flex-wrap items-center justify-center gap-4 text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                  <span className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-[color:var(--fc-status-success)]" />
+                    Session complete
+                  </span>
+                  {completedDate && (
+                    <span className="flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4 text-[color:var(--fc-text-dim)]" />
+                      {formatDate(completedDate)}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
+                    {workoutStats.totalReps} reps
+                  </span>
+                </div>
+              </div>
 
-            {/* Stats Grid */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: "24px",
-              }}
-            >
-              {/* Total Duration */}
-              <GlassCard elevation={1} className="p-8 flex flex-col gap-2">
-                <span
-                  style={{
-                    fontSize: "12px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    fontWeight: 700,
-                  }}
-                >
-                  Total Duration
-                </span>
-                <span
-                  style={{
-                    fontFamily: "monospace",
-                    fontSize: "36px",
-                    fontWeight: 500,
-                    color: isDark ? "#3dffec" : "#0891B2",
-                  }}
-                >
-                  {formatDuration(workoutStats.duration)}
-                </span>
-              </GlassCard>
+              <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
+                <GlassCard elevation={1} className="fc-glass fc-card p-4 sm:p-6">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                    <span>Duration</span>
+                    <Clock className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
+                  </div>
+                  <div className="mt-3 text-3xl font-semibold text-[color:var(--fc-accent-cyan)] font-mono">
+                    {formatDuration(workoutStats.duration)}
+                  </div>
+                </GlassCard>
+                <GlassCard elevation={1} className="fc-glass fc-card p-4 sm:p-6">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                    <span>Sets crushed</span>
+                    <CheckCircle className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
+                  </div>
+                  <div className="mt-3 text-3xl font-semibold text-[color:var(--fc-accent-cyan)] font-mono">
+                    {workoutStats.totalSets}
+                  </div>
+                </GlassCard>
+                <GlassCard elevation={1} className="fc-glass fc-card p-4 sm:p-6">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                    <span>Volume lifted</span>
+                    <BarChart3 className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
+                  </div>
+                  <div className="mt-3 text-3xl font-semibold text-[color:var(--fc-accent-cyan)] font-mono">
+                    {formatVolume(workoutStats.totalWeight)}
+                    <span className="ml-2 text-sm text-[color:var(--fc-text-dim)]">KG</span>
+                  </div>
+                </GlassCard>
+              </div>
+            </GlassCard>
 
-              {/* Sets Crushed */}
-              <GlassCard elevation={1} className="p-8 flex flex-col gap-2">
-                <span
-                  style={{
-                    fontSize: "12px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    fontWeight: 700,
-                  }}
-                >
-                  Sets Crushed
-                </span>
-                <span
-                  style={{
-                    fontFamily: "monospace",
-                    fontSize: "36px",
-                    fontWeight: 500,
-                    color: isDark ? "#3dffec" : "#0891B2",
-                  }}
-                >
-                  {workoutStats.totalSets}
-                </span>
-              </GlassCard>
-
-              {/* Volume Lifted */}
-              <GlassCard elevation={1} className="p-8 flex flex-col gap-2">
-                <span
-                  style={{
-                    fontSize: "12px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    fontWeight: 700,
-                  }}
-                >
-                  Volume Lifted
-                </span>
-                <span
-                  style={{
-                    fontFamily: "monospace",
-                    fontSize: "36px",
-                    fontWeight: 500,
-                    color: isDark ? "#3dffec" : "#0891B2",
-                  }}
-                >
-                  {formatVolume(workoutStats.totalWeight)}
-                  <small style={{ fontSize: "0.4em", marginLeft: "4px" }}>KG</small>
-                </span>
-              </GlassCard>
-            </div>
-
-            {/* Personal Records Section */}
             {personalRecords.length > 0 && (
-              <section
-                style={{
-                  background: "linear-gradient(135deg, rgba(255, 61, 252, 0.1), rgba(61, 255, 236, 0.05))",
-                  border: `1px solid ${
-                    isDark ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.3)"
-                  }`,
-                  borderRadius: "32px",
-                  padding: "40px",
-                  position: "relative",
-                  overflow: "hidden",
-                  backdropFilter: "blur(30px)",
-                  WebkitBackdropFilter: "blur(30px)",
-                }}
+              <GlassCard
+                elevation={2}
+                className="fc-glass fc-card p-6 sm:p-8 relative overflow-hidden"
               >
                 <div
+                  className="pointer-events-none absolute -top-10 right-0 h-40 w-40 rounded-full opacity-50 blur-3xl"
                   style={{
-                    position: "absolute",
-                    top: 0,
-                    right: 0,
-                    width: "60%",
-                    height: "60%",
-                    background: "radial-gradient(circle at top right, rgba(61, 255, 236, 0.2), transparent 60%)",
-                    pointerEvents: "none",
+                    background:
+                      "radial-gradient(circle at top right, rgba(255, 61, 252, 0.25), transparent 65%)",
                   }}
                 />
-                <div style={{ position: "relative", zIndex: 1 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "16px",
-                      marginBottom: "32px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "48px",
-                        height: "48px",
-                        background: "#ff3dfc",
-                        borderRadius: "12px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxShadow: "0 0 30px rgba(255, 61, 252, 0.4)",
-                      }}
-                    >
-                      <Star
-                        style={{
-                          width: "24px",
-                          height: "24px",
-                          stroke: "#000000",
-                          strokeWidth: 2.5,
-                          fill: "none",
-                        }}
-                      />
+                <div className="relative z-10">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-purple)] text-black shadow-[0_0_24px_rgba(124,58,237,0.45)]">
+                      <Star className="h-6 w-6" />
                     </div>
                     <div>
-                      <h2
-                        style={{
-                          fontSize: "24px",
-                          fontWeight: 700,
-                          letterSpacing: "-0.02em",
-                          margin: 0,
-                          color: isDark ? "#FFFFFF" : "#1A1A1A",
-                        }}
-                      >
-                        Personal Records Achieved
+                      <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                        Personal records achieved
                       </h2>
-                      <p
-                        style={{
-                          color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                          fontSize: "14px",
-                          margin: "4px 0 0 0",
-                        }}
-                      >
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
                         You are stronger than you were {workoutStats.duration} minutes ago.
                       </p>
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "16px",
-                    }}
-                  >
+                  <div className="mt-6 space-y-3">
                     {personalRecords.slice(0, 5).map((pr: any) => {
                       const exerciseName =
                         pr.exercise?.name || pr.exerciseName || "Exercise";
@@ -1464,46 +1495,17 @@ export default function WorkoutComplete() {
                       return (
                         <div
                           key={pr.id}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            padding: "16px",
-                            background: "rgba(255, 255, 255, 0.03)",
-                            borderRadius: "16px",
-                            borderLeft: "3px solid #ff3dfc",
-                          }}
+                          className="fc-list-row flex items-center justify-between gap-4 px-4 py-3"
                         >
                           <div>
-                            <h4
-                              style={{
-                                fontSize: "18px",
-                                fontWeight: 600,
-                                margin: 0,
-                                marginBottom: "4px",
-                                color: isDark ? "#FFFFFF" : "#1A1A1A",
-                              }}
-                            >
+                            <h4 className="text-base font-semibold text-[color:var(--fc-text-primary)]">
                               {exerciseName}
                             </h4>
-                            <p
-                              style={{
-                                fontSize: "14px",
-                                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                                margin: 0,
-                              }}
-                            >
+                            <p className="text-sm text-[color:var(--fc-text-dim)]">
                               {recordType}
                             </p>
                           </div>
-                          <div
-                            style={{
-                              fontFamily: "monospace",
-                              color: "#3dffec",
-                              fontSize: "16px",
-                              fontWeight: 600,
-                            }}
-                          >
+                          <div className="font-mono text-sm font-semibold text-[color:var(--fc-accent-cyan)]">
                             {deltaValue}
                           </div>
                         </div>
@@ -1511,279 +1513,147 @@ export default function WorkoutComplete() {
                     })}
                   </div>
                 </div>
-              </section>
-            )}
-
-            {/* Next Workout Box */}
-            {nextWorkout && (
-              <GlassCard elevation={2} className="p-6 flex items-center justify-between gap-4">
-                <div>
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                      marginBottom: "4px",
-                      margin: 0,
-                    }}
-                  >
-                    Up Next in Schedule
-                  </p>
-                  <h3
-                    style={{
-                      fontSize: "20px",
-                      fontWeight: 700,
-                      margin: 0,
-                      color: isDark ? "#FFFFFF" : "#1A1A1A",
-                    }}
-                  >
-                    {nextWorkout.name ||
-                      (nextWorkout.template as any)?.name ||
-                      "Workout"}
-                  </h3>
-                </div>
-                {nextWorkout.scheduled_date && (
-                  <div
-                    style={{
-                      fontFamily: "monospace",
-                      fontSize: "13px",
-                      color: isDark ? "#3dffec" : "#0891B2",
-                    }}
-                  >
-                    Scheduled for {formatScheduledDate(nextWorkout.scheduled_date)}
-                  </div>
-                )}
               </GlassCard>
             )}
 
-            {/* Blocks Section - Keep existing structure with glass styling */}
-            {blockGroups.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {blockGroups.map((block, index) => {
-                  const isExpanded = expandedBlocks.has(block.block_id);
-                  const setCount = block.sets.length;
-                  const exerciseNamesList = Array.from(
-                    block.exerciseNames.values()
-                  );
-                  const exerciseNamesDisplay =
-                    exerciseNamesList.length > 0
-                      ? exerciseNamesList.length === 1
-                        ? exerciseNamesList[0]
-                        : exerciseNamesList.join(" + ")
-                      : "Exercise";
-
-                  return (
-                    <div
-                      key={block.block_id}
-                      onClick={() => toggleBlock(block.block_id)}
-                      className="cursor-pointer"
-                    >
-                      <GlassCard
-                        elevation={2}
-                        className="overflow-hidden"
-                      >
-                      <div
-                        style={{
-                          padding: "24px 32px",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                          {isExpanded ? (
-                            <ChevronDown
-                              style={{
-                                width: "20px",
-                                height: "20px",
-                                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                              }}
-                            />
-                          ) : (
-                            <ChevronUp
-                              style={{
-                                width: "20px",
-                                height: "20px",
-                                transform: "rotate(180deg)",
-                                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                              }}
-                            />
-                          )}
-                          <div style={{ flex: 1 }}>
-                            <h3
-                              style={{
-                                fontSize: "18px",
-                                fontWeight: 700,
-                                margin: 0,
-                                marginBottom: "8px",
-                                color: isDark ? "#FFFFFF" : "#1A1A1A",
-                              }}
-                            >
-                              Block {block.block_order} - {formatBlockType(block.block_type).toUpperCase()}
-                              {setCount > 0 && ` (${setCount} ${setCount === 1 ? "set" : "sets"})`}
-                            </h3>
-                            <p
-                              style={{
-                                fontSize: "14px",
-                                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                                margin: 0,
-                              }}
-                            >
-                              {exerciseNamesDisplay}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      {isExpanded && (
-                        <div
-                          style={{
-                            padding: "0 32px 24px 32px",
-                            borderTop: `1px solid ${
-                              isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                            }`,
-                            marginTop: "0",
-                          }}
-                        >
-                          <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                            {block.sets.length === 0 ? (
-                              renderTemplateExercises(block, block.exerciseNames)
-                            ) : (
-                              block.sets
-                                .sort((a, b) => {
-                                  if (a.set_number && b.set_number) {
-                                    return a.set_number - b.set_number;
-                                  }
-                                  if (a.set_number) return -1;
-                                  if (b.set_number) return 1;
-                                  return (
-                                    new Date(a.completed_at).getTime() -
-                                    new Date(b.completed_at).getTime()
-                                  );
-                                })
-                                .map((set, setIndex) => (
-                                  <div
-                                    key={set.id}
-                                    style={{
-                                      paddingLeft: "16px",
-                                      borderLeft: `2px solid ${
-                                        isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                                      }`,
-                                    }}
-                                  >
-                                    {renderSetDisplay(set, block.block_type, block.exerciseNames)}
-                                  </div>
-                                ))
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </GlassCard>
+            {nextWorkout && (
+              <GlassCard elevation={2} className="fc-glass fc-card p-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Up next in schedule
+                    </p>
+                    <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                      {nextWorkout.name ||
+                        (nextWorkout.template as any)?.name ||
+                        "Workout"}
+                    </h3>
+                  </div>
+                  {nextWorkout.scheduled_date && (
+                    <div className="font-mono text-xs uppercase tracking-[0.2em] text-[color:var(--fc-accent-cyan)]">
+                      Scheduled for {formatScheduledDate(nextWorkout.scheduled_date)}
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+                </div>
+              </GlassCard>
             )}
 
-            {/* Action Buttons */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr auto",
-                gap: "16px",
-                marginTop: "16px",
-              }}
-            >
+            {blockGroups.length > 0 && (
+              <section className="space-y-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                      Workout breakdown
+                    </h2>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Review every block and logged set from today.
+                    </p>
+                  </div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    {blockGroups.length} blocks
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {blockGroups.map((block) => {
+                    const isExpanded = expandedBlocks.has(block.block_id);
+                    const setCount = block.sets.length;
+                    const exerciseNamesList = Array.from(
+                      block.exerciseNames.values()
+                    );
+                    const exerciseNamesDisplay =
+                      exerciseNamesList.length > 0
+                        ? exerciseNamesList.length === 1
+                          ? exerciseNamesList[0]
+                          : exerciseNamesList.join(" + ")
+                        : "Exercise";
+
+                    return (
+                      <GlassCard
+                        key={block.block_id}
+                        elevation={2}
+                        className="fc-glass fc-card overflow-hidden"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleBlock(block.block_id)}
+                          className="w-full p-5 text-left sm:p-6"
+                        >
+                          <div className="flex items-start gap-3">
+                            {isExpanded ? (
+                              <ChevronDown className="mt-1 h-5 w-5 text-[color:var(--fc-text-dim)]" />
+                            ) : (
+                              <ChevronUp className="mt-1 h-5 w-5 rotate-180 text-[color:var(--fc-text-dim)]" />
+                            )}
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                                Block {block.block_order} •{" "}
+                                {formatBlockType(block.block_type).toUpperCase()}
+                                {setCount > 0 &&
+                                  ` (${setCount} ${setCount === 1 ? "set" : "sets"})`}
+                              </h3>
+                              <p className="text-sm text-[color:var(--fc-text-dim)]">
+                                {exerciseNamesDisplay}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="border-t border-[color:var(--fc-glass-border)] px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+                            <div className="flex flex-col gap-3">
+                              {block.sets.length === 0 ? (
+                                renderTemplateExercises(block, block.exerciseNames)
+                              ) : (
+                                block.sets
+                                  .sort((a, b) => {
+                                    if (a.set_number && b.set_number) {
+                                      return a.set_number - b.set_number;
+                                    }
+                                    if (a.set_number) return -1;
+                                    if (b.set_number) return 1;
+                                    return (
+                                      new Date(a.completed_at).getTime() -
+                                      new Date(b.completed_at).getTime()
+                                    );
+                                  })
+                                  .map((set) => (
+                                    <div
+                                      key={set.id}
+                                      className="border-l-2 border-[color:var(--fc-glass-border)] pl-4"
+                                    >
+                                      {renderSetDisplay(
+                                        set,
+                                        block.block_type,
+                                        block.exerciseNames
+                                      )}
+                                    </div>
+                                  ))
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </GlassCard>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
-                onClick={markWorkoutComplete}
+                onClick={() => router.push("/client")}
+                className="fc-btn fc-btn-primary flex w-full items-center justify-center gap-3 px-6 py-4 text-sm uppercase tracking-[0.2em] sm:w-auto"
                 disabled={completing}
-                style={{
-                  padding: "20px 40px",
-                  borderRadius: "16px",
-                  fontWeight: 700,
-                  fontSize: "16px",
-                  background: "#FFFFFF",
-                  color: "#050505",
-                  border: "none",
-                  position: "relative",
-                  overflow: "hidden",
-                  cursor: completing ? "not-allowed" : "pointer",
-                  opacity: completing ? 0.6 : 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "12px",
-                  transition: "all 0.3s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!completing) {
-                    e.currentTarget.style.transform = "scale(1.02)";
-                    e.currentTarget.style.boxShadow = "0 10px 40px rgba(255, 255, 255, 0.2)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "scale(1)";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
               >
-                {completing ? (
-                  <div
-                    className="animate-spin"
-                    style={{
-                      width: "24px",
-                      height: "24px",
-                      border: "2px solid #050505",
-                      borderTopColor: "transparent",
-                      borderRadius: "50%",
-                    }}
-                  />
-                ) : (
-                  <>
-                    <span
-                      style={{
-                        fontFamily: "monospace",
-                        fontWeight: 700,
-                        letterSpacing: "0.1em",
-                      }}
-                    >
-                      Return to Dashboard
-                    </span>
-                    <Home style={{ width: "18px", height: "18px" }} />
-                  </>
-                )}
+                Return to Dashboard
+                <Home className="h-4 w-4" />
               </button>
               <button
-                style={{
-                  padding: "20px",
-                  borderRadius: "16px",
-                  background: isDark
-                    ? "rgba(255, 255, 255, 0.03)"
-                    : "rgba(255, 255, 255, 0.4)",
-                  backdropFilter: "blur(10px)",
-                  WebkitBackdropFilter: "blur(10px)",
-                  border: `1px solid ${
-                    isDark ? "rgba(255, 255, 255, 0.125)" : "rgba(255, 255, 255, 0.2)"
-                  }`,
-                  color: isDark ? "#FFFFFF" : "#1A1A1A",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "all 0.3s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = isDark
-                    ? "rgba(255, 255, 255, 0.1)"
-                    : "rgba(255, 255, 255, 0.5)";
-                  e.currentTarget.style.borderColor = isDark
-                    ? "rgba(255, 255, 255, 0.3)"
-                    : "rgba(255, 255, 255, 0.3)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = isDark
-                    ? "rgba(255, 255, 255, 0.03)"
-                    : "rgba(255, 255, 255, 0.4)";
-                  e.currentTarget.style.borderColor = isDark
-                    ? "rgba(255, 255, 255, 0.1)"
-                    : "rgba(255, 255, 255, 0.2)";
-                }}
+                className="fc-btn fc-btn-secondary flex items-center justify-center gap-2 px-5 py-3 text-sm"
+                type="button"
               >
-                <Share2 style={{ width: "18px", height: "18px" }} />
+                <Share2 className="h-4 w-4" />
+                Share recap
               </button>
             </div>
           </div>

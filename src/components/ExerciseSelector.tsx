@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -123,40 +122,43 @@ export default function ExerciseSelector({ isOpen, onClose, onSelect, templateId
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-start p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-start p-4">
       <div className="w-full max-w-sm" style={{maxWidth: '400px'}}>
-        <Card className="bg-white border-slate-200 w-full h-screen overflow-y-auto rounded-lg">
-          <CardHeader className="p-4">
+        <div className="fc-modal fc-card w-full h-[95vh] overflow-y-auto">
+          <div className="p-4 border-b border-[color:var(--fc-glass-border)]">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg">Select Exercise</CardTitle>
-                <CardDescription className="text-sm">
+                <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                  Exercise Library
+                </span>
+                <div className="text-lg font-semibold fc-text-primary mt-2">Select Exercise</div>
+                <p className="text-sm fc-text-subtle">
                   Choose an exercise to add to your template
-                </CardDescription>
+                </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={onClose}>
+              <Button variant="ghost" size="sm" onClick={onClose} className="fc-btn fc-btn-ghost">
                 <X className="w-4 h-4" />
               </Button>
             </div>
-          </CardHeader>
-          <CardContent className="p-4">
+          </div>
+          <div className="p-4">
             <div className="space-y-4">
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 fc-text-subtle w-4 h-4" />
                 <Input
                   placeholder="Search exercises..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 fc-glass-soft border border-[color:var(--fc-glass-border)]"
                 />
               </div>
 
               {/* Category Filter */}
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label className="fc-text-subtle">Category</Label>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger>
+                  <SelectTrigger className="fc-glass-soft border border-[color:var(--fc-glass-border)]">
                     <SelectValue placeholder="All categories" />
                   </SelectTrigger>
                   <SelectContent>
@@ -175,7 +177,7 @@ export default function ExerciseSelector({ isOpen, onClose, onSelect, templateId
                 <div className="space-y-4">
                   {[...Array(3)].map((_, i) => (
                     <div key={i} className="animate-pulse">
-                      <div className="h-16 bg-slate-200 rounded-lg"></div>
+                      <div className="h-16 bg-[color:var(--fc-glass-border)] rounded-lg"></div>
                     </div>
                   ))}
                 </div>
@@ -185,12 +187,12 @@ export default function ExerciseSelector({ isOpen, onClose, onSelect, templateId
               {!loading && (
                 <div className="space-y-3">
                   {filteredExercises.map(exercise => (
-                    <Card 
+                    <div 
                       key={exercise.id} 
-                      className="bg-white border-slate-200 hover:shadow-md transition-shadow cursor-pointer"
+                      className="fc-glass fc-card border border-[color:var(--fc-glass-border)] transition-all fc-hover-rise cursor-pointer"
                       onClick={() => handleSelectExercise(exercise)}
                     >
-                      <CardContent className="p-4">
+                      <div className="p-4">
                         <div className="flex items-start gap-3">
                           <div className="flex-shrink-0">
                             {exercise.image_url ? (
@@ -201,25 +203,25 @@ export default function ExerciseSelector({ isOpen, onClose, onSelect, templateId
                                 className="w-12 h-12"
                               />
                             ) : (
-                              <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center">
-                                <Dumbbell className="w-6 h-6 text-slate-400" />
+                              <div className="w-12 h-12 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center">
+                                <Dumbbell className="w-6 h-6 fc-text-subtle" />
                               </div>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-slate-800">{exercise.name}</h3>
-                            <p className="text-sm text-slate-500 mt-1 line-clamp-2">
+                            <h3 className="font-medium fc-text-primary">{exercise.name}</h3>
+                            <p className="text-sm fc-text-subtle mt-1 line-clamp-2">
                               {exercise.description}
                             </p>
                             <div className="mt-2">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
                                 {exercise.category}
                               </span>
                             </div>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -227,9 +229,11 @@ export default function ExerciseSelector({ isOpen, onClose, onSelect, templateId
               {/* Empty State */}
               {!loading && filteredExercises.length === 0 && (
                 <div className="text-center py-8">
-                  <Dumbbell className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <h3 className="text-sm font-medium text-slate-800 mb-1">No exercises found</h3>
-                  <p className="text-sm text-slate-500">
+                  <div className="mx-auto mb-3 fc-icon-tile fc-icon-workouts w-14 h-14">
+                    <Dumbbell className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-medium fc-text-primary mb-1">No exercises found</h3>
+                  <p className="text-sm fc-text-subtle">
                     {exercises.length === 0 
                       ? 'Create some exercises first to add to your template.'
                       : 'Try adjusting your search or filter criteria.'
@@ -239,14 +243,14 @@ export default function ExerciseSelector({ isOpen, onClose, onSelect, templateId
               )}
 
               {/* Cancel Button */}
-              <div className="pt-4 border-t">
-                <Button variant="outline" onClick={onClose} className="w-full">
+              <div className="pt-4 border-t border-[color:var(--fc-glass-border)]">
+                <Button variant="outline" onClick={onClose} className="w-full fc-btn fc-btn-secondary">
                   Cancel
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

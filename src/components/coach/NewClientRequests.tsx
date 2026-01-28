@@ -2,15 +2,9 @@
 
 import { useState } from 'react'
 import { UserPlus, Clock, Check, X, ArrowRight } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { useTheme } from '@/contexts/ThemeContext'
 
 export default function NewClientRequests() {
-  const { getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
-
   const [requests, setRequests] = useState([
     {
       id: 1,
@@ -53,50 +47,57 @@ export default function NewClientRequests() {
   }
 
   return (
-    <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-      <CardHeader className="pb-4">
-        <CardTitle className={`flex items-center gap-2 ${theme.text}`}>
-          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-            <UserPlus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+      <div className="pb-4 p-6 border-b border-[color:var(--fc-glass-border)]">
+        <div className="flex items-center gap-3">
+          <div className="fc-icon-tile fc-icon-workouts">
+            <UserPlus className="w-5 h-5" />
           </div>
-          New Client Requests
-          <Badge className="bg-blue-500 text-white ml-auto">
+          <div>
+            <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+              New requests
+            </span>
+            <h3 className="text-lg font-semibold fc-text-primary mt-2">
+              New Client Requests
+            </h3>
+          </div>
+          <span className="ml-auto fc-pill fc-pill-glass fc-text-workouts text-xs">
             {requests.length}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
+          </span>
+        </div>
+      </div>
       
-      <CardContent className="p-6">
+      <div className="p-6">
         <div className="space-y-4">
           {requests.map((request) => (
             <div 
               key={request.id}
-              className={`${theme.card} ${theme.shadow} rounded-xl p-4 border-2 border-blue-200 dark:border-blue-800 hover:shadow-lg transition-all duration-300`}
+              className="fc-list-row rounded-2xl p-4 border border-[color:var(--fc-glass-border)] fc-glass-soft"
             >
               <div className="flex items-start gap-4">
-                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                  <UserPlus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="fc-icon-tile fc-icon-workouts">
+                  <UserPlus className="w-5 h-5" />
                 </div>
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className={`font-semibold ${theme.text} text-sm`}>
+                    <h3 className="font-semibold fc-text-primary text-sm">
                       {request.name}
                     </h3>
-                    <Badge className="bg-blue-500 text-white text-xs">
+                    <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
                       New
-                    </Badge>
+                    </span>
                   </div>
                   
-                  <p className={`text-sm ${theme.textSecondary} mb-2`}>
+                  <p className="text-sm fc-text-dim mb-2">
                     {request.email}
                   </p>
                   
-                  <p className={`text-sm ${theme.textSecondary} mb-3`}>
+                  <p className="text-sm fc-text-dim mb-3">
                     {request.message}
                   </p>
                   
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-4">
+                  <div className="flex items-center gap-2 text-xs fc-text-subtle mb-4">
                     <Clock className="w-3 h-3" />
                     <span>{request.timeAgo}</span>
                   </div>
@@ -104,7 +105,7 @@ export default function NewClientRequests() {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                      className="fc-btn fc-btn-primary fc-press flex-1"
                       onClick={() => handleAccept(request.id)}
                     >
                       <Check className="w-4 h-4 mr-2" />
@@ -113,7 +114,7 @@ export default function NewClientRequests() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                      className="fc-btn fc-btn-secondary fc-text-error"
                       onClick={() => handleDecline(request.id)}
                     >
                       <X className="w-4 h-4 mr-2" />
@@ -126,16 +127,16 @@ export default function NewClientRequests() {
           ))}
         </div>
         
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="pt-4 border-t border-[color:var(--fc-glass-border)]">
           <Button 
             variant="outline" 
-            className="w-full border-dashed border-2 border-slate-300 dark:border-slate-600 hover:border-blue-400 dark:hover:border-blue-500"
+            className="w-full border-dashed fc-btn fc-btn-secondary"
           >
             <ArrowRight className="w-4 h-4 mr-2" />
             View All Requests
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

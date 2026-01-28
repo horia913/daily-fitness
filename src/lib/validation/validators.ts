@@ -34,8 +34,8 @@ export const UpdateExerciseSchema = ExerciseSchema.partial().extend({
 export const WorkoutTemplateSchema = z.object({
   name: z.string().min(1, 'Template name is required').max(200, 'Template name must be 200 characters or less'),
   description: z.string().max(2000, 'Description must be 2000 characters or less').optional().nullable(),
-  difficulty_level: z.enum(['beginner', 'intermediate', 'advanced'], {
-    message: 'Difficulty level must be beginner, intermediate, or advanced'
+  difficulty_level: z.enum(['beginner', 'intermediate', 'advanced', 'athlete'], {
+    message: 'Difficulty level must be beginner, intermediate, advanced, or athlete'
   }),
   estimated_duration: z.number().int('Duration must be an integer').min(1, 'Duration must be at least 1 minute').max(480, 'Duration must be 480 minutes or less'),
   category: z.string().max(100, 'Category must be 100 characters or less').optional().nullable(),
@@ -68,7 +68,8 @@ export const WorkoutBlockTypeSchema = z.enum([
   'emom',
   'for_time',
   'tabata',
-  'circuit'
+  'circuit',
+  'hr_sets'
 ])
 
 export const WorkoutBlockSchema = z.object({
@@ -97,11 +98,10 @@ export const UpdateWorkoutBlockSchema = WorkoutBlockSchema.partial().extend({
 export const ProgramSchema = z.object({
   name: z.string().min(1, 'Program name is required').max(200, 'Program name must be 200 characters or less'),
   description: z.string().max(2000, 'Description must be 2000 characters or less').optional().nullable(),
-  difficulty_level: z.enum(['beginner', 'intermediate', 'advanced'], {
-    message: 'Difficulty level must be beginner, intermediate, or advanced'
+  difficulty_level: z.enum(['beginner', 'intermediate', 'advanced', 'athlete'], {
+    message: 'Difficulty level must be beginner, intermediate, advanced, or athlete'
   }),
   duration_weeks: z.number().int('Duration must be an integer').min(1, 'Duration must be at least 1 week').max(52, 'Duration must be 52 weeks or less'),
-  target_audience: z.string().max(100, 'Target audience must be 100 characters or less').optional().nullable(),
   is_active: z.boolean().default(true),
 })
 

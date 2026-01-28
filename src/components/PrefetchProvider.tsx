@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { PrefetchService } from '@/lib/prefetch'
+import { isPrefetchDisabled } from '@/lib/featureFlags'
+import { isLiveWorkoutRoute } from '@/lib/workoutMode'
 import { usePathname } from 'next/navigation'
 
 interface PrefetchProviderProps {
@@ -15,6 +17,8 @@ export function PrefetchProvider({ children }: PrefetchProviderProps) {
   const prefetchedRoutes = useRef(new Set<string>())
 
   useEffect(() => {
+    if (isLiveWorkoutRoute(pathname)) return
+    if (isPrefetchDisabled) return
     if (!user) return
 
     const userRole = user.user_metadata?.role || 'client'
@@ -104,6 +108,8 @@ export function usePrefetch() {
   const { user } = useAuth()
 
   const prefetchRoute = async (route: string) => {
+    if (isLiveWorkoutRoute(route)) return
+    if (isPrefetchDisabled) return
     if (!user) return
 
     const userRole = user.user_metadata?.role || 'client'

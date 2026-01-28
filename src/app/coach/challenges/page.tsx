@@ -16,7 +16,7 @@ import { Challenge, getAllChallenges } from "@/lib/challengeService";
 
 function CoachChallengesPageContent() {
   const { user, loading: authLoading } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { getSemanticColor, performanceSettings } = useTheme();
   const router = useRouter();
 
   const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -76,100 +76,73 @@ function CoachChallengesPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center justify-between mb-4">
+      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl space-y-6">
+        <GlassCard elevation={1} className="p-6 md:p-8">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-3">
+              <Badge className="fc-badge fc-badge-strong w-fit">Challenge Hub</Badge>
               <div className="flex items-center gap-4">
                 <Link href="/coach">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
                     <ArrowLeft className="w-5 h-5" />
                   </Button>
                 </Link>
                 <div>
-                  <h1
-                    className="text-3xl font-bold mb-1"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
+                  <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
                     Challenges
                   </h1>
-                  <p
-                    className="text-sm"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    }}
-                  >
-                    Manage and create challenges for clients
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Launch seasonal competitions, track participation, and award winners.
                   </p>
                 </div>
               </div>
-              <Button
-                onClick={() => alert("Create challenge feature - integrate with createChallenge service")}
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-                }}
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Create Challenge
-              </Button>
             </div>
+            <Button
+              onClick={() => alert("Create challenge feature - integrate with createChallenge service")}
+              className="fc-btn fc-btn-primary"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Create Challenge
+            </Button>
+          </div>
 
-            {/* Filters */}
-            <div className="flex gap-2">
-              {["all", "draft", "active", "completed"].map((status) => (
-                <Button
-                  key={status}
-                  variant={filterStatus === status ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setFilterStatus(status as any)}
-                  style={
-                    filterStatus === status
-                      ? {
-                          background: getSemanticColor("trust").gradient,
-                          boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-                        }
-                      : {}
-                  }
-                >
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </Button>
-              ))}
-            </div>
-          </GlassCard>
-        </div>
+          <div className="mt-6 flex flex-wrap gap-2">
+            {["all", "draft", "active", "completed"].map((status) => (
+              <Button
+                key={status}
+                variant={filterStatus === status ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterStatus(status as any)}
+                className={filterStatus === status ? "fc-btn fc-btn-primary" : "fc-btn fc-btn-ghost"}
+                style={
+                  filterStatus === status
+                    ? {
+                        background: getSemanticColor("trust").gradient,
+                        boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
+                      }
+                    : {}
+                }
+              >
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+              </Button>
+            ))}
+          </div>
+        </GlassCard>
 
         {/* Challenges Grid */}
         {filteredChallenges.length === 0 ? (
           <GlassCard elevation={2} className="p-12">
             <div className="text-center">
-              <Trophy
-                className="w-24 h-24 mx-auto mb-6"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                }}
-              />
-              <h2
-                className="text-2xl font-bold mb-2"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
+              <Trophy className="w-24 h-24 mx-auto mb-6 text-[color:var(--fc-text-subtle)]" />
+              <h2 className="text-2xl font-bold mb-2 text-[color:var(--fc-text-primary)]">
                 No Challenges Found
               </h2>
-              <p
-                className="text-sm mb-6"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
+              <p className="text-sm mb-6 text-[color:var(--fc-text-dim)]">
                 Create your first challenge to get started
               </p>
               <Button
                 onClick={() => alert("Create challenge feature")}
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-                }}
+                className="fc-btn fc-btn-primary"
               >
                 <Plus className="w-5 h-5 mr-2" />
                 Create Challenge
@@ -208,27 +181,17 @@ function CoachChallengesPageContent() {
                   </Badge>
                 </div>
 
-                <h3
-                  className="text-lg font-bold mb-2"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
+                <h3 className="text-lg font-bold mb-2 text-[color:var(--fc-text-primary)]">
                   {challenge.name}
                 </h3>
 
                 {challenge.description && (
-                  <p
-                    className="text-sm mb-4 line-clamp-2"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                    }}
-                  >
+                  <p className="text-sm mb-4 line-clamp-2 text-[color:var(--fc-text-dim)]">
                     {challenge.description}
                   </p>
                 )}
 
-                <div className="flex items-center gap-3 text-xs" style={{
-                  color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                }}>
+                <div className="flex items-center gap-3 text-xs text-[color:var(--fc-text-subtle)]">
                   <div className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
                     <span>{new Date(challenge.start_date).toLocaleDateString()}</span>

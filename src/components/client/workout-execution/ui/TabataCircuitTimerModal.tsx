@@ -218,29 +218,30 @@ export function TabataCircuitTimerModal({
   // Show completed screen
   if (isCompleted) {
     return (
-      <div
-        className={`fixed inset-0 z-[9999] transition-colors duration-500 bg-green-900/95`}
-      >
-        <div className="h-full flex flex-col items-center justify-center p-4 relative">
-          {/* Close Button */}
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="sm"
-            className="absolute top-4 right-4 text-white hover:bg-white/20 bg-white/10 backdrop-blur-sm rounded-full p-2 z-10"
-          >
-            <X className="w-5 h-5" />
-          </Button>
+      <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm">
+        <div className="h-full flex items-center justify-center p-6">
+          <div className="fc-modal fc-card w-full max-w-md text-center px-6 py-8 relative">
+            <Button
+              onClick={onClose}
+              variant="ghost"
+              size="sm"
+              className="absolute top-4 right-4 rounded-full p-2 fc-btn fc-btn-ghost"
+            >
+              <X className="w-5 h-5" />
+            </Button>
 
-          <div className="text-center">
-            <div className="text-6xl mb-8">🎉</div>
-            <div className="text-5xl font-black text-white mb-4">Workout Complete!</div>
-            <div className="text-xl text-green-100 mb-8">
+            <div className="mx-auto mb-6 w-20 h-20 rounded-full flex items-center justify-center fc-icon-tile fc-icon-workouts">
+              <span className="text-3xl">🎉</span>
+            </div>
+            <div className="text-3xl font-bold fc-text-primary mb-2">
+              Workout complete
+            </div>
+            <div className="text-base fc-text-dim mb-8">
               Great job completing all rounds!
             </div>
             <Button
               onClick={onClose}
-              className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg"
+              className="w-full fc-btn fc-btn-primary fc-press py-5 text-base"
             >
               Close
             </Button>
@@ -326,220 +327,227 @@ export function TabataCircuitTimerModal({
     nextExerciseName = "Next Round";
   }
 
+  const phaseLabel =
+    intervalPhase === "work"
+      ? "Work"
+      : intervalPhase === "rest_after_set"
+      ? "Rest After Set"
+      : "Rest";
+  const phaseAccent =
+    intervalPhase === "work"
+      ? "fc-text-workouts"
+      : intervalPhase === "rest_after_set"
+      ? "fc-text-warning"
+      : "fc-text-neutral";
+
   return (
-    <div
-      className={`fixed inset-0 z-[9999] transition-colors duration-500 ${
-        intervalPhase === "work"
-          ? "bg-red-900/95"
-          : intervalPhase === "rest_after_set"
-          ? "bg-purple-900/95"
-          : "bg-blue-900/95"
-      }`}
-    >
-      <div className="h-full flex flex-col relative overflow-hidden">
-        {/* Close Button */}
-        <Button
-          onClick={onClose}
-          variant="ghost"
-          size="sm"
-          className="absolute top-4 right-4 text-white hover:bg-white/20 bg-white/10 backdrop-blur-sm rounded-full p-2 z-10"
-        >
-          <X className="w-5 h-5" />
-        </Button>
-
-        {/* Segment Counter */}
-        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 z-10">
-          <div className="bg-white/20 backdrop-blur-sm rounded-full px-6 py-2">
-            <span className="text-white font-semibold text-lg">
-              {currentSegment} / {totalSegments}
-            </span>
-          </div>
-        </div>
-
-        {/* Main Timer Display */}
-        <div className="text-center flex-1 flex flex-col justify-center items-center px-4">
-          {/* Total Duration Display */}
-          {(() => {
-            // Calculate total duration in seconds for one round
-            let durationPerRound = 0;
-            
-            if (sets && Array.isArray(sets) && sets.length > 0) {
-              sets.forEach((set) => {
-                if (set && Array.isArray(set.exercises) && set.exercises.length > 0) {
-                  const exercisesInSet = set.exercises.length;
-                  
-                  set.exercises.forEach((exercise, exIndex) => {
-                    if (exercise) {
-                      const isLastExercise = exIndex === exercisesInSet - 1;
-                      // Add work time (always)
-                      const workTime = Number(exercise.work_seconds) || 20;
-                      durationPerRound += workTime;
-                      
-                      // Add rest time only if not last exercise
-                      if (!isLastExercise) {
-                        const restTime = Number(exercise.rest_after) || 10;
-                        durationPerRound += restTime;
-                      }
-                    }
-                  });
-                  
-                  // Add rest_after_set for all sets in a round
-                  const restAfterSet = Number(set.rest_between_sets) || 30;
-                  durationPerRound += restAfterSet;
-                }
-              });
-            }
-            
-            // Multiply by rounds
-            const rounds = Number(totalRounds) || 1;
-            let totalDurationSeconds = durationPerRound * rounds;
-            
-            // Subtract last rest_after_set (last set of last round doesn't have it)
-            if (sets && sets.length > 0) {
-              const lastSet = sets[sets.length - 1];
-              if (lastSet) {
-                const lastRestAfterSet = Number(lastSet.rest_between_sets) || 30;
-                totalDurationSeconds -= lastRestAfterSet;
-              }
-            }
-            
-            // Ensure we have a valid number
-            if (isNaN(totalDurationSeconds) || totalDurationSeconds < 0 || !isFinite(totalDurationSeconds)) {
-              totalDurationSeconds = 0;
-            }
-            
-            // Format duration
-            const totalMinutes = Math.floor(totalDurationSeconds / 60);
-            const totalSeconds = totalDurationSeconds % 60;
-            const durationText = totalMinutes > 0 
-              ? `${totalMinutes}m ${totalSeconds}s`
-              : `${totalSeconds}s`;
-            
-            return (
-              <div className="mb-6">
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-3 text-center">
-                  <div className="text-sm text-gray-300 mb-1">Total Duration</div>
-                  <div className="text-xl font-semibold text-white">{durationText}</div>
+    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm">
+      <div className="h-full flex items-center justify-center p-4">
+        <div className="fc-modal fc-card w-full max-w-4xl overflow-hidden">
+          <div className="px-6 pt-6 pb-4 border-b border-[color:var(--fc-glass-border)] flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="fc-icon-tile fc-icon-workouts">
+                <Play className="w-5 h-5" />
+              </div>
+              <div className="space-y-2">
+                <span className={`fc-pill fc-pill-glass ${phaseAccent}`}>
+                  {phaseLabel}
+                </span>
+                <div className="text-2xl font-bold fc-text-primary">
+                  Interval Circuit
+                </div>
+                <div className="text-sm fc-text-dim">
+                  Round {intervalRound + 1} of {Math.max(1, Number(totalRounds) || 1)}
                 </div>
               </div>
-            );
-          })()}
-
-          {/* Current Exercise Info */}
-          {currentExercise && (
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-8 py-6 max-w-md mb-12">
-              <div className="text-2xl font-bold text-white mb-2">{exerciseName}</div>
-              {intervalPhase === "work" && (
-                <div className="text-lg text-gray-200">
-                  {currentExercise.work_seconds
-                    ? `${currentExercise.work_seconds}s work`
-                    : currentExercise.target_reps
-                    ? `${currentExercise.target_reps} reps`
-                    : "Work phase"}
-                </div>
-              )}
             </div>
-          )}
-
-          {/* Phase Indicator */}
-          <div
-            className={`mb-8 px-8 py-4 rounded-2xl ${
-              intervalPhase === "work"
-                ? "bg-red-600/30 border-2 border-red-400"
-                : intervalPhase === "rest_after_set"
-                ? "bg-purple-600/30 border-2 border-purple-400"
-                : "bg-blue-600/30 border-2 border-blue-400"
-            }`}
-          >
-            <div className="text-4xl sm:text-5xl font-black text-white">
-              {intervalPhase === "work"
-                ? "WORK"
-                : intervalPhase === "rest_after_set"
-                ? "REST AFTER SET"
-                : "REST"}
-            </div>
-          </div>
-
-          {/* Large Timer */}
-          <div
-            className={`text-9xl sm:text-[12rem] font-black mb-8 ${
-              intervalPhase === "work" ? "text-red-100" : "text-blue-100"
-            }`}
-          >
-            {Math.floor(intervalPhaseLeft / 60)
-              .toString()
-              .padStart(2, "0")}
-            :{(intervalPhaseLeft % 60).toString().padStart(2, "0")}
-          </div>
-
-
-          {/* Next Exercise Preview */}
-          <div className="mb-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-4 text-center">
-              <div className="text-sm text-gray-300 mb-1">Next:</div>
-              <div className="text-lg font-semibold text-white">{nextExerciseName}</div>
-            </div>
-          </div>
-
-          {/* Control Buttons - Always visible */}
-          <div className="flex gap-4 items-center justify-center mt-4">
-            {/* Previous Button */}
-            <Button
-            onClick={handlePrevious}
-            variant="outline"
-            size="sm"
-            className="!border-white/80 !text-white hover:!bg-white hover:!text-black !bg-white/20 backdrop-blur-sm min-w-[48px] min-h-[48px]"
-            disabled={
-              timerExerciseIndex === 0 &&
-              timerSetIndex === 0 &&
-              intervalRound === 0 &&
-              intervalPhase === "work"
-            }
-          >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-
-            {/* Play/Pause Button - Only show pause when active, otherwise show play */}
-            {intervalActive ? (
+            <div className="flex items-center gap-2">
+              <div className="fc-pill fc-pill-glass fc-text-subtle">
+                Segment {currentSegment} / {totalSegments}
+              </div>
               <Button
-                onClick={() => setIsTimerPaused(!isTimerPaused)}
-                variant="outline"
-                size="lg"
-                className="!border-white/80 !text-white hover:!bg-white hover:!text-black !bg-white/20 backdrop-blur-sm px-8 py-3 text-lg min-w-[64px] min-h-[64px]"
+                onClick={onClose}
+                variant="ghost"
+                size="sm"
+                className="rounded-full p-2 fc-btn fc-btn-ghost"
               >
-                {isTimerPaused ? (
-                  <Play className="w-6 h-6" />
-                ) : (
-                  <Pause className="w-6 h-6" />
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="px-6 py-6">
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="space-y-6">
+                {(() => {
+                  // Calculate total duration in seconds for one round
+                  let durationPerRound = 0;
+                  
+                  if (sets && Array.isArray(sets) && sets.length > 0) {
+                    sets.forEach((set) => {
+                      if (set && Array.isArray(set.exercises) && set.exercises.length > 0) {
+                        const exercisesInSet = set.exercises.length;
+                        
+                        set.exercises.forEach((exercise, exIndex) => {
+                          if (exercise) {
+                            const isLastExercise = exIndex === exercisesInSet - 1;
+                            // Add work time (always)
+                            const workTime = Number(exercise.work_seconds) || 20;
+                            durationPerRound += workTime;
+                            
+                            // Add rest time only if not last exercise
+                            if (!isLastExercise) {
+                              const restTime = Number(exercise.rest_after) || 10;
+                              durationPerRound += restTime;
+                            }
+                          }
+                        });
+                        
+                        // Add rest_after_set for all sets in a round
+                        const restAfterSet = Number(set.rest_between_sets) || 30;
+                        durationPerRound += restAfterSet;
+                      }
+                    });
+                  }
+                  
+                  // Multiply by rounds
+                  const rounds = Number(totalRounds) || 1;
+                  let totalDurationSeconds = durationPerRound * rounds;
+                  
+                  // Subtract last rest_after_set (last set of last round doesn't have it)
+                  if (sets && sets.length > 0) {
+                    const lastSet = sets[sets.length - 1];
+                    if (lastSet) {
+                      const lastRestAfterSet = Number(lastSet.rest_between_sets) || 30;
+                      totalDurationSeconds -= lastRestAfterSet;
+                    }
+                  }
+                  
+                  // Ensure we have a valid number
+                  if (isNaN(totalDurationSeconds) || totalDurationSeconds < 0 || !isFinite(totalDurationSeconds)) {
+                    totalDurationSeconds = 0;
+                  }
+                  
+                  // Format duration
+                  const totalMinutes = Math.floor(totalDurationSeconds / 60);
+                  const totalSeconds = totalDurationSeconds % 60;
+                  const durationText = totalMinutes > 0 
+                    ? `${totalMinutes}m ${totalSeconds}s`
+                    : `${totalSeconds}s`;
+                  
+                  return (
+                    <div className="fc-glass-soft rounded-2xl px-5 py-4">
+                      <div className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle">
+                        Total duration
+                      </div>
+                      <div className="text-lg font-semibold fc-text-primary">
+                        {durationText}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {currentExercise && (
+                  <div className="fc-glass-soft rounded-2xl px-6 py-5">
+                    <div className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle mb-2">
+                      Current exercise
+                    </div>
+                    <div className="text-2xl font-semibold fc-text-primary">
+                      {exerciseName}
+                    </div>
+                    {intervalPhase === "work" && (
+                      <div className="text-sm fc-text-dim mt-2">
+                        {currentExercise.work_seconds
+                          ? `${currentExercise.work_seconds}s work`
+                          : currentExercise.target_reps
+                          ? `${currentExercise.target_reps} reps`
+                          : "Work phase"}
+                      </div>
+                    )}
+                  </div>
                 )}
-              </Button>
-            ) : (
-              <Button
-                onClick={handleStart}
-                variant="outline"
-                size="lg"
-                className="!border-white/80 !text-white hover:!bg-white hover:!text-black !bg-white/20 backdrop-blur-sm px-8 py-3 text-lg min-w-[64px] min-h-[64px]"
-              >
-                <Play className="w-6 h-6" />
-              </Button>
-            )}
 
-            {/* Next Button */}
-            <Button
-              onClick={handleNext}
-              variant="outline"
-              size="sm"
-              className="!border-white/80 !text-white hover:!bg-white hover:!text-black !bg-white/20 backdrop-blur-sm min-w-[48px] min-h-[48px]"
-            >
-              <ArrowLeft className="w-5 h-5 rotate-180" />
-            </Button>
+                <div className="fc-glass-soft rounded-2xl px-6 py-5">
+                  <div className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle mb-2">
+                    Up next
+                  </div>
+                  <div className="text-lg font-semibold fc-text-primary">
+                    {nextExerciseName}
+                  </div>
+                </div>
+              </div>
 
-            {/* Stop Button - Only show when active */}
+              <div className="flex flex-col items-center justify-center text-center gap-6">
+                <div className={`text-base font-semibold ${phaseAccent}`}>
+                  {phaseLabel}
+                </div>
+                <div className="text-6xl sm:text-7xl font-black font-mono tracking-tight fc-text-primary">
+                  {Math.floor(intervalPhaseLeft / 60)
+                    .toString()
+                    .padStart(2, "0")}
+                  :{(intervalPhaseLeft % 60).toString().padStart(2, "0")}
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={handlePrevious}
+                    variant="outline"
+                    size="sm"
+                    className="fc-btn fc-btn-secondary fc-press min-w-[48px] min-h-[48px]"
+                    disabled={
+                      timerExerciseIndex === 0 &&
+                      timerSetIndex === 0 &&
+                      intervalRound === 0 &&
+                      intervalPhase === "work"
+                    }
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                  {intervalActive ? (
+                    <Button
+                      onClick={() => setIsTimerPaused(!isTimerPaused)}
+                      variant="outline"
+                      size="lg"
+                      className="fc-btn fc-btn-primary fc-press min-w-[64px] min-h-[64px]"
+                    >
+                      {isTimerPaused ? (
+                        <Play className="w-6 h-6" />
+                      ) : (
+                        <Pause className="w-6 h-6" />
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleStart}
+                      variant="outline"
+                      size="lg"
+                      className="fc-btn fc-btn-primary fc-press min-w-[64px] min-h-[64px]"
+                    >
+                      <Play className="w-6 h-6" />
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleNext}
+                    variant="outline"
+                    size="sm"
+                    className="fc-btn fc-btn-secondary fc-press min-w-[48px] min-h-[48px]"
+                  >
+                    <ArrowLeft className="w-5 h-5 rotate-180" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 pb-6 pt-4 border-t border-[color:var(--fc-glass-border)] flex items-center justify-between">
+            <div className="text-xs tracking-[0.2em] uppercase fc-text-subtle">
+              Sets {timerSetIndex + 1}/{sets.length} · Exercise {timerExerciseIndex + 1}/
+              {currentSet?.exercises?.length || 1}
+            </div>
             {intervalActive && (
               <Button
                 onClick={handleStop}
                 variant="outline"
-                className="px-6 py-3 text-lg !border-red-400 !text-red-100 hover:!bg-red-600 hover:!text-white !bg-red-600/30 backdrop-blur-sm"
+                className="fc-btn fc-btn-destructive fc-press px-6 py-3 text-sm"
               >
                 Stop
               </Button>

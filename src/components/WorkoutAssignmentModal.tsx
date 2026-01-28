@@ -451,14 +451,14 @@ export default function WorkoutAssignmentModal({
       data-theme={isDark ? "dark" : "light"}
     >
       <div
-        className={`relative ${theme.card} ${theme.shadow} rounded-3xl border ${theme.border} max-w-4xl max-h-[95vh] w-full overflow-hidden transform transition-all duration-300 ease-out`}
+        className={`relative ${theme.card} ${theme.shadow} fc-glass fc-card rounded-3xl border ${theme.border} max-w-4xl max-h-[95vh] w-full overflow-hidden transform transition-all duration-300 ease-out`}
         style={{
           animation: "modalSlideIn 0.3s ease-out",
         }}
       >
         {/* Header */}
         <div
-          className={`sticky top-0 ${theme.card} border-b ${theme.border} px-6 py-5 rounded-t-3xl`}
+          className={`sticky top-0 ${theme.card} fc-glass fc-card border-b ${theme.border} px-6 py-5 rounded-t-3xl`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -589,7 +589,7 @@ export default function WorkoutAssignmentModal({
                 {filteredWorkouts.map((workout) => (
                   <Card
                     key={workout.id}
-                    className={`${theme.card} border ${
+                    className={`${theme.card} fc-glass fc-card border ${
                       theme.border
                     } rounded-2xl hover:shadow-lg transition-all duration-200 cursor-pointer ${
                       selectedWorkouts.includes(workout.id)
@@ -759,7 +759,7 @@ export default function WorkoutAssignmentModal({
                   filteredClients.map((client) => (
                     <Card
                       key={client.id}
-                      className={`${theme.card} border ${
+                      className={`${theme.card} fc-glass fc-card border ${
                         theme.border
                       } rounded-2xl hover:shadow-lg transition-all duration-200 cursor-pointer ${
                         selectedClients.includes(client.id)
@@ -813,7 +813,7 @@ export default function WorkoutAssignmentModal({
             <div className="space-y-6">
               {/* Assignment Summary */}
               <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
+                className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}
               >
                 <CardHeader className="p-6">
                   <div className="flex items-center gap-3">
@@ -961,7 +961,7 @@ export default function WorkoutAssignmentModal({
 
         {/* Action Buttons */}
         <div
-          className={`sticky bottom-0 ${theme.card} border-t ${theme.border} px-6 py-4 rounded-b-3xl`}
+          className={`sticky bottom-0 ${theme.card} fc-glass fc-card border-t ${theme.border} px-6 py-4 rounded-b-3xl`}
         >
           <div className="flex justify-between items-center">
             <Button

@@ -1,11 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useTheme } from '@/contexts/ThemeContext'
 import { 
   FileText,
   Download,
@@ -39,9 +36,6 @@ interface ReportGeneratorProps {
 }
 
 export default function ReportGenerator({ onGenerate, onPreview }: ReportGeneratorProps) {
-  const { getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
-
   const [selectedSections, setSelectedSections] = useState<string[]>(['summary', 'client-progress', 'achievements'])
   const [selectedFormat, setSelectedFormat] = useState<'pdf' | 'excel' | 'csv'>('pdf')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -140,28 +134,35 @@ export default function ReportGenerator({ onGenerate, onPreview }: ReportGenerat
 
   const getFormatColor = (format: string) => {
     switch (format) {
-      case 'pdf': return 'text-red-600 dark:text-red-400'
-      case 'excel': return 'text-green-600 dark:text-green-400'
-      case 'csv': return 'text-blue-600 dark:text-blue-400'
-      default: return 'text-slate-600 dark:text-slate-400'
+      case 'pdf': return 'fc-text-error'
+      case 'excel': return 'fc-text-success'
+      case 'csv': return 'fc-text-workouts'
+      default: return 'fc-text-dim'
     }
   }
 
   return (
-    <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-      <CardHeader>
-        <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-          <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-            <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+      <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
+        <div className="flex items-center gap-3">
+          <div className="fc-icon-tile fc-icon-workouts">
+            <FileText className="w-5 h-5" />
           </div>
-          Report Generator
-        </CardTitle>
-      </CardHeader>
+          <div>
+            <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+              Reports
+            </span>
+            <h2 className="text-lg font-semibold fc-text-primary mt-2">
+              Report Generator
+            </h2>
+          </div>
+        </div>
+      </div>
       
-      <CardContent className="space-y-6">
+      <div className="space-y-6 p-6">
         {/* Report Sections */}
         <div>
-          <h3 className={`font-semibold ${theme.text} mb-4`}>Select Report Sections</h3>
+          <h3 className="font-semibold fc-text-primary mb-4">Select Report Sections</h3>
           <div className="space-y-3">
             {reportSections.map(section => {
               const Icon = section.icon
@@ -171,45 +172,41 @@ export default function ReportGenerator({ onGenerate, onPreview }: ReportGenerat
               return (
                 <div 
                   key={section.id} 
-                  className={`${theme.card} rounded-xl p-4 border-2 cursor-pointer transition-all duration-300 ${
-                    isSelected ? 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20' : 'hover:border-slate-300 dark:hover:border-slate-600'
+                  className={`fc-glass-soft rounded-2xl p-4 border border-[color:var(--fc-glass-border)] cursor-pointer transition-all duration-300 ${
+                    isSelected ? 'ring-1 ring-[color:var(--fc-domain-workouts)]' : ''
                   }`}
                   onClick={() => handleSectionToggle(section.id)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${
-                      isSelected ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-slate-100 dark:bg-slate-800'
-                    }`}>
-                      <Icon className={`w-4 h-4 ${
-                        isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-slate-600 dark:text-slate-400'
-                      }`} />
+                    <div className="fc-icon-tile fc-icon-workouts">
+                      <Icon className="w-4 h-4" />
                     </div>
                     
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h4 className={`font-medium ${theme.text}`}>{section.title}</h4>
+                        <h4 className="font-medium fc-text-primary">{section.title}</h4>
                         {isRequired && (
-                          <Badge className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-0 text-xs">
+                          <span className="fc-pill fc-pill-glass fc-text-error text-xs">
                             Required
-                          </Badge>
+                          </span>
                         )}
                         {isSelected && (
-                          <Badge className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-0 text-xs">
+                          <span className="fc-pill fc-pill-glass fc-text-success text-xs">
                             Selected
-                          </Badge>
+                          </span>
                         )}
                       </div>
-                      <p className={`text-sm ${theme.textSecondary}`}>{section.description}</p>
+                      <p className="text-sm fc-text-dim">{section.description}</p>
                     </div>
                     
                     <div className="flex items-center gap-2">
                       {isRequired ? (
-                        <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        <CheckCircle className="w-5 h-5 fc-text-success" />
                       ) : (
                         <Checkbox
                           checked={isSelected}
                           onChange={() => handleSectionToggle(section.id)}
-                          className="data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                          className="data-[state=checked]:bg-[color:var(--fc-domain-workouts)] data-[state=checked]:border-[color:var(--fc-domain-workouts)]"
                         />
                       )}
                     </div>
@@ -222,33 +219,29 @@ export default function ReportGenerator({ onGenerate, onPreview }: ReportGenerat
 
         {/* Export Format */}
         <div>
-          <h3 className={`font-semibold ${theme.text} mb-4`}>Export Format</h3>
+          <h3 className="font-semibold fc-text-primary mb-4">Export Format</h3>
           <div className="grid grid-cols-3 gap-3">
             {(['pdf', 'excel', 'csv'] as const).map(format => (
               <div
                 key={format}
-                className={`${theme.card} rounded-xl p-4 border-2 cursor-pointer transition-all duration-300 ${
-                  selectedFormat === format 
-                    ? 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20' 
-                    : 'hover:border-slate-300 dark:hover:border-slate-600'
+                className={`fc-glass-soft rounded-2xl p-4 border border-[color:var(--fc-glass-border)] cursor-pointer transition-all duration-300 ${
+                  selectedFormat === format ? 'ring-1 ring-[color:var(--fc-domain-workouts)]' : ''
                 }`}
                 onClick={() => setSelectedFormat(format)}
               >
                 <div className="flex flex-col items-center gap-2">
-                  <div className={`p-2 rounded-lg ${
-                    selectedFormat === format ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-slate-100 dark:bg-slate-800'
-                  }`}>
+                  <div className="fc-icon-tile fc-icon-workouts">
                     <div className={getFormatColor(format)}>
                       {getFormatIcon(format)}
                     </div>
                   </div>
-                  <span className={`text-sm font-medium ${theme.text}`}>
+                  <span className="text-sm font-medium fc-text-primary">
                     {format.toUpperCase()}
                   </span>
                   {selectedFormat === format && (
-                    <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-0 text-xs">
+                    <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
                       Selected
-                    </Badge>
+                    </span>
                   )}
                 </div>
               </div>
@@ -257,20 +250,20 @@ export default function ReportGenerator({ onGenerate, onPreview }: ReportGenerat
         </div>
 
         {/* Report Summary */}
-        <div className={`${theme.card} rounded-xl p-4 border-2`}>
-          <h3 className={`font-semibold ${theme.text} mb-3`}>Report Summary</h3>
+        <div className="fc-glass-soft rounded-2xl p-4 border border-[color:var(--fc-glass-border)]">
+          <h3 className="font-semibold fc-text-primary mb-3">Report Summary</h3>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className={`text-sm ${theme.textSecondary}`}>Sections included:</span>
-              <span className={`text-sm font-medium ${theme.text}`}>{selectedSections.length}</span>
+              <span className="text-sm fc-text-subtle">Sections included:</span>
+              <span className="text-sm font-medium fc-text-primary">{selectedSections.length}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className={`text-sm ${theme.textSecondary}`}>Export format:</span>
-              <span className={`text-sm font-medium ${theme.text}`}>{selectedFormat.toUpperCase()}</span>
+              <span className="text-sm fc-text-subtle">Export format:</span>
+              <span className="text-sm font-medium fc-text-primary">{selectedFormat.toUpperCase()}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className={`text-sm ${theme.textSecondary}`}>Estimated size:</span>
-              <span className={`text-sm font-medium ${theme.text}`}>
+              <span className="text-sm fc-text-subtle">Estimated size:</span>
+              <span className="text-sm font-medium fc-text-primary">
                 {selectedSections.length * 2 + 5} pages
               </span>
             </div>
@@ -282,7 +275,7 @@ export default function ReportGenerator({ onGenerate, onPreview }: ReportGenerat
           <Button
             variant="outline"
             onClick={handlePreviewReport}
-            className="flex-1"
+            className="flex-1 fc-btn fc-btn-secondary"
           >
             <Eye className="w-4 h-4 mr-2" />
             Preview Report
@@ -291,7 +284,7 @@ export default function ReportGenerator({ onGenerate, onPreview }: ReportGenerat
           <Button
             onClick={handleGenerateReport}
             disabled={isGenerating || selectedSections.length === 0}
-            className="flex-1"
+            className="flex-1 fc-btn fc-btn-primary fc-press"
           >
             {isGenerating ? (
               <>
@@ -308,25 +301,25 @@ export default function ReportGenerator({ onGenerate, onPreview }: ReportGenerat
         </div>
 
         {/* Quick Actions */}
-        <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
-          <Button variant="outline" size="sm">
+        <div className="flex flex-wrap gap-2 pt-4 border-t border-[color:var(--fc-glass-border)]">
+          <Button variant="outline" size="sm" className="fc-btn fc-btn-secondary">
             <Mail className="w-3 h-3 mr-1" />
             Email Report
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="fc-btn fc-btn-secondary">
             <Share2 className="w-3 h-3 mr-1" />
             Share Link
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="fc-btn fc-btn-secondary">
             <Printer className="w-3 h-3 mr-1" />
             Print
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="fc-btn fc-btn-secondary">
             <MessageSquare className="w-3 h-3 mr-1" />
             Send to Client
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

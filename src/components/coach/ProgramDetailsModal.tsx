@@ -1,10 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { useTheme } from '@/contexts/ThemeContext'
 import { Program, WorkoutTemplate, Exercise, ExerciseCategory } from '@/lib/workoutTemplateService'
 import { 
   X, 
@@ -28,13 +25,10 @@ interface ProgramDetailsModalProps {
 }
 
 export default function ProgramDetailsModal({ program, templates, exercises, categories, onClose, onEdit }: ProgramDetailsModalProps) {
-  const { getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
-
   const difficultyColors = {
-    'beginner': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-    'intermediate': 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
-    'advanced': 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+    'beginner': 'fc-text-success',
+    'intermediate': 'fc-text-warning',
+    'advanced': 'fc-text-error'
   }
 
   const targetAudienceLabels = {
@@ -48,12 +42,11 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
 
   return (
     <div 
-      className={`fixed inset-0 z-[9999] flex items-start justify-center p-4 ${theme.background.includes('slate-900') ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/50 backdrop-blur-sm'}`}
+      className="fixed inset-0 z-[9999] flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      data-theme={theme.background.includes('slate-900') ? 'dark' : 'light'}
     >
       <div 
-        className={`relative ${theme.card} ${theme.shadow} rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
+        className="relative fc-modal fc-card w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden"
         style={{
           animation: 'modalSlideIn 0.3s ease-out',
           height: 'min(90vh, calc(100vh - 2rem))',
@@ -62,17 +55,18 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
         }}
       >
         {/* Header */}
-        <div className={`sticky top-0 ${theme.card} border-b ${theme.border} px-6 py-5 rounded-t-3xl`}>
+        <div className="sticky top-0 border-b border-[color:var(--fc-glass-border)] px-6 py-5 rounded-t-3xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-2xl bg-gradient-to-br from-purple-400 via-purple-500 to-purple-600 shadow-lg`}>
-                <Calendar className={`w-6 h-6 text-white`} />
+              <div className="fc-icon-tile fc-icon-workouts">
+                <Calendar className="w-6 h-6" />
               </div>
               <div>
-                <h2 className={`text-2xl font-bold ${theme.text}`}>
+                <span className="fc-pill fc-pill-glass fc-text-workouts">Program</span>
+                <h2 className="text-2xl font-bold fc-text-primary mt-2">
                   {program.name}
                 </h2>
-                <p className={`text-sm ${theme.textSecondary} mt-1`}>
+                <p className="text-sm fc-text-dim mt-1">
                   Created {new Date(program.created_at).toLocaleDateString()}
                 </p>
               </div>
@@ -81,7 +75,7 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className={`p-2 rounded-xl transition-all duration-200 ${theme.textSecondary} hover:${theme.text} hover:${theme.background.includes('slate-900') ? 'bg-slate-700' : 'bg-slate-100'}`}
+              className="p-2 rounded-xl fc-btn fc-btn-ghost"
               aria-label="Close modal"
             >
               <X className="w-5 h-5" />
@@ -93,90 +87,90 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
         <div className="flex-1 overflow-y-auto px-6 pb-6">
           <div className="space-y-6">
             {/* Program Overview */}
-            <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
-              <CardHeader className="p-6">
+            <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+              <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-xl bg-gradient-to-br from-purple-400 via-purple-500 to-purple-600 shadow-lg`}>
-                    <Target className={`w-5 h-5 text-white`} />
+                  <div className="fc-icon-tile fc-icon-workouts">
+                    <Target className="w-5 h-5" />
                   </div>
-                  <CardTitle className={`text-xl font-bold ${theme.text}`}>Program Overview</CardTitle>
+                  <div className="text-xl font-bold fc-text-primary">Program Overview</div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
+              </div>
+              <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className={`p-4 rounded-xl ${theme.card} border ${theme.border}`}>
+                  <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                     <div className="flex items-center gap-2 mb-2">
-                      <Clock className="w-4 h-4 text-blue-500" />
-                      <span className={`text-sm font-medium ${theme.text}`}>Duration</span>
+                      <Clock className="w-4 h-4 fc-text-workouts" />
+                      <span className="text-sm font-medium fc-text-primary">Duration</span>
                     </div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{program.duration_weeks} weeks</p>
+                    <p className="text-2xl font-bold fc-text-primary">{program.duration_weeks} weeks</p>
                   </div>
                   
-                  <div className={`p-4 rounded-xl ${theme.card} border ${theme.border}`}>
+                  <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                     <div className="flex items-center gap-2 mb-2">
-                      <Dumbbell className="w-4 h-4 text-green-500" />
-                      <span className={`text-sm font-medium ${theme.text}`}>Workouts</span>
+                      <Dumbbell className="w-4 h-4 fc-text-workouts" />
+                      <span className="text-sm font-medium fc-text-primary">Workouts</span>
                     </div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{program.schedule?.length || 0}</p>
+                    <p className="text-2xl font-bold fc-text-primary">{program.schedule?.length || 0}</p>
                   </div>
                   
-                  <div className={`p-4 rounded-xl ${theme.card} border ${theme.border}`}>
+                  <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                     <div className="flex items-center gap-2 mb-2">
-                      <Users className="w-4 h-4 text-orange-500" />
-                      <span className={`text-sm font-medium ${theme.text}`}>Target</span>
+                      <Users className="w-4 h-4 fc-text-habits" />
+                      <span className="text-sm font-medium fc-text-primary">Target</span>
                     </div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{targetAudienceLabels[program.target_audience as keyof typeof targetAudienceLabels] || program.target_audience}</p>
+                    <p className="text-2xl font-bold fc-text-primary">{targetAudienceLabels[program.target_audience as keyof typeof targetAudienceLabels] || program.target_audience}</p>
                   </div>
                   
-                  <div className={`p-4 rounded-xl ${theme.card} border ${theme.border}`}>
+                  <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                     <div className="flex items-center gap-2 mb-2">
-                      <Star className="w-4 h-4 text-yellow-500" />
-                      <span className={`text-sm font-medium ${theme.text}`}>Level</span>
+                      <Star className="w-4 h-4 fc-text-warning" />
+                      <span className="text-sm font-medium fc-text-primary">Level</span>
                     </div>
-                    <Badge className={`${difficultyColors[program.difficulty_level as keyof typeof difficultyColors]} border-0`}>
+                    <span className={`fc-pill fc-pill-glass ${difficultyColors[program.difficulty_level as keyof typeof difficultyColors]}`}>
                       {program.difficulty_level}
-                    </Badge>
+                    </span>
                   </div>
                 </div>
 
                 {program.description && (
                   <div className="mt-6">
-                    <h4 className={`text-lg font-semibold ${theme.text} mb-2`}>Description</h4>
-                    <p className={`${theme.textSecondary} leading-relaxed`}>{program.description}</p>
+                    <h4 className="text-lg font-semibold fc-text-primary mb-2">Description</h4>
+                    <p className="fc-text-dim leading-relaxed">{program.description}</p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Weekly Schedule */}
-            <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
-              <CardHeader className="p-6">
+            <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+              <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-xl bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-lg`}>
-                    <Calendar className={`w-5 h-5 text-white`} />
+                  <div className="fc-icon-tile fc-icon-workouts">
+                    <Calendar className="w-5 h-5" />
                   </div>
-                  <CardTitle className={`text-xl font-bold ${theme.text}`}>
+                  <div className="text-xl font-bold fc-text-primary">
                     Weekly Schedule
-                  </CardTitle>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
+              </div>
+              <div className="p-6">
                 <div className="grid grid-cols-7 gap-2">
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => {
                     const dayWorkouts = (program.schedule as any)?.filter((s: any) => s.program_day === index + 1) || []
                     return (
-                      <div key={day} className={`p-3 rounded-lg ${theme.card} border ${theme.border} text-center`}>
-                        <h4 className={`font-semibold ${theme.text} mb-2`}>{day.slice(0, 3)}</h4>
+                      <div key={day} className="p-3 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)] text-center">
+                        <h4 className="font-semibold fc-text-primary mb-2">{day.slice(0, 3)}</h4>
                         {dayWorkouts.length > 0 ? (
                           <div className="space-y-1">
                             {dayWorkouts.map((schedule: any, idx: number) => {
                               const template = templates.find(t => t.id === schedule.template_id)
                               return (
-                                <div key={idx} className={`text-xs p-2 rounded ${theme.card} border ${theme.border}`}>
-                                  <div className={`font-medium ${theme.text} truncate`}>
+                                <div key={idx} className="text-xs p-2 rounded fc-glass-soft border border-[color:var(--fc-glass-border)]">
+                                  <div className="font-medium fc-text-primary truncate">
                                     {template?.name || 'Workout'}
                                   </div>
-                                  <div className={`text-xs ${theme.textSecondary}`}>
+                                  <div className="text-xs fc-text-subtle">
                                     {schedule.duration_minutes}m
                                   </div>
                                 </div>
@@ -184,56 +178,56 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
                             })}
                           </div>
                         ) : (
-                          <div className={`text-xs ${theme.textSecondary}`}>Rest</div>
+                          <div className="text-xs fc-text-subtle">Rest</div>
                         )}
                       </div>
                     )
                   })}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Workout Templates */}
-            <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
-              <CardHeader className="p-6">
+            <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+              <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-xl bg-gradient-to-br from-green-400 via-green-500 to-green-600 shadow-lg`}>
-                    <Dumbbell className={`w-5 h-5 text-white`} />
+                  <div className="fc-icon-tile fc-icon-workouts">
+                    <Dumbbell className="w-5 h-5" />
                   </div>
-                  <CardTitle className={`text-xl font-bold ${theme.text}`}>
+                  <div className="text-xl font-bold fc-text-primary">
                     Workout Templates ({program.schedule?.length || 0})
-                  </CardTitle>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
+              </div>
+              <div className="p-6">
                 {program.schedule && program.schedule.length > 0 ? (
                   <div className="space-y-4">
                     {program.schedule.map((scheduleItem: any, index: number) => {
                       const template = templates.find(t => t.id === scheduleItem.template_id)
                       return (
-                        <div key={scheduleItem.id || index} className={`${theme.card} border ${theme.border} rounded-xl p-4`}>
+                        <div key={scheduleItem.id || index} className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-xl p-4">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
-                              <h4 className={`font-semibold ${theme.text} mb-1`}>
+                              <h4 className="font-semibold fc-text-primary mb-1">
                                 {template?.name || 'Workout'}
                               </h4>
                               <div className="flex items-center gap-4 text-sm">
-                                <span className={`${theme.textSecondary}`}>
+                                <span className="fc-text-dim">
                                   <Calendar className="w-3 h-3 inline mr-1" />
                                   Week {scheduleItem.week_number || 1}, Day {scheduleItem.day_of_week || 1}
                                 </span>
-                                <span className={`${theme.textSecondary}`}>
+                                <span className="fc-text-dim">
                                   <Clock className="w-3 h-3 inline mr-1" />
                                   {template?.estimated_duration || 60}m
                                 </span>
-                                <span className={`${theme.textSecondary}`}>
+                                <span className="fc-text-dim">
                                   <Dumbbell className="w-3 h-3 inline mr-1" />
                                   {template?.exercises?.length || 0} exercises
                                 </span>
                                 {template?.difficulty_level && (
-                                  <Badge className={`text-xs ${difficultyColors[template.difficulty_level as keyof typeof difficultyColors]} border-0`}>
+                                  <span className={`fc-pill fc-pill-glass text-xs ${difficultyColors[template.difficulty_level as keyof typeof difficultyColors]}`}>
                                     {template.difficulty_level}
-                                  </Badge>
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -244,27 +238,27 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <Dumbbell className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                    <p className={`text-slate-500 ${theme.textSecondary}`}>No workout templates added to this program</p>
+                    <Dumbbell className="w-12 h-12 fc-text-subtle mx-auto mb-4" />
+                    <p className="fc-text-dim">No workout templates added to this program</p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className={`flex-shrink-0 ${theme.card} border-t ${theme.border} px-6 py-4 rounded-b-3xl sticky bottom-0`}>
+        <div className="flex-shrink-0 border-t border-[color:var(--fc-glass-border)] px-6 py-4 rounded-b-3xl sticky bottom-0">
           <div className="flex justify-end gap-3">
             <Button 
               variant="outline" 
               onClick={onClose}
-              className="rounded-xl"
+              className="rounded-xl fc-btn fc-btn-secondary"
             >
               Close
             </Button>
             <Button 
-              className={`${theme.primary} rounded-xl`}
+              className="fc-btn fc-btn-primary fc-press rounded-xl"
               onClick={onEdit}
             >
               <Edit className="w-4 h-4 mr-2" />

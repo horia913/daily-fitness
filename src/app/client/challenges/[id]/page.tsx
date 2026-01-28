@@ -9,15 +9,15 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Trophy, Calendar, Gift } from "lucide-react";
 import Link from "next/link";
 import { getChallengeDetails, getChallengeLeaderboard } from "@/lib/challengeService";
+import { cn } from "@/lib/utils";
 
 function ChallengeDetailContent() {
   const params = useParams();
   const { user, loading: authLoading } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
   const challengeId = params.id as string;
 
   const [challenge, setChallenge] = useState<any>(null);
@@ -52,10 +52,12 @@ function ChallengeDetailContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 container mx-auto px-4 py-8">
-            <div className="animate-pulse space-y-6">
-              <div className="h-24 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-              <div className="h-96 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="fc-glass fc-card p-8">
+              <div className="animate-pulse space-y-6">
+                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="h-80 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+              </div>
             </div>
           </div>
         </AnimatedBackground>
@@ -68,13 +70,11 @@ function ChallengeDetailContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 container mx-auto px-4 py-8">
-            <GlassCard elevation={2} className="p-12">
-              <div className="text-center">
-                <p style={{ color: isDark ? "#fff" : "#1A1A1A" }}>
-                  Challenge not found
-                </p>
-              </div>
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+              <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                Challenge not found
+              </p>
             </GlassCard>
           </div>
         </AnimatedBackground>
@@ -86,96 +86,59 @@ function ChallengeDetailContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
-        {/* Header */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center gap-4 mb-4">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
               <Link href="/client/challenges">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-5 h-5" />
+                <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
+                  <ArrowLeft className="h-5 w-5" />
                 </Button>
               </Link>
-              <div className="flex-1">
-                <h1
-                  className="text-3xl font-bold mb-1"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
+              <div>
+                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                  Challenge Details
+                </span>
+                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
                   {challenge.name}
                 </h1>
-                <div className="flex items-center gap-3 mt-2">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)" }} />
-                    <span
-                      className="text-sm"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                      }}
-                    >
-                      {new Date(challenge.start_date).toLocaleDateString()} - {new Date(challenge.end_date).toLocaleDateString()}
-                    </span>
-                  </div>
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-[color:var(--fc-text-dim)]">
+                  <span className="inline-flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
+                    {new Date(challenge.start_date).toLocaleDateString()} -{" "}
+                    {new Date(challenge.end_date).toLocaleDateString()}
+                  </span>
                   {challenge.reward_description && (
-                    <div className="flex items-center gap-2">
-                      <Gift className="w-4 h-4" style={{ color: getSemanticColor("warning").primary }} />
-                      <span
-                        className="text-sm font-medium"
-                        style={{ color: getSemanticColor("warning").primary }}
-                      >
-                        {challenge.reward_description}
-                      </span>
-                    </div>
+                    <span className="inline-flex items-center gap-2 text-[color:var(--fc-status-warning)]">
+                      <Gift className="w-4 h-4" />
+                      {challenge.reward_description}
+                    </span>
                   )}
                 </div>
               </div>
-              <Badge
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  color: "#fff",
-                }}
-              >
-                {challenge.status}
-              </Badge>
             </div>
+            <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)] uppercase">
+              {challenge.status}
+            </span>
+          </div>
 
-            {challenge.description && (
-              <p
-                className="text-sm"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                }}
-              >
-                {challenge.description}
-              </p>
-            )}
-          </GlassCard>
-        </div>
+          {challenge.description && (
+            <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
+              {challenge.description}
+            </p>
+          )}
+        </GlassCard>
 
-        {/* Leaderboard */}
-        <GlassCard elevation={2} className="p-6">
+        <GlassCard elevation={2} className="fc-glass fc-card p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center"
-              style={{
-                background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
-                boxShadow: "0 4px 12px rgba(255, 215, 0, 0.3)",
-              }}
-            >
+            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-500 shadow-[0_8px_18px_rgba(245,158,11,0.35)]">
               <Trophy className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2
-                className="text-xl font-bold"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
+              <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
                 Leaderboard
               </h2>
-              <p
-                className="text-sm"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
+              <p className="text-sm text-[color:var(--fc-text-dim)]">
                 {leaderboard.length} participants
               </p>
             </div>
@@ -183,27 +146,12 @@ function ChallengeDetailContent() {
 
           {leaderboard.length === 0 ? (
             <div className="text-center py-12">
-              <Trophy
-                className="w-16 h-16 mx-auto mb-4"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                }}
-              />
-              <p
-                className="text-lg font-semibold"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                }}
-              >
+              <Trophy className="w-16 h-16 mx-auto mb-4 text-[color:var(--fc-text-subtle)]" />
+              <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                 No participants yet
               </p>
-              <p
-                className="text-sm mt-2"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                }}
-              >
-                Be the first to join!
+              <p className="text-sm mt-2 text-[color:var(--fc-text-dim)]">
+                Be the first to join.
               </p>
             </div>
           ) : (
@@ -211,71 +159,47 @@ function ChallengeDetailContent() {
               {leaderboard.map((entry, index) => (
                 <div
                   key={entry.id}
-                  className={`p-4 rounded-lg ${
-                    entry.client_id === user?.id ? "ring-2 ring-offset-2" : ""
-                  }`}
-                  style={{
-                    background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
-                    ...(entry.client_id === user?.id && {
-                      border: `2px solid ${getSemanticColor("energy").primary}`,
-                      boxShadow: `0 0 0 2px ${getSemanticColor("energy").primary}40`,
-                      // Use CSS custom property for ring color if needed
-                      '--ring-color': getSemanticColor("energy").primary,
-                    } as React.CSSProperties),
-                  }}
+                  className={cn(
+                    "fc-glass-soft fc-card p-4 transition-all",
+                    entry.client_id === user?.id
+                      ? "border border-[color:var(--fc-accent-cyan)]/50 shadow-[0_0_0_1px_rgba(8,145,178,0.25)]"
+                      : "border border-[color:var(--fc-glass-border)]"
+                  )}
                 >
                   <div className="flex items-center gap-4">
                     <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0"
-                      style={{
-                        background:
-                          entry.final_rank === 1
-                            ? "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)"
-                            : entry.final_rank === 2
-                            ? "linear-gradient(135deg, #C0C0C0 0%, #808080 100%)"
-                            : entry.final_rank === 3
-                            ? "linear-gradient(135deg, #CD7F32 0%, #8B4513 100%)"
-                            : isDark
-                            ? "rgba(255,255,255,0.1)"
-                            : "rgba(0,0,0,0.05)",
-                        color: entry.final_rank <= 3 ? "#fff" : isDark ? "#fff" : "#1A1A1A",
-                      }}
+                      className={cn(
+                        "w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0",
+                        entry.final_rank === 1
+                          ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white"
+                          : entry.final_rank === 2
+                          ? "bg-gradient-to-br from-slate-300 to-slate-500 text-white"
+                          : entry.final_rank === 3
+                          ? "bg-gradient-to-br from-amber-700 to-orange-900 text-white"
+                          : "bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-primary)]"
+                      )}
                     >
                       {entry.final_rank || index + 1}
                     </div>
 
                     <div className="flex-1">
-                      <p
-                        className="font-semibold"
-                        style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                      >
+                      <p className="font-semibold text-[color:var(--fc-text-primary)]">
                         Participant {index + 1}
                       </p>
                       {entry.selected_track && (
-                        <p
-                          className="text-xs"
-                          style={{
-                            color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                          }}
-                        >
-                          {entry.selected_track === "fat_loss" ? "Fat Loss Track" : "Muscle Gain Track"}
+                        <p className="text-xs text-[color:var(--fc-text-subtle)]">
+                          {entry.selected_track === "fat_loss"
+                            ? "Fat Loss Track"
+                            : "Muscle Gain Track"}
                         </p>
                       )}
                     </div>
 
                     <div className="text-right">
-                      <p
-                        className="text-2xl font-bold"
-                        style={{ color: getSemanticColor("energy").primary }}
-                      >
+                      <p className="text-2xl font-bold text-[color:var(--fc-accent-cyan)]">
                         {entry.total_score}
                       </p>
-                      <p
-                        className="text-xs"
-                        style={{
-                          color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                        }}
-                      >
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">
                         points
                       </p>
                     </div>

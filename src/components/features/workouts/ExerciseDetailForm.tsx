@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useTheme } from "@/contexts/ThemeContext";
 import {
   Plus,
   Zap,
@@ -37,6 +36,7 @@ interface ExerciseDetailFormProps {
   mode?: "inline" | "modal";
   allowTypeChange?: boolean;
   allowStructureEditing?: boolean;
+  allowedBlockTypes?: string[]; // Optional: filter available block types for volume calculator
 }
 
 const complexGroupLabels: Record<string, string> = {
@@ -51,6 +51,7 @@ const complexGroupLabels: Record<string, string> = {
   drop_set: "Drop Set Configuration",
   pre_exhaustion: "Pre-Exhaustion Configuration",
   for_time: "For Time Configuration",
+  hr_sets: "HR Sets Configuration",
 };
 
 export default function ExerciseDetailForm({
@@ -60,9 +61,9 @@ export default function ExerciseDetailForm({
   mode: _mode = "inline",
   allowTypeChange = true,
   allowStructureEditing = true,
+  allowedBlockTypes,
 }: ExerciseDetailFormProps) {
-  const { isDark, getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
+  const theme = { text: "fc-text-primary", textSecondary: "fc-text-subtle" };
 
   // Helper function to ensure value is an array
   const ensureArray = <T,>(value: T[] | undefined | null): T[] =>
@@ -140,6 +141,11 @@ export default function ExerciseDetailForm({
   };
 
   const exerciseType = exercise.exercise_type || "straight_set";
+  
+  // Debug: Log exercise type to help troubleshoot HR Sets form visibility
+  if (exerciseType === "hr_sets") {
+    console.log("🔍 HR Sets form should be visible. Exercise type:", exerciseType, "Exercise:", exercise);
+  }
 
   // Helper function to render Load % / Weight field with toggle
   const renderLoadWeightField = (
@@ -189,7 +195,7 @@ export default function ExerciseDetailForm({
               min="0"
               max="200"
               step="1"
-              className="mt-1 rounded-xl"
+              className="mt-1 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]"
             />
             <p className={`text-xs ${theme.textSecondary} mt-1`}>
               Percentage of estimated 1RM (e.g., 70 = 70% of 1RM)
@@ -210,7 +216,7 @@ export default function ExerciseDetailForm({
               placeholder={weightPlaceholder}
               min="0"
               step="0.1"
-              className="mt-1 rounded-xl"
+              className="mt-1 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]"
             />
             <p className={`text-xs ${theme.textSecondary} mt-1`}>
               Specific weight in kilograms
@@ -249,50 +255,112 @@ export default function ExerciseDetailForm({
             disabled={!allowTypeChange}
           >
             <SelectTrigger
-              className="mt-2 rounded-xl"
+              className="mt-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]"
               disabled={!allowTypeChange}
             >
               <SelectValue placeholder="Select exercise type" />
             </SelectTrigger>
             <SelectContent className="z-[99999] max-h-60">
-              <SelectItem value="straight_set" className="rounded-lg">
+              {/* Resistance Training Blocks */}
+              <SelectItem
+                value="straight_set"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes &&
+                  !allowedBlockTypes.includes("straight_set")
+                }
+              >
                 Straight Set
               </SelectItem>
-              <SelectItem value="superset" className="rounded-lg">
+              <SelectItem
+                value="superset"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes && !allowedBlockTypes.includes("superset")
+                }
+              >
                 Superset
               </SelectItem>
-              <SelectItem value="giant_set" className="rounded-lg">
+              <SelectItem
+                value="giant_set"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes && !allowedBlockTypes.includes("giant_set")
+                }
+              >
                 Giant Set
               </SelectItem>
-              <SelectItem value="drop_set" className="rounded-lg">
+              <SelectItem
+                value="drop_set"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes && !allowedBlockTypes.includes("drop_set")
+                }
+              >
                 Drop Set
               </SelectItem>
-              <SelectItem value="cluster_set" className="rounded-lg">
+              <SelectItem
+                value="cluster_set"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes &&
+                  !allowedBlockTypes.includes("cluster_set")
+                }
+              >
                 Cluster Set
               </SelectItem>
-              <SelectItem value="rest_pause" className="rounded-lg">
+              <SelectItem
+                value="rest_pause"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes &&
+                  !allowedBlockTypes.includes("rest_pause")
+                }
+              >
                 Rest-Pause
               </SelectItem>
-              <SelectItem value="pre_exhaustion" className="rounded-lg">
+              <SelectItem
+                value="pre_exhaustion"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes &&
+                  !allowedBlockTypes.includes("pre_exhaustion")
+                }
+              >
                 Pre-Exhaustion
               </SelectItem>
-              <SelectItem value="amrap" className="rounded-lg">
-                AMRAP
+              <SelectItem
+                value="hr_sets"
+                className="rounded-lg"
+                disabled={
+                  allowedBlockTypes &&
+                  !allowedBlockTypes.includes("hr_sets")
+                }
+              >
+                HR Sets
               </SelectItem>
-              <SelectItem value="emom" className="rounded-lg">
-                EMOM
-              </SelectItem>
-              <SelectItem value="tabata" className="rounded-lg">
-                Tabata
-              </SelectItem>
-              <SelectItem value="for_time" className="rounded-lg">
-                For Time
-              </SelectItem>
+              {/* Time-Based Blocks - Hidden when filtering */}
+              {(!allowedBlockTypes || allowedBlockTypes.length === 0) && (
+                <>
+                  <SelectItem value="amrap" className="rounded-lg">
+                    AMRAP
+                  </SelectItem>
+                  <SelectItem value="emom" className="rounded-lg">
+                    EMOM
+                  </SelectItem>
+                  <SelectItem value="tabata" className="rounded-lg">
+                    Tabata
+                  </SelectItem>
+                  <SelectItem value="for_time" className="rounded-lg">
+                    For Time
+                  </SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>
 
-        {!["tabata", "giant_set"].includes(exerciseType) && (
+        {!["tabata", "giant_set", "hr_sets"].includes(exerciseType) && (
           <div>
             <Label className={`text-sm font-medium ${theme.text}`}>
               {exerciseLabel}
@@ -412,11 +480,11 @@ export default function ExerciseDetailForm({
       {/* Superset */}
       {exerciseType === "superset" && (
         <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
-              <Zap className="w-4 h-4 text-purple-600" />
+              <Zap className="w-4 h-4 fc-text-workouts" />
               Superset Configuration
             </h4>
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
@@ -544,11 +612,11 @@ export default function ExerciseDetailForm({
       {/* AMRAP */}
       {exerciseType === "amrap" && (
         <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
-              <Rocket className="w-4 h-4 text-purple-600" />
+              <Rocket className="w-4 h-4 fc-text-workouts" />
               AMRAP Configuration
             </h4>
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
@@ -593,11 +661,11 @@ export default function ExerciseDetailForm({
       {/* EMOM */}
       {exerciseType === "emom" && (
         <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
-              <Timer className="w-4 h-4 text-purple-600" />
+              <Timer className="w-4 h-4 fc-text-workouts" />
               EMOM Configuration
             </h4>
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
@@ -613,7 +681,7 @@ export default function ExerciseDetailForm({
                 value={exercise.emom_mode || ""}
                 onValueChange={(value) => updateExercise({ emom_mode: value })}
               >
-                <SelectTrigger className="mt-2 rounded-xl">
+                <SelectTrigger className="mt-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -733,11 +801,11 @@ export default function ExerciseDetailForm({
       {/* Tabata */}
       {exerciseType === "tabata" && (
         <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
-              <CloudLightning className="w-4 h-4 text-purple-600" />
+              <CloudLightning className="w-4 h-4 fc-text-workouts" />
               Tabata Circuit Configuration
             </h4>
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
@@ -829,7 +897,7 @@ export default function ExerciseDetailForm({
                         };
                       })
                     }
-                    className="border-dashed border-purple-300 dark:border-purple-600 text-purple-600 dark:text-purple-400"
+                    className="fc-btn fc-btn-secondary border-dashed fc-text-workouts"
                   >
                     <Plus className="w-3 h-3 mr-1" />
                     Add Set
@@ -841,7 +909,7 @@ export default function ExerciseDetailForm({
                 (set: any, setIndex: number) => (
                   <div
                     key={setIndex}
-                    className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
+                    className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h5 className={`font-medium ${theme.text}`}>
@@ -866,7 +934,7 @@ export default function ExerciseDetailForm({
                               };
                             })
                           }
-                          className="text-red-500 hover:text-red-700"
+                          className="fc-btn fc-btn-ghost fc-text-error"
                         >
                           <X className="w-3 h-3" />
                         </Button>
@@ -878,10 +946,10 @@ export default function ExerciseDetailForm({
                         (setExercise: any, exerciseIndex: number) => (
                           <div
                             key={exerciseIndex}
-                            className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600"
+                            className="p-3 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)]"
                           >
                             <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <span className="text-xs text-slate-500 w-6">
+                              <span className="text-xs fc-text-subtle w-6">
                                 {exerciseIndex + 1}.
                               </span>
                               <div className="flex-1">
@@ -958,7 +1026,7 @@ export default function ExerciseDetailForm({
                                       };
                                     })
                                   }
-                                  className="text-red-500 hover:text-red-700 p-1"
+                                  className="fc-btn fc-btn-ghost fc-text-error p-1"
                                 >
                                   <X className="w-3 h-3" />
                                 </Button>
@@ -1117,7 +1185,7 @@ export default function ExerciseDetailForm({
                               };
                             })
                           }
-                          className="w-full border-dashed text-xs"
+                          className="w-full fc-btn fc-btn-secondary border-dashed text-xs"
                         >
                           <Plus className="w-3 h-3 mr-1" />
                           Add Exercise
@@ -1172,11 +1240,11 @@ export default function ExerciseDetailForm({
       {/* Drop Set */}
       {exerciseType === "drop_set" && (
         <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
-              <TrendingDown className="w-4 h-4 text-purple-600" />
+              <TrendingDown className="w-4 h-4 fc-text-workouts" />
               Drop Set Configuration
             </h4>
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
@@ -1267,11 +1335,11 @@ export default function ExerciseDetailForm({
       {/* Giant Set */}
       {exerciseType === "giant_set" && (
         <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
-              <Flame className="w-4 h-4 text-purple-600" />
+              <Flame className="w-4 h-4 fc-text-workouts" />
               Giant Set Configuration
             </h4>
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
@@ -1287,10 +1355,10 @@ export default function ExerciseDetailForm({
                 (gsExercise: any, index: number) => (
                   <div
                     key={index}
-                    className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
+                    className="p-3 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)]"
                   >
                     <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300 w-8">
+                        <span className="text-sm font-medium fc-text-subtle w-8">
                         {index + 1}.
                       </span>
                       <div className="flex-1">
@@ -1339,7 +1407,7 @@ export default function ExerciseDetailForm({
                               };
                             })
                           }
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          className="fc-btn fc-btn-ghost fc-text-error"
                         >
                           <X className="w-3 h-3" />
                         </Button>
@@ -1462,7 +1530,7 @@ export default function ExerciseDetailForm({
                       };
                     })
                   }
-                  className="w-full border-dashed border-purple-300 dark:border-purple-600 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                  className="w-full fc-btn fc-btn-secondary border-dashed fc-text-workouts"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Exercise to Giant Set
@@ -1515,11 +1583,11 @@ export default function ExerciseDetailForm({
       {/* Cluster Set */}
       {exerciseType === "cluster_set" && (
         <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
-              <Link className="w-4 h-4 text-purple-600" />
+              <Link className="w-4 h-4 fc-text-workouts" />
               Cluster Set Configuration
             </h4>
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
@@ -1622,11 +1690,11 @@ export default function ExerciseDetailForm({
       {/* Rest-Pause */}
       {exerciseType === "rest_pause" && (
         <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
-              <PauseCircle className="w-4 h-4 text-purple-600" />
+              <PauseCircle className="w-4 h-4 fc-text-workouts" />
               Rest-Pause Set Configuration
             </h4>
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
@@ -1696,11 +1764,11 @@ export default function ExerciseDetailForm({
       {/* Pre-Exhaustion */}
       {exerciseType === "pre_exhaustion" && (
         <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
-              <Dumbbell className="w-4 h-4 text-purple-600" />
+              <Dumbbell className="w-4 h-4 fc-text-workouts" />
               Pre-Exhaustion Configuration
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1821,11 +1889,11 @@ export default function ExerciseDetailForm({
       {/* For Time */}
       {exerciseType === "for_time" && (
         <div className="space-y-4">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
-              <Activity className="w-4 h-4 text-purple-600" />
+              <Activity className="w-4 h-4 fc-text-workouts" />
               For Time Configuration
             </h4>
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
@@ -1886,13 +1954,253 @@ export default function ExerciseDetailForm({
           </div>
         </div>
       )}
+
+      {/* HR Sets */}
+      {exerciseType === "hr_sets" && (
+        <div className="space-y-4">
+          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <h4
+              className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
+            >
+              <Activity className="w-4 h-4 fc-text-warning" />
+              HR Sets Configuration
+            </h4>
+            <p className={`text-sm ${theme.textSecondary} mb-4`}>
+              Heart rate zone training for aerobic endurance (Zone 2-5)
+            </p>
+
+            {/* Session Type: Continuous vs Intervals */}
+            <div className="mb-4">
+              <Label className={`text-sm font-medium ${theme.text}`}>
+                Session Type
+              </Label>
+              <Select
+                value={
+                  exercise.hr_is_intervals === true
+                    ? "intervals"
+                    : exercise.hr_is_intervals === false
+                    ? "continuous"
+                    : ""
+                }
+                onValueChange={(value) =>
+                  updateExercise({ hr_is_intervals: value === "intervals" })
+                }
+              >
+                <SelectTrigger className="mt-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+                  <SelectValue placeholder="Select session type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="continuous">Continuous</SelectItem>
+                  <SelectItem value="intervals">Intervals</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* HR Zone or Percentage */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <Label className={`text-sm font-medium ${theme.text}`}>
+                  HR Zone (1-5)
+                </Label>
+                <Input
+                  type="number"
+                  value={exercise.hr_zone === "" ? "" : exercise.hr_zone || ""}
+                  onChange={(e) =>
+                    updateExercise({
+                      hr_zone: handleNumberChange(e.target.value, 0),
+                      hr_percentage_min: "",
+                      hr_percentage_max: "",
+                    })
+                  }
+                  min="1"
+                  max="5"
+                  placeholder="e.g., 2"
+                  className="mt-2 rounded-xl"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className={`text-sm font-medium ${theme.text}`}>
+                    HR % Min
+                  </Label>
+                  <Input
+                    type="number"
+                    value={
+                      exercise.hr_percentage_min === ""
+                        ? ""
+                        : exercise.hr_percentage_min || ""
+                    }
+                    onChange={(e) =>
+                      updateExercise({
+                        hr_percentage_min: handleNumberChange(e.target.value, 0),
+                        hr_zone: "",
+                      })
+                    }
+                    min="50"
+                    max="100"
+                    placeholder="e.g., 60"
+                    className="mt-2 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className={`text-sm font-medium ${theme.text}`}>
+                    HR % Max
+                  </Label>
+                  <Input
+                    type="number"
+                    value={
+                      exercise.hr_percentage_max === ""
+                        ? ""
+                        : exercise.hr_percentage_max || ""
+                    }
+                    onChange={(e) =>
+                      updateExercise({
+                        hr_percentage_max: handleNumberChange(e.target.value, 0),
+                        hr_zone: "",
+                      })
+                    }
+                    min="50"
+                    max="100"
+                    placeholder="e.g., 70"
+                    className="mt-2 rounded-xl"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Continuous Mode Fields */}
+            {exercise.hr_is_intervals === false && (
+              <div className="mb-4">
+                <Label className={`text-sm font-medium ${theme.text}`}>
+                  Duration (minutes)
+                </Label>
+                <Input
+                  type="number"
+                  value={
+                    exercise.hr_duration_minutes === ""
+                      ? ""
+                      : exercise.hr_duration_minutes || ""
+                  }
+                  onChange={(e) =>
+                    updateExercise({
+                      hr_duration_minutes: handleNumberChange(e.target.value, 0),
+                    })
+                  }
+                  min="1"
+                  placeholder="e.g., 30"
+                  className="mt-2 rounded-xl"
+                />
+              </div>
+            )}
+
+            {/* Interval Mode Fields */}
+            {exercise.hr_is_intervals === true && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <Label className={`text-sm font-medium ${theme.text}`}>
+                    Work Duration (minutes)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={
+                      exercise.hr_work_duration_minutes === ""
+                        ? ""
+                        : exercise.hr_work_duration_minutes || ""
+                    }
+                    onChange={(e) =>
+                      updateExercise({
+                        hr_work_duration_minutes: handleNumberChange(
+                          e.target.value,
+                          0
+                        ),
+                      })
+                    }
+                    min="1"
+                    placeholder="e.g., 5"
+                    className="mt-2 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className={`text-sm font-medium ${theme.text}`}>
+                    Rest Duration (minutes)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={
+                      exercise.hr_rest_duration_minutes === ""
+                        ? ""
+                        : exercise.hr_rest_duration_minutes || ""
+                    }
+                    onChange={(e) =>
+                      updateExercise({
+                        hr_rest_duration_minutes: handleNumberChange(
+                          e.target.value,
+                          0
+                        ),
+                      })
+                    }
+                    min="0"
+                    placeholder="e.g., 3"
+                    className="mt-2 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className={`text-sm font-medium ${theme.text}`}>
+                    Target Rounds
+                  </Label>
+                  <Input
+                    type="number"
+                    value={
+                      exercise.hr_target_rounds === ""
+                        ? ""
+                        : exercise.hr_target_rounds || ""
+                    }
+                    onChange={(e) =>
+                      updateExercise({
+                        hr_target_rounds: handleNumberChange(e.target.value, 0),
+                      })
+                    }
+                    min="1"
+                    placeholder="e.g., 4"
+                    className="mt-2 rounded-xl"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Optional Distance Field */}
+            <div>
+              <Label className={`text-sm font-medium ${theme.text}`}>
+                Distance (meters, optional)
+              </Label>
+              <Input
+                type="number"
+                value={
+                  exercise.hr_distance_meters === ""
+                    ? ""
+                    : exercise.hr_distance_meters || ""
+                }
+                onChange={(e) =>
+                  updateExercise({
+                    hr_distance_meters: handleNumberChange(e.target.value, 0),
+                  })
+                }
+                min="0"
+                placeholder="e.g., 5000"
+                className="mt-2 rounded-xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <Label className={`text-sm font-medium ${theme.text}`}>Notes</Label>
         <Textarea
           value={exercise.notes || ""}
           onChange={(e) => updateExercise({ notes: e.target.value })}
           placeholder="Add any notes or instructions..."
-          className="mt-2 rounded-xl"
+          className="mt-2 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]"
           rows={3}
         />
       </div>

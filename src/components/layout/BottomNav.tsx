@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Home,
   Dumbbell,
@@ -59,40 +60,19 @@ export default function BottomNav() {
     setMounted(true);
   }, []);
 
-  // Show static skeleton during SSR and initial hydration
+  const fixedNavStyle: React.CSSProperties = {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: "100%",
+    zIndex: 10000,
+  };
+
+  // Render nothing until mounted so server and client output match (avoids hydration mismatch).
+  // After mount we portal the nav into document.body.
   if (!mounted) {
-    return (
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-slate-200 h-20 z-[10000] shadow-lg">
-        <div className="h-full px-2">
-          <div className="flex items-center justify-between h-full max-w-md mx-auto">
-            <div className="flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl min-w-[60px]">
-              <div className="w-6 h-6 bg-slate-200 rounded" />
-              <div className="w-8 h-3 bg-slate-200 rounded" />
-            </div>
-            <div className="flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl min-w-[55px]">
-              <div className="w-5.5 h-5.5 bg-slate-200 rounded" />
-              <div className="w-8 h-3 bg-slate-200 rounded" />
-            </div>
-            <div className="flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl min-w-[55px]">
-              <div className="w-5.5 h-5.5 bg-slate-200 rounded" />
-              <div className="w-8 h-3 bg-slate-200 rounded" />
-            </div>
-            <div className="flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl min-w-[55px]">
-              <div className="w-5.5 h-5.5 bg-slate-200 rounded" />
-              <div className="w-8 h-3 bg-slate-200 rounded" />
-            </div>
-            <div className="flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl min-w-[55px]">
-              <div className="w-5.5 h-5.5 bg-slate-200 rounded" />
-              <div className="w-8 h-3 bg-slate-200 rounded" />
-            </div>
-            <div className="flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl min-w-[50px]">
-              <div className="w-5 h-5 bg-slate-200 rounded" />
-              <div className="w-8 h-3 bg-slate-200 rounded" />
-            </div>
-          </div>
-        </div>
-      </nav>
-    );
+    return null;
   }
 
   // Determine which nav items to show based on current path
@@ -100,8 +80,12 @@ export default function BottomNav() {
     ? coachNavItems
     : clientNavItems;
 
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-t border-slate-200 dark:border-slate-700 h-20 z-[10000] shadow-lg">
+  const navContent = (
+    <nav
+      data-fc-bottom-nav
+      style={fixedNavStyle}
+      className="fc-glass fc-card border-t border-[color:var(--fc-glass-border)] h-20 shadow-lg"
+    >
       <div className="h-full px-2">
         <div className="flex items-center justify-between h-full max-w-md mx-auto">
           {navItems.map((item) => {
@@ -130,15 +114,15 @@ export default function BottomNav() {
                 className={`group relative flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-2xl transition-all duration-200 ease-in-out ${
                   isActive
                     ? isCoachWorkoutsItem
-                      ? "text-orange-600 bg-gradient-to-br from-orange-50 to-orange-100 shadow-md transform scale-105"
+                      ? "fc-text-workouts fc-glass-soft border border-[color:var(--fc-glass-border)] shadow-md transform scale-105"
                       : isCoachProgramsItem
-                      ? "text-purple-600 bg-gradient-to-br from-purple-50 to-purple-100 shadow-md transform scale-105"
+                      ? "fc-text-workouts fc-glass-soft border border-[color:var(--fc-glass-border)] shadow-md transform scale-105"
                       : isCoachNutritionItem
-                      ? "text-green-600 bg-gradient-to-br from-green-50 to-green-100 shadow-md transform scale-105"
+                      ? "fc-text-habits fc-glass-soft border border-[color:var(--fc-glass-border)] shadow-md transform scale-105"
                       : isCoachMenuItem
-                      ? "text-slate-600 bg-gradient-to-br from-slate-50 to-slate-100 shadow-md transform scale-105"
-                      : "text-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-md transform scale-105"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:shadow-sm hover:transform hover:scale-102"
+                      ? "fc-text-neutral fc-glass-soft border border-[color:var(--fc-glass-border)] shadow-md transform scale-105"
+                      : "fc-text-primary fc-glass-soft border border-[color:var(--fc-glass-border)] shadow-md transform scale-105"
+                    : "fc-text-subtle hover:fc-text-primary hover:fc-glass-soft hover:shadow-sm hover:transform hover:scale-102"
                 } ${
                   isHomeItem
                     ? "min-w-[60px]"
@@ -153,47 +137,47 @@ export default function BottomNav() {
               >
                 {/* Special indicator for Home/Dashboard item */}
                 {isActive && isHomeItem && (
-                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-600 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-[color:var(--fc-domain-workouts)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Special indicator for Workouts item */}
                 {isActive && isWorkoutsItem && (
-                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce"></div>
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[color:var(--fc-domain-workouts)] rounded-full animate-bounce"></div>
                 )}
 
                 {/* Special indicator for Nutrition item */}
                 {isActive && isNutritionItem && (
-                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[color:var(--fc-accent-cyan)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Special indicator for Progress item */}
                 {isActive && isProgressItem && (
-                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[color:var(--fc-accent-cyan)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Special indicator for Profile item */}
                 {isActive && isProfileItem && (
-                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-slate-600 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[color:var(--fc-glass-border)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Special indicator for Coach Workouts item */}
                 {isActive && isCoachWorkoutsItem && (
-                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce"></div>
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[color:var(--fc-domain-workouts)] rounded-full animate-bounce"></div>
                 )}
 
                 {/* Special indicator for Coach Nutrition item */}
                 {isActive && isCoachNutritionItem && (
-                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[color:var(--fc-accent-cyan)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Special indicator for Coach Programs item */}
                 {isActive && isCoachProgramsItem && (
-                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[color:var(--fc-accent-cyan)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Special indicator for Coach Menu item */}
                 {isActive && isCoachMenuItem && (
-                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-slate-500 rounded-full animate-pulse"></div>
+                  <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-[color:var(--fc-glass-border)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Icon with special treatment for Home, Workouts, Nutrition, Progress, Profile, Coach Workouts, Coach Programs, Coach Nutrition, Coach Messages, and Coach Menu */}
@@ -237,86 +221,86 @@ export default function BottomNav() {
                     } transition-all duration-200 ${
                       isActive
                         ? isWorkoutsItem
-                          ? "text-orange-600"
+                          ? "fc-text-workouts"
                           : isNutritionItem
-                          ? "text-green-600"
+                          ? "fc-text-habits"
                           : isProgressItem
-                          ? "text-purple-600"
+                          ? "fc-text-warning"
                           : isProfileItem
-                          ? "text-slate-700"
+                          ? "fc-text-neutral"
                           : isCoachWorkoutsItem
-                          ? "text-orange-600"
+                          ? "fc-text-workouts"
                           : isCoachProgramsItem
-                          ? "text-purple-600"
+                          ? "fc-text-workouts"
                           : isCoachNutritionItem
-                          ? "text-green-600"
+                          ? "fc-text-habits"
                           : isCoachMenuItem
-                          ? "text-slate-600"
-                          : "text-blue-600"
-                        : "text-slate-500 group-hover:text-slate-700"
+                          ? "fc-text-neutral"
+                          : "fc-text-primary"
+                        : "fc-text-subtle group-hover:fc-text-primary"
                     }`}
                   />
 
                   {/* Special sparkle effect for active Home item */}
                   {isActive && isHomeItem && (
                     <div className="absolute -top-1 -right-1">
-                      <Sparkles className="w-3 h-3 text-blue-400 animate-pulse" />
+                    <Sparkles className="w-3 h-3 fc-text-workouts animate-pulse" />
                     </div>
                   )}
 
                   {/* Special energy effect for active Workouts item */}
                   {isActive && isWorkoutsItem && (
                     <div className="absolute -top-1 -right-1">
-                      <Zap className="w-3 h-3 text-orange-400 animate-pulse" />
+                    <Zap className="w-3 h-3 fc-text-workouts animate-pulse" />
                     </div>
                   )}
 
                   {/* Special leaf effect for active Nutrition item */}
                   {isActive && isNutritionItem && (
                     <div className="absolute -top-1 -right-1">
-                      <Leaf className="w-3 h-3 text-green-400 animate-pulse" />
+                    <Leaf className="w-3 h-3 fc-text-habits animate-pulse" />
                     </div>
                   )}
 
                   {/* Special trophy effect for active Progress item */}
                   {isActive && isProgressItem && (
                     <div className="absolute -top-1 -right-1">
-                      <Trophy className="w-3 h-3 text-purple-400 animate-pulse" />
+                    <Trophy className="w-3 h-3 fc-text-warning animate-pulse" />
                     </div>
                   )}
 
                   {/* Special settings effect for active Profile item */}
                   {isActive && isProfileItem && (
                     <div className="absolute -top-1 -right-1">
-                      <Settings className="w-3 h-3 text-slate-500 animate-pulse" />
+                    <Settings className="w-3 h-3 fc-text-neutral animate-pulse" />
                     </div>
                   )}
 
                   {/* Special energy effect for active Coach Workouts item */}
                   {isActive && isCoachWorkoutsItem && (
                     <div className="absolute -top-1 -right-1">
-                      <Zap className="w-3 h-3 text-orange-400 animate-pulse" />
+                    <Zap className="w-3 h-3 fc-text-workouts animate-pulse" />
                     </div>
                   )}
 
                   {/* Special trophy effect for active Coach Programs item */}
                   {isActive && isCoachProgramsItem && (
                     <div className="absolute -top-1 -right-1">
-                      <Trophy className="w-3 h-3 text-purple-400 animate-pulse" />
+                    <Trophy className="w-3 h-3 fc-text-workouts animate-pulse" />
                     </div>
                   )}
 
                   {/* Special health effect for active Coach Nutrition item */}
                   {isActive && isCoachNutritionItem && (
                     <div className="absolute -top-1 -right-1">
-                      <Leaf className="w-3 h-3 text-green-400 animate-pulse" />
+                    <Leaf className="w-3 h-3 fc-text-habits animate-pulse" />
                     </div>
                   )}
 
                   {/* Special tools effect for active Coach Menu item */}
                   {isActive && isCoachMenuItem && (
                     <div className="absolute -top-1 -right-1">
-                      <Grid className="w-3 h-3 text-slate-400 animate-pulse" />
+                    <Grid className="w-3 h-3 fc-text-neutral animate-pulse" />
                     </div>
                   )}
                 </div>
@@ -326,23 +310,23 @@ export default function BottomNav() {
                   className={`text-xs font-semibold transition-all duration-200 ${
                     isActive
                       ? isWorkoutsItem
-                        ? "text-orange-600"
+                        ? "fc-text-workouts"
                         : isNutritionItem
-                        ? "text-green-600"
+                        ? "fc-text-habits"
                         : isProgressItem
-                        ? "text-purple-600"
+                        ? "fc-text-warning"
                         : isProfileItem
-                        ? "text-slate-700"
+                        ? "fc-text-neutral"
                         : isCoachWorkoutsItem
-                        ? "text-orange-600"
+                        ? "fc-text-workouts"
                         : isCoachProgramsItem
-                        ? "text-purple-600"
+                        ? "fc-text-workouts"
                         : isCoachNutritionItem
-                        ? "text-green-600"
+                        ? "fc-text-habits"
                         : isCoachMenuItem
-                        ? "text-slate-600"
-                        : "text-blue-600"
-                      : "text-slate-500 group-hover:text-slate-700"
+                        ? "fc-text-neutral"
+                        : "fc-text-primary"
+                      : "fc-text-subtle group-hover:fc-text-primary"
                   } ${
                     isHomeItem
                       ? "text-[11px]"
@@ -363,87 +347,87 @@ export default function BottomNav() {
 
                 {/* Subtle background glow for active Home item */}
                 {isActive && isHomeItem && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-100/50 to-blue-200/30 rounded-2xl blur-sm -z-10"></div>
+                  <div className="absolute inset-0 fc-glass-soft rounded-2xl blur-sm -z-10"></div>
                 )}
 
                 {/* Subtle background glow for active Workouts item */}
                 {isActive && isWorkoutsItem && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-orange-100/50 to-orange-200/30 rounded-2xl blur-sm -z-10"></div>
+                  <div className="absolute inset-0 fc-glass-soft rounded-2xl blur-sm -z-10"></div>
                 )}
 
                 {/* Subtle background glow for active Nutrition item */}
                 {isActive && isNutritionItem && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-100/50 to-green-200/30 rounded-2xl blur-sm -z-10"></div>
+                  <div className="absolute inset-0 fc-glass-soft rounded-2xl blur-sm -z-10"></div>
                 )}
 
                 {/* Subtle background glow for active Progress item */}
                 {isActive && isProgressItem && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-100/50 to-purple-200/30 rounded-2xl blur-sm -z-10"></div>
+                  <div className="absolute inset-0 fc-glass-soft rounded-2xl blur-sm -z-10"></div>
                 )}
 
                 {/* Subtle background glow for active Profile item */}
                 {isActive && isProfileItem && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-slate-100/50 to-slate-200/30 rounded-2xl blur-sm -z-10"></div>
+                  <div className="absolute inset-0 fc-glass-soft rounded-2xl blur-sm -z-10"></div>
                 )}
 
                 {/* Subtle background glow for active Coach Workouts item */}
                 {isActive && isCoachWorkoutsItem && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-orange-100/50 to-orange-200/30 rounded-2xl blur-sm -z-10"></div>
+                  <div className="absolute inset-0 fc-glass-soft rounded-2xl blur-sm -z-10"></div>
                 )}
 
                 {/* Subtle background glow for active Coach Programs item */}
                 {isActive && isCoachProgramsItem && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-100/50 to-purple-200/30 rounded-2xl blur-sm -z-10"></div>
+                  <div className="absolute inset-0 fc-glass-soft rounded-2xl blur-sm -z-10"></div>
                 )}
 
                 {/* Subtle background glow for active Coach Nutrition item */}
                 {isActive && isCoachNutritionItem && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-100/50 to-green-200/30 rounded-2xl blur-sm -z-10"></div>
+                  <div className="absolute inset-0 fc-glass-soft rounded-2xl blur-sm -z-10"></div>
                 )}
 
                 {/* Subtle background glow for active Coach Menu item */}
                 {isActive && isCoachMenuItem && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-slate-100/50 to-slate-200/30 rounded-2xl blur-sm -z-10"></div>
+                  <div className="absolute inset-0 fc-glass-soft rounded-2xl blur-sm -z-10"></div>
                 )}
 
                 {/* Workout progress indicator for active Workouts item */}
                 {isActive && isWorkoutsItem && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-orange-400 to-orange-600 rounded-full animate-pulse"></div>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-[color:var(--fc-domain-workouts)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Nutrition progress indicator for active Nutrition item */}
                 {isActive && isNutritionItem && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-green-400 to-green-600 rounded-full animate-pulse"></div>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-[color:var(--fc-accent-cyan)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Progress indicator for active Progress item */}
                 {isActive && isProgressItem && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-purple-400 to-purple-600 rounded-full animate-pulse"></div>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-[color:var(--fc-accent-cyan)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Profile indicator for active Profile item */}
                 {isActive && isProfileItem && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-slate-400 to-slate-600 rounded-full animate-pulse"></div>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-[color:var(--fc-glass-border)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Coach Workouts indicator for active Coach Workouts item */}
                 {isActive && isCoachWorkoutsItem && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-orange-400 to-orange-600 rounded-full animate-pulse"></div>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-[color:var(--fc-domain-workouts)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Coach Programs indicator for active Coach Programs item */}
                 {isActive && isCoachProgramsItem && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-purple-400 to-purple-600 rounded-full animate-pulse"></div>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-[color:var(--fc-domain-workouts)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Coach Nutrition indicator for active Coach Nutrition item */}
                 {isActive && isCoachNutritionItem && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-green-400 to-green-600 rounded-full animate-pulse"></div>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-[color:var(--fc-accent-cyan)] rounded-full animate-pulse"></div>
                 )}
 
                 {/* Coach Menu indicator for active Coach Menu item */}
                 {isActive && isCoachMenuItem && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-slate-400 to-slate-600 rounded-full animate-pulse"></div>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-[color:var(--fc-glass-border)] rounded-full animate-pulse"></div>
                 )}
               </Link>
             );
@@ -452,4 +436,7 @@ export default function BottomNav() {
       </div>
     </nav>
   );
+
+  // Portal the nav into document.body so it is always viewport-fixed
+  return createPortal(navContent, document.body);
 }

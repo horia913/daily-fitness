@@ -3,7 +3,7 @@
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
@@ -119,399 +119,94 @@ const menuItems = [
 ];
 
 export default function CoachMenu() {
-  const { isDark, getThemeStyles, performanceSettings } = useTheme();
-  const theme = getThemeStyles();
+  const { performanceSettings } = useTheme();
 
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen">
-          {/* Content */}
-          <div
-            className="relative z-10"
-            style={{ padding: "24px 20px", paddingBottom: "100px" }}
-          >
-            <div
-              className="max-w-7xl mx-auto"
-              style={{ display: "flex", flexDirection: "column", gap: "24px" }}
-            >
-              {/* Header */}
-              <div
-                style={{
-                  textAlign: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "16px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "16px",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "64px",
-                      height: "64px",
-                      borderRadius: "18px",
-                      background:
-                        "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: isDark
-                        ? "0 4px 12px rgba(0, 0, 0, 0.4)"
-                        : "0 2px 8px rgba(0, 0, 0, 0.08)",
-                    }}
-                  >
-                    <Users
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        color: "#FFFFFF",
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <h1
-                      style={{
-                        fontSize: "32px",
-                        fontWeight: "800",
-                        color: isDark ? "#FFFFFF" : "#1A1A1A",
-                        margin: 0,
-                        lineHeight: "1.2",
-                      }}
-                    >
-                      Coach Menu
-                    </h1>
-                    <p
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: "400",
-                        color: isDark ? "#D1D5DB" : "#6B7280",
-                        margin: 0,
-                      }}
-                    >
-                      Access all your coaching tools and features
-                    </p>
-                  </div>
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+                  <Users className="w-7 h-7 text-white" />
                 </div>
-              </div>
-
-              {/* Menu Grid */}
-              <div
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-                style={{ gap: "20px" }}
-              >
-                {menuItems.map((item, index) => {
-                  const Icon = item.icon;
-                  const gradients = [
-                    "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)", // Purple
-                    "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)", // Orange
-                    "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)", // Green
-                    "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)", // Blue
-                    "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)", // Purple
-                    "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)", // Orange
-                    "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)", // Green
-                    "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)", // Blue
-                    "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)", // Purple
-                    "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)", // Orange
-                    "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)", // Green
-                  ];
-                  return (
-                    <Link href={item.href} key={index}>
-                      <div
-                        style={{
-                          backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                          borderRadius: "24px",
-                          padding: "24px",
-                          boxShadow: isDark
-                            ? "0 4px 12px rgba(0, 0, 0, 0.4)"
-                            : "0 2px 8px rgba(0, 0, 0, 0.08)",
-                          cursor: "pointer",
-                          height: "100%",
-                          border: `2px solid ${isDark ? "#2A2A2A" : "#E5E7EB"}`,
-                          transition: "all 0.3s ease",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "16px",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "scale(1.02)";
-                          e.currentTarget.style.boxShadow = isDark
-                            ? "0 8px 24px rgba(0, 0, 0, 0.6)"
-                            : "0 4px 16px rgba(0, 0, 0, 0.12)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "scale(1)";
-                          e.currentTarget.style.boxShadow = isDark
-                            ? "0 4px 12px rgba(0, 0, 0, 0.4)"
-                            : "0 2px 8px rgba(0, 0, 0, 0.08)";
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "16px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "56px",
-                              height: "56px",
-                              borderRadius: "18px",
-                              background: gradients[index % gradients.length],
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Icon
-                              style={{
-                                width: "32px",
-                                height: "32px",
-                                color: "#FFFFFF",
-                              }}
-                            />
-                          </div>
-                          <h3
-                            style={{
-                              fontSize: "18px",
-                              fontWeight: "600",
-                              color: isDark ? "#FFFFFF" : "#1A1A1A",
-                              margin: 0,
-                              lineHeight: "1.4",
-                              flex: 1,
-                            }}
-                          >
-                            {item.title}
-                          </h3>
-                        </div>
-                        <p
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: "400",
-                            color: isDark ? "#9CA3AF" : "#6B7280",
-                            margin: 0,
-                            lineHeight: "1.5",
-                          }}
-                        >
-                          {item.description}
-                        </p>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-
-              {/* Quick Actions */}
-              <div
-                style={{
-                  backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                  borderRadius: "24px",
-                  padding: "24px",
-                  boxShadow: isDark
-                    ? "0 4px 12px rgba(0, 0, 0, 0.4)"
-                    : "0 2px 8px rgba(0, 0, 0, 0.08)",
-                  border: `2px solid ${isDark ? "#8B5CF6" : "#6C5CE7"}`,
-                }}
-              >
-                <h2
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: "700",
-                    color: isDark ? "#8B5CF6" : "#6C5CE7",
-                    margin: 0,
-                    marginBottom: "20px",
-                  }}
-                >
-                  Quick Actions
-                </h2>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-                  <Link href="/coach/clients">
-                    <button
-                      style={{
-                        backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                        color: isDark ? "#FFFFFF" : "#1A1A1A",
-                        border: `2px solid ${isDark ? "#2A2A2A" : "#E5E7EB"}`,
-                        borderRadius: "20px",
-                        padding: "12px 24px",
-                        fontSize: "14px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = isDark
-                          ? "#2A2A2A"
-                          : "#F9FAFB";
-                        e.currentTarget.style.borderColor = "#6C5CE7";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = isDark
-                          ? "#1E1E1E"
-                          : "#FFFFFF";
-                        e.currentTarget.style.borderColor = isDark
-                          ? "#2A2A2A"
-                          : "#E5E7EB";
-                      }}
-                    >
-                      <Users style={{ width: "16px", height: "16px" }} />
-                      View All Clients
-                    </button>
-                  </Link>
-                  <Link href="/coach/programs-workouts">
-                    <button
-                      style={{
-                        backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                        color: isDark ? "#FFFFFF" : "#1A1A1A",
-                        border: `2px solid ${isDark ? "#2A2A2A" : "#E5E7EB"}`,
-                        borderRadius: "20px",
-                        padding: "12px 24px",
-                        fontSize: "14px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = isDark
-                          ? "#2A2A2A"
-                          : "#F9FAFB";
-                        e.currentTarget.style.borderColor = "#6C5CE7";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = isDark
-                          ? "#1E1E1E"
-                          : "#FFFFFF";
-                        e.currentTarget.style.borderColor = isDark
-                          ? "#2A2A2A"
-                          : "#E5E7EB";
-                      }}
-                    >
-                      <Dumbbell style={{ width: "16px", height: "16px" }} />
-                      Create Workout
-                    </button>
-                  </Link>
-                  <Link href="/coach/nutrition">
-                    <button
-                      style={{
-                        backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                        color: isDark ? "#FFFFFF" : "#1A1A1A",
-                        border: `2px solid ${isDark ? "#2A2A2A" : "#E5E7EB"}`,
-                        borderRadius: "20px",
-                        padding: "12px 24px",
-                        fontSize: "14px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = isDark
-                          ? "#2A2A2A"
-                          : "#F9FAFB";
-                        e.currentTarget.style.borderColor = "#6C5CE7";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = isDark
-                          ? "#1E1E1E"
-                          : "#FFFFFF";
-                        e.currentTarget.style.borderColor = isDark
-                          ? "#2A2A2A"
-                          : "#E5E7EB";
-                      }}
-                    >
-                      <Apple style={{ width: "16px", height: "16px" }} />
-                      Create Meal Plan
-                    </button>
-                  </Link>
-                  <Link href="/coach/availability">
-                    <button
-                      style={{
-                        backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                        color: isDark ? "#FFFFFF" : "#1A1A1A",
-                        border: `2px solid ${isDark ? "#2A2A2A" : "#E5E7EB"}`,
-                        borderRadius: "20px",
-                        padding: "12px 24px",
-                        fontSize: "14px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = isDark
-                          ? "#2A2A2A"
-                          : "#F9FAFB";
-                        e.currentTarget.style.borderColor = "#6C5CE7";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = isDark
-                          ? "#1E1E1E"
-                          : "#FFFFFF";
-                        e.currentTarget.style.borderColor = isDark
-                          ? "#2A2A2A"
-                          : "#E5E7EB";
-                      }}
-                    >
-                      <Clock style={{ width: "16px", height: "16px" }} />
-                      Set Availability
-                    </button>
-                  </Link>
-                  <Link href="/coach/profile">
-                    <button
-                      style={{
-                        backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                        color: isDark ? "#FFFFFF" : "#1A1A1A",
-                        border: `2px solid ${isDark ? "#2A2A2A" : "#E5E7EB"}`,
-                        borderRadius: "20px",
-                        padding: "12px 24px",
-                        fontSize: "14px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = isDark
-                          ? "#2A2A2A"
-                          : "#F9FAFB";
-                        e.currentTarget.style.borderColor = "#6C5CE7";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = isDark
-                          ? "#1E1E1E"
-                          : "#FFFFFF";
-                        e.currentTarget.style.borderColor = isDark
-                          ? "#2A2A2A"
-                          : "#E5E7EB";
-                      }}
-                    >
-                      <User style={{ width: "16px", height: "16px" }} />
-                      Edit Profile
-                    </button>
-                  </Link>
+                <div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Coach Toolkit
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                    Coach Menu
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Access all your coaching tools and features.
+                  </p>
                 </div>
               </div>
             </div>
+          </GlassCard>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {menuItems.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <Link href={item.href} key={index}>
+                  <GlassCard elevation={2} className="fc-glass fc-card p-6 h-full transition-all hover:scale-[1.02] hover:shadow-xl">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                        <Icon className="w-6 h-6 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                        {item.title}
+                      </h3>
+                    </div>
+                    <p className="mt-3 text-sm text-[color:var(--fc-text-dim)]">
+                      {item.description}
+                    </p>
+                  </GlassCard>
+                </Link>
+              );
+            })}
           </div>
+
+          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)] mb-4">
+              Quick Actions
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/coach/clients">
+                <Button className="fc-btn fc-btn-secondary">
+                  <Users className="w-4 h-4 mr-2" />
+                  View All Clients
+                </Button>
+              </Link>
+              <Link href="/coach/programs-workouts">
+                <Button className="fc-btn fc-btn-secondary">
+                  <Dumbbell className="w-4 h-4 mr-2" />
+                  Create Workout
+                </Button>
+              </Link>
+              <Link href="/coach/nutrition">
+                <Button className="fc-btn fc-btn-secondary">
+                  <Apple className="w-4 h-4 mr-2" />
+                  Create Meal Plan
+                </Button>
+              </Link>
+              <Link href="/coach/availability">
+                <Button className="fc-btn fc-btn-secondary">
+                  <Clock className="w-4 h-4 mr-2" />
+                  Set Availability
+                </Button>
+              </Link>
+              <Link href="/coach/profile">
+                <Button className="fc-btn fc-btn-secondary">
+                  <User className="w-4 h-4 mr-2" />
+                  Edit Profile
+                </Button>
+              </Link>
+            </div>
+          </GlassCard>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

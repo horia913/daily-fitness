@@ -2,8 +2,6 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useTheme } from "@/contexts/ThemeContext";
 import {
   Edit,
   Trash2,
@@ -41,110 +39,65 @@ interface ExerciseBlockCardProps {
 // Block type styles with colors and icons
 const blockTypeStyles: Record<
   string,
-  { color: string; bg: string; text: string; icon: any; label: string }
+  { icon: any; label: string }
 > = {
   straight_set: {
-    color: "blue",
-    bg: "bg-blue-100 dark:bg-blue-900/30",
-    text: "text-blue-600 dark:text-blue-400",
     icon: Dumbbell,
     label: "Straight Set",
   },
   superset: {
-    color: "green",
-    bg: "bg-green-100 dark:bg-green-900/30",
-    text: "text-green-600 dark:text-green-400",
     icon: Zap,
     label: "Superset",
   },
   giant_set: {
-    color: "orange",
-    bg: "bg-orange-100 dark:bg-orange-900/30",
-    text: "text-orange-600 dark:text-orange-400",
     icon: Target,
     label: "Giant Set",
   },
   drop_set: {
-    color: "red",
-    bg: "bg-red-100 dark:bg-red-900/30",
-    text: "text-red-600 dark:text-red-400",
     icon: TrendingDown,
     label: "Drop Set",
   },
   cluster_set: {
-    color: "purple",
-    bg: "bg-purple-100 dark:bg-purple-900/30",
-    text: "text-purple-600 dark:text-purple-400",
     icon: Timer,
     label: "Cluster Set",
   },
   rest_pause: {
-    color: "yellow",
-    bg: "bg-yellow-100 dark:bg-yellow-900/30",
-    text: "text-yellow-600 dark:text-yellow-400",
     icon: PauseCircle,
     label: "Rest-Pause",
   },
   pyramid_set: {
-    color: "indigo",
-    bg: "bg-indigo-100 dark:bg-indigo-900/30",
-    text: "text-indigo-600 dark:text-indigo-400",
     icon: BarChart3,
     label: "Pyramid Set",
   },
   pre_exhaustion: {
-    color: "pink",
-    bg: "bg-pink-100 dark:bg-pink-900/30",
-    text: "text-pink-600 dark:text-pink-400",
     icon: Activity,
     label: "Pre-Exhaustion",
   },
   amrap: {
-    color: "emerald",
-    bg: "bg-emerald-100 dark:bg-emerald-900/30",
-    text: "text-emerald-600 dark:text-emerald-400",
     icon: RotateCcw,
     label: "AMRAP",
   },
   emom: {
-    color: "cyan",
-    bg: "bg-cyan-100 dark:bg-cyan-900/30",
-    text: "text-cyan-600 dark:text-cyan-400",
     icon: Clock,
     label: "EMOM",
   },
   emom_reps: {
-    color: "sky",
-    bg: "bg-sky-100 dark:bg-sky-900/30",
-    text: "text-sky-600 dark:text-sky-400",
     icon: Hash,
     label: "EMOM Reps",
   },
   tabata: {
-    color: "rose",
-    bg: "bg-rose-100 dark:bg-rose-900/30",
-    text: "text-rose-600 dark:text-rose-400",
     icon: Flame,
     label: "Tabata",
   },
   circuit: {
-    color: "violet",
-    bg: "bg-violet-100 dark:bg-violet-900/30",
-    text: "text-violet-600 dark:text-violet-400",
     icon: Repeat,
     label: "Circuit",
   },
   for_time: {
-    color: "amber",
-    bg: "bg-amber-100 dark:bg-amber-900/30",
-    text: "text-amber-600 dark:text-amber-400",
     icon: Zap,
     label: "For Time",
   },
   ladder: {
-    color: "teal",
-    bg: "bg-teal-100 dark:bg-teal-900/30",
-    text: "text-teal-600 dark:text-teal-400",
     icon: BarChart3,
     label: "Ladder",
   },
@@ -177,9 +130,6 @@ export default function ExerciseBlockCard({
   renderMode = "form",
   children,
 }: ExerciseBlockCardProps) {
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
-
   const exerciseType =
     exercise.exercise_type || exercise.block_type || "straight_set";
   const isComplex = COMPLEX_BLOCK_TYPES.includes(exerciseType);
@@ -606,9 +556,7 @@ export default function ExerciseBlockCard({
       draggable={draggable}
       onDragStart={(e) => draggable && onDragStart?.(e, exercise.id)}
       onDragEnd={draggable ? onDragEnd : undefined}
-      className={`${theme.card} border ${
-        theme.border
-      } rounded-xl p-3 sm:p-4 transition-all duration-200 hover:shadow-md w-full ${
+      className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-3 sm:p-4 transition-all duration-200 fc-hover-rise w-full ${
         draggable ? "cursor-move" : ""
       }`}
     >
@@ -619,12 +567,10 @@ export default function ExerciseBlockCard({
           <div className="flex items-center gap-2 flex-shrink-0">
             {draggable && (
               <div className="hidden sm:block cursor-grab active:cursor-grabbing">
-                <GripVertical className="w-4 h-4 text-gray-400" />
+                <GripVertical className="w-4 h-4 fc-text-subtle" />
               </div>
             )}
-            <div
-              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${styleConfig.bg} ${styleConfig.text}`}
-            >
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary">
               {index + 1}
             </div>
           </div>
@@ -632,25 +578,23 @@ export default function ExerciseBlockCard({
           {/* Exercise info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h4 className={`font-semibold ${theme.text} break-words`}>
+              <h4 className="font-semibold fc-text-primary break-words">
                 {isComplex &&
                 exerciseType !== "superset" &&
                 exerciseType !== "pre_exhaustion"
                   ? `${styleConfig.label} ${index + 1}`
                   : mainExerciseName}
               </h4>
-              <Badge
-                className={`text-xs ${styleConfig.bg} ${styleConfig.text} border-0`}
-              >
-                <BlockIcon className="w-3 h-3 mr-1" />
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                <BlockIcon className="w-3 h-3 mr-1 fc-text-workouts" />
                 {styleConfig.label}
-              </Badge>
+              </span>
             </div>
-            <p className={`text-sm ${theme.textSecondary} break-words`}>
+            <p className="text-sm fc-text-subtle break-words">
               {renderExerciseSummary()}
             </p>
             {exercise.notes && (
-              <p className={`text-xs ${theme.textSecondary} mt-1`}>
+              <p className="text-xs fc-text-subtle mt-1">
                 Note: {exercise.notes}
               </p>
             )}
@@ -666,7 +610,7 @@ export default function ExerciseBlockCard({
                 variant="ghost"
                 size="sm"
                 onClick={() => onEdit(exercise)}
-                className="rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                className="fc-btn fc-btn-ghost fc-press"
               >
                 <Edit className="w-4 h-4" />
               </Button>
@@ -677,7 +621,7 @@ export default function ExerciseBlockCard({
                 variant="ghost"
                 size="sm"
                 onClick={() => onDelete(exercise.id)}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"
+                className="fc-btn fc-btn-ghost fc-press fc-text-error"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -688,7 +632,7 @@ export default function ExerciseBlockCard({
 
       {/* Nested exercises for complex blocks */}
       {showNestedExercises && (
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+        <div className="mt-4 pt-4 border-t border-[color:var(--fc-glass-border)] space-y-3">
           {/* Group exercises by sets for tabata/circuit */}
           {(exerciseType === "tabata" || exerciseType === "circuit") &&
           (exercise.tabata_sets || exercise.circuit_sets)
@@ -701,9 +645,7 @@ export default function ExerciseBlockCard({
                   {/* Set header with rest after set time */}
                   {((exercise as any).rest_after_set ||
                     set.rest_between_sets) && (
-                    <div
-                      className={`text-xs font-medium ${theme.textSecondary} mb-1`}
-                    >
+                    <div className="text-xs font-medium fc-text-subtle mb-1">
                       Set {setIndex + 1} •{" "}
                       {(exercise as any).rest_after_set ||
                         set.rest_between_sets}
@@ -776,9 +718,7 @@ export default function ExerciseBlockCard({
                       })}
                     </div>
                   ) : (
-                    <div
-                      className={`text-xs ${theme.textSecondary} pl-2 italic`}
-                    >
+                    <div className="text-xs fc-text-subtle pl-2 italic">
                       No exercises in this set
                     </div>
                   )}

@@ -3,6 +3,9 @@
 import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
@@ -15,7 +18,7 @@ import Link from "next/link";
 
 export default function CreateMealPlanPage() {
   const { user } = useAuth();
-  const { getThemeStyles } = useTheme();
+  const { getThemeStyles, performanceSettings } = useTheme();
   const theme = getThemeStyles();
   const router = useRouter();
 
@@ -61,27 +64,31 @@ export default function CreateMealPlanPage() {
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="p-4 sm:p-6">
           <div className="max-w-2xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-6">
-              <Link href="/coach/nutrition/meal-plans">
-                <Button variant="outline" size="icon" className="rounded-xl">
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-              </Link>
-              <div className="flex-1">
-                <h1 className={`text-3xl font-bold ${theme.text}`}>
-                  Create Meal Plan
-                </h1>
-                <p className={`${theme.textSecondary}`}>
-                  Create a new nutrition plan for your clients
-                </p>
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8">
+              <div className="flex items-center gap-4">
+                <Link href="/coach/nutrition/meal-plans">
+                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
+                </Link>
+                <div className="flex-1">
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Meal Plan Builder
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    Create Meal Plan
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Create a new nutrition plan for your clients.
+                  </p>
+                </div>
               </div>
-            </div>
+            </GlassCard>
 
-            {/* Form */}
             <form
               onSubmit={handleSubmit}
               className={`${theme.card} ${theme.shadow} rounded-3xl p-6 sm:p-8 space-y-6`}
@@ -147,7 +154,7 @@ export default function CreateMealPlanPage() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white"
+                  className="flex-1 fc-btn fc-btn-primary"
                 >
                   {loading ? "Creating..." : "Create Meal Plan"}
                 </Button>
@@ -155,7 +162,7 @@ export default function CreateMealPlanPage() {
             </form>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

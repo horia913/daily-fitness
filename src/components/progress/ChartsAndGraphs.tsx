@@ -1,10 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { 
   BarChart3, 
   LineChart, 
@@ -51,7 +48,6 @@ import {
   Moon,
   Rainbow
 } from 'lucide-react'
-import { useTheme } from '@/contexts/ThemeContext'
 import { cn } from '@/lib/utils'
 
 interface ChartDataPoint {
@@ -115,8 +111,6 @@ export function ChartsAndGraphs({
   onRefresh,
   className = '' 
 }: ChartsAndGraphsProps) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const [selectedChart, setSelectedChart] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [timeRange, setTimeRange] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>('3M')
@@ -147,15 +141,15 @@ export function ChartsAndGraphs({
           { date: '2024-01-29', value: 72.9, metadata: { notes: 'Excellent progress' } },
           { date: '2024-02-05', value: 72.2, metadata: { notes: 'Goal achieved!' } }
         ],
-        color: 'text-blue-600',
+        color: 'fc-text-workouts',
         type: 'line',
         visible: true,
         goal: 70,
         unit: 'kg'
       }],
       annotations: [
-        { date: '2024-01-15', label: 'First Milestone', type: 'milestone', color: 'text-green-600' },
-        { date: '2024-02-05', label: 'Goal Achieved!', type: 'achievement', color: 'text-yellow-600' }
+        { date: '2024-01-15', label: 'First Milestone', type: 'milestone', color: 'fc-text-success' },
+        { date: '2024-02-05', label: 'Goal Achieved!', type: 'achievement', color: 'fc-text-warning' }
       ]
     },
     {
@@ -179,7 +173,7 @@ export function ChartsAndGraphs({
             { date: '2024-02-01', value: 70, metadata: { workout: 'Push Day' } },
             { date: '2024-02-15', value: 75, metadata: { workout: 'Push Day' } }
           ],
-          color: 'text-blue-600',
+          color: 'fc-text-workouts',
           type: 'bar',
           visible: true,
           unit: 'kg'
@@ -193,7 +187,7 @@ export function ChartsAndGraphs({
             { date: '2024-02-01', value: 90, metadata: { workout: 'Leg Day' } },
             { date: '2024-02-15', value: 95, metadata: { workout: 'Leg Day' } }
           ],
-          color: 'text-green-600',
+          color: 'fc-text-success',
           type: 'bar',
           visible: true,
           unit: 'kg'
@@ -223,7 +217,7 @@ export function ChartsAndGraphs({
           { date: '2024-01-29', value: 6 },
           { date: '2024-02-05', value: 5 }
         ],
-        color: 'text-purple-600',
+        color: 'fc-text-habits',
         type: 'area',
         visible: true,
         goal: 4,
@@ -253,6 +247,26 @@ export function ChartsAndGraphs({
     }
   }
 
+  const getDatasetFillClass = (color: string) => {
+    if (color.startsWith('fc-text-')) {
+      switch (color) {
+        case 'fc-text-workouts':
+          return 'bg-[color:var(--fc-domain-workouts)]'
+        case 'fc-text-habits':
+          return 'bg-[color:var(--fc-domain-habits)]'
+        case 'fc-text-success':
+          return 'bg-[color:var(--fc-status-success)]'
+        case 'fc-text-warning':
+          return 'bg-[color:var(--fc-status-warning)]'
+        case 'fc-text-error':
+          return 'bg-[color:var(--fc-status-error)]'
+        default:
+          return 'bg-[color:var(--fc-glass-border)]'
+      }
+    }
+    return color.replace('text-', 'bg-')
+  }
+
   const getMetricIcon = (metricId: string) => {
     switch (metricId) {
       case 'weight': return <Weight className="w-4 h-4" />
@@ -276,47 +290,50 @@ export function ChartsAndGraphs({
 
   if (loading) {
     return (
-      <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden", isDark ? "bg-slate-800/50" : "bg-white")}>
-        <CardHeader className="p-6 pb-4">
+      <div className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+        <div className="p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-white" />
+              <div className="fc-icon-tile fc-icon-workouts w-12 h-12">
+                <BarChart3 className="w-6 h-6" />
               </div>
               <div>
-                <CardTitle className="text-2xl font-bold text-slate-800 dark:text-slate-200">Charts & Graphs</CardTitle>
-                <p className="text-slate-600 dark:text-slate-400">Data visualization and progress tracking</p>
+                <div className="text-2xl font-bold fc-text-primary">Charts & Graphs</div>
+                <p className="fc-text-subtle">Data visualization and progress tracking</p>
               </div>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="p-6 pt-0">
+        </div>
+        <div className="p-6 pt-0">
           <div className="animate-pulse space-y-6">
             {/* Header skeleton */}
             <div className="flex gap-4">
-              <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-xl w-32"></div>
-              <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-xl w-32"></div>
+              <div className="h-10 bg-[color:var(--fc-glass-border)] rounded-xl w-32"></div>
+              <div className="h-10 bg-[color:var(--fc-glass-border)] rounded-xl w-32"></div>
             </div>
             
             {/* Chart skeleton */}
-            <div className="bg-slate-200 dark:bg-slate-700 rounded-2xl h-64"></div>
+            <div className="bg-[color:var(--fc-glass-border)] rounded-2xl h-64"></div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card className={cn("rounded-3xl shadow-lg border-0 overflow-hidden w-full", isDark ? "bg-slate-800/50" : "bg-white", className)}>
-      <CardHeader className="p-4 sm:p-6 pb-4">
+    <div className={cn("fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] overflow-hidden w-full", className)}>
+      <div className="p-4 sm:p-6 pb-4 border-b border-[color:var(--fc-glass-border)]">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-white" />
+            <div className="fc-icon-tile fc-icon-workouts w-12 h-12">
+              <BarChart3 className="w-6 h-6" />
             </div>
             <div>
-              <CardTitle className="text-2xl font-bold text-slate-800 dark:text-slate-200">Charts & Graphs</CardTitle>
-              <p className="text-slate-600 dark:text-slate-400">
+              <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                Analytics
+              </span>
+              <div className="text-2xl font-bold fc-text-primary mt-2">Charts & Graphs</div>
+              <p className="fc-text-subtle">
                 {filteredCharts.length} chart{filteredCharts.length !== 1 ? 's' : ''} • Visualize your progress
               </p>
             </div>
@@ -324,7 +341,7 @@ export function ChartsAndGraphs({
           
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
             {/* View Mode Toggle */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 flex-shrink-0">
+            <div className="flex items-center fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-xl p-1 flex-shrink-0">
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="sm"
@@ -332,8 +349,8 @@ export function ChartsAndGraphs({
                 className={cn(
                   "rounded-lg",
                   viewMode === 'grid' 
-                    ? "bg-white dark:bg-slate-700 shadow-sm" 
-                    : "hover:bg-transparent"
+                    ? "fc-btn fc-btn-secondary" 
+                    : "fc-btn fc-btn-ghost"
                 )}
               >
                 <BarChart3 className="w-4 h-4" />
@@ -345,8 +362,8 @@ export function ChartsAndGraphs({
                 className={cn(
                   "rounded-lg",
                   viewMode === 'list' 
-                    ? "bg-white dark:bg-slate-700 shadow-sm" 
-                    : "hover:bg-transparent"
+                    ? "fc-btn fc-btn-secondary" 
+                    : "fc-btn fc-btn-ghost"
                 )}
               >
                 <Eye className="w-4 h-4" />
@@ -358,7 +375,7 @@ export function ChartsAndGraphs({
               onClick={onRefresh}
               variant="outline"
               size="sm"
-              className="rounded-xl"
+              className="fc-btn fc-btn-secondary"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh
@@ -370,8 +387,8 @@ export function ChartsAndGraphs({
         <div className="flex flex-col sm:flex-row gap-4 mt-4 w-full overflow-x-auto">
           {/* Time Range Selector */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Calendar className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
-            <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 flex-shrink-0">
+            <Calendar className="w-4 h-4 fc-text-subtle flex-shrink-0" />
+            <div className="flex gap-1 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-xl p-1 flex-shrink-0">
               {(['1M', '3M', '6M', '1Y', 'ALL'] as const).map((range) => (
                 <Button
                   key={range}
@@ -381,8 +398,8 @@ export function ChartsAndGraphs({
                   className={cn(
                     "rounded-lg text-xs px-2",
                     timeRange === range 
-                      ? "bg-white dark:bg-slate-700 shadow-sm" 
-                      : "hover:bg-transparent"
+                      ? "fc-btn fc-btn-secondary" 
+                      : "fc-btn fc-btn-ghost"
                   )}
                 >
                   {range}
@@ -394,8 +411,8 @@ export function ChartsAndGraphs({
           {/* Metric Filter */}
           {metrics.length > 0 && (
             <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
-              <Filter className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
-              <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 overflow-x-auto">
+              <Filter className="w-4 h-4 fc-text-subtle flex-shrink-0" />
+              <div className="flex gap-1 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-xl p-1 overflow-x-auto">
                 <Button
                   variant={selectedMetric === null ? 'default' : 'ghost'}
                   size="sm"
@@ -403,8 +420,8 @@ export function ChartsAndGraphs({
                   className={cn(
                     "rounded-lg text-xs px-2 whitespace-nowrap flex-shrink-0",
                     selectedMetric === null 
-                      ? "bg-white dark:bg-slate-700 shadow-sm" 
-                      : "hover:bg-transparent"
+                      ? "fc-btn fc-btn-secondary" 
+                      : "fc-btn fc-btn-ghost"
                   )}
                 >
                   All
@@ -418,8 +435,8 @@ export function ChartsAndGraphs({
                     className={cn(
                       "rounded-lg text-xs px-2 whitespace-nowrap flex-shrink-0",
                       selectedMetric === metric 
-                        ? "bg-white dark:bg-slate-700 shadow-sm" 
-                        : "hover:bg-transparent"
+                        ? "fc-btn fc-btn-secondary" 
+                        : "fc-btn fc-btn-ghost"
                     )}
                   >
                     {getMetricIcon(metric)}
@@ -430,23 +447,23 @@ export function ChartsAndGraphs({
             </div>
           )}
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-6 pt-0">
+      <div className="p-6 pt-0">
         {filteredCharts.length === 0 ? (
           <div className="text-center py-16">
-            <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <BarChart3 className="w-12 h-12 text-blue-500 dark:text-blue-400" />
+            <div className="w-24 h-24 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <BarChart3 className="w-12 h-12 fc-text-workouts" />
             </div>
-            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-4">
+            <h3 className="text-2xl font-bold fc-text-primary mb-4">
               No Data Yet
             </h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-8 max-w-md mx-auto text-lg">
+            <p className="fc-text-subtle mb-8 max-w-md mx-auto text-lg">
               Start logging your workouts and measurements to see beautiful charts of your progress!
             </p>
             <Button 
               onClick={onRefresh}
-              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-2xl px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+              className="fc-btn fc-btn-primary fc-press px-8 py-4 text-lg font-semibold"
             >
               <RefreshCw className="w-5 h-5 mr-2" />
               Generate Charts
@@ -473,8 +490,8 @@ export function ChartsAndGraphs({
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
@@ -498,18 +515,35 @@ function ChartCard({
   isSelected: boolean
   getChartIcon: (type: string) => React.ReactNode
 }) {
-  const { isDark, getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const [isExpanded, setIsExpanded] = useState(false)
   const [selectedDataset, setSelectedDataset] = useState<string | null>(null)
   const [hoveredPoint, setHoveredPoint] = useState<ChartDataPoint | null>(null)
 
+  const getDatasetFillClass = (color: string) => {
+    if (color.startsWith('fc-text-')) {
+      switch (color) {
+        case 'fc-text-workouts':
+          return 'bg-[color:var(--fc-domain-workouts)]'
+        case 'fc-text-habits':
+          return 'bg-[color:var(--fc-domain-habits)]'
+        case 'fc-text-success':
+          return 'bg-[color:var(--fc-status-success)]'
+        case 'fc-text-warning':
+          return 'bg-[color:var(--fc-status-warning)]'
+        case 'fc-text-error':
+          return 'bg-[color:var(--fc-status-error)]'
+        default:
+          return 'bg-[color:var(--fc-glass-border)]'
+      }
+    }
+    return color.replace('text-', 'bg-')
+  }
+
   const cardClasses = cn(
     "rounded-2xl p-6 transition-all duration-300 cursor-pointer",
-    "bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-800 dark:to-slate-900",
-    "border border-slate-200 dark:border-slate-700",
-    "hover:shadow-xl hover:scale-[1.02]",
-    isSelected && "ring-2 ring-blue-500 shadow-lg",
+    "fc-glass fc-card border border-[color:var(--fc-glass-border)]",
+    "fc-hover-rise",
+    isSelected && "ring-2 ring-[color:var(--fc-domain-workouts)]",
     isExpanded && "col-span-2 row-span-2"
   )
 
@@ -531,7 +565,7 @@ function ChartCard({
               y2={200 * ratio}
               stroke="currentColor"
               strokeWidth="0.5"
-              className="text-slate-200 dark:text-slate-700"
+              className="text-[color:var(--fc-glass-border)]"
             />
           ))}
           
@@ -545,7 +579,7 @@ function ChartCard({
               stroke="currentColor"
               strokeWidth="2"
               strokeDasharray="5,5"
-              className="text-green-500"
+              className="fc-text-success"
             />
           )}
           
@@ -589,7 +623,7 @@ function ChartCard({
         </svg>
         
         {/* X-axis labels */}
-        <div className="flex justify-between mt-2 text-xs text-slate-500">
+        <div className="flex justify-between mt-2 text-xs fc-text-subtle">
           {dataset.data.map((point, index) => (
             <span key={index} className="text-center">
               {new Date(point.date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
@@ -614,19 +648,19 @@ function ChartCard({
                   <div
                     className={cn(
                       "w-full rounded-t-sm transition-all duration-300 hover:opacity-80 cursor-pointer",
-                      dataset.color.replace('text-', 'bg-')
+                      getDatasetFillClass(dataset.color)
                     )}
                     style={{ height: `${height}%` }}
                     onClick={() => setHoveredPoint(point)}
                     onMouseEnter={() => setHoveredPoint(point)}
                     onMouseLeave={() => setHoveredPoint(null)}
                   >
-                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 fc-glass-soft border border-[color:var(--fc-glass-border)] text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
                       {point.value}{dataset.unit}
                     </div>
                   </div>
                 </div>
-                <div className="text-xs text-slate-500 mt-2 text-center">
+                <div className="text-xs fc-text-subtle mt-2 text-center">
                   {new Date(point.date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
                 </div>
               </div>
@@ -652,14 +686,14 @@ function ChartCard({
     <div className={cardClasses} onClick={onSelect}>
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+          <div className="fc-icon-tile fc-icon-workouts w-10 h-10">
             {getChartIcon(chart.type)}
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">
+            <h3 className="text-lg font-bold fc-text-primary mb-1">
               {chart.title}
             </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm fc-text-subtle">
               {chart.description}
             </p>
           </div>
@@ -673,7 +707,7 @@ function ChartCard({
               e.stopPropagation()
               setIsExpanded(!isExpanded)
             }}
-            className="rounded-xl"
+            className="fc-btn fc-btn-ghost fc-press"
           >
             {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </Button>
@@ -684,7 +718,7 @@ function ChartCard({
               e.stopPropagation()
               onExport()
             }}
-            className="rounded-xl"
+            className="fc-btn fc-btn-ghost fc-press"
           >
             <Download className="w-4 h-4" />
           </Button>
@@ -695,7 +729,7 @@ function ChartCard({
               e.stopPropagation()
               onShare()
             }}
-            className="rounded-xl"
+            className="fc-btn fc-btn-ghost fc-press"
           >
             <Share2 className="w-4 h-4" />
           </Button>
@@ -712,9 +746,9 @@ function ChartCard({
         <div className="flex flex-wrap gap-2 mb-4">
           {chart.datasets.map((dataset) => (
             <div key={dataset.id} className="flex items-center gap-2">
-              <div className={cn("w-3 h-3 rounded-full", dataset.color.replace('text-', 'bg-'))}></div>
-              <span className="text-sm text-slate-700 dark:text-slate-300">{dataset.name}</span>
-              <span className="text-sm font-medium text-slate-800 dark:text-slate-200">
+              <div className={cn("w-3 h-3 rounded-full", getDatasetFillClass(dataset.color))}></div>
+              <span className="text-sm fc-text-subtle">{dataset.name}</span>
+              <span className="text-sm font-medium fc-text-primary">
                 {dataset.data[dataset.data.length - 1]?.value}{dataset.unit}
               </span>
             </div>
@@ -724,17 +758,17 @@ function ChartCard({
 
       {/* Hovered Point Details */}
       {hoveredPoint && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 mb-4">
+        <div className="fc-glass-soft rounded-xl p-4 border border-[color:var(--fc-glass-border)] mb-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">
+              <p className="font-semibold fc-text-primary">
                 {new Date(hoveredPoint.date).toLocaleDateString()}
               </p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
+              <p className="text-sm fc-text-subtle">
                 Value: {hoveredPoint.value}
               </p>
               {hoveredPoint.metadata?.notes && (
-                <p className="text-sm text-slate-500 dark:text-slate-500">
+                <p className="text-sm fc-text-subtle">
                   {hoveredPoint.metadata.notes}
                 </p>
               )}
@@ -743,7 +777,7 @@ function ChartCard({
               variant="outline"
               size="sm"
               onClick={() => setHoveredPoint(null)}
-              className="rounded-xl"
+              className="fc-btn fc-btn-secondary"
             >
               Close
             </Button>
@@ -752,18 +786,18 @@ function ChartCard({
       )}
 
       {/* Chart Info */}
-      <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700">
+      <div className="flex items-center justify-between pt-4 border-t border-[color:var(--fc-glass-border)]">
         <div className="flex items-center gap-2">
-          <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-0">
+          <span className="fc-pill fc-pill-glass fc-text-workouts">
             {chart.type.toUpperCase()}
-          </Badge>
-          <Badge className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-0">
+          </span>
+          <span className="fc-pill fc-pill-glass fc-text-success">
             {timeRange}
-          </Badge>
+          </span>
         </div>
         
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-xs fc-text-subtle">
             {chart.datasets.length} dataset{chart.datasets.length !== 1 ? 's' : ''}
           </span>
         </div>

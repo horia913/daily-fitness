@@ -1,12 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { useTheme } from '@/contexts/ThemeContext'
 import { 
   Plus,
   Edit,
@@ -85,22 +81,11 @@ export default function ProgramTimeline({
   availableTemplates,
   isEditing
 }: ProgramTimelineProps) {
-  const { getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set())
   const [editingWeek, setEditingWeek] = useState<string | null>(null)
   const [editingWorkout, setEditingWorkout] = useState<string | null>(null)
 
   const dayNames = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7']
-  const dayColors = [
-    'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-    'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
-    'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
-    'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-    'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-    'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300',
-    'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-  ]
 
   const toggleWeekExpansion = (weekId: string) => {
     const newExpanded = new Set(expandedWeeks)
@@ -131,17 +116,22 @@ export default function ProgramTimeline({
   return (
     <div className="space-y-6">
       {/* Timeline Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className={`text-xl font-semibold ${theme.text}`}>Program Timeline</h3>
-          <p className={`text-sm ${theme.textSecondary}`}>
+          <span className="fc-pill fc-pill-glass fc-text-workouts">
+            Program timeline
+          </span>
+          <h3 className="text-xl font-semibold fc-text-primary mt-2">
+            Training blocks overview
+          </h3>
+          <p className="text-sm fc-text-dim">
             {weeks.length} weeks • {weeks.reduce((sum, week) => sum + getTotalWorkoutsForWeek(week), 0)} total workouts
           </p>
         </div>
         {isEditing && (
           <Button
             onClick={onAddWeek}
-            className="rounded-xl bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+            className="fc-btn fc-btn-primary fc-press"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Week
@@ -151,30 +141,30 @@ export default function ProgramTimeline({
 
       {/* Timeline */}
       <div className="space-y-4">
-        {weeks.map((week, weekIndex) => {
+        {weeks.map((week) => {
           const isExpanded = expandedWeeks.has(week.id)
           const totalWorkouts = getTotalWorkoutsForWeek(week)
           const weekDuration = getWeekDuration(week)
           
           return (
-            <Card key={week.id} className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-              <CardHeader className="pb-3">
+            <div key={week.id} className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+              <div className="pb-3 p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     {/* Week Number */}
-                    <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-white font-bold text-lg">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-full fc-icon-tile fc-icon-workouts text-lg font-bold">
                       {week.week_number}
                     </div>
                     
                     {/* Week Info */}
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-1">
-                        <h4 className={`font-semibold ${theme.text} text-lg`}>
+                        <h4 className="font-semibold fc-text-primary text-lg">
                           {editingWeek === week.id ? (
                             <Input
                               value={week.name}
                               onChange={(e) => onUpdateWeek(week.id, { name: e.target.value })}
-                              className="h-8 text-lg font-semibold"
+                              className="h-8 text-lg font-semibold fc-glass-soft border border-[color:var(--fc-glass-border)]"
                               onBlur={() => setEditingWeek(null)}
                               autoFocus
                             />
@@ -185,24 +175,24 @@ export default function ProgramTimeline({
                           )}
                         </h4>
                         {week.is_deload && (
-                          <Badge className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-0">
+                          <span className="fc-pill fc-pill-glass fc-text-warning text-xs">
                             Deload
-                          </Badge>
+                          </span>
                         )}
                       </div>
                       
-                      <div className="flex items-center gap-4 text-sm text-slate-500">
+                      <div className="flex flex-wrap items-center gap-4 text-sm fc-text-subtle">
                         <div className="flex items-center gap-1">
-                          <Dumbbell className="w-3 h-3" />
+                          <Dumbbell className="w-3 h-3 fc-text-workouts" />
                           <span>{totalWorkouts} workouts</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
+                          <Clock className="w-3 h-3 fc-text-workouts" />
                           <span>{weekDuration}m total</span>
                         </div>
                         {week.focus_area && (
                           <div className="flex items-center gap-1">
-                            <Target className="w-3 h-3" />
+                            <Target className="w-3 h-3 fc-text-workouts" />
                             <span>{week.focus_area}</span>
                           </div>
                         )}
@@ -216,7 +206,7 @@ export default function ProgramTimeline({
                       variant="ghost"
                       size="sm"
                       onClick={() => toggleWeekExpansion(week.id)}
-                      className="p-2"
+                      className="p-2 fc-btn fc-btn-ghost"
                     >
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4" />
@@ -230,7 +220,7 @@ export default function ProgramTimeline({
                           variant="ghost"
                           size="sm"
                           onClick={() => setEditingWeek(week.id)}
-                          className="p-2 text-blue-600 hover:text-blue-700"
+                          className="p-2 fc-btn fc-btn-ghost"
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -238,7 +228,7 @@ export default function ProgramTimeline({
                           variant="ghost"
                           size="sm"
                           onClick={() => onRemoveWeek(week.id)}
-                          className="p-2 text-red-600 hover:text-red-700"
+                          className="p-2 fc-btn fc-btn-ghost fc-text-error"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -249,15 +239,15 @@ export default function ProgramTimeline({
 
                 {/* Week Description */}
                 {week.description && (
-                  <p className={`text-sm ${theme.textSecondary} mt-2`}>
+                  <p className="text-sm fc-text-dim mt-2">
                     {week.description}
                   </p>
                 )}
-              </CardHeader>
+              </div>
 
               {/* Week Content */}
               {isExpanded && (
-                <CardContent className="pt-0">
+                <div className="pt-0 px-6 pb-6">
                   {/* Days Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                     {dayNames.map((dayName, dayIndex) => {
@@ -268,10 +258,10 @@ export default function ProgramTimeline({
                         <div key={dayIndex} className="space-y-2">
                           {/* Day Header */}
                           <div className="flex items-center justify-between">
-                            <h5 className={`text-sm font-medium ${theme.text}`}>{dayName}</h5>
-                            <Badge className={`${dayColors[dayIndex]} border-0 text-xs`}>
+                            <h5 className="text-sm font-medium fc-text-primary">{dayName}</h5>
+                            <span className="fc-pill fc-pill-glass text-xs fc-text-dim">
                               {workoutCount}
-                            </Badge>
+                            </span>
                           </div>
 
                           {/* Workouts for this day */}
@@ -293,7 +283,7 @@ export default function ProgramTimeline({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onAddWorkout(week.id, dayIndex)}
-                                className="w-full h-8 text-xs border-dashed"
+                                className="w-full h-8 text-xs border-dashed fc-btn fc-btn-secondary"
                               >
                                 <Plus className="w-3 h-3 mr-1" />
                                 Add Workout
@@ -304,33 +294,35 @@ export default function ProgramTimeline({
                       )
                     })}
                   </div>
-                </CardContent>
+                </div>
               )}
-            </Card>
+            </div>
           )
         })}
       </div>
 
       {/* Empty State */}
       {weeks.length === 0 && (
-        <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-          <CardContent className="text-center py-12">
-            <Calendar className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <h3 className={`text-lg font-medium ${theme.text} mb-2`}>No weeks yet</h3>
-            <p className={`text-sm ${theme.textSecondary} mb-6`}>
+        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="text-center py-12">
+            <div className="mx-auto mb-4 fc-icon-tile fc-icon-workouts w-16 h-16">
+              <Calendar className="w-8 h-8" />
+            </div>
+            <h3 className="text-lg font-medium fc-text-primary mb-2">No weeks yet</h3>
+            <p className="text-sm fc-text-dim mb-6">
               Add weeks to build your program timeline.
             </p>
             {isEditing && (
               <Button 
                 onClick={onAddWeek}
-                className="rounded-xl bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+                className="fc-btn fc-btn-primary fc-press"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add First Week
               </Button>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -346,9 +338,6 @@ interface WorkoutCardProps {
 }
 
 function WorkoutCard({ workout, isEditing, onEdit, onRemove, onUpdate }: WorkoutCardProps) {
-  const { getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
-
   const getCategoryIcon = (categoryName: string) => {
     switch (categoryName?.toLowerCase()) {
       case 'strength': return Dumbbell
@@ -367,26 +356,26 @@ function WorkoutCard({ workout, isEditing, onEdit, onRemove, onUpdate }: Workout
   const CategoryIcon = getCategoryIcon(categoryName)
 
   return (
-    <Card className={`${theme.card} ${theme.shadow} rounded-xl border-2 hover:shadow-md transition-all duration-200`}>
-      <CardContent className="p-3">
+    <div className="fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] hover:shadow-md transition-all duration-200">
+      <div className="p-3">
         <div className="flex items-center gap-2">
           {/* Workout Icon */}
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800">
-            <CategoryIcon className="w-4 h-4 text-slate-500" />
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg fc-glass border border-[color:var(--fc-glass-border)]">
+            <CategoryIcon className="w-4 h-4 fc-text-subtle" />
           </div>
 
           {/* Workout Info */}
           <div className="flex-1 min-w-0">
-            <h6 className={`font-medium ${theme.text} text-sm truncate`}>
+            <h6 className="font-medium fc-text-primary text-sm truncate">
               {workout.template?.name || 'Unknown Workout'}
             </h6>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Clock className="w-3 h-3" />
+            <div className="flex items-center gap-2 text-xs fc-text-subtle">
+              <Clock className="w-3 h-3 fc-text-workouts" />
               <span>{workout.template?.estimated_duration || 0}m</span>
               {workout.is_optional && (
-                <Badge variant="outline" className="text-xs">
+                <span className="fc-pill fc-pill-glass text-[10px] fc-text-dim">
                   Optional
-                </Badge>
+                </span>
               )}
             </div>
           </div>
@@ -398,7 +387,7 @@ function WorkoutCard({ workout, isEditing, onEdit, onRemove, onUpdate }: Workout
                 variant="ghost"
                 size="sm"
                 onClick={onEdit}
-                className="p-1 text-blue-600 hover:text-blue-700"
+                className="p-1 fc-btn fc-btn-ghost"
               >
                 <Edit className="w-3 h-3" />
               </Button>
@@ -406,7 +395,7 @@ function WorkoutCard({ workout, isEditing, onEdit, onRemove, onUpdate }: Workout
                 variant="ghost"
                 size="sm"
                 onClick={onRemove}
-                className="p-1 text-red-600 hover:text-red-700"
+                className="p-1 fc-btn fc-btn-ghost fc-text-error"
               >
                 <Trash2 className="w-3 h-3" />
               </Button>
@@ -416,11 +405,11 @@ function WorkoutCard({ workout, isEditing, onEdit, onRemove, onUpdate }: Workout
 
         {/* Workout Notes */}
         {workout.notes && (
-          <div className={`mt-2 p-2 rounded-lg ${theme.card}`}>
-            <p className={`text-xs ${theme.textSecondary}`}>{workout.notes}</p>
+          <div className="mt-2 p-2 rounded-lg fc-glass border border-[color:var(--fc-glass-border)]">
+            <p className="text-xs fc-text-dim">{workout.notes}</p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

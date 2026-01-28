@@ -1,41 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAllClientGoals } from '@/lib/goalSyncService'
-import { createClient } from '@supabase/supabase-js'
 import { createErrorResponse, handleApiError, createSuccessResponse } from '@/lib/apiErrorHandler'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+import { validateApiAuth, validateOwnership, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
 
 export async function POST(req: NextRequest) {
   try {
-    // Get auth from request
-    const authHeader = req.headers.get('authorization')
-    let userId: string | null = null
-
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.substring(7)
-      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-      
-      if (!authError && user) {
-        userId = user.id
-      }
+    // Validate authentication
+    const { user } = await validateApiAuth(req)
+    // Get client_id from request body
+    let body: any = {}
+    try {
+      body = await req.json()
+    } catch {
+      // Body already consumed or invalid
     }
 
-    // If no auth header, try to get from request body (for server-side calls)
-    if (!userId) {
-      try {
-        const body = await req.json().catch(() => ({}))
-        userId = body.client_id || body.userId || null
-      } catch {
-        // Body already consumed or invalid
-      }
+    const clientId = body.client_id || body.userId || null
+
+    if (!clientId) {
+      return createErrorResponse('Missing client_id in request body', undefined, 'VALIDATION_ERROR', 400)
     }
 
-    if (!userId) {
-      return createErrorResponse('Unauthorized - client ID required', undefined, 'UNAUTHORIZED', 401)
+    // SECURITY: Validate that client_id matches authenticated user
+    try {
+      validateOwnership(user.id, clientId)
+    } catch (error: any) {
+      return createForbiddenResponse('Cannot sync goals for another user')
     }
+
+    const userId = user.id
 
     // Sync all goals for this client
     const results = await syncAllClientGoals(userId)
@@ -45,7 +38,14 @@ export async function POST(req: NextRequest) {
       total: results.length,
       results
     })
-  } catch (error) {
+  } catch (error: any) {
+    // Handle auth errors specifically
+    if (error.message === 'Missing authorization header' || error.message === 'Invalid or expired token' || error.message === 'User not authenticated') {
+      return createUnauthorizedResponse(error.message)
+    }
+    if (error.message === 'Forbidden - Cannot access another user\'s resource') {
+      return createForbiddenResponse(error.message)
+    }
     return handleApiError(error, 'Failed to sync goals')
   }
 }

@@ -6,6 +6,7 @@ import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Card, CardContent } from '@/components/ui/card'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -450,82 +451,81 @@ export default function CoachGoals() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div style={{ minHeight: '100vh', paddingBottom: '100px' }}>
-        <div style={{ padding: '24px 20px' }}>
-          <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Header */}
-            <div className="text-center space-y-8">
-              <div className="flex items-center justify-center gap-3 mb-8">
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                  <Target className="w-8 h-8 text-white" />
+        <div className="min-h-screen pb-24">
+          <div className="px-6 pt-10">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <GlassCard className="p-6 md:p-8">
+                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-3">
+                    <Badge className="fc-badge fc-badge-strong w-fit">Goal Command</Badge>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg">
+                        <Target className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
+                          Client Goals
+                        </h1>
+                        <p className="text-sm text-[color:var(--fc-text-dim)]">
+                          Set outcomes and auto-track progress from workouts and metrics.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-normal pb-1">
-                  Client Goals
-                </h1>
+              </GlassCard>
+
+            <GlassCard className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 p-3 text-white shadow-lg">
+                  <Zap className="w-6 h-6" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)] mb-2">
+                    Automated Progress Tracking
+                  </h3>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Goals update automatically from workouts, body measurements, nutrition logs, and PRs.
+                  </p>
+                </div>
               </div>
-              <p className={`text-lg ${theme.textSecondary} max-w-2xl mx-auto`}>
-                Set fitness goals that automatically track progress from app activities
-              </p>
-            </div>
+            </GlassCard>
 
-            {/* Info Banner */}
-            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', border: '2px solid #2196F3', background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)' }}>
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                    <Zap className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className={`text-lg font-bold ${theme.text} mb-2`}>Automated Progress Tracking</h3>
-                    <p className={`text-sm ${theme.textSecondary}`}>
-                      Goals automatically update based on client activities: workout completions, body measurements, nutrition logs, and exercise PRs. Progress is tracked in real-time without manual updates.
-                    </p>
-                  </div>
-                </div>
-            </div>
-
-            {/* Search and Filters */}
-            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-              <div className="flex flex-col lg:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 ${theme.textSecondary} w-5 h-5`} />
+            <GlassCard className="p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-subtle)]" />
                   <Input
                     placeholder="Search goals or clients..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`pl-12 h-12 rounded-xl border-2 ${theme.border} ${theme.text} bg-transparent focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500`}
+                    className="fc-input h-12 w-full pl-12"
                   />
                 </div>
-                <div className="flex gap-3">
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className={`w-48 h-12 ${theme.border} ${theme.text} bg-transparent rounded-xl`}>
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="paused">Paused</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="fc-select h-12 w-48">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
+            </GlassCard>
 
-            {/* Action Buttons */}
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-wrap gap-3">
               <Dialog open={showCreateGoal} onOpenChange={setShowCreateGoal}>
                 <DialogTrigger asChild>
-                  <Button className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg px-6 py-3">
-                    <Plus className="w-5 h-5" />
+                  <Button className="fc-btn fc-btn-primary">
+                    <Plus className="w-5 h-5 mr-2" />
                     Create Goal
                   </Button>
                 </DialogTrigger>
               </Dialog>
-              <Button
-                variant="outline"
-                onClick={loadData}
-                className={`${theme.border} ${theme.text} hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400 rounded-xl px-6 py-3`}
-              >
+              <Button variant="outline" onClick={loadData} className="fc-btn fc-btn-ghost">
                 <RefreshCw className="w-5 h-5 mr-2" />
                 Refresh
               </Button>

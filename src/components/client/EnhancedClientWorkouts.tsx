@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -8,7 +8,8 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { supabase } from "@/lib/supabase";
+import { supabase, ensureAuthenticated } from "@/lib/supabase";
+import { useNewWorkoutLoader } from "@/lib/featureFlags";
 import {
   Calendar,
   Clock,
@@ -44,6 +45,31 @@ import WorkoutTemplateService, {
   DailyWorkoutExercise,
   ExerciseAlternative,
 } from "@/lib/workoutTemplateService";
+import { usePathname } from "next/navigation";
+import { fetchApi } from "@/lib/apiClient";
+
+type WorkoutSummaryPayload = {
+  avatarUrl: string | null;
+  todaysWorkout: DailyWorkout | null;
+  currentProgram: Program | null;
+  workoutHistory: DailyWorkout[];
+  completedPrograms: Program[];
+  upcomingWorkouts: DailyWorkout[];
+  allAssignedWorkouts: any[];
+  weeklyProgress: { current: number; goal: number };
+  weeklyStats: { totalVolume: number; activeTime: number };
+  allTimeVolume?: number;
+  thisWeekAssignments: any[];
+  assignmentIdByTemplate: Record<string, string>;
+  scheduleIdByTemplate: Record<string, string>;
+};
+
+const workoutSummaryCache = new Map<
+  string,
+  { data: WorkoutSummaryPayload; fetchedAt: number }
+>();
+const WORKOUT_SUMMARY_TTL_MS = 45 * 1000;
+const PERF_WORKOUTS_ENABLED = process.env.NEXT_PUBLIC_DEBUG_HARNESS === "true";
 
 interface EnhancedClientWorkoutsProps {
   clientId: string;
@@ -105,9 +131,29 @@ export default function EnhancedClientWorkouts({
 }: EnhancedClientWorkoutsProps) {
   const { isDark, getSemanticColor, performanceSettings, getThemeStyles } =
     useTheme();
-  const { user, profile } = useAuth();
+  const { user, profile, session, signOut } = useAuth();
   const theme = getThemeStyles();
   const router = useRouter();
+  const pathname = usePathname();
+  const perfMarksRef = useRef<{
+    mountAt: number;
+    fetchResolvedAt: number;
+    summaryApplied: boolean;
+    logged: boolean;
+  }>({
+    mountAt: 0,
+    fetchResolvedAt: 0,
+    summaryApplied: false,
+    logged: false,
+  });
+  const useNewLoader =
+    useNewWorkoutLoader || pathname.startsWith("/client/workouts");
+
+  useEffect(() => {
+    if (!PERF_WORKOUTS_ENABLED) return;
+    perfMarksRef.current.mountAt = performance.now();
+    performance.mark("workouts_mount");
+  }, []);
 
   // State management
   const [todaysWorkout, setTodaysWorkout] = useState<DailyWorkout | null>(null);
@@ -122,8 +168,16 @@ export default function EnhancedClientWorkouts({
     totalVolume: 0,
     activeTime: 0,
   });
+  const [allTimeVolume, setAllTimeVolume] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [thisWeekAssignments, setThisWeekAssignments] = useState<any[]>([]);
+  const [assignmentIdByTemplate, setAssignmentIdByTemplate] = useState<
+    Record<string, string>
+  >({});
+  const [scheduleIdByTemplate, setScheduleIdByTemplate] = useState<
+    Record<string, string>
+  >({});
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Modal states
   const [showAlternatives, setShowAlternatives] = useState<string | null>(null);
@@ -150,6 +204,9 @@ export default function EnhancedClientWorkouts({
   const loadWorkoutData = useCallback(async () => {
     setLoading(true);
     try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated();
+
       // Load next due workout using direct database queries (same as dashboard)
       console.log("🔍 Client Workouts - Loading workout for client:", clientId);
 
@@ -381,8 +438,11 @@ export default function EnhancedClientWorkouts({
       setTodaysWorkout(nextWorkout);
 
       // Check for active program assignment (if program tables exist)
+      // Declare at function scope so it can be reused later
+      let allProgramAssignments: any[] | null = null;
       try {
-        const { data: allProgramAssignments, error: allProgramError } =
+        // OPTIMIZED: Single query for program assignments (reused later, includes coach_id)
+        const { data: programAssignmentsData, error: allProgramError } =
           await supabase
             .from("program_assignments")
             .select(
@@ -391,12 +451,17 @@ export default function EnhancedClientWorkouts({
             start_date,
             status,
             program_id,
+            coach_id,
             name,
             description,
             duration_weeks
           `
             )
-            .eq("client_id", clientId);
+            .eq("client_id", clientId)
+            .order("created_at", { ascending: false });
+
+        // Store in function-scoped variable for reuse later
+        allProgramAssignments = programAssignmentsData || null;
 
         console.log(
           "🔍 Client Workouts - ALL program assignments:",
@@ -404,164 +469,131 @@ export default function EnhancedClientWorkouts({
           allProgramError
         );
 
-        const { data: programAssignment, error: programError } = await supabase
-          .from("program_assignments")
-          .select(
-            `
-            id,
-            start_date,
-            status,
-            program_id,
-            name,
-            description,
-            duration_weeks
-          `
-          )
-          .eq("client_id", clientId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        // Get the most recent active program assignment
+        const programAssignment = allProgramAssignments && allProgramAssignments.length > 0
+          ? allProgramAssignments[0]
+          : null;
 
         console.log(
           "🔍 Client Workouts - Program assignment:",
-          programAssignment,
-          programError
+          programAssignment
         );
 
         if (programAssignment) {
-          const programName =
-            programAssignment.name && programAssignment.name.trim().length > 0
-              ? programAssignment.name
-              : "Program";
-          const programDescription =
-            programAssignment.description &&
-            programAssignment.description.trim().length > 0
-              ? programAssignment.description
-              : "";
+          // Get the next incomplete program_day_assignments for this program
+          // SOURCE OF TRUTH: Next program workout = earliest program_day_assignments where is_completed IS NOT true
+          const { data: nextProgramDay, error: programDayError } = await supabase
+            .from("program_day_assignments")
+            .select(
+              `
+              id,
+              day_number,
+              workout_template_id,
+              workout_assignment_id,
+              is_completed,
+              name,
+              description,
+              day_type
+            `
+            )
+            .eq("program_assignment_id", programAssignment.id)
+            .eq("day_type", "workout")
+            .or("is_completed.is.null,is_completed.eq.false")
+            .order("day_number", { ascending: true })
+            .limit(1)
+            .maybeSingle();
 
-          let programExercises: DailyWorkoutExercise[] = [];
-          try {
-            const { data: clientRulesData, error: clientRulesError } =
-              await supabase
-                .from("client_program_progression_rules")
-                .select(
-                  `
-                  id,
-                  week_number,
-                  block_order,
-                  exercise_id,
-                  exercise_order,
-                  exercise_letter,
-                  sets,
-                  reps,
-                  rest_seconds,
-                  notes
-                `
-                )
-                .eq("program_assignment_id", programAssignment.id)
-                .eq("week_number", 1)
-                .order("block_order", { ascending: true })
-                .order("exercise_order", { ascending: true });
-
-            if (clientRulesError) {
-              console.error(
-                "🔍 Client Workouts - Error loading client program rules:",
-                clientRulesError
-              );
-            } else {
-              const clientRules =
-                (clientRulesData as ClientProgramRuleRecord[] | null) ?? [];
-              const ruleExerciseIds = Array.from(
-                new Set(
-                  clientRules
-                    .map((rule) => rule.exercise_id)
-                    .filter((id): id is string => Boolean(id))
-                )
-              );
-
-              const ruleExerciseDetailsMap = new Map<
-                string,
-                { name: string; description: string }
-              >();
-
-              if (ruleExerciseIds.length > 0) {
-                const {
-                  data: ruleExerciseDetails,
-                  error: ruleExerciseDetailsError,
-                } = await supabase
-                  .from("exercises")
-                  .select("id, name, description")
-                  .in("id", ruleExerciseIds);
-
-                if (ruleExerciseDetailsError) {
-                  console.error(
-                    "🔍 Client Workouts - Error loading program exercise metadata:",
-                    ruleExerciseDetailsError
-                  );
-                } else if (ruleExerciseDetails) {
-                  ruleExerciseDetails.forEach((detail) => {
-                    ruleExerciseDetailsMap.set(detail.id, {
-                      name: detail.name,
-                      description: detail.description ?? "",
-                    });
-                  });
-                }
-              }
-
-              programExercises = clientRules
-                .map((rule, index) => {
-                  const detail = rule.exercise_id
-                    ? ruleExerciseDetailsMap.get(rule.exercise_id)
-                    : undefined;
-                  const rawOrder =
-                    typeof rule.exercise_order === "number"
-                      ? rule.exercise_order
-                      : index + 1;
-                  const orderIndex = Math.max(0, rawOrder - 1);
-                  const fallbackName =
-                    detail?.name ||
-                    rule.exercise_letter ||
-                    `Exercise ${orderIndex + 1}`;
-
-                  return {
-                    id: rule.id,
-                    exerciseId: rule.exercise_id ?? "",
-                    name: detail?.name || fallbackName,
-                    description: detail?.description || "",
-                    orderIndex,
-                    notes: rule.notes || undefined,
-                    sets: rule.sets ?? 0,
-                    reps: rule.reps ?? "",
-                    restSeconds: rule.rest_seconds ?? 60,
-                    progressionNotes: undefined,
-                    weightGuidance: undefined,
-                  };
-                })
-                .sort((a, b) => a.orderIndex - b.orderIndex);
-            }
-          } catch (rulesError) {
+          if (programDayError) {
             console.error(
-              "🔍 Client Workouts - Unexpected error loading client program rules:",
-              rulesError
+              "🔍 Client Workouts - Error loading next program day:",
+              programDayError
             );
           }
 
-          if (!nextWorkout || !nextWorkout.hasWorkout) {
+          if (nextProgramDay && !nextProgramDay.is_completed) {
+            const programName =
+              nextProgramDay.name && nextProgramDay.name.trim().length > 0
+                ? nextProgramDay.name
+                : programAssignment.name && programAssignment.name.trim().length > 0
+                ? programAssignment.name
+                : "Program";
+            const programDescription =
+              nextProgramDay.description && nextProgramDay.description.trim().length > 0
+                ? nextProgramDay.description
+                : programAssignment.description &&
+                  programAssignment.description.trim().length > 0
+                ? programAssignment.description
+                : "";
+
+            // Load exercises from workout template if available
+            let programExercises: DailyWorkoutExercise[] = [];
+            if (nextProgramDay.workout_template_id) {
+              try {
+                const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
+                const blocks = await WorkoutBlockService.getWorkoutBlocks(
+                  nextProgramDay.workout_template_id
+                );
+                programExercises = blocks
+                  .flatMap((block) => {
+                    return (block.exercises || []).map((exercise, index) => ({
+                      id: exercise.id || `${block.id}-${index}`,
+                      exerciseId: exercise.exercise_id || "",
+                      name: exercise.exercise?.name || "Exercise",
+                      description: exercise.exercise?.description || "",
+                      orderIndex: exercise.exercise_order ?? index,
+                      notes: exercise.notes || undefined,
+                      sets: exercise.sets || 0,
+                      reps: exercise.reps || "",
+                      restSeconds: exercise.rest_seconds || 60,
+                      progressionNotes: undefined,
+                      weightGuidance: undefined,
+                    }));
+                  })
+                  .sort((a, b) => a.orderIndex - b.orderIndex);
+              } catch (blocksError) {
+                console.error(
+                  "🔍 Client Workouts - Error loading workout blocks:",
+                  blocksError
+                );
+              }
+            }
+
+            // Set nextWorkout with program_day_assignments.id (stored in scheduleId field)
             nextWorkout = {
               hasWorkout: true,
-              templateId: programAssignment.program_id || undefined,
+              templateId: nextProgramDay.workout_template_id || undefined,
+              scheduleId: nextProgramDay.id, // Store program_day_assignments.id here
               templateName: programName,
               templateDescription: programDescription,
               weekNumber: 1,
-              programDay: 1,
+              programDay: nextProgramDay.day_number || 1,
               exercises: programExercises,
               generatedAt: programAssignment.start_date,
-              message: "Program ready!",
+              message: "Program workout ready!",
             };
             console.log(
-              "🔍 Client Workouts - Set program assignment as workout:",
+              "🔍 Client Workouts - Set program day assignment as workout:",
               nextWorkout
             );
+          } else if (!nextWorkout || !nextWorkout.hasWorkout) {
+            // Fallback: no incomplete program days found, but show program info
+            const programName =
+              programAssignment.name && programAssignment.name.trim().length > 0
+                ? programAssignment.name
+                : "Program";
+            const programDescription =
+              programAssignment.description &&
+              programAssignment.description.trim().length > 0
+                ? programAssignment.description
+                : "";
+
+            nextWorkout = {
+              hasWorkout: false,
+              templateId: programAssignment.program_id || undefined,
+              templateName: programName,
+              templateDescription: programDescription,
+              message: "All program workouts completed!",
+            };
           }
         }
       } catch (error) {
@@ -573,29 +605,24 @@ export default function EnhancedClientWorkouts({
 
       setTodaysWorkout(nextWorkout);
 
-      // Get program progress for current program info
-      // Handle gracefully if new tables don't exist yet
-      let programProgress;
-      try {
-        programProgress = await WorkoutTemplateService.getProgramProgress(
-          clientId
-        );
-      } catch (error) {
-        console.log("Program progress tracking not available yet");
-        programProgress = null;
-      }
+      // TASK 3: Get program progress from program_day_assignments (source of truth)
+      // Get active program assignment first
+      const activeProgramAssignment = allProgramAssignments && allProgramAssignments.length > 0
+        ? allProgramAssignments[0]
+        : null;
 
-      if (programProgress) {
+      if (activeProgramAssignment) {
+        // Get program metrics from program_day_assignments
+        const { getProgramMetrics } = await import("@/lib/programMetricsService");
+        const programMetrics = await getProgramMetrics(activeProgramAssignment.id);
+
         // Get program details
-        // Fetch program details without the profiles relationship to avoid 406 errors
-        // Use explicit column selection instead of * to avoid RLS issues
         let programData = null;
         let programError = null;
         let coachInfo = null;
 
         try {
           // Query through program_assignments to respect RLS policies
-          // Clients should access workout_programs through program_assignments, not directly
           const { data: assignmentWithProgram, error: assignmentError } =
             await supabase
               .from("program_assignments")
@@ -607,7 +634,7 @@ export default function EnhancedClientWorkouts({
               )
             `
               )
-              .eq("program_id", programProgress.program_id)
+              .eq("id", activeProgramAssignment.id)
               .eq("client_id", clientId)
               .maybeSingle();
 
@@ -637,15 +664,18 @@ export default function EnhancedClientWorkouts({
         }
 
         if (!programError && programData) {
+          // Calculate estimated week from current_day_number (assuming ~7 workouts per week)
+          const estimatedWeek = programMetrics?.current_day_number
+            ? Math.ceil(programMetrics.current_day_number / 7)
+            : 1;
+
           setCurrentProgram({
             id: programData.id,
             name: programData.name,
             description: programData.description,
-            current_week: programProgress.current_week,
+            current_week: estimatedWeek,
             total_weeks: programData.duration_weeks,
-            progress_percentage: Math.round(
-              (programProgress.current_week / programData.duration_weeks) * 100
-            ),
+            progress_percentage: programMetrics?.completion_percentage || 0,
             difficulty_level: programData.difficulty_level,
             coach_name:
               `${coachInfo?.first_name || ""} ${
@@ -735,28 +765,12 @@ export default function EnhancedClientWorkouts({
           assignedError
         );
 
-        // Also load program assignments
-        const { data: assignedPrograms, error: programsError } = await supabase
-          .from("program_assignments")
-          .select(
-            `
-            id,
-            start_date,
-            status,
-            program_id,
-            coach_id,
-            name,
-            description,
-            duration_weeks
-          `
-          )
-          .eq("client_id", clientId)
-          .order("created_at", { ascending: false });
+        // OPTIMIZED: Reuse program assignments already fetched above (no duplicate query!)
+        const assignedPrograms = allProgramAssignments || [];
 
         console.log(
           "🔍 Client Workouts - Assigned programs:",
-          assignedPrograms,
-          programsError
+          assignedPrograms
         );
 
         if (assignedError) {
@@ -765,92 +779,110 @@ export default function EnhancedClientWorkouts({
 
         const allAssignments = [];
 
-        // Process workout assignments
+        // OPTIMIZED: Batch fetch ALL coach profiles at once instead of N+1 queries
+        const allCoachIds = new Set<string>();
         if (assignedWorkouts) {
-          const workoutsWithDetails = await Promise.all(
-            assignedWorkouts.map(async (assignment) => {
-              console.log("🔎 Processing workout assignment:", assignment);
-              let templateSnapshot =
-                assignment.name || assignment.description
-                  ? {
-                      id: assignment.workout_template_id,
-                      name: assignment.name,
-                      description: assignment.description,
-                    }
-                  : null;
+          assignedWorkouts.forEach((a: any) => {
+            if (a.coach_id) allCoachIds.add(a.coach_id);
+          });
+        }
+        if (assignedPrograms) {
+          assignedPrograms.forEach((a: any) => {
+            if (a.coach_id) allCoachIds.add(a.coach_id);
+          });
+        }
 
-              if (!templateSnapshot) {
-                // Client sessions can't read coach templates (RLS), so fall back to the snapshot columns.
-                templateSnapshot = {
-                  id: assignment.workout_template_id,
-                  name: "Workout",
-                  description: null,
-                };
-              }
+        // Single query for all coach profiles
+        const coachProfilesMap = new Map<string, any>();
+        if (allCoachIds.size > 0) {
+          const { data: coaches, error: coachesError } = await supabase
+            .from("profiles")
+            .select("id, first_name, last_name")
+            .in("id", Array.from(allCoachIds));
 
-              const { data: coach } = await supabase
-                .from("profiles")
-                .select("first_name, last_name")
-                .eq("id", assignment.coach_id)
-                .maybeSingle();
+          if (!coachesError && coaches) {
+            coaches.forEach((coach: any) => {
+              coachProfilesMap.set(coach.id, coach);
+            });
+          }
+        }
 
-              return {
-                ...assignment,
-                type: "workout",
-                workout_templates: templateSnapshot,
-                profiles: coach,
+        // Process workout assignments (no queries in loop!)
+        if (assignedWorkouts) {
+          const workoutsWithDetails = assignedWorkouts.map((assignment: any) => {
+            console.log("🔎 Processing workout assignment:", assignment);
+            let templateSnapshot =
+              assignment.name || assignment.description
+                ? {
+                    id: assignment.workout_template_id,
+                    name: assignment.name,
+                    description: assignment.description,
+                  }
+                : null;
+
+            if (!templateSnapshot) {
+              // Client sessions can't read coach templates (RLS), so fall back to the snapshot columns.
+              templateSnapshot = {
+                id: assignment.workout_template_id,
+                name: "Workout",
+                description: null,
               };
-            })
-          );
+            }
+
+            // Get coach from map (no query!)
+            const coach = coachProfilesMap.get(assignment.coach_id) || null;
+
+            return {
+              ...assignment,
+              type: "workout",
+              workout_templates: templateSnapshot,
+              profiles: coach,
+            };
+          });
           allAssignments.push(...workoutsWithDetails);
         }
 
-        // Process program assignments
+        // Process program assignments (no queries in loop!)
         if (assignedPrograms) {
-          const programsWithDetails = await Promise.all(
-            assignedPrograms.map(async (assignment) => {
-              console.log("🔎 Processing program assignment:", assignment);
-              let programSnapshot =
-                assignment.name || assignment.description
-                  ? {
-                      id: assignment.program_id,
-                      name: assignment.name,
-                      description: assignment.description,
-                      duration_weeks: assignment.duration_weeks,
-                    }
-                  : null;
+          const programsWithDetails = assignedPrograms.map((assignment: any) => {
+            console.log("🔎 Processing program assignment:", assignment);
+            let programSnapshot =
+              assignment.name || assignment.description
+                ? {
+                    id: assignment.program_id,
+                    name: assignment.name,
+                    description: assignment.description,
+                    duration_weeks: assignment.duration_weeks,
+                  }
+                : null;
 
-              if (!programSnapshot) {
-                // Client sessions can't read coach programs (RLS), so rely on assignment snapshot data.
-                programSnapshot = {
-                  id: assignment.program_id,
-                  name: "Program",
-                  description: null,
-                  duration_weeks: assignment.duration_weeks,
-                };
-              }
-
-              const { data: coach } = await supabase
-                .from("profiles")
-                .select("first_name, last_name")
-                .eq("id", assignment.coach_id)
-                .maybeSingle();
-
-              return {
-                ...assignment,
-                type: "program",
-                workout_templates: programSnapshot
-                  ? {
-                      id: programSnapshot.id,
-                      name: programSnapshot.name,
-                      description: programSnapshot.description,
-                      duration_weeks: programSnapshot.duration_weeks,
-                    }
-                  : null,
-                profiles: coach,
+            if (!programSnapshot) {
+              // Client sessions can't read coach programs (RLS), so rely on assignment snapshot data.
+              programSnapshot = {
+                id: assignment.program_id,
+                name: "Program",
+                description: null,
+                duration_weeks: assignment.duration_weeks,
               };
-            })
-          );
+            }
+
+            // Get coach from map (no query!)
+            const coach = coachProfilesMap.get(assignment.coach_id) || null;
+
+            return {
+              ...assignment,
+              type: "program",
+              workout_templates: programSnapshot
+                ? {
+                    id: programSnapshot.id,
+                    name: programSnapshot.name,
+                    description: programSnapshot.description,
+                    duration_weeks: programSnapshot.duration_weeks,
+                  }
+                : null,
+              profiles: coach,
+            };
+          });
           allAssignments.push(...programsWithDetails);
         }
 
@@ -914,6 +946,19 @@ export default function EnhancedClientWorkouts({
         }
         setWeeklyStats({ totalVolume: Math.round(totalVolume), activeTime });
 
+        const { data: allTimeLogs } = await supabase
+          .from("workout_logs")
+          .select("total_weight_lifted")
+          .eq("client_id", clientId)
+          .not("completed_at", "is", null);
+
+        const totalAllTimeVolume =
+          allTimeLogs?.reduce(
+            (sum, log) => sum + (log.total_weight_lifted || 0),
+            0
+          ) || 0;
+        setAllTimeVolume(Math.round(totalAllTimeVolume));
+
         // Load this week's workout assignments
         const mondayStr = monday.toISOString().split("T")[0];
         const sundayStr = sunday.toISOString().split("T")[0];
@@ -961,8 +1006,91 @@ export default function EnhancedClientWorkouts({
     }
   }, [clientId]);
 
+  const loadWorkoutDataFromApi = useCallback(async () => {
+    if (!clientId) return;
+    setLoading(true);
+    setLoadError(null);
+
+    try {
+      const cacheKey = `${clientId}:${pathname}`;
+      const cached = workoutSummaryCache.get(cacheKey);
+      if (cached && Date.now() - cached.fetchedAt < WORKOUT_SUMMARY_TTL_MS) {
+        const data = cached.data;
+        setAvatarUrl(data.avatarUrl || null);
+        setTodaysWorkout(data.todaysWorkout || null);
+        setCurrentProgram(data.currentProgram || null);
+        setWorkoutHistory(data.workoutHistory || []);
+        setCompletedPrograms(data.completedPrograms || []);
+        setUpcomingWorkouts(data.upcomingWorkouts || []);
+        setAllAssignedWorkouts(data.allAssignedWorkouts || []);
+        setWeeklyProgress(data.weeklyProgress || { current: 0, goal: 0 });
+        setWeeklyStats(data.weeklyStats || { totalVolume: 0, activeTime: 0 });
+        setAllTimeVolume(data.allTimeVolume || 0);
+        setThisWeekAssignments(data.thisWeekAssignments || []);
+        setAssignmentIdByTemplate(data.assignmentIdByTemplate || {});
+        setScheduleIdByTemplate(data.scheduleIdByTemplate || {});
+        setLoading(false);
+        return;
+      }
+
+      if (!session?.access_token) {
+        setLoadError("Session expired. Please sign in again.");
+        await signOut();
+        router.push("/");
+        return;
+      }
+
+      const response = await fetchApi("/api/client/workouts/summary", {
+        method: "GET",
+        cache: "no-store",
+        onSessionExpired: async () => {
+          setLoadError("Session expired. Please sign in again.");
+          await signOut();
+          router.push("/");
+        },
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        setLoadError(text || "Failed to load workout data.");
+        return;
+      }
+
+      const data = (await response.json()) as WorkoutSummaryPayload;
+      workoutSummaryCache.set(cacheKey, { data, fetchedAt: Date.now() });
+
+      if (PERF_WORKOUTS_ENABLED) {
+        perfMarksRef.current.fetchResolvedAt = performance.now();
+        performance.mark("workouts_summary_fetch_resolved");
+      }
+
+      setAvatarUrl(data.avatarUrl || null);
+      setTodaysWorkout(data.todaysWorkout || null);
+      setCurrentProgram(data.currentProgram || null);
+      setWorkoutHistory(data.workoutHistory || []);
+      setCompletedPrograms(data.completedPrograms || []);
+      setUpcomingWorkouts(data.upcomingWorkouts || []);
+      setAllAssignedWorkouts(data.allAssignedWorkouts || []);
+      setWeeklyProgress(data.weeklyProgress || { current: 0, goal: 0 });
+      setWeeklyStats(data.weeklyStats || { totalVolume: 0, activeTime: 0 });
+      setAllTimeVolume(data.allTimeVolume || 0);
+      setThisWeekAssignments(data.thisWeekAssignments || []);
+      setAssignmentIdByTemplate(data.assignmentIdByTemplate || {});
+      setScheduleIdByTemplate(data.scheduleIdByTemplate || {});
+      if (PERF_WORKOUTS_ENABLED) {
+        perfMarksRef.current.summaryApplied = true;
+      }
+    } catch (error) {
+      console.error("Error loading workout data (API):", error);
+      setLoadError("Failed to load workout data.");
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId, pathname, router, session, signOut]);
+
   // Fetch avatar URL
   useEffect(() => {
+    if (useNewLoader) return;
     if (user?.id) {
       (async () => {
         try {
@@ -979,18 +1107,64 @@ export default function EnhancedClientWorkouts({
         }
       })();
     }
-  }, [user]);
+  }, [user, useNewLoader]);
 
   useEffect(() => {
+    if (useNewLoader) {
+      loadWorkoutDataFromApi().catch((error) => {
+        console.error("Error loading workout data (API):", error);
+      });
+      return;
+    }
+
     loadWorkoutData().catch((error) => {
       console.error("Error loading workout data:", error);
     });
-  }, [loadWorkoutData]);
+  }, [loadWorkoutData, loadWorkoutDataFromApi, useNewLoader]);
+
+  useEffect(() => {
+    if (!PERF_WORKOUTS_ENABLED) return;
+    const marks = perfMarksRef.current;
+    if (marks.logged) return;
+    if (!marks.summaryApplied || loading) return;
+
+    const renderAt = performance.now();
+    performance.mark("workouts_first_render");
+
+    const mountAt = marks.mountAt || renderAt;
+    const fetchResolvedAt = marks.fetchResolvedAt || renderAt;
+    const mountToFetchMs = Math.round(fetchResolvedAt - mountAt);
+    const fetchToRenderMs = Math.round(renderAt - fetchResolvedAt);
+    const mountToRenderMs = Math.round(renderAt - mountAt);
+
+    console.log(
+      `PERF_WORKOUTS mountToFetchMs=${mountToFetchMs} | fetchToRenderMs=${fetchToRenderMs} | mountToRenderMs=${mountToRenderMs}`
+    );
+    marks.logged = true;
+  }, [loading]);
 
   const startWorkout = async (workout: DailyWorkout) => {
+    if (workout.scheduleId) {
+      router.push(`/client/workouts/${workout.scheduleId}/start`);
+      return;
+    }
+
     if (!workout.templateId) return;
 
     try {
+      if (useNewLoader) {
+        const scheduleId = scheduleIdByTemplate[workout.templateId];
+        if (scheduleId) {
+          router.push(`/client/workouts/${scheduleId}/start`);
+          return;
+        }
+        const assignmentId = assignmentIdByTemplate[workout.templateId];
+        if (assignmentId) {
+          router.push(`/client/workouts/${assignmentId}/start`);
+          return;
+        }
+      }
+
       // Find the active assignment for this client and template
       const { data: assignment, error } = await supabase
         .from("workout_assignments")
@@ -1114,234 +1288,102 @@ export default function EnhancedClientWorkouts({
     );
   }
 
+  if (loadError && useNewLoader) {
+    return (
+      <div className={`min-h-screen ${theme.background}`}>
+        <div className="p-6">
+          <div className="max-w-3xl mx-auto">
+            <GlassCard>
+              <div className="p-6 space-y-4 text-center">
+                <h2 className="text-lg font-semibold text-slate-800">
+                  Unable to load workouts
+                </h2>
+                <p className="text-sm text-slate-600">{loadError}</p>
+                <Button onClick={() => loadWorkoutDataFromApi()}>
+                  Refresh
+                </Button>
+              </div>
+            </GlassCard>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <AnimatedBackground>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        @keyframes rotate-shimmer {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes pulse-red {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-          70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
-      `,
-        }}
-      />
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div
-        style={{
-          minHeight: "100vh",
-          paddingBottom: "100px",
-        }}
-      >
-        <div style={{ padding: "24px 20px" }}>
-          <div
-            className="max-w-4xl mx-auto"
-            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-          >
+      <div className="relative z-10 min-h-screen pb-28">
+          <div className="px-5 py-6">
+            <div className="relative z-10 max-w-4xl mx-auto flex flex-col gap-5">
             {/* Header Section */}
-            <header
-              style={{
-                marginBottom: "48px",
-              }}
-            >
+            <header className="mb-12">
               <div>
-                <h4
-                  className="mono"
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.3em",
-                    color: isDark ? "#22D3EE" : "#0891B2",
-                    margin: 0,
-                    marginBottom: "8px",
-                    fontFamily: "monospace",
-                  }}
-                >
+                <h4 className="mono text-xs font-medium uppercase tracking-[0.3em] fc-text-workouts mb-2">
                   Training Protocol
                 </h4>
-                <h1
-                  style={{
-                    fontSize: "48px",
-                    fontWeight: 800,
-                    lineHeight: "1.2",
-                    letterSpacing: "-0.02em",
-                    color: isDark ? "#FFFFFF" : "#1A1A1A",
-                    margin: 0,
-                  }}
-                >
-                  Your <span style={{ color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280" }}>Workouts</span>
+                <h1 className="text-4xl md:text-5xl font-extrabold leading-tight tracking-tight fc-text-primary m-0">
+                  Your <span className="fc-text-subtle">Workouts</span>
                 </h1>
               </div>
             </header>
 
-            {/* Today's Hero Card */}
+            {/* Unified Hero Card */}
             {todaysWorkout?.hasWorkout ? (
-              <section style={{ marginBottom: "32px" }}>
-                <div
-                  style={{
-                    borderLeft: "4px solid #EF4444",
-                  }}
-                  className="rounded-2xl"
-                >
+              <section className="mb-8">
+                <div className="fc-accent-workouts rounded-2xl">
                   <GlassCard
                     elevation={2}
-                    className="p-8 min-h-[280px] flex flex-col justify-between relative overflow-hidden kinetic-shimmer"
+                    className="fc-glass fc-card fc-kinetic-shimmer p-8 min-h-[280px] flex flex-col justify-between relative overflow-hidden"
                   >
-                  {/* Kinetic shimmer overlay */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-150%",
-                      left: "-150%",
-                      width: "400%",
-                      height: "400%",
-                      background:
-                        "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 80%)",
-                      animation: "rotate-shimmer 12s infinite linear",
-                      pointerEvents: "none",
-                    }}
-                  />
-
-                  <div
-                    style={{
-                      position: "relative",
-                      zIndex: 10,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "24px",
-                      flex: 1,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "12px",
-                        }}
-                      >
-                        <span
-                          style={{
-                            padding: "4px 12px",
-                            borderRadius: "99px",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            background:
-                              "linear-gradient(90deg, #EF4444, #F59E0B)",
-                            color: "#FFFFFF",
-                            width: "fit-content",
-                            animation: "pulse-red 2s infinite",
-                          }}
-                        >
-                          <Zap
-                            style={{
-                              width: "12px",
-                              height: "12px",
-                              fill: "currentColor",
-                            }}
-                          />
-                          Today
+                  <div className="relative z-10 flex flex-col gap-6 flex-1">
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col gap-3">
+                        <span className="fc-pill fc-pill-glass fc-text-workouts inline-flex items-center gap-1 w-fit fc-streak-pulse">
+                          <Zap className="w-3 h-3" />
+                          Next Up
                         </span>
-                        <h2
-                          style={{
-                            fontSize: "30px",
-                            fontWeight: 700,
-                            lineHeight: "1.25",
-                            color: isDark ? "#FFFFFF" : "#1A1A1A",
-                            margin: 0,
-                            letterSpacing: "-0.02em",
-                          }}
-                        >
+                        {currentProgram && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="fc-outline" className="px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.2em]">
+                              Program
+                            </Badge>
+                            <span className="text-[11px] uppercase tracking-[0.22em] fc-text-dim font-mono">
+                              Week {currentProgram.current_week} of {currentProgram.total_weeks}
+                            </span>
+                            {typeof currentProgram.progress_percentage === "number" && (
+                              <span className="text-[11px] uppercase tracking-[0.22em] fc-text-dim font-mono">
+                                • {currentProgram.progress_percentage}% complete
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <h2 className="text-3xl font-bold leading-tight tracking-tight fc-text-primary m-0">
                           {todaysWorkout.templateName}
                         </h2>
-                        <div
-                          style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: "20px",
-                            color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <Dumbbell
-                              style={{
-                                width: "20px",
-                                height: "20px",
-                                color: "#EF4444",
-                              }}
-                            />
-                            <span style={{ fontSize: "16px", fontWeight: 500 }}>
-                              {todaysWorkout.exercises?.length || 0} Exercises
+                        <div className="flex flex-wrap gap-5 fc-text-dim">
+                          <div className="flex items-center gap-2">
+                            <Dumbbell className="w-5 h-5 fc-text-workouts" />
+                            <span className="text-base font-medium">
+                              {(todaysWorkout.exerciseCount ??
+                                (todaysWorkout.exercises?.length || 0))}{" "}
+                              Exercises
                             </span>
                           </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <Layers
-                              style={{
-                                width: "20px",
-                                height: "20px",
-                                color: "#EF4444",
-                              }}
-                            />
-                            <span style={{ fontSize: "16px", fontWeight: 500 }}>
-                              {todaysWorkout.exercises?.reduce(
-                                (sum, e) => sum + (e.sets || 0),
-                                0
-                              ) || 0}{" "}
+                          <div className="flex items-center gap-2">
+                            <Layers className="w-5 h-5 fc-text-workouts" />
+                            <span className="text-base font-medium">
+                              {(todaysWorkout.totalSets ??
+                                (todaysWorkout.exercises?.reduce(
+                                  (sum, e) => sum + (e.sets || 0),
+                                  0
+                                ) || 0))}{" "}
                               Sets
                             </span>
                           </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <Clock
-                              style={{
-                                width: "20px",
-                                height: "20px",
-                                color: isDark
-                                  ? "rgba(255,255,255,0.4)"
-                                  : "#6B7280",
-                              }}
-                            />
-                            <span
-                              style={{
-                                fontSize: "16px",
-                                fontWeight: 500,
-                                fontFamily: "monospace",
-                              }}
-                            >
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-5 h-5 fc-text-dim" />
+                            <span className="text-base font-medium font-mono">
                               ~{todaysWorkout.estimatedDuration || 0} min
                             </span>
                           </div>
@@ -1349,113 +1391,74 @@ export default function EnhancedClientWorkouts({
                       </div>
                     </div>
 
-                    {/* Buttons */}
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "16px",
-                        marginTop: "32px",
-                      }}
-                    >
-                      <button
-                        onClick={() => startWorkout(todaysWorkout)}
-                        style={{
-                          height: "56px",
-                          background:
-                            "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                          boxShadow: "0 4px 20px rgba(16, 185, 129, 0.3)",
-                          borderRadius: "18px",
-                          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                          cursor: "pointer",
-                          border: "none",
-                          color: "#FFFFFF",
-                          fontSize: "18px",
-                          fontWeight: 700,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "12px",
-                          flex: 1,
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                          e.currentTarget.style.boxShadow =
-                            "0 8px 24px rgba(16, 185, 129, 0.4)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow =
-                            "0 4px 20px rgba(16, 185, 129, 0.3)";
-                        }}
-                        onMouseDown={(e) => {
-                          e.currentTarget.style.transform = "scale(0.96)";
-                          e.currentTarget.style.filter = "brightness(0.9)";
-                        }}
-                        onMouseUp={(e) => {
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                          e.currentTarget.style.filter = "brightness(1)";
-                        }}
-                      >
-                        <Play
-                          style={{
-                            width: "24px",
-                            height: "24px",
-                            fill: "currentColor",
-                          }}
+                    <div className="fc-glass-soft rounded-2xl p-4 sm:p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs uppercase tracking-[0.3em] fc-text-dim">
+                          Progress Snapshot
+                        </span>
+                        <span className="font-mono text-sm font-bold fc-text-workouts">
+                          {weeklyProgress.current} / {weeklyProgress.goal}{" "}
+                          <span className="font-normal fc-text-subtle">
+                            Workouts
+                          </span>
+                        </span>
+                      </div>
+                      <div className="fc-progress-track">
+                        <div
+                          className="fc-progress-fill"
+                          style={{ width: `${weeklyProgressPercent}%` }}
                         />
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-6">
+                        <div>
+                          <p className="text-[11px] font-normal uppercase tracking-[0.18em] fc-text-dim mb-1">
+                            Total Volume
+                          </p>
+                          <p className="text-lg font-bold font-mono tracking-tight fc-text-primary m-0">
+                            {weeklyStats.totalVolume.toLocaleString()}
+                            <span className="text-xs font-normal fc-text-subtle ml-1">
+                              kg
+                            </span>
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-normal uppercase tracking-[0.18em] fc-text-dim mb-1">
+                            Active Time
+                          </p>
+                          <p className="text-lg font-bold font-mono tracking-tight fc-text-primary m-0">
+                            {weeklyStats.activeTime}
+                            <span className="text-xs font-normal fc-text-subtle ml-1">
+                              min
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="mt-8 flex flex-col gap-4">
+                      <Button
+                        variant="fc-primary"
+                        size="xl"
+                        onClick={() => startWorkout(todaysWorkout)}
+                        className="w-full"
+                      >
+                        <Play className="w-6 h-6 fill-current" />
                         Start Workout
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="fc-secondary"
+                        size="lg"
                         onClick={() =>
                           router.push(
                             `/client/workouts/${todaysWorkout.templateId}/details`
                           )
                         }
-                        style={{
-                          height: "48px",
-                          background: isDark
-                            ? "rgba(255,255,255,0.05)"
-                            : "rgba(0,0,0,0.02)",
-                          border: `1px solid ${
-                            isDark
-                              ? "rgba(255,255,255,0.08)"
-                              : "rgba(0,0,0,0.1)"
-                          }`,
-                          borderRadius: "16px",
-                          transition: "all 0.2s ease",
-                          cursor: "pointer",
-                          color: isDark ? "rgba(255,255,255,0.7)" : "#6B7280",
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "8px",
-                          padding: "0 24px",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = isDark
-                            ? "rgba(255,255,255,0.1)"
-                            : "rgba(0,0,0,0.05)";
-                          e.currentTarget.style.borderColor = isDark
-                            ? "rgba(255,255,255,0.2)"
-                            : "rgba(0,0,0,0.15)";
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = isDark
-                            ? "rgba(255,255,255,0.05)"
-                            : "rgba(0,0,0,0.02)";
-                          e.currentTarget.style.borderColor = isDark
-                            ? "rgba(255,255,255,0.08)"
-                            : "rgba(0,0,0,0.1)";
-                          e.currentTarget.style.transform = "translateY(0)";
-                        }}
+                        className="w-full"
                       >
-                        <Info style={{ width: "20px", height: "20px" }} />
+                        <Info className="w-5 h-5" />
                         Details
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </GlassCard>
@@ -1522,418 +1525,97 @@ export default function EnhancedClientWorkouts({
               </GlassCard>
             )}
 
-            {/* Weekly Progress Banner */}
-            <section style={{ marginBottom: "32px" }}>
-              <div
-                style={{
-                  borderLeft: "4px solid #3B82F6",
-                }}
-                className="rounded-2xl"
-              >
-                <GlassCard
-                  elevation={2}
-                  className="p-6"
-                >
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "24px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "8px",
-                      flex: 1,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-end",
-                      }}
-                    >
-                      <h3
-                        style={{
-                          fontSize: "18px",
-                          fontWeight: 500,
-                          lineHeight: "1.25",
-                          color: isDark ? "#FFFFFF" : "#1A1A1A",
-                          margin: 0,
-                        }}
-                      >
-                        Weekly Progress
-                      </h3>
-                      <span
-                        style={{
-                          fontFamily: "monospace",
-                          fontSize: "16px",
-                          fontWeight: 700,
-                          color: "#3B82F6",
-                        }}
-                      >
-                        {weeklyProgress.current} / {weeklyProgress.goal}{" "}
-                        <span
-                          style={{
-                            color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                            fontWeight: 400,
-                          }}
-                        >
-                          Workouts
-                        </span>
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        height: "8px",
-                        background: isDark
-                          ? "rgba(255,255,255,0.05)"
-                          : "rgba(0,0,0,0.05)",
-                        borderRadius: "4px",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: "100%",
-                          background:
-                            "linear-gradient(90deg, #3B82F6, #10B981)",
-                          borderRadius: "4px",
-                          transition: "width 1s cubic-bezier(0.65, 0, 0.35, 1)",
-                          width: `${weeklyProgressPercent}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      height: "48px",
-                      width: "1px",
-                      background: isDark
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.1)",
-                      display: "none",
-                    }}
-                  />
-                  <div style={{ display: "flex", gap: "32px" }}>
-                    <div>
-                      <p
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 400,
-                          color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.1em",
-                          margin: "0 0 4px 0",
-                        }}
-                      >
-                        Total Volume
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "20px",
-                          fontWeight: 700,
-                          fontFamily: "monospace",
-                          letterSpacing: "-0.02em",
-                          color: isDark ? "#FFFFFF" : "#1A1A1A",
-                          margin: 0,
-                        }}
-                      >
-                        {weeklyStats.totalVolume.toLocaleString()}
-                        <span
-                          style={{
-                            color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                            fontSize: "14px",
-                            fontWeight: 400,
-                            marginLeft: "4px",
-                          }}
-                        >
-                          kg
-                        </span>
-                      </p>
-                    </div>
-                    <div>
-                      <p
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 400,
-                          color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.1em",
-                          margin: "0 0 4px 0",
-                        }}
-                      >
-                        Active Time
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "20px",
-                          fontWeight: 700,
-                          fontFamily: "monospace",
-                          letterSpacing: "-0.02em",
-                          color: isDark ? "#FFFFFF" : "#1A1A1A",
-                          margin: 0,
-                        }}
-                      >
-                        {weeklyStats.activeTime}
-                        <span
-                          style={{
-                            color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                            fontSize: "14px",
-                            fontWeight: 400,
-                            marginLeft: "4px",
-                          }}
-                        >
-                          min
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </GlassCard>
-              </div>
-            </section>
-
             {/* SECONDARY FEATURES - Below main workout */}
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-3" style={{ gap: "12px" }}>
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
               <GlassCard
                 elevation={1}
-                className="p-6 text-center flex flex-col items-center gap-3"
+                className="fc-glass fc-card p-3 sm:p-4 text-center flex flex-col items-center gap-2"
               >
-                <div
-                  style={{
-                    width: "56px",
-                    height: "56px",
-                    borderRadius: "18px",
-                    background:
-                      "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <Flame
-                    style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
-                  />
+                <div className="fc-icon-tile fc-icon-habits w-9 h-9">
+                  <Flame className="w-4 h-4" />
                 </div>
-                <div
-                  style={{
-                    fontSize: "40px",
-                    fontWeight: "800",
-                    color: isDark ? "#FFFFFF" : "#1A1A1A",
-                    lineHeight: "1.1",
-                  }}
-                >
+                <div className="text-lg sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
                   7
                 </div>
-                <div
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: "400",
-                    color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
-                  }}
-                >
+                <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] fc-text-dim">
                   Day Streak
                 </div>
               </GlassCard>
               <GlassCard
                 elevation={1}
-                className="p-6 text-center flex flex-col items-center gap-3"
+                className="fc-glass fc-card p-3 sm:p-4 text-center flex flex-col items-center gap-2"
               >
-                <div
-                  style={{
-                    width: "56px",
-                    height: "56px",
-                    borderRadius: "18px",
-                    background:
-                      "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <Trophy
-                    style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
-                  />
+                <div className="fc-icon-tile fc-icon-challenges w-9 h-9">
+                  <Trophy className="w-4 h-4" />
                 </div>
-                <div
-                  style={{
-                    fontSize: "40px",
-                    fontWeight: "800",
-                    color: isDark ? "#FFFFFF" : "#1A1A1A",
-                    lineHeight: "1.1",
-                  }}
-                >
+                <div className="text-lg sm:text-2xl font-extrabold fc-text-primary leading-tight">
                   12
                 </div>
-                <div
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: "400",
-                    color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
-                  }}
-                >
+                <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] fc-text-dim">
                   This Month
                 </div>
               </GlassCard>
               <GlassCard
                 elevation={1}
-                className="p-6 text-center flex flex-col items-center gap-3"
+                className="fc-glass fc-card p-3 sm:p-4 text-center flex flex-col items-center gap-2"
               >
-                <div
-                  style={{
-                    width: "56px",
-                    height: "56px",
-                    borderRadius: "18px",
-                    background:
-                      "linear-gradient(135deg, #667EEA 0%, #764BA2 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <TrendingUp
-                    style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
-                  />
+                <div className="fc-icon-tile fc-icon-workouts w-9 h-9">
+                  <TrendingUp className="w-4 h-4" />
                 </div>
-                <div
-                  style={{
-                    fontSize: "40px",
-                    fontWeight: "800",
-                    color: isDark ? "#FFFFFF" : "#1A1A1A",
-                    lineHeight: "1.1",
-                  }}
-                >
+                <div className="text-lg sm:text-2xl font-extrabold fc-text-primary leading-tight">
                   85%
                 </div>
-                <div
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: "400",
-                    color: isDark ? "rgba(255,255,255,0.6)" : "#6B7280",
-                  }}
-                >
+                <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] fc-text-dim">
                   Success Rate
+                </div>
+              </GlassCard>
+              <GlassCard
+                elevation={1}
+                className="fc-glass fc-card p-3 sm:p-4 text-center flex flex-col items-center gap-2"
+              >
+                <div className="fc-icon-tile fc-icon-meals w-9 h-9">
+                  <Dumbbell className="w-4 h-4" />
+                </div>
+                <div className="text-lg sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
+                  {allTimeVolume.toLocaleString()}
+                </div>
+                <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] fc-text-dim">
+                  All Time kg
                 </div>
               </GlassCard>
             </div>
 
-            {/* Current Program Status - Collapsible */}
-            {currentProgram && (
-              <details className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-emerald-900/20 dark:via-teal-900/20 dark:to-cyan-900/20 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-emerald-200/50 dark:border-emerald-700/50 shadow-lg">
-                <summary className="p-4 sm:p-6 cursor-pointer">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg">
-                        <Award className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                      </div>
-                      <div>
-                        <span className="font-bold text-emerald-800 dark:text-emerald-200 text-sm sm:text-lg">
-                          Current Program
-                        </span>
-                        <p className="text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm">
-                          {currentProgram.name}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-0 px-3 sm:px-4 py-1 sm:py-2 text-xs sm:text-base font-bold">
-                      Week {currentProgram.current_week} of{" "}
-                      {currentProgram.total_weeks}
-                    </Badge>
-                  </div>
-                </summary>
-                <div className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-4">
-                  <div className="bg-white/50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-xl">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                            <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                          </div>
-                          <div>
-                            <span className="text-sm sm:text-lg font-bold text-slate-800 dark:text-white">
-                              {currentProgram.progress_percentage}%
-                            </span>
-                            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                              Complete
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                          Coached by
-                        </p>
-                        <p className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm">
-                          {currentProgram.coach_name}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="relative">
-                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 sm:h-4 overflow-hidden">
-                        <div
-                          className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 h-2 sm:h-4 rounded-full transition-all duration-1000 ease-out shadow-lg"
-                          style={{
-                            width: `${currentProgram.progress_percentage}%`,
-                          }}
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
-                        </div>
-                      </div>
-                      <div className="flex justify-between mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                        <span>Started</span>
-                        <span className="font-bold">
-                          {currentProgram.progress_percentage}% Complete
-                        </span>
-                        <span>Goal</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </details>
-            )}
-
             {/* This Week's Workouts */}
             {thisWeekAssignments.length > 0 && (
-              <section style={{ marginBottom: "32px" }}>
-                <h3
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: 600,
-                    lineHeight: "1.25",
-                    color: isDark ? "#FFFFFF" : "#1A1A1A",
-                    marginBottom: "16px",
-                    paddingLeft: "4px",
-                  }}
-                >
+              <section className="mb-8">
+                <h3 className="text-xl font-semibold leading-tight fc-text-primary mb-4 pl-1">
                   This Week
                 </h3>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                  }}
-                >
+                <div className="flex flex-col gap-3">
                   {thisWeekAssignments.map((assignment) => {
                     const workoutDate = new Date(assignment.scheduled_date);
                     const isCompleted = assignment.completed;
                     const isSkipped = assignment.status === "skipped";
                     const isToday = assignment.scheduled_date === today;
+                    const scheduleLabel = formatDate(assignment.scheduled_date);
 
                     const monthAbbr = workoutDate.toLocaleDateString("en-US", {
                       month: "short",
                     });
                     const day = workoutDate.getDate();
+                    const dateLabel = `${monthAbbr} ${day}`;
+                    const dateVariant = isCompleted
+                      ? "fc-date-card--done"
+                      : isSkipped
+                      ? "fc-date-card--skipped"
+                      : "fc-date-card--today";
+                    const statusVariant = isCompleted
+                      ? "fc-status-pill--done"
+                      : isSkipped
+                      ? "fc-status-pill--skipped"
+                      : "fc-status-pill--upcoming";
 
                     return (
                       <div
@@ -1944,92 +1626,25 @@ export default function EnhancedClientWorkouts({
                           );
                         }}
                       >
-                        <div
-                          style={{
-                            opacity: isSkipped ? 0.7 : 1,
-                          }}
-                        >
+                        <div className={isSkipped ? "opacity-70" : ""}>
                           <GlassCard
                             elevation={2}
-                            className="p-5 flex items-center justify-between cursor-pointer"
+                            className={`fc-glass fc-card fc-list-row p-5 flex items-center justify-between cursor-pointer fc-hover-rise fc-press ${
+                              isCompleted ? "fc-accent-workouts" : ""
+                            }`}
                           >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "20px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "56px",
-                              height: "56px",
-                              borderRadius: "12px",
-                              background: isCompleted
-                                ? "rgba(16, 185, 129, 0.1)"
-                                : isSkipped
-                                ? isDark
-                                  ? "#1F2937"
-                                  : "#F3F4F6"
-                                : "rgba(59, 130, 246, 0.1)",
-                              border: `1px solid ${
-                                isCompleted
-                                  ? "rgba(16, 185, 129, 0.2)"
-                                  : isSkipped
-                                  ? isDark
-                                    ? "#374151"
-                                    : "#E5E7EB"
-                                  : "rgba(59, 130, 246, 0.2)"
-                              }`,
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: isCompleted
-                                ? "#10B981"
-                                : isSkipped
-                                ? isDark
-                                  ? "#6B7280"
-                                  : "#9CA3AF"
-                                : "#3B82F6",
-                              fontFamily: "monospace",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              {monthAbbr}
-                            </span>
-                            <span style={{ fontSize: "20px", fontWeight: 700 }}>
-                              {day}
-                            </span>
+                        <div className="flex items-center gap-5">
+                          <div className={`fc-icon-tile fc-icon-workouts ${dateVariant}`}>
+                            <CalendarIcon className="w-6 h-6" />
                           </div>
                           <div>
-                            <h4
-                              style={{
-                                fontSize: "18px",
-                                fontWeight: 600,
-                                lineHeight: "1.25",
-                                color: isDark ? "#FFFFFF" : "#1A1A1A",
-                                margin: "0 0 4px 0",
-                              }}
-                            >
+                            <h4 className="text-lg font-semibold leading-tight fc-text-primary mb-1">
                               {assignment.name || "Workout"}
                             </h4>
-                            <p
-                              style={{
-                                fontSize: "14px",
-                                fontWeight: 400,
-                                color: isDark
-                                  ? "rgba(255,255,255,0.5)"
-                                  : "#6B7280",
-                                margin: 0,
-                              }}
-                            >
+                            <div className="text-[11px] uppercase tracking-[0.22em] fc-text-dim font-mono mb-1">
+                              {scheduleLabel} • {dateLabel}
+                            </div>
+                            <p className="text-sm fc-text-subtle">
                               {isCompleted && assignment.completed_at
                                 ? `Completed at ${new Date(
                                     assignment.completed_at
@@ -2045,69 +1660,18 @@ export default function EnhancedClientWorkouts({
                             </p>
                           </div>
                         </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "16px",
-                          }}
-                        >
+                        <div className="flex items-center gap-4">
                           <span
-                            style={{
-                              padding: "4px 12px",
-                              borderRadius: "99px",
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              background: isCompleted
-                                ? "rgba(16, 185, 129, 0.2)"
-                                : isSkipped
-                                ? isDark
-                                  ? "#1F2937"
-                                  : "#F3F4F6"
-                                : "rgba(59, 130, 246, 0.2)",
-                              border: `1px solid ${
-                                isCompleted
-                                  ? "rgba(16, 185, 129, 0.3)"
-                                  : isSkipped
-                                  ? isDark
-                                    ? "#374151"
-                                    : "#E5E7EB"
-                                  : "rgba(59, 130, 246, 0.3)"
-                              }`,
-                              color: isCompleted
-                                ? "#10B981"
-                                : isSkipped
-                                ? isDark
-                                  ? "#6B7280"
-                                  : "#9CA3AF"
-                                : "#3B82F6",
-                            }}
+                            className={`fc-status-pill ${statusVariant}`}
                           >
-                            {isCompleted && (
-                              <CheckCircle
-                                style={{ width: "14px", height: "14px" }}
-                              />
-                            )}
+                            {isCompleted && <CheckCircle className="w-3.5 h-3.5" />}
                             {isCompleted
                               ? "DONE"
                               : isSkipped
                               ? "SKIPPED"
                               : "UPCOMING"}
                           </span>
-                          <ChevronRight
-                            style={{
-                              width: "24px",
-                              height: "24px",
-                              color: isDark
-                                ? "rgba(255,255,255,0.4)"
-                                : "#9CA3AF",
-                            }}
-                          />
+                          <ChevronRight className="w-6 h-6 fc-text-subtle" />
                         </div>
                       </GlassCard>
                         </div>
@@ -2242,26 +1806,10 @@ export default function EnhancedClientWorkouts({
               <section className="space-y-6 mb-8">
                 {/* Header */}
                 <div className="flex items-center gap-4">
-                  <div
-                    className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                      isDark
-                        ? "bg-gradient-to-br from-purple-600/20 to-blue-600/20 border border-white/10"
-                        : "bg-gradient-to-br from-purple-100 to-blue-100 border border-purple-200"
-                    }`}
-                    style={{
-                      backdropFilter: "blur(24px) saturate(180%)",
-                    }}
-                  >
-                    <Dumbbell
-                      className={isDark ? "text-purple-400" : "text-purple-600"}
-                      size={28}
-                    />
+                  <div className="fc-icon-tile fc-icon-workouts">
+                    <Dumbbell className="w-7 h-7" />
                   </div>
-                  <h2
-                    className={`text-2xl font-bold tracking-tight ${
-                      isDark ? "text-white" : "text-slate-900"
-                    }`}
-                  >
+                  <h2 className="text-2xl font-bold tracking-tight fc-text-primary">
                     All Assigned Workouts
                   </h2>
                 </div>
@@ -2286,10 +1834,6 @@ export default function EnhancedClientWorkouts({
                     const getStatusBadge = () => {
                       if (assignment.status === "assigned") {
                         return {
-                          bg: isDark
-                            ? "bg-blue-500/20 border-blue-500/30"
-                            : "bg-blue-100 border-blue-200",
-                          text: isDark ? "text-blue-400" : "text-blue-700",
                           label: "ASSIGNED",
                         };
                       } else if (
@@ -2297,24 +1841,27 @@ export default function EnhancedClientWorkouts({
                         assignment.status === "active"
                       ) {
                         return {
-                          bg: isDark
-                            ? "bg-green-500/20 border-green-500/30"
-                            : "bg-green-100 border-green-200",
-                          text: isDark ? "text-green-400" : "text-green-700",
                           label: "IN PROGRESS",
                         };
                       } else {
                         return {
-                          bg: isDark
-                            ? "bg-slate-500/20 border-slate-500/30"
-                            : "bg-slate-100 border-slate-200",
-                          text: isDark ? "text-slate-400" : "text-slate-700",
                           label: "COMPLETED",
                         };
                       }
                     };
 
                     const statusBadge = getStatusBadge();
+                    const statusVariant =
+                      assignment.status === "assigned"
+                        ? "fc-status-pill--upcoming"
+                        : assignment.status === "in_progress" ||
+                          assignment.status === "active"
+                        ? "fc-status-pill--active"
+                        : "fc-status-pill--done";
+                    const iconVariant =
+                      assignment.type === "program"
+                        ? "fc-icon-challenges"
+                        : "fc-icon-workouts";
 
                     return (
                       <Link
@@ -2326,84 +1873,26 @@ export default function EnhancedClientWorkouts({
                         }
                         className="group block"
                       >
-                        <div
-                          className="rounded-2xl border transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-                          style={{
-                            background: isDark
-                              ? "rgba(28, 28, 30, 0.80)"
-                              : "rgba(255, 255, 255, 0.85)",
-                            backdropFilter: "blur(20px) saturate(150%)",
-                            WebkitBackdropFilter: "blur(20px) saturate(150%)",
-                            border: `1px solid ${
-                              isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.18)"
-                            }`,
-                            borderRadius: "1rem",
-                            padding: "24px",
-                            boxShadow: isDark
-                              ? "0px 4px 16px rgba(0,0,0,0.6)"
-                              : "0px 4px 16px rgba(0,0,0,0.12)",
-                          }}
+                        <GlassCard
+                          elevation={2}
+                          className="fc-glass fc-card fc-list-row p-5 transition-all duration-300 fc-hover-rise fc-press"
                         >
-                        {/* Shimmer effect overlay */}
-                        {isDark && (
-                          <div
-                            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-600"
-                            style={{
-                              background:
-                                "linear-gradient(135deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%)",
-                              backgroundSize: "200% 200%",
-                              pointerEvents: "none",
-                            }}
-                          />
-                        )}
-
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative z-10">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           {/* Left: Date and Info */}
                           <div className="flex items-center gap-5 flex-1 min-w-0">
-                            {/* Date Box */}
-                            <div
-                              className={`w-14 h-14 flex-shrink-0 rounded-xl flex flex-col items-center justify-center font-bold ${
-                                assignment.status === "assigned"
-                                  ? isDark
-                                    ? "bg-blue-500/10 border border-blue-500/20 text-blue-400"
-                                    : "bg-blue-100 border border-blue-200 text-blue-700"
-                                  : assignment.status === "in_progress" ||
-                                    assignment.status === "active"
-                                  ? isDark
-                                    ? "bg-green-500/10 border border-green-500/20 text-green-400"
-                                    : "bg-green-100 border border-green-200 text-green-700"
-                                  : isDark
-                                  ? "bg-slate-800 border border-slate-700 text-slate-500"
-                                  : "bg-slate-100 border border-slate-200 text-slate-600"
-                              }`}
-                            >
-                              <span className="text-xs font-bold uppercase tracking-wider">
-                                {monthName}
-                              </span>
-                              <span className="text-xl leading-none">
-                                {dayNumber}
-                              </span>
+                            {/* Icon Tile */}
+                            <div className={`fc-icon-tile ${iconVariant}`}>
+                              {assignment.type === "program" ? (
+                                <Award className="w-6 h-6" />
+                              ) : (
+                                <Dumbbell className="w-6 h-6" />
+                              )}
                             </div>
 
                             {/* Workout Info */}
                             <div className="flex-1 min-w-0">
                               <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <h4
-                                  className={`text-lg font-semibold group-hover:transition-colors ${
-                                    assignment.status === "assigned"
-                                      ? isDark
-                                        ? "text-blue-400 group-hover:text-blue-300"
-                                        : "text-blue-700 group-hover:text-blue-600"
-                                      : assignment.status === "in_progress" ||
-                                        assignment.status === "active"
-                                      ? isDark
-                                        ? "text-green-400 group-hover:text-green-300"
-                                        : "text-green-700 group-hover:text-green-600"
-                                      : isDark
-                                      ? "text-white group-hover:text-slate-200"
-                                      : "text-slate-900 group-hover:text-slate-800"
-                                  }`}
-                                >
+                                <h4 className="text-lg font-semibold fc-text-primary">
                                   {template?.name ||
                                     assignment.name ||
                                     (assignment.type === "program"
@@ -2411,15 +1900,8 @@ export default function EnhancedClientWorkouts({
                                       : "Workout")}
                                 </h4>
                                 <Badge
-                                  className={`${
-                                    assignment.type === "program"
-                                      ? isDark
-                                        ? "bg-purple-500/20 text-purple-400 border-purple-500/30"
-                                        : "bg-purple-100 text-purple-700 border-purple-200"
-                                      : isDark
-                                      ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                                      : "bg-blue-100 text-blue-700 border-blue-200"
-                                  } px-2 py-0.5 text-xs font-bold uppercase tracking-wider border`}
+                                  variant="fc-outline"
+                                  className="px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.18em]"
                                 >
                                   {assignment.type === "program"
                                     ? "Program"
@@ -2429,14 +1911,13 @@ export default function EnhancedClientWorkouts({
 
                               {/* Description or Details */}
                               <div className="space-y-1">
+                                <div className="text-[11px] uppercase tracking-[0.22em] fc-text-dim font-mono">
+                                  {monthName} {dayNumber}
+                                </div>
                                 {(template?.description ||
                                   assignment.description) && (
                                   <p
-                                    className={`text-sm ${
-                                      isDark
-                                        ? "text-slate-400"
-                                        : "text-slate-600"
-                                    } line-clamp-1`}
+                                    className="text-sm fc-text-subtle line-clamp-1"
                                   >
                                     {template?.description ||
                                       assignment.description}
@@ -2445,11 +1926,7 @@ export default function EnhancedClientWorkouts({
                                 <div className="flex flex-wrap items-center gap-3 text-xs">
                                   {template?.duration_minutes && (
                                     <div
-                                      className={`flex items-center gap-1.5 ${
-                                        isDark
-                                          ? "text-slate-500"
-                                          : "text-slate-500"
-                                      }`}
+                                      className="flex items-center gap-1.5 fc-text-dim"
                                     >
                                       <Clock size={14} />
                                       <span className="font-mono">
@@ -2459,11 +1936,7 @@ export default function EnhancedClientWorkouts({
                                   )}
                                   {coach && (
                                     <div
-                                      className={`flex items-center gap-1.5 ${
-                                        isDark
-                                          ? "text-slate-500"
-                                          : "text-slate-500"
-                                      }`}
+                                      className="flex items-center gap-1.5 fc-text-dim"
                                     >
                                       <span>Coach: {coach.first_name}</span>
                                     </div>
@@ -2476,9 +1949,7 @@ export default function EnhancedClientWorkouts({
                           {/* Right: Status and Actions */}
                           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                             {/* Status Badge */}
-                            <div
-                              className={`px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.text} self-start sm:self-auto`}
-                            >
+                            <div className={`fc-status-pill ${statusVariant}`}>
                               {statusBadge.label}
                             </div>
 
@@ -2497,12 +1968,8 @@ export default function EnhancedClientWorkouts({
                                     );
                                   }
                                 }}
-                                className={`h-10 px-3 sm:px-4 rounded-xl font-semibold transition-all flex-1 sm:flex-initial ${
-                                  isDark
-                                    ? "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-300"
-                                    : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700"
-                                }`}
-                                variant="outline"
+                                className="h-10 px-3 sm:px-4 rounded-xl font-semibold flex-1 sm:flex-initial"
+                                variant="fc-secondary"
                               >
                                 <Eye size={16} className="sm:mr-2" />
                                 <span className="hidden sm:inline">
@@ -2520,11 +1987,8 @@ export default function EnhancedClientWorkouts({
                                     router.push(`/client/workouts/${assignment.id}/start`);
                                   }
                                 }}
-                                className={`h-10 px-3 sm:px-4 rounded-xl font-semibold transition-all flex-1 sm:flex-initial ${
-                                  isDark
-                                    ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0"
-                                    : "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0"
-                                }`}
+                                className="h-10 px-3 sm:px-4 rounded-xl font-semibold flex-1 sm:flex-initial"
+                                variant="fc-primary"
                               >
                                 <Play
                                   size={16}
@@ -2539,15 +2003,11 @@ export default function EnhancedClientWorkouts({
                             </div>
 
                             <ChevronRight
-                              className={`w-6 h-6 transition-colors hidden md:block ${
-                                isDark
-                                  ? "text-slate-600 group-hover:text-white"
-                                  : "text-slate-400 group-hover:text-slate-600"
-                              }`}
+                              className="w-6 h-6 fc-text-subtle hidden md:block"
                             />
                           </div>
                         </div>
-                        </div>
+                        </GlassCard>
                       </Link>
                     );
                   })}

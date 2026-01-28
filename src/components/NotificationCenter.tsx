@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { 
   Bell, 
   X, 
@@ -26,34 +24,34 @@ interface NotificationCenterProps {
 const getNotificationIcon = (type: NotificationData['type']) => {
   switch (type) {
     case 'reminder':
-      return <Clock className="w-4 h-4 text-blue-600" />
+      return <Clock className="w-4 h-4 fc-text-workouts" />
     case 'achievement':
-      return <Trophy className="w-4 h-4 text-yellow-600" />
+      return <Trophy className="w-4 h-4 fc-text-warning" />
     case 'workout':
-      return <Dumbbell className="w-4 h-4 text-purple-600" />
+      return <Dumbbell className="w-4 h-4 fc-text-habits" />
     case 'session':
-      return <MessageCircle className="w-4 h-4 text-green-600" />
+      return <MessageCircle className="w-4 h-4 fc-text-success" />
     case 'general':
-      return <Target className="w-4 h-4 text-orange-600" />
+      return <Target className="w-4 h-4 fc-text-warning" />
     default:
-      return <Bell className="w-4 h-4 text-slate-600" />
+      return <Bell className="w-4 h-4 fc-text-subtle" />
   }
 }
 
 const getNotificationColor = (type: NotificationData['type']) => {
   switch (type) {
     case 'reminder':
-      return 'bg-blue-100 text-blue-800'
+      return 'fc-text-workouts'
     case 'achievement':
-      return 'bg-yellow-100 text-yellow-800'
+      return 'fc-text-warning'
     case 'session':
-      return 'bg-green-100 text-green-800'
+      return 'fc-text-success'
     case 'workout':
-      return 'bg-purple-100 text-purple-800'
+      return 'fc-text-habits'
     case 'general':
-      return 'bg-orange-100 text-orange-800'
+      return 'fc-text-warning'
     default:
-      return 'bg-slate-100 text-slate-800'
+      return 'fc-text-subtle'
   }
 }
 
@@ -135,18 +133,25 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-end p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-end p-4">
       <div className="w-full max-w-sm" style={{maxWidth: '400px'}}>
-        <Card className="bg-white border-slate-200 w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl">
-          <CardHeader className="p-4 border-b">
+        <div className="fc-modal fc-card w-full max-h-[calc(100vh-2rem)] overflow-y-auto">
+          <div className="p-4 border-b border-[color:var(--fc-glass-border)]">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-slate-600" />
-                <CardTitle className="text-lg">Notifications</CardTitle>
+              <div className="flex items-center gap-3">
+                <div className="fc-icon-tile fc-icon-workouts">
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+                    Notifications
+                  </span>
+                  <div className="text-lg font-semibold fc-text-primary mt-2">Notifications</div>
+                </div>
                 {unreadCount > 0 && (
-                  <Badge className="bg-red-500 text-white text-xs">
+                  <span className="fc-pill fc-pill-glass fc-text-error text-xs">
                     {unreadCount}
-                  </Badge>
+                  </span>
                 )}
               </div>
               <div className="flex items-center gap-1">
@@ -155,42 +160,44 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                     variant="ghost"
                     size="sm"
                     onClick={handleMarkAllAsRead}
-                    className="p-1"
+                    className="p-1 fc-btn fc-btn-ghost"
                     title="Mark all as read"
                   >
-                    <CheckCheck className="w-4 h-4 text-green-600" />
+                    <CheckCheck className="w-4 h-4 fc-text-success" />
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleClearAll}
-                  className="p-1"
+                  className="p-1 fc-btn fc-btn-ghost"
                   title="Clear all"
                 >
-                  <Trash2 className="w-4 h-4 text-red-600" />
+                  <Trash2 className="w-4 h-4 fc-text-error" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={onClose}>
+                <Button variant="ghost" size="sm" onClick={onClose} className="fc-btn fc-btn-ghost">
                   <X className="w-4 h-4" />
                 </Button>
               </div>
             </div>
-          </CardHeader>
+          </div>
           
-          <CardContent className="p-0">
+          <div className="p-0">
             {loading ? (
               <div className="p-4 space-y-4">
                 {[...Array(3)].map((_, i) => (
                   <div key={i} className="animate-pulse">
-                    <div className="h-16 bg-slate-200 rounded-lg"></div>
+                    <div className="h-16 bg-[color:var(--fc-glass-border)] rounded-lg"></div>
                   </div>
                 ))}
               </div>
             ) : notifications.length === 0 ? (
               <div className="p-8 text-center">
-                <Bell className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <h3 className="text-sm font-medium text-slate-800 mb-1">No notifications</h3>
-                <p className="text-sm text-slate-500">
+                <div className="mx-auto mb-3 fc-icon-tile fc-icon-workouts w-12 h-12">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-medium fc-text-primary mb-1">No notifications</h3>
+                <p className="text-sm fc-text-subtle">
                   You're all caught up! New notifications will appear here.
                 </p>
               </div>
@@ -199,8 +206,8 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors ${
-                      !notification.read ? 'bg-blue-50' : ''
+                    className={`p-4 border-b border-[color:var(--fc-glass-border)] cursor-pointer transition-colors ${
+                      !notification.read ? 'fc-glass-soft' : ''
                     }`}
                     onClick={() => handleNotificationClick(notification)}
                   >
@@ -211,17 +218,17 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-medium text-slate-800 mb-1">
+                            <h4 className="text-sm font-medium fc-text-primary mb-1">
                               {notification.title}
                             </h4>
-                            <p className="text-sm text-slate-600 mb-2 line-clamp-2">
+                            <p className="text-sm fc-text-subtle mb-2 line-clamp-2">
                               {notification.message}
                             </p>
                             <div className="flex items-center gap-2">
-                              <Badge className={`text-xs ${getNotificationColor(notification.type)}`}>
+                              <span className={`fc-pill fc-pill-glass text-xs ${getNotificationColor(notification.type)}`}>
                                 {notification.type.replace('_', ' ')}
-                              </Badge>
-                              <span className="text-xs text-slate-500">
+                              </span>
+                              <span className="text-xs fc-text-subtle">
                                 {formatTimestamp(notification.timestamp instanceof Date ? notification.timestamp.getTime() : new Date(notification.timestamp).getTime())}
                               </span>
                             </div>
@@ -235,10 +242,10 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                                   e.stopPropagation()
                                   handleMarkAsRead(notification.id)
                                 }}
-                                className="p-1"
+                                className="p-1 fc-btn fc-btn-ghost"
                                 title="Mark as read"
                               >
-                                <Check className="w-3 h-3 text-green-600" />
+                                <Check className="w-3 h-3 fc-text-success" />
                               </Button>
                             </div>
                           )}
@@ -249,8 +256,8 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

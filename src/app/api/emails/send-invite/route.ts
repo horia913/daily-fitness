@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { emailService } from '@/lib/emailService'
+import { validateApiAuth, createUnauthorizedResponse } from '@/lib/apiAuth'
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate authentication - only authenticated users (coaches) can send invites
+    await validateApiAuth(request)
+    
     const body = await request.json()
     const { clientEmail, clientName, inviteCode, expiryDays, inviteLink } = body
 
@@ -32,6 +36,9 @@ export async function POST(request: NextRequest) {
       )
     }
   } catch (error: any) {
+    if (error.message === 'Missing authorization header' || error.message === 'Invalid or expired token' || error.message === 'User not authenticated') {
+      return createUnauthorizedResponse('Authentication required to send invites')
+    }
     console.error('Error in send-invite API route:', error)
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

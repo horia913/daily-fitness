@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -1002,15 +1001,15 @@ export default function ProgramProgressionRulesEditor({
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-[color:var(--fc-glass-border)] border-t-[color:var(--fc-domain-workouts)]"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-        <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+      <div className="p-4 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl">
+        <div className="flex items-center gap-2 fc-text-error">
           <AlertCircle className="w-5 h-5" />
           <span>{error}</span>
         </div>
@@ -1055,10 +1054,10 @@ export default function ProgramProgressionRulesEditor({
   return (
     <div className="space-y-6">
       {/* Header with placeholder indicator and Replace Workout button */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {isPlaceholder && (
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex-1 mr-4">
-            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+          <div className="p-4 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl flex-1 min-w-[260px]">
+            <div className="flex items-center gap-2 fc-text-workouts">
               <AlertCircle className="w-5 h-5" />
               <span>
                 Showing Week 1 data as placeholders. Edit any field to create
@@ -1071,7 +1070,7 @@ export default function ProgramProgressionRulesEditor({
           <Button
             variant="outline"
             onClick={handleRefreshFromTemplate}
-            className="flex-shrink-0"
+            className="flex-shrink-0 fc-btn fc-btn-secondary"
             disabled={loading}
           >
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -1080,7 +1079,7 @@ export default function ProgramProgressionRulesEditor({
           <Button
             variant="outline"
             onClick={() => setShowReplaceWorkout(true)}
-            className="flex-shrink-0"
+            className="flex-shrink-0 fc-btn fc-btn-secondary"
           >
             <Replace className="w-4 h-4 mr-2" />
             Replace Workout
@@ -1089,7 +1088,7 @@ export default function ProgramProgressionRulesEditor({
       </div>
 
       {blockForms.length === 0 ? (
-        <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+        <div className="p-8 text-center fc-text-dim fc-glass-soft border border-dashed border-[color:var(--fc-glass-border)] rounded-2xl">
           <p>
             No progression rules found. Assign a workout template to this
             program day.
@@ -1141,7 +1140,7 @@ export default function ProgramProgressionRulesEditor({
             size="lg"
             onClick={saveChanges}
             disabled={saving}
-            className="bg-gradient-to-r from-purple-500 to-orange-500 text-white px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all"
+            className="fc-btn fc-btn-primary fc-press px-8 py-3 rounded-full shadow-lg"
           >
             {saving ? (
               <>
@@ -1160,18 +1159,22 @@ export default function ProgramProgressionRulesEditor({
 
       {/* Replace Workout Modal */}
       {showReplaceWorkout && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50">
-          <Card className="w-full max-w-md">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-bold mb-4">Replace Workout</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md fc-modal fc-card">
+            <div className="p-6">
+              <h3 className="text-lg font-bold fc-text-primary mb-4">
+                Replace Workout
+              </h3>
+              <p className="text-sm fc-text-dim mb-4">
                 Select a new workout template to replace the current one. This
                 will delete all current progression rules and copy the new
                 template.
               </p>
               <div className="space-y-4">
                 <div>
-                  <Label>Select Workout Template</Label>
+                  <Label className="fc-text-primary">
+                    Select Workout Template
+                  </Label>
                   <Select
                     onValueChange={(value) => {
                       if (value) {
@@ -1179,7 +1182,7 @@ export default function ProgramProgressionRulesEditor({
                       }
                     }}
                   >
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-2 fc-glass-soft border border-[color:var(--fc-glass-border)]">
                       <SelectValue placeholder="Choose a template..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -1195,13 +1198,14 @@ export default function ProgramProgressionRulesEditor({
                   <Button
                     onClick={() => setShowReplaceWorkout(false)}
                     variant="outline"
+                    className="fc-btn fc-btn-secondary"
                   >
                     Cancel
                   </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
     </div>

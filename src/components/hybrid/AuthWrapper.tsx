@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 import { COACH_ROLES, isCoachRole } from "@/lib/roleGuard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,7 @@ export function AuthWrapper() {
   const [explicitSubmit, setExplicitSubmit] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
 
   // Password strength checker
   const getPasswordStrength = (password: string) => {
@@ -82,6 +84,8 @@ export function AuthWrapper() {
   // Fetch coaches for dropdown
   const fetchCoaches = async () => {
     try {
+      if (!user) return;
+
       const { data, error} = await supabase
         .from("profiles")
         .select("id, email, first_name, last_name")
@@ -101,37 +105,24 @@ export function AuthWrapper() {
 
   // Redirect if already logged in
   useEffect(() => {
-    const checkUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        // Get user profile to determine role-based redirect
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
+    if (authLoading) return;
+    if (!user) return;
 
-        if (profile) {
-          const redirectPath = isCoachRole(profile.role)
-            ? "/coach"
-            : "/client";
-          router.push(redirectPath);
-        } else {
-          // Fallback to client if no profile found
-          router.push("/client");
-        }
-      }
+    const redirectWithProfile = async () => {
+      const resolvedProfile = profile || (await refreshProfile());
+      const redirectPath = resolvedProfile && isCoachRole(resolvedProfile.role)
+        ? "/coach"
+        : "/client";
+      router.push(redirectPath);
     };
 
-    checkUser();
-  }, [router]);
+    redirectWithProfile();
+  }, [user, profile, authLoading, refreshProfile, router]);
 
   // Fetch coaches when component mounts
   useEffect(() => {
     fetchCoaches();
-  }, []);
+  }, [user]);
 
   // Handle URL parameters for invite links
   useEffect(() => {

@@ -5,6 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import ClientProfileView from "@/components/coach/client-views/ClientProfileView";
 import { ArrowLeft } from "lucide-react";
@@ -14,55 +17,57 @@ export default function ClientProfilePage() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
+  const { performanceSettings } = useTheme();
 
   const clientId = params.id as string;
 
   if (authLoading) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-900">
-          <div className="p-4 sm:p-6">
-            <div className="max-w-7xl mx-auto">
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <GlassCard elevation={2} className="fc-glass fc-card p-8">
               <div className="animate-pulse space-y-4">
-                <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-                <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+                <div className="h-16 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
               </div>
-            </div>
+            </GlassCard>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-900">
-        <div className="p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header */}
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
             <div className="flex items-center gap-4">
               <Link href={`/coach/clients/${clientId}`}>
-                <Button variant="outline" size="icon" className="rounded-xl">
+                <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
               </Link>
               <div>
-                <h1 className={`text-3xl font-bold ${theme.text}`}>
+                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
                   Client Profile
+                </span>
+                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                  Profile & Settings
                 </h1>
-                <p className={`${theme.textSecondary}`}>
-                  View personal information & settings
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  View personal information and preferences.
                 </p>
               </div>
             </div>
+          </GlassCard>
 
-            {/* Profile Content */}
-            <ClientProfileView clientId={clientId} />
-          </div>
+          <ClientProfileView clientId={clientId} />
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

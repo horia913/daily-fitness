@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "@/contexts/ThemeContext";
 import Link from "next/link";
 import {
   TrendingUp,
@@ -37,8 +35,6 @@ interface CheckIn {
 export default function ClientProgressView({
   clientId,
 }: ClientProgressViewProps) {
-  const { isDark, getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -68,10 +64,7 @@ export default function ClientProgressView({
       <div className="space-y-4">
         {[1, 2].map((i) => (
           <div key={i} className="animate-pulse">
-            <div
-              className={`${theme.card} h-40`}
-              style={{ borderRadius: "24px", padding: "24px" }}
-            ></div>
+            <div className="h-40 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl p-6"></div>
           </div>
         ))}
       </div>
@@ -85,8 +78,7 @@ export default function ClientProgressView({
         <Link href={`/coach/clients/${clientId}/fms`}>
           <Button
             variant="outline"
-            className="flex items-center gap-2"
-            style={{ borderRadius: "20px" }}
+            className="flex items-center gap-2 fc-btn fc-btn-secondary"
           >
             <ClipboardCheck className="w-4 h-4" />
             FMS Assessments
@@ -96,327 +88,158 @@ export default function ClientProgressView({
 
       {/* Stats Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div
-          className="p-[1px] bg-gradient-to-r from-orange-500 to-amber-600"
-          style={{
-            borderRadius: "24px",
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-          }}
-        >
-          <Card
-            className={`${theme.card} border-0`}
-            style={{ borderRadius: "24px" }}
-          >
-            <CardContent style={{ padding: "16px" }}>
-              <div className="text-center">
-                <p
-                  className={`${theme.text}`}
-                  style={{
-                    fontSize: "32px",
-                    fontWeight: "800",
-                    lineHeight: "1.1",
-                  }}
-                >
-                  {checkIns.length}
-                </p>
-                <p
-                  className={`${theme.textSecondary}`}
-                  style={{ fontSize: "14px", fontWeight: "400" }}
-                >
-                  Check-Ins
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
+          <p className="text-3xl font-bold fc-text-primary">
+            {checkIns.length}
+          </p>
+          <p className="text-sm fc-text-dim">Check-Ins</p>
         </div>
 
-        <div
-          className="p-[1px] bg-gradient-to-r from-blue-500 to-indigo-600"
-          style={{
-            borderRadius: "24px",
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-          }}
-        >
-          <Card
-            className={`${theme.card} border-0`}
-            style={{ borderRadius: "24px" }}
-          >
-            <CardContent style={{ padding: "16px" }}>
-              <div className="text-center">
-                <p
-                  className={`${theme.text}`}
-                  style={{
-                    fontSize: "32px",
-                    fontWeight: "800",
-                    lineHeight: "1.1",
-                  }}
-                >
-                  {checkIns.length > 0 && checkIns[0].weight
-                    ? `${checkIns[0].weight}kg`
-                    : "-"}
-                </p>
-                <p
-                  className={`${theme.textSecondary}`}
-                  style={{ fontSize: "14px", fontWeight: "400" }}
-                >
-                  Current Weight
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
+          <p className="text-3xl font-bold fc-text-primary">
+            {checkIns.length > 0 && checkIns[0].weight
+              ? `${checkIns[0].weight}kg`
+              : "-"}
+          </p>
+          <p className="text-sm fc-text-dim">Current Weight</p>
         </div>
 
-        <div
-          className="p-[1px] bg-gradient-to-r from-green-500 to-emerald-600"
-          style={{
-            borderRadius: "24px",
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-          }}
-        >
-          <Card
-            className={`${theme.card} border-0`}
-            style={{ borderRadius: "24px" }}
-          >
-            <CardContent style={{ padding: "16px" }}>
-              <div className="text-center">
-                <p
-                  className={`${theme.text}`}
-                  style={{
-                    fontSize: "32px",
-                    fontWeight: "800",
-                    lineHeight: "1.1",
-                  }}
-                >
-                  {checkIns.length > 1 &&
-                  checkIns[0]?.weight &&
-                  checkIns[checkIns.length - 1]?.weight
-                    ? `${(
-                        (checkIns[checkIns.length - 1]?.weight || 0) -
-                        (checkIns[0]?.weight || 0)
-                      ).toFixed(1)}kg`
-                    : "-"}
-                </p>
-                <p
-                  className={`${theme.textSecondary}`}
-                  style={{ fontSize: "14px", fontWeight: "400" }}
-                >
-                  Total Change
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-4 text-center">
+          <p className="text-3xl font-bold fc-text-primary">
+            {checkIns.length > 1 &&
+            checkIns[0]?.weight &&
+            checkIns[checkIns.length - 1]?.weight
+              ? `${(
+                  (checkIns[checkIns.length - 1]?.weight || 0) -
+                  (checkIns[0]?.weight || 0)
+                ).toFixed(1)}kg`
+              : "-"}
+          </p>
+          <p className="text-sm fc-text-dim">Total Change</p>
         </div>
       </div>
 
       {/* Check-Ins List */}
       <div className="space-y-4">
         {checkIns.length === 0 ? (
-          <Card
-            className={`${theme.card} border-2 ${
-              isDark ? "border-slate-700" : "border-slate-200"
-            }`}
-            style={{
-              borderRadius: "24px",
-              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-            }}
-          >
-            <CardContent
-              className="text-center"
-              style={{ padding: "48px 24px" }}
-            >
-              <Camera className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3
-                className={`${theme.text} mb-2`}
-                style={{ fontSize: "20px", fontWeight: "700" }}
-              >
-                No Check-Ins Yet
-              </h3>
-              <p
-                className={`${theme.textSecondary}`}
-                style={{ fontSize: "14px" }}
-              >
-                This client hasn't submitted any check-ins yet.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl text-center px-6 py-12">
+            <div className="mx-auto mb-4 fc-icon-tile fc-icon-workouts w-16 h-16">
+              <Camera className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold fc-text-primary mb-2">
+              No Check-Ins Yet
+            </h3>
+            <p className="text-sm fc-text-dim">
+              This client hasn't submitted any check-ins yet.
+            </p>
+          </div>
         ) : (
           checkIns.map((checkIn, index) => (
             <div
               key={checkIn.id}
-              className="p-[1px] bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600"
-              style={{
-                borderRadius: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-              }}
+              className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-5"
             >
-              <Card
-                className={`${theme.card} border-0`}
-                style={{ borderRadius: "24px" }}
-              >
-                <CardContent style={{ padding: "20px" }}>
-                  <div className="flex items-start gap-4">
-                    {/* Date Badge */}
-                    <div
-                      className="bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center flex-shrink-0 shadow-md"
-                      style={{
-                        width: "48px",
-                        height: "48px",
-                        borderRadius: "16px",
-                      }}
-                    >
-                      <Calendar className="w-6 h-6 text-white" />
-                    </div>
+              <div className="flex items-start gap-4">
+                {/* Date Badge */}
+                <div className="fc-icon-tile fc-icon-workouts">
+                  <Calendar className="w-6 h-6" />
+                </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4
-                          className={`${theme.text}`}
-                          style={{ fontSize: "18px", fontWeight: "600" }}
-                        >
-                          Check-In #{checkIns.length - index}
-                        </h4>
-                        <span className={`text-sm ${theme.textSecondary}`}>
-                          {new Date(checkIn.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      {/* Metrics Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {checkIn.weight && (
-                          <div
-                            className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30"
-                            style={{ padding: "12px", borderRadius: "16px" }}
-                          >
-                            <Scale className="w-4 h-4 mb-1 text-blue-600 dark:text-blue-400" />
-                            <p
-                              className="text-slate-800 dark:text-slate-200"
-                              style={{ fontSize: "14px", fontWeight: "600" }}
-                            >
-                              {checkIn.weight}kg
-                            </p>
-                            <p
-                              className="text-slate-600 dark:text-slate-400"
-                              style={{ fontSize: "12px" }}
-                            >
-                              Weight
-                            </p>
-                          </div>
-                        )}
-
-                        {checkIn.bodyFat && (
-                          <div
-                            className="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800/30"
-                            style={{ padding: "12px", borderRadius: "16px" }}
-                          >
-                            <TrendingUp className="w-4 h-4 mb-1 text-orange-600 dark:text-orange-400" />
-                            <p
-                              className="text-slate-800 dark:text-slate-200"
-                              style={{ fontSize: "14px", fontWeight: "600" }}
-                            >
-                              {checkIn.bodyFat}%
-                            </p>
-                            <p
-                              className="text-slate-600 dark:text-slate-400"
-                              style={{ fontSize: "12px" }}
-                            >
-                              Body Fat
-                            </p>
-                          </div>
-                        )}
-
-                        {checkIn.muscleMass && (
-                          <div
-                            className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/30"
-                            style={{ padding: "12px", borderRadius: "16px" }}
-                          >
-                            <TrendingUp className="w-4 h-4 mb-1 text-green-600 dark:text-green-400" />
-                            <p
-                              className="text-slate-800 dark:text-slate-200"
-                              style={{ fontSize: "14px", fontWeight: "600" }}
-                            >
-                              {checkIn.muscleMass}kg
-                            </p>
-                            <p
-                              className="text-slate-600 dark:text-slate-400"
-                              style={{ fontSize: "12px" }}
-                            >
-                              Muscle
-                            </p>
-                          </div>
-                        )}
-
-                        {checkIn.photos && checkIn.photos.length > 0 && (
-                          <div
-                            className="bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/30"
-                            style={{ padding: "12px", borderRadius: "16px" }}
-                          >
-                            <Camera className="w-4 h-4 mb-1 text-purple-600 dark:text-purple-400" />
-                            <p
-                              className="text-slate-800 dark:text-slate-200"
-                              style={{ fontSize: "14px", fontWeight: "600" }}
-                            >
-                              {checkIn.photos.length}
-                            </p>
-                            <p
-                              className="text-slate-600 dark:text-slate-400"
-                              style={{ fontSize: "12px" }}
-                            >
-                              Photos
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Measurements */}
-                      {checkIn.measurements &&
-                        Object.keys(checkIn.measurements).length > 0 && (
-                          <div
-                            className="mt-3 bg-slate-50 dark:bg-slate-800/50"
-                            style={{ padding: "12px", borderRadius: "16px" }}
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <Ruler className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                              <span
-                                className="text-slate-700 dark:text-slate-300"
-                                style={{ fontSize: "14px", fontWeight: "600" }}
-                              >
-                                Measurements
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-                              {checkIn.measurements.chest && (
-                                <span className={theme.textSecondary}>
-                                  Chest: {checkIn.measurements.chest}cm
-                                </span>
-                              )}
-                              {checkIn.measurements.waist && (
-                                <span className={theme.textSecondary}>
-                                  Waist: {checkIn.measurements.waist}cm
-                                </span>
-                              )}
-                              {checkIn.measurements.hips && (
-                                <span className={theme.textSecondary}>
-                                  Hips: {checkIn.measurements.hips}cm
-                                </span>
-                              )}
-                              {checkIn.measurements.arms && (
-                                <span className={theme.textSecondary}>
-                                  Arms: {checkIn.measurements.arms}cm
-                                </span>
-                              )}
-                              {checkIn.measurements.legs && (
-                                <span className={theme.textSecondary}>
-                                  Legs: {checkIn.measurements.legs}cm
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                    </div>
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold fc-text-primary">
+                      Check-In #{checkIns.length - index}
+                    </h4>
+                    <span className="text-sm fc-text-subtle">
+                      {new Date(checkIn.created_at).toLocaleDateString()}
+                    </span>
                   </div>
-                </CardContent>
-              </Card>
+
+                  {/* Metrics Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {checkIn.weight && (
+                      <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3">
+                        <Scale className="w-4 h-4 mb-1 fc-text-workouts" />
+                        <p className="text-sm font-semibold fc-text-primary">
+                          {checkIn.weight}kg
+                        </p>
+                        <p className="text-xs fc-text-subtle">Weight</p>
+                      </div>
+                    )}
+
+                    {checkIn.bodyFat && (
+                      <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3">
+                        <TrendingUp className="w-4 h-4 mb-1 fc-text-warning" />
+                        <p className="text-sm font-semibold fc-text-primary">
+                          {checkIn.bodyFat}%
+                        </p>
+                        <p className="text-xs fc-text-subtle">Body Fat</p>
+                      </div>
+                    )}
+
+                    {checkIn.muscleMass && (
+                      <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3">
+                        <TrendingUp className="w-4 h-4 mb-1 fc-text-success" />
+                        <p className="text-sm font-semibold fc-text-primary">
+                          {checkIn.muscleMass}kg
+                        </p>
+                        <p className="text-xs fc-text-subtle">Muscle</p>
+                      </div>
+                    )}
+
+                    {checkIn.photos && checkIn.photos.length > 0 && (
+                      <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3">
+                        <Camera className="w-4 h-4 mb-1 fc-text-workouts" />
+                        <p className="text-sm font-semibold fc-text-primary">
+                          {checkIn.photos.length}
+                        </p>
+                        <p className="text-xs fc-text-subtle">Photos</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Measurements */}
+                  {checkIn.measurements &&
+                    Object.keys(checkIn.measurements).length > 0 && (
+                      <div className="mt-3 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl px-3 py-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Ruler className="w-4 h-4 fc-text-workouts" />
+                          <span className="text-sm font-semibold fc-text-primary">
+                            Measurements
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs fc-text-subtle">
+                          {checkIn.measurements.chest && (
+                            <span>
+                              Chest: {checkIn.measurements.chest}cm
+                            </span>
+                          )}
+                          {checkIn.measurements.waist && (
+                            <span>
+                              Waist: {checkIn.measurements.waist}cm
+                            </span>
+                          )}
+                          {checkIn.measurements.hips && (
+                            <span>
+                              Hips: {checkIn.measurements.hips}cm
+                            </span>
+                          )}
+                          {checkIn.measurements.arms && (
+                            <span>
+                              Arms: {checkIn.measurements.arms}cm
+                            </span>
+                          )}
+                          {checkIn.measurements.legs && (
+                            <span>
+                              Legs: {checkIn.measurements.legs}cm
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </div>
             </div>
           ))
         )}

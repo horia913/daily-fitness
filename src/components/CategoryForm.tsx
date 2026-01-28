@@ -194,7 +194,7 @@ export default function CategoryForm({ isOpen, onClose, onSuccess, category, col
       data-theme={isDark ? 'dark' : 'light'}
     >
       <div 
-        className={`relative ${theme.card} shadow-2xl rounded-3xl border ${theme.border} w-full overflow-hidden transform transition-all duration-300 ease-out flex flex-col`}
+        className={`relative ${theme.card} fc-glass fc-card shadow-2xl rounded-3xl border ${theme.border} w-full overflow-hidden transform transition-all duration-300 ease-out flex flex-col`}
         style={{
           maxWidth: 'min(95vw, 40rem)',
           height: 'min(88vh, calc(100vh - 4rem))',
@@ -202,7 +202,7 @@ export default function CategoryForm({ isOpen, onClose, onSuccess, category, col
         }}
       >
         {/* Header - Sticky */}
-        <CardHeader className={`border-b ${theme.border} px-6 py-5 flex-shrink-0`}>
+        <CardHeader className={`border-b ${theme.border} px-6 py-5 flex-shrink-0 fc-glass fc-card`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 bg-pink-600 rounded-xl flex items-center justify-center shadow-md">

@@ -390,7 +390,7 @@ export default function WorkoutTemplatesPage() {
         <div className="relative z-10 min-h-screen p-4 sm:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
-            <GlassCard elevation={2} className="p-6">
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
                   <div
@@ -405,21 +405,14 @@ export default function WorkoutTemplatesPage() {
                     <Dumbbell className="w-8 h-8 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h1
-                      className="text-3xl font-bold mb-2"
-                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                    >
+                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                      Template Library
+                    </span>
+                    <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
                       Workout Templates
                     </h1>
-                    <p
-                      className="text-sm"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
-                      Create and manage workout templates for your clients
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Create and manage templates for your clients.
                     </p>
                   </div>
                 </div>
@@ -433,19 +426,13 @@ export default function WorkoutTemplatesPage() {
                         loadAssignmentCounts(coachId);
                       }
                     }}
+                    className="fc-btn fc-btn-ghost"
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Refresh
                   </Button>
                   <Link href="/coach/workouts/templates/create">
-                    <Button
-                      style={{
-                        background: getSemanticColor("energy").gradient,
-                        boxShadow: `0 4px 12px ${
-                          getSemanticColor("energy").primary
-                        }30`,
-                      }}
-                    >
+                    <Button className="fc-btn fc-btn-primary">
                       <Plus className="w-4 h-4 mr-2" />
                       Create Template
                     </Button>
@@ -456,7 +443,7 @@ export default function WorkoutTemplatesPage() {
 
             {/* Stats Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <GlassCard elevation={2} className="p-6">
+              <GlassCard elevation={2} className="fc-glass fc-card p-6">
                 <div className="flex items-center gap-4">
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -477,21 +464,14 @@ export default function WorkoutTemplatesPage() {
                       className="text-2xl font-bold"
                       color={isDark ? "#fff" : "#1A1A1A"}
                     />
-                    <p
-                      className="text-sm"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Total Templates
                     </p>
                   </div>
                 </div>
               </GlassCard>
 
-              <GlassCard elevation={2} className="p-6">
+              <GlassCard elevation={2} className="fc-glass fc-card p-6">
                 <div className="flex items-center gap-4">
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -515,21 +495,14 @@ export default function WorkoutTemplatesPage() {
                       className="text-2xl font-bold"
                       color={isDark ? "#fff" : "#1A1A1A"}
                     />
-                    <p
-                      className="text-sm"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Active Assignments
                     </p>
                   </div>
                 </div>
               </GlassCard>
 
-              <GlassCard elevation={2} className="p-6">
+              <GlassCard elevation={2} className="fc-glass fc-card p-6">
                 <div className="flex items-center gap-4">
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -550,14 +523,7 @@ export default function WorkoutTemplatesPage() {
                       className="text-2xl font-bold"
                       color={isDark ? "#fff" : "#1A1A1A"}
                     />
-                    <p
-                      className="text-sm"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Showing Now
                     </p>
                   </div>
@@ -566,7 +532,7 @@ export default function WorkoutTemplatesPage() {
             </div>
 
             {/* Filters and Search */}
-            <GlassCard elevation={2} className="p-4 sm:p-6">
+            <GlassCard elevation={2} className="fc-glass fc-card p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1 relative">
                   <Search
@@ -647,29 +613,21 @@ export default function WorkoutTemplatesPage() {
 
             {/* Templates List */}
             {filteredAndSortedTemplates.length === 0 ? (
-              <GlassCard elevation={2} className="p-12 text-center">
+              <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
                 <Dumbbell
                   className="w-24 h-24 mx-auto mb-6"
                   style={{
                     color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
                   }}
                 />
-                <h3
-                  className="text-2xl font-bold mb-3"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
+                <h3 className="text-2xl font-bold mb-3 text-[color:var(--fc-text-primary)]">
                   {searchTerm ||
                   selectedDifficulty !== "all" ||
                   selectedDuration !== "all"
                     ? "No templates found"
                     : "No workout templates yet"}
                 </h3>
-                <p
-                  className="text-sm mb-6 max-w-md mx-auto"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="text-sm mb-6 max-w-md mx-auto text-[color:var(--fc-text-dim)]">
                   {searchTerm ||
                   selectedDifficulty !== "all" ||
                   selectedDuration !== "all"
@@ -677,14 +635,7 @@ export default function WorkoutTemplatesPage() {
                     : "Create your first workout template to get started"}
                 </p>
                 <Link href="/coach/workouts/templates/create">
-                  <Button
-                    style={{
-                      background: getSemanticColor("energy").gradient,
-                      boxShadow: `0 4px 12px ${
-                        getSemanticColor("energy").primary
-                      }30`,
-                    }}
-                  >
+                  <Button className="fc-btn fc-btn-primary">
                     <Plus className="w-5 h-5 mr-2" />
                     Create Your First Template
                   </Button>

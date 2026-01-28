@@ -4,9 +4,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Camera, X, Upload } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
+import { Camera, X } from "lucide-react";
 import { MobilityMetric } from "@/lib/progressTrackingService";
 import {
   MOBILITY_REFERENCE_VALUES,
@@ -33,8 +31,11 @@ export default function MobilityFormFields({
   clientId,
   recordId,
 }: MobilityFormFieldsProps) {
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
+  const theme = {
+    text: "fc-text-primary",
+    textSecondary: "fc-text-subtle",
+    border: "border-[color:var(--fc-glass-border)]",
+  };
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [side, setSide] = useState<"left" | "right">("left");
 
@@ -120,11 +121,11 @@ export default function MobilityFormFields({
     const color = reference ? getValueColor(value, reference) : "gray";
     const colorClasses = {
       green:
-        "border-green-300 bg-green-50 dark:bg-green-900/20 dark:border-green-700",
+        "fc-glass-soft border border-[color:var(--fc-status-success)]",
       yellow:
-        "border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-700",
-      red: "border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-700",
-      gray: theme.border,
+        "fc-glass-soft border border-[color:var(--fc-status-warning)]",
+      red: "fc-glass-soft border border-[color:var(--fc-status-error)]",
+      gray: "fc-glass-soft border border-[color:var(--fc-glass-border)]",
     };
 
     return (
@@ -132,16 +133,15 @@ export default function MobilityFormFields({
         <div className="flex items-center justify-between">
           <Label className={`${theme.textSecondary} text-sm`}>{label}</Label>
           {reference && (
-            <Badge
-              variant="outline"
-              className={`text-xs ${
+            <span
+              className={`fc-pill fc-pill-glass text-xs ${
                 color === "green"
-                  ? "border-green-400 text-green-700 dark:text-green-400"
+                  ? "fc-text-success"
                   : color === "yellow"
-                  ? "border-yellow-400 text-yellow-700 dark:text-yellow-400"
+                  ? "fc-text-warning"
                   : color === "red"
-                  ? "border-red-400 text-red-700 dark:text-red-400"
-                  : ""
+                  ? "fc-text-error"
+                  : "fc-text-subtle"
               }`}
             >
               {color === "green"
@@ -151,7 +151,7 @@ export default function MobilityFormFields({
                 : color === "red"
                 ? "✗ Poor"
                 : ""}
-            </Badge>
+            </span>
           )}
         </div>
         <Input
@@ -206,17 +206,19 @@ export default function MobilityFormFields({
         <div className="flex gap-2 mb-4">
           <Button
             type="button"
-            variant={side === "left" ? "default" : "outline"}
             onClick={() => setSide("left")}
-            className="flex-1"
+            className={`flex-1 fc-btn fc-press ${
+              side === "left" ? "fc-btn-primary" : "fc-btn-secondary"
+            }`}
           >
             Left Side
           </Button>
           <Button
             type="button"
-            variant={side === "right" ? "default" : "outline"}
             onClick={() => setSide("right")}
-            className="flex-1"
+            className={`flex-1 fc-btn fc-press ${
+              side === "right" ? "fc-btn-primary" : "fc-btn-secondary"
+            }`}
           >
             Right Side
           </Button>
@@ -282,17 +284,19 @@ export default function MobilityFormFields({
         <div className="flex gap-2 mb-4">
           <Button
             type="button"
-            variant={side === "left" ? "default" : "outline"}
             onClick={() => setSide("left")}
-            className="flex-1"
+            className={`flex-1 fc-btn fc-press ${
+              side === "left" ? "fc-btn-primary" : "fc-btn-secondary"
+            }`}
           >
             Left Side
           </Button>
           <Button
             type="button"
-            variant={side === "right" ? "default" : "outline"}
             onClick={() => setSide("right")}
-            className="flex-1"
+            className={`flex-1 fc-btn fc-press ${
+              side === "right" ? "fc-btn-primary" : "fc-btn-secondary"
+            }`}
           >
             Right Side
           </Button>
@@ -419,7 +423,7 @@ export default function MobilityFormFields({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {photos.map((photoUrl, index) => (
               <div key={index} className="relative group">
-                <div className="aspect-square rounded-lg overflow-hidden border-2 border-slate-200 dark:border-slate-700">
+                <div className="aspect-square rounded-2xl overflow-hidden border border-[color:var(--fc-glass-border)]">
                   <Image
                     src={photoUrl}
                     alt={`Assessment photo ${index + 1}`}
@@ -432,7 +436,7 @@ export default function MobilityFormFields({
                   type="button"
                   variant="destructive"
                   size="sm"
-                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity fc-press"
                   onClick={() => handlePhotoDelete(photoUrl, index)}
                 >
                   <X className="w-4 h-4" />
@@ -457,7 +461,7 @@ export default function MobilityFormFields({
             <Button
               type="button"
               variant="outline"
-              className="w-full"
+              className="w-full fc-btn fc-btn-secondary fc-press"
               disabled={uploadingPhotos}
               asChild
             >

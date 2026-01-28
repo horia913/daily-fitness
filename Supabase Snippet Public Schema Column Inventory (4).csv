@@ -1,0 +1,100 @@
+schema,table_name,constraint_name,constraint_def
+public,achievements,achievements_achievement_type_check,"CHECK ((achievement_type = ANY (ARRAY['milestone'::text, 'goal_completion'::text, 'personal_record'::text, 'consistency'::text, 'progress'::text, 'workout_streak'::text, 'assessment_improvement'::text])))"
+public,body_metrics,body_metrics_visceral_fat_level_check,CHECK (((visceral_fat_level >= 0) AND (visceral_fat_level <= 25)))
+public,booked_sessions,valid_rating,CHECK (((session_rating IS NULL) OR ((session_rating >= 1) AND (session_rating <= 5))))
+public,booked_sessions,valid_session_type,"CHECK ((session_type = ANY (ARRAY['personal_training'::text, 'nutrition_consultation'::text, 'check_in'::text, 'assessment'::text])))"
+public,booked_sessions,valid_status,"CHECK ((status = ANY (ARRAY['scheduled'::text, 'completed'::text, 'cancelled'::text, 'no_show'::text])))"
+public,challenge_participants,challenge_participants_selected_track_check,"CHECK ((selected_track = ANY (ARRAY['fat_loss'::text, 'muscle_gain'::text])))"
+public,challenge_participants,challenge_participants_status_check,"CHECK ((status = ANY (ARRAY['registered'::text, 'active'::text, 'completed'::text, 'withdrawn'::text])))"
+public,challenge_scoring_categories,challenge_scoring_categories_scoring_method_check,"CHECK ((scoring_method = ANY (ARRAY['pr_improvement'::text, 'bw_multiple'::text, 'tonnage'::text, 'waist_delta'::text, 'muscle_gain_bw_multiple'::text, 'adherence_percentage'::text])))"
+public,challenge_video_submissions,challenge_video_submissions_status_check,"CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))"
+public,challenges,challenges_challenge_type_check,"CHECK ((challenge_type = ANY (ARRAY['coach_challenge'::text, 'recomp_challenge'::text])))"
+public,challenges,challenges_recomp_track_check,"CHECK ((recomp_track = ANY (ARRAY['fat_loss'::text, 'muscle_gain'::text, 'both'::text])))"
+public,challenges,challenges_status_check,"CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'completed'::text, 'cancelled'::text])))"
+public,clients,clients_status_check,"CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text, 'pending'::text])))"
+public,coach_availability,coach_availability_day_of_week_check,CHECK (((day_of_week >= 0) AND (day_of_week <= 6)))
+public,coach_time_slots,valid_recurring_end,CHECK ((((recurring_pattern IS NULL) AND (recurring_end_date IS NULL)) OR ((recurring_pattern IS NOT NULL) AND (recurring_end_date >= date))))
+public,coach_time_slots,valid_time_range,CHECK ((end_time > start_time))
+public,exercise_alternatives,exercise_alternatives_reason_check,"CHECK ((reason = ANY (ARRAY['equipment'::text, 'difficulty'::text, 'injury'::text, 'preference'::text])))"
+public,fms_assessments,fms_assessments_active_straight_leg_raise_left_check,CHECK (((active_straight_leg_raise_left >= 0) AND (active_straight_leg_raise_left <= 3)))
+public,fms_assessments,fms_assessments_active_straight_leg_raise_right_check,CHECK (((active_straight_leg_raise_right >= 0) AND (active_straight_leg_raise_right <= 3)))
+public,fms_assessments,fms_assessments_deep_squat_check,CHECK (((deep_squat >= 0) AND (deep_squat <= 3)))
+public,fms_assessments,fms_assessments_hurdle_step_left_check,CHECK (((hurdle_step_left >= 0) AND (hurdle_step_left <= 3)))
+public,fms_assessments,fms_assessments_hurdle_step_right_check,CHECK (((hurdle_step_right >= 0) AND (hurdle_step_right <= 3)))
+public,fms_assessments,fms_assessments_inline_lunge_left_check,CHECK (((inline_lunge_left >= 0) AND (inline_lunge_left <= 3)))
+public,fms_assessments,fms_assessments_inline_lunge_right_check,CHECK (((inline_lunge_right >= 0) AND (inline_lunge_right <= 3)))
+public,fms_assessments,fms_assessments_rotary_stability_left_check,CHECK (((rotary_stability_left >= 0) AND (rotary_stability_left <= 3)))
+public,fms_assessments,fms_assessments_rotary_stability_right_check,CHECK (((rotary_stability_right >= 0) AND (rotary_stability_right <= 3)))
+public,fms_assessments,fms_assessments_shoulder_mobility_left_check,CHECK (((shoulder_mobility_left >= 0) AND (shoulder_mobility_left <= 3)))
+public,fms_assessments,fms_assessments_shoulder_mobility_right_check,CHECK (((shoulder_mobility_right >= 0) AND (shoulder_mobility_right <= 3)))
+public,fms_assessments,fms_assessments_total_score_check,CHECK (((total_score >= 0) AND (total_score <= 21)))
+public,fms_assessments,fms_assessments_trunk_stability_pushup_check,CHECK (((trunk_stability_pushup >= 0) AND (trunk_stability_pushup <= 3)))
+public,goals,goals_category_check,"CHECK ((category = ANY (ARRAY['weight_loss'::text, 'muscle_gain'::text, 'strength'::text, 'endurance'::text, 'mobility'::text, 'body_composition'::text, 'performance'::text, 'other'::text])))"
+public,goals,goals_priority_check,"CHECK ((priority = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text])))"
+public,goals,goals_status_check,"CHECK ((status = ANY (ARRAY['active'::text, 'completed'::text, 'paused'::text, 'cancelled'::text])))"
+public,habits,habits_frequency_type_check,"CHECK (((frequency_type)::text = ANY ((ARRAY['daily'::character varying, 'weekly'::character varying])::text[])))"
+public,habits,habits_target_days_check,CHECK (((target_days >= 1) AND (target_days <= 7)))
+public,leaderboard_rankings,leaderboard_rankings_sex_filter_check,"CHECK (((sex_filter)::text = ANY ((ARRAY['M'::character varying, 'F'::character varying, NULL::character varying])::text[])))"
+public,leaderboard_rankings,leaderboard_rankings_time_filter_check,"CHECK (((time_filter)::text = ANY ((ARRAY['weekly'::character varying, 'monthly'::character varying, 'yearly'::character varying, 'all_time'::character varying])::text[])))"
+public,leaderboard_titles,leaderboard_titles_sex_filter_check,"CHECK (((sex_filter)::text = ANY ((ARRAY['M'::character varying, 'F'::character varying, NULL::character varying])::text[])))"
+public,meal_plan_items,meal_plan_items_day_of_week_check,CHECK (((day_of_week >= 1) AND (day_of_week <= 7)))
+public,meal_plan_items,meal_plan_items_meal_type_check,"CHECK ((meal_type = ANY (ARRAY['breakfast'::text, 'lunch'::text, 'dinner'::text, 'snack'::text])))"
+public,performance_tests,performance_tests_perceived_effort_check,CHECK (((perceived_effort >= 1) AND (perceived_effort <= 10)))
+public,performance_tests,performance_tests_test_type_check,"CHECK ((test_type = ANY (ARRAY['1km_run'::text, 'step_test'::text])))"
+public,personal_records,personal_records_record_type_check,"CHECK ((record_type = ANY (ARRAY['weight'::text, 'reps'::text, 'distance'::text, 'time'::text, 'score'::text])))"
+public,profiles,profiles_role_check,"CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'client'::text])))"
+public,profiles,profiles_sex_check,"CHECK (((sex)::text = ANY ((ARRAY['M'::character varying, 'F'::character varying])::text[])))"
+public,program_assignment_progress,program_assignment_progress_current_day_check,CHECK (((current_day >= 1) AND (current_day <= 6)))
+public,program_assignments,program_assignments_status_check,"CHECK ((status = ANY (ARRAY['active'::text, 'completed'::text, 'paused'::text, 'cancelled'::text])))"
+public,program_day_assignments,program_day_assignments_day_type_check,"CHECK ((day_type = ANY (ARRAY['workout'::text, 'rest'::text, 'assessment'::text])))"
+public,program_days,program_days_day_type_check,"CHECK ((day_type = ANY (ARRAY['workout'::text, 'rest'::text, 'assessment'::text])))"
+public,program_days,program_days_intensity_level_check,"CHECK ((intensity_level = ANY (ARRAY['light'::text, 'moderate'::text, 'high'::text])))"
+public,program_progression_rules,program_progression_rules_sets_check,CHECK ((sets > 0))
+public,program_progression_rules,program_progression_rules_week_number_check,CHECK ((week_number >= 1))
+public,program_schedule,program_schedule_day_of_week_check,CHECK (((day_of_week >= 0) AND (day_of_week <= 6)))
+public,program_schedule,program_schedule_week_number_check,CHECK ((week_number >= 1))
+public,program_workout_completions,program_workout_completions_program_day_check,CHECK (((program_day >= 1) AND (program_day <= 6)))
+public,progression_guidelines,progression_guidelines_category_check,"CHECK ((category = ANY (ARRAY['Hypertrophy'::text, 'Max Strength'::text, 'Strength Endurance'::text, 'Explosive Power'::text, 'Sprint Speed'::text, 'Aerobic Endurance'::text, 'Anaerobic Capacity'::text])))"
+public,progression_guidelines,progression_guidelines_difficulty_check,"CHECK ((difficulty = ANY (ARRAY['beginner'::text, 'intermediate'::text, 'advanced'::text, 'athlete'::text])))"
+public,sessions,sessions_status_check,"CHECK ((status = ANY (ARRAY['scheduled'::text, 'completed'::text, 'cancelled'::text, 'no_show'::text])))"
+public,volume_guidelines,volume_guidelines_category_check,"CHECK ((category = ANY (ARRAY['Hypertrophy'::text, 'Max Strength'::text, 'Strength Endurance'::text, 'Explosive Power'::text, 'Sprint Speed'::text, 'Aerobic Endurance'::text, 'Anaerobic Capacity'::text])))"
+public,volume_guidelines,volume_guidelines_difficulty_check,"CHECK ((difficulty = ANY (ARRAY['beginner'::text, 'intermediate'::text, 'advanced'::text, 'athlete'::text])))"
+public,workout_assignments,workout_assignments_status_check,"CHECK ((status = ANY (ARRAY['assigned'::text, 'in_progress'::text, 'completed'::text, 'skipped'::text])))"
+public,workout_blocks,workout_blocks_hr_percentage_max_check,CHECK (((hr_percentage_max IS NULL) OR ((hr_percentage_max >= (50)::numeric) AND (hr_percentage_max <= (100)::numeric))))
+public,workout_blocks,workout_blocks_hr_percentage_min_check,CHECK (((hr_percentage_min IS NULL) OR ((hr_percentage_min >= (50)::numeric) AND (hr_percentage_min <= (100)::numeric))))
+public,workout_blocks,workout_blocks_hr_zone_target_check,CHECK (((hr_zone_target IS NULL) OR ((hr_zone_target >= 1) AND (hr_zone_target <= 5))))
+public,workout_exercise_logs,workout_exercise_logs_difficulty_rating_check,CHECK (((difficulty_rating >= 1) AND (difficulty_rating <= 10)))
+public,workout_exercise_logs,workout_exercise_logs_form_quality_rating_check,CHECK (((form_quality_rating >= 1) AND (form_quality_rating <= 10)))
+public,workout_hr_sets,check_continuous_or_intervals,CHECK ((((is_intervals = false) AND (duration_seconds IS NOT NULL) AND (work_duration_seconds IS NULL) AND (rest_duration_seconds IS NULL) AND (target_rounds IS NULL)) OR ((is_intervals = true) AND (duration_seconds IS NULL) AND (work_duration_seconds IS NOT NULL) AND (rest_duration_seconds IS NOT NULL) AND (target_rounds IS NOT NULL))))
+public,workout_hr_sets,check_hr_zone_or_percentage,CHECK ((((hr_zone IS NOT NULL) AND (hr_percentage_min IS NULL) AND (hr_percentage_max IS NULL)) OR ((hr_zone IS NULL) AND (hr_percentage_min IS NOT NULL) AND (hr_percentage_max IS NOT NULL) AND (hr_percentage_min <= hr_percentage_max))))
+public,workout_hr_sets,workout_hr_sets_average_hr_percentage_check,CHECK (((average_hr_percentage IS NULL) OR ((average_hr_percentage >= (50)::numeric) AND (average_hr_percentage <= (100)::numeric))))
+public,workout_hr_sets,workout_hr_sets_distance_meters_check,CHECK (((distance_meters IS NULL) OR (distance_meters >= (0)::numeric)))
+public,workout_hr_sets,workout_hr_sets_duration_seconds_check,CHECK (((duration_seconds IS NULL) OR (duration_seconds > 0)))
+public,workout_hr_sets,workout_hr_sets_hr_percentage_max_check,CHECK (((hr_percentage_max IS NULL) OR ((hr_percentage_max >= (50)::numeric) AND (hr_percentage_max <= (100)::numeric))))
+public,workout_hr_sets,workout_hr_sets_hr_percentage_min_check,CHECK (((hr_percentage_min IS NULL) OR ((hr_percentage_min >= (50)::numeric) AND (hr_percentage_min <= (100)::numeric))))
+public,workout_hr_sets,workout_hr_sets_hr_zone_check,CHECK (((hr_zone IS NULL) OR ((hr_zone >= 1) AND (hr_zone <= 5))))
+public,workout_hr_sets,workout_hr_sets_rest_duration_seconds_check,CHECK (((rest_duration_seconds IS NULL) OR (rest_duration_seconds >= 0)))
+public,workout_hr_sets,workout_hr_sets_rounds_completed_check,CHECK (((rounds_completed IS NULL) OR (rounds_completed >= 0)))
+public,workout_hr_sets,workout_hr_sets_target_rounds_check,CHECK (((target_rounds IS NULL) OR (target_rounds > 0)))
+public,workout_hr_sets,workout_hr_sets_work_duration_seconds_check,CHECK (((work_duration_seconds IS NULL) OR (work_duration_seconds > 0)))
+public,workout_logs,workout_logs_average_hr_percentage_check,CHECK (((average_hr_percentage IS NULL) OR ((average_hr_percentage >= (50)::numeric) AND (average_hr_percentage <= (100)::numeric))))
+public,workout_logs,workout_logs_energy_level_check,CHECK (((energy_level >= 1) AND (energy_level <= 10)))
+public,workout_logs,workout_logs_max_hr_percentage_check,CHECK (((max_hr_percentage IS NULL) OR ((max_hr_percentage >= (50)::numeric) AND (max_hr_percentage <= (100)::numeric))))
+public,workout_logs,workout_logs_muscle_fatigue_level_check,CHECK (((muscle_fatigue_level >= 1) AND (muscle_fatigue_level <= 10)))
+public,workout_logs,workout_logs_overall_difficulty_rating_check,CHECK (((overall_difficulty_rating >= 1) AND (overall_difficulty_rating <= 10)))
+public,workout_logs,workout_logs_perceived_effort_check,CHECK (((perceived_effort >= 1) AND (perceived_effort <= 10)))
+public,workout_logs,workout_logs_total_distance_meters_check,CHECK (((total_distance_meters IS NULL) OR (total_distance_meters >= (0)::numeric)))
+public,workout_logs,workout_logs_total_hr_zone2_minutes_check,CHECK (((total_hr_zone2_minutes IS NULL) OR (total_hr_zone2_minutes >= (0)::numeric)))
+public,workout_logs,workout_logs_total_hr_zone45_minutes_check,CHECK (((total_hr_zone45_minutes IS NULL) OR (total_hr_zone45_minutes >= (0)::numeric)))
+public,workout_programs,workout_programs_category_check,"CHECK (((category IS NULL) OR (category = ANY (ARRAY['Hypertrophy'::text, 'Max Strength'::text, 'Strength Endurance'::text, 'Explosive Power'::text, 'Sprint Speed'::text, 'Aerobic Endurance'::text, 'Anaerobic Capacity'::text]))))"
+public,workout_programs,workout_programs_difficulty_level_check,"CHECK ((difficulty_level = ANY (ARRAY['beginner'::text, 'intermediate'::text, 'advanced'::text, 'athlete'::text])))"
+public,workout_set_details,workout_set_details_rpe_check,CHECK (((rpe >= 1) AND (rpe <= 10)))
+public,workout_set_logs,workout_set_logs_hr_average_percentage_check,CHECK (((hr_average_percentage IS NULL) OR ((hr_average_percentage >= (50)::numeric) AND (hr_average_percentage <= (100)::numeric))))
+public,workout_set_logs,workout_set_logs_hr_distance_meters_check,CHECK (((hr_distance_meters IS NULL) OR (hr_distance_meters >= (0)::numeric)))
+public,workout_set_logs,workout_set_logs_hr_duration_seconds_check,CHECK (((hr_duration_seconds IS NULL) OR (hr_duration_seconds > 0)))
+public,workout_set_logs,workout_set_logs_hr_interval_round_check,CHECK (((hr_interval_round IS NULL) OR (hr_interval_round > 0)))
+public,workout_set_logs,workout_set_logs_hr_percentage_check,CHECK (((hr_percentage IS NULL) OR ((hr_percentage >= (50)::numeric) AND (hr_percentage <= (100)::numeric))))
+public,workout_set_logs,workout_set_logs_hr_rest_duration_seconds_check,CHECK (((hr_rest_duration_seconds IS NULL) OR (hr_rest_duration_seconds >= 0)))
+public,workout_set_logs,workout_set_logs_hr_work_duration_seconds_check,CHECK (((hr_work_duration_seconds IS NULL) OR (hr_work_duration_seconds > 0)))
+public,workout_set_logs,workout_set_logs_hr_zone_check,CHECK (((hr_zone IS NULL) OR ((hr_zone >= 1) AND (hr_zone <= 5))))
+public,workout_templates,workout_templates_difficulty_level_check,"CHECK ((difficulty_level = ANY (ARRAY['beginner'::text, 'intermediate'::text, 'advanced'::text, 'athlete'::text])))"

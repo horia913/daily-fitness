@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BlockDetailsGrid, BlockDetail } from "./ui/BlockDetailsGrid";
@@ -9,9 +8,10 @@ import { ProgressIndicator } from "./ui/ProgressIndicator";
 import { InstructionsBox } from "./ui/InstructionsBox";
 import { BlockTypeBadge } from "./ui/BlockTypeBadge";
 import { NavigationControls } from "./ui/NavigationControls";
+import { ProgressionBadge } from "./ui/ProgressionBadge";
+import { ExerciseActionButtons } from "./ui/ExerciseActionButtons";
 import { BaseBlockExecutorProps } from "./types";
 import { WorkoutBlockType, WorkoutBlockExercise } from "@/types/workoutBlocks";
-import { Youtube, Timer, RefreshCw } from "lucide-react";
 
 interface BaseBlockExecutorLayoutProps extends BaseBlockExecutorProps {
   // Section 1: Exercise Name
@@ -40,6 +40,9 @@ interface BaseBlockExecutorLayoutProps extends BaseBlockExecutorProps {
   // Optional: Exercise actions
   currentExercise?: WorkoutBlockExercise;
   showRestTimer?: boolean;
+  
+  // Progression suggestion (inherited from BaseBlockExecutorProps)
+  progressionSuggestion?: import("@/lib/clientProgressionService").ProgressionSuggestion | null;
 }
 
 export function BaseBlockExecutorLayout({
@@ -61,6 +64,7 @@ export function BaseBlockExecutorLayout({
   onVideoClick,
   onAlternativesClick,
   onRestTimerClick,
+  progressionSuggestion,
 }: BaseBlockExecutorLayoutProps) {
   const { getThemeStyles } = useTheme();
   const theme = getThemeStyles();
@@ -68,12 +72,8 @@ export function BaseBlockExecutorLayout({
   const totalBlocks = allBlocks.length || 1;
   const canGoPrevious = currentBlockIndex > 0;
   const canGoNext = currentBlockIndex < totalBlocks - 1;
-
-  // Check if this block has multiple exercises
   const hasMultipleExercises = (block.block.exercises?.length || 0) > 1;
-
-  // Only show general buttons for single-exercise blocks
-  const shouldShowGeneralButtons = currentExercise && !hasMultipleExercises;
+  const shouldShowHeaderActions = currentExercise && !hasMultipleExercises;
 
   const handlePrevious = () => {
     if (onBlockChange && canGoPrevious) {
@@ -101,54 +101,29 @@ export function BaseBlockExecutorLayout({
         </div>
       </div>
 
-      {/* Section 1: Exercise Name */}
-      <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-4">
-        {exerciseName}
-      </h2>
-
-      {/* Exercise Actions */}
-      {shouldShowGeneralButtons && (
-        <div className="flex items-center gap-2 mb-4">
-          {showRestTimer && onRestTimerClick && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onRestTimerClick}
-              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
-              title="Start Rest Timer"
-            >
-              <Timer className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-            </Button>
-          )}
-          {currentExercise?.exercise?.video_url && onVideoClick && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                onVideoClick(
-                  currentExercise.exercise?.video_url || "",
-                  currentExercise.exercise?.name
-                )
-              }
-              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
-              title="Watch Exercise Video"
-            >
-              <Youtube className="w-5 h-5 text-red-600 dark:text-red-400" />
-            </Button>
-          )}
-          {currentExercise?.exercise_id && onAlternativesClick && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onAlternativesClick(currentExercise.exercise_id)}
-              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
-              title="View Exercise Alternatives"
-            >
-              <RefreshCw className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            </Button>
-          )}
-        </div>
+      {/* Progression Badge (if suggestion exists) */}
+      {progressionSuggestion && (
+        <ProgressionBadge
+          suggestion={progressionSuggestion}
+          exerciseId={currentExercise?.exercise_id || ""}
+        />
       )}
+
+      {/* Section 1: Exercise Name */}
+      <div className="mb-4">
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+          {exerciseName}
+        </h2>
+        {shouldShowHeaderActions && (
+          <div className="mt-2 flex items-center gap-2">
+            <ExerciseActionButtons
+              exercise={currentExercise as WorkoutBlockExercise}
+              onVideoClick={onVideoClick}
+              onAlternativesClick={onAlternativesClick}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="space-y-6">
         {/* Section 2: Block Details Grid */}

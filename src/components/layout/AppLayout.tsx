@@ -17,9 +17,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-800 dark:to-indigo-900 flex flex-col">
+    <div className="min-h-screen fc-app-bg flex flex-col">
       <Header />
-      <main className="flex-1 pb-24 overflow-y-auto">{children}</main>
+      <main className="flex-1 min-h-0 overflow-y-auto pb-24">{children}</main>
       <BottomNav />
     </div>
   );

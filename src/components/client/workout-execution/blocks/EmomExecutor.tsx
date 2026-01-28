@@ -14,6 +14,7 @@ import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useLoggingReset } from "../hooks/useLoggingReset";
 
 export function EmomExecutor({
   block,
@@ -54,6 +55,7 @@ export function EmomExecutor({
   const [reps, setReps] = useState("");
   const [currentMinute, setCurrentMinute] = useState(1);
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [isActive, setIsActive] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -182,60 +184,65 @@ export function EmomExecutor({
       }
     } catch (e) {}
 
-    // Calculate duration used for this minute (60 - timeRemaining)
-    const durationUsedThisMin = 60 - timeRemaining;
+    try {
+      // Calculate duration used for this minute (60 - timeRemaining)
+      const durationUsedThisMin = 60 - timeRemaining;
 
-    const logData: any = {
-      block_type: 'emom',
-      emom_minute_number: currentMinute,
-    };
-    
-    // Only add fields if they're defined
-    if (currentExercise?.exercise_id) logData.exercise_id = currentExercise.exercise_id;
-    if (repsNum !== undefined && repsNum !== null && !isNaN(repsNum)) logData.emom_total_reps_this_min = repsNum;
-    if (durationUsedThisMin !== undefined && durationUsedThisMin !== null) logData.emom_total_duration_sec = durationUsedThisMin;
-    
-    const result = await logSetToDatabase(logData);
+      const logData: any = {
+        block_type: 'emom',
+        emom_minute_number: currentMinute,
+        emom_mode: emomMode,
+        emom_reps_per_round: emomMode === "target_reps" ? targetReps : null,
+      };
+      
+      // Only add fields if they're defined
+      if (currentExercise?.exercise_id) logData.exercise_id = currentExercise.exercise_id;
+      if (repsNum !== undefined && repsNum !== null && !isNaN(repsNum)) logData.emom_total_reps_this_min = repsNum;
+      if (durationUsedThisMin !== undefined && durationUsedThisMin !== null) logData.emom_total_duration_sec = durationUsedThisMin;
+      if (!isNaN(weightNum) && weightNum > 0) logData.weight = weightNum;
+      
+      const result = await logSetToDatabase(logData);
 
-    if (result.success) {
-      if (result.e1rm && onE1rmUpdate) {
-        onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
+      if (result.success) {
+        if (result.e1rm && onE1rmUpdate) {
+          onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
+        }
+
+        setReps("");
+
+        addToast({
+          title: "EMOM Work Logged!",
+          description: `${weightNum}kg × ${repsNum} reps (Minute ${currentMinute})`,
+          variant: "success",
+          duration: 2000,
+        });
+
+        // If all minutes complete, finish block
+        if (currentMinute >= durationMinutes && timeRemaining === 0) {
+          const loggedSetsArray: LoggedSet[] = [
+            {
+              id: `temp-${Date.now()}`,
+              exercise_id: currentExercise.exercise_id,
+              block_id: block.block.id,
+              set_number: currentMinute,
+              weight_kg: weightNum,
+              reps_completed: repsNum,
+              completed_at: new Date(),
+            } as LoggedSet,
+          ];
+          onBlockComplete(block.block.id, loggedSetsArray);
+        }
+      } else {
+        addToast({
+          title: "Failed to Save",
+          description: "Failed to save work. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
       }
-
-      setReps("");
-
-      addToast({
-        title: "EMOM Work Logged!",
-        description: `${weightNum}kg × ${repsNum} reps (Minute ${currentMinute})`,
-        variant: "success",
-        duration: 2000,
-      });
-
-      // If all minutes complete, finish block
-      if (currentMinute >= durationMinutes && timeRemaining === 0) {
-        const loggedSetsArray: LoggedSet[] = [
-          {
-            id: `temp-${Date.now()}`,
-            exercise_id: currentExercise.exercise_id,
-            block_id: block.block.id,
-            set_number: currentMinute,
-            weight_kg: weightNum,
-            reps_completed: repsNum,
-            completed_at: new Date(),
-          } as LoggedSet,
-        ];
-        onBlockComplete(block.block.id, loggedSetsArray);
-      }
-    } else {
-      addToast({
-        title: "Failed to Save",
-        description: "Failed to save work. Please try again.",
-        variant: "destructive",
-        duration: 5000,
-      });
+    } finally {
+      setIsLoggingSet(false);
     }
-
-    setIsLoggingSet(false);
   };
 
   const loggingInputs = (
@@ -272,6 +279,8 @@ export function EmomExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <LargeInput
             label="Reps Completed"
@@ -279,6 +288,8 @@ export function EmomExecutor({
             onChange={setReps}
             placeholder="0"
             step="1"
+            showStepper
+            stepAmount={1}
           />
         </div>
       </GlassCard>

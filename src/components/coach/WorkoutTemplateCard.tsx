@@ -1,10 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { useTheme } from '@/contexts/ThemeContext'
 import { 
   Dumbbell, 
   Clock,
@@ -15,18 +12,7 @@ import {
   Users,
   UserPlus,
   Copy,
-  Share2,
   Star,
-  TrendingUp,
-  MoreVertical,
-  Bookmark,
-  BookmarkCheck,
-  Eye,
-  EyeOff,
-  Timer,
-  GripVertical,
-  Calendar,
-  Award,
   Zap,
   Heart,
   Activity
@@ -75,14 +61,12 @@ export default function WorkoutTemplateCard({
   onAssign,
   onView
 }: WorkoutTemplateCardProps) {
-  const { getThemeStyles } = useTheme()
-  const theme = getThemeStyles()
   const [showActions, setShowActions] = useState(false)
 
-  const difficultyColors = {
-    'Beginner': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-    'Intermediate': 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
-    'Advanced': 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+  const difficultyStyles = {
+    'Beginner': 'fc-text-success',
+    'Intermediate': 'fc-text-warning',
+    'Advanced': 'fc-text-error'
   }
 
   const difficultyLabels = {
@@ -104,48 +88,49 @@ export default function WorkoutTemplateCard({
   }
 
   const getDurationColor = (duration: number) => {
-    if (duration <= 30) return 'text-green-600 dark:text-green-400'
-    if (duration <= 60) return 'text-blue-600 dark:text-blue-400'
-    return 'text-orange-600 dark:text-orange-400'
+    if (duration <= 30) return 'fc-text-success'
+    if (duration <= 60) return 'fc-text-workouts'
+    return 'fc-text-warning'
   }
 
   const getUsageColor = (usage: number) => {
-    if (usage >= 20) return 'text-green-600 dark:text-green-400'
-    if (usage >= 10) return 'text-blue-600 dark:text-blue-400'
-    if (usage >= 5) return 'text-orange-600 dark:text-orange-400'
-    return 'text-slate-500'
+    if (usage >= 20) return 'fc-text-success'
+    if (usage >= 10) return 'fc-text-workouts'
+    if (usage >= 5) return 'fc-text-warning'
+    return 'fc-text-dim'
   }
 
   const getRatingColor = (rating: number) => {
-    if (rating >= 4.5) return 'text-yellow-600 dark:text-yellow-400'
-    if (rating >= 4.0) return 'text-blue-600 dark:text-blue-400'
-    if (rating >= 3.5) return 'text-orange-600 dark:text-orange-400'
-    return 'text-slate-500'
+    if (rating >= 4.5) return 'fc-text-success'
+    if (rating >= 4.0) return 'fc-text-workouts'
+    if (rating >= 3.5) return 'fc-text-warning'
+    return 'fc-text-dim'
   }
 
   const CategoryIcon = getCategoryIcon(template.category?.name || '')
 
   if (viewMode === 'list') {
     return (
-      <Card 
-        className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-lg transition-all duration-300 cursor-pointer ${
-          isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' : 'hover:border-slate-300 dark:hover:border-slate-600'
+      <div 
+        className={`fc-glass fc-card fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] transition-all duration-300 cursor-pointer ${
+          isSelected ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
         }`}
         onClick={() => onSelect(template.id)}
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
       >
-        <CardContent className="p-6">
+        <div className="p-6">
           <div className="flex items-center gap-4">
             {/* Template Image */}
-            <div className="relative w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl overflow-hidden flex-shrink-0">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20"></div>
+            <div className="relative w-20 h-20 fc-glass-soft rounded-2xl overflow-hidden flex-shrink-0 border border-[color:var(--fc-glass-border)]">
               <div className="w-full h-full flex items-center justify-center">
-                <CategoryIcon className="w-8 h-8 text-slate-400" />
+                <div className="fc-icon-tile fc-icon-workouts">
+                  <CategoryIcon className="w-6 h-6" />
+                </div>
               </div>
               {template.category && (
                 <div 
-                  className="absolute top-1 right-1 w-3 h-3 rounded-full border border-white"
+                  className="absolute top-2 right-2 w-3 h-3 rounded-full border border-[color:var(--fc-glass-border-strong)]"
                   style={{ backgroundColor: template.category.color }}
                 />
               )}
@@ -155,16 +140,16 @@ export default function WorkoutTemplateCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <h3 className={`font-semibold ${theme.text} text-lg mb-1`}>
+                  <h3 className="font-semibold fc-text-primary text-lg mb-1">
                     {template.name}
                   </h3>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`text-sm ${theme.textSecondary}`}>
+                    <span className="text-sm fc-text-dim">
                       {template.category?.name || 'Uncategorized'}
                     </span>
-                    <Badge className={`${difficultyColors[template.difficulty_level as keyof typeof difficultyColors]} border-0 text-xs`}>
+                    <span className={`fc-pill fc-pill-glass text-xs ${difficultyStyles[template.difficulty_level as keyof typeof difficultyStyles]}`}>
                       {difficultyLabels[template.difficulty_level as keyof typeof difficultyLabels]}
-                    </Badge>
+                    </span>
                     <div className={`flex items-center gap-1 text-xs ${getDurationColor(template.estimated_duration)}`}>
                       <Clock className="w-3 h-3" />
                       <span>{template.estimated_duration}m</span>
@@ -172,19 +157,19 @@ export default function WorkoutTemplateCard({
                   </div>
                 </div>
                 {isSelected && (
-                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                  <div className="w-6 h-6 fc-icon-tile fc-icon-workouts">
+                    <div className="w-2 h-2 rounded-full bg-[color:var(--fc-text-primary)]"></div>
                   </div>
                 )}
               </div>
 
               {template.description && (
-                <p className={`text-sm ${theme.textSecondary} mb-3 line-clamp-2`}>
+                <p className="text-sm fc-text-dim mb-3 line-clamp-2">
                   {template.description}
                 </p>
               )}
 
-              <div className="flex items-center gap-4 text-xs text-slate-500">
+              <div className="flex items-center gap-4 text-xs fc-text-subtle">
                 <span>{template.exercise_count || 0} exercises</span>
                 <div className={`flex items-center gap-1 ${getUsageColor(template.usage_count || 0)}`}>
                   <Users className="w-3 h-3" />
@@ -210,6 +195,7 @@ export default function WorkoutTemplateCard({
                   onAssign(template)
                 }}
                 title="Assign to Client"
+                className="fc-btn fc-btn-secondary"
               >
                 <UserPlus className="w-4 h-4" />
               </Button>
@@ -221,6 +207,7 @@ export default function WorkoutTemplateCard({
                   onView(template)
                 }}
                 title="View Details"
+                className="fc-btn fc-btn-secondary"
               >
                 <Play className="w-4 h-4" />
               </Button>
@@ -232,6 +219,7 @@ export default function WorkoutTemplateCard({
                   onEdit(template)
                 }}
                 title="Edit Template"
+                className="fc-btn fc-btn-secondary"
               >
                 <Edit className="w-4 h-4" />
               </Button>
@@ -242,7 +230,7 @@ export default function WorkoutTemplateCard({
                   e.stopPropagation()
                   onDuplicate(template)
                 }}
-                className="text-green-600 hover:text-green-700"
+                className="fc-btn fc-btn-secondary fc-text-success"
                 title="Duplicate Template"
               >
                 <Copy className="w-4 h-4" />
@@ -254,80 +242,79 @@ export default function WorkoutTemplateCard({
                   e.stopPropagation()
                   onDelete(template.id)
                 }}
-                className="text-red-600 hover:text-red-700"
+                className="fc-btn fc-btn-secondary fc-text-error"
                 title="Delete Template"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   // Grid view
   return (
-    <Card 
-      className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-lg transition-all duration-300 cursor-pointer ${
-        isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' : 'hover:border-slate-300 dark:hover:border-slate-600'
+    <div 
+      className={`fc-glass fc-card fc-hover-rise fc-press rounded-2xl border border-[color:var(--fc-glass-border)] transition-all duration-300 cursor-pointer ${
+        isSelected ? 'ring-2 ring-[color:var(--fc-domain-workouts)]' : ''
       }`}
       onClick={() => onSelect(template.id)}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
       {/* Template Header */}
-      <div className="relative h-32 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-t-2xl overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20"></div>
-        
-        {/* Category Icon */}
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-          <div className="w-12 h-12 bg-white/20 dark:bg-slate-800/20 rounded-full flex items-center justify-center">
-            <CategoryIcon className="w-6 h-6 text-white dark:text-slate-300" />
+      <div className="relative h-32 rounded-t-2xl overflow-hidden border-b border-[color:var(--fc-glass-border)]">
+        <div className="absolute inset-0 fc-glass-soft"></div>
+
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+          <div className="fc-icon-tile fc-icon-workouts">
+            <CategoryIcon className="w-6 h-6" />
           </div>
         </div>
         
         {/* Category Color Indicator */}
         {template.category && (
           <div 
-            className="absolute top-3 left-3 w-4 h-4 rounded-full border-2 border-white"
+            className="absolute top-3 left-3 w-4 h-4 rounded-full border-2 border-[color:var(--fc-glass-border-strong)]"
             style={{ backgroundColor: template.category.color }}
           />
         )}
 
         {/* Selection Indicator */}
         {isSelected && (
-          <div className="absolute top-3 right-3 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-            <div className="w-2 h-2 bg-white rounded-full"></div>
+          <div className="absolute top-3 right-3 w-6 h-6 fc-icon-tile fc-icon-workouts">
+            <div className="w-2 h-2 rounded-full bg-[color:var(--fc-text-primary)]"></div>
           </div>
         )}
 
         {/* Difficulty Badge */}
         <div className="absolute bottom-3 left-3">
-          <Badge className={`${difficultyColors[template.difficulty_level as keyof typeof difficultyColors]} border-0`}>
+          <span className={`fc-pill fc-pill-glass text-xs ${difficultyStyles[template.difficulty_level as keyof typeof difficultyStyles]}`}>
             {difficultyLabels[template.difficulty_level as keyof typeof difficultyLabels]}
-          </Badge>
+          </span>
         </div>
 
         {/* Duration */}
         <div className="absolute bottom-3 right-3">
-          <div className={`flex items-center gap-1 px-2 py-1 bg-white/80 dark:bg-slate-800/80 rounded-lg ${getDurationColor(template.estimated_duration)}`}>
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)] ${getDurationColor(template.estimated_duration)}`}>
             <Clock className="w-3 h-3" />
             <span className="text-xs font-medium">{template.estimated_duration}m</span>
           </div>
         </div>
       </div>
 
-      <CardContent className="p-4 space-y-3">
+      <div className="p-4 space-y-3">
         {/* Template Name and Category */}
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <h3 className={`font-semibold ${theme.text} text-lg mb-1`}>
+            <h3 className="font-semibold fc-text-primary text-lg mb-1">
               {template.name}
             </h3>
             <div className="flex items-center gap-2">
-              <CategoryIcon className="w-4 h-4 text-slate-400" />
-              <span className={`text-sm ${theme.textSecondary}`}>
+              <CategoryIcon className="w-4 h-4 fc-text-subtle" />
+              <span className="text-sm fc-text-dim">
                 {template.category?.name || 'Uncategorized'}
               </span>
             </div>
@@ -336,15 +323,15 @@ export default function WorkoutTemplateCard({
 
         {/* Description */}
         {template.description && (
-          <p className={`text-sm ${theme.textSecondary} line-clamp-2`}>
+          <p className="text-sm fc-text-dim line-clamp-2">
             {template.description}
           </p>
         )}
 
         {/* Stats */}
-        <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="flex items-center justify-between text-xs fc-text-subtle">
           <div className="flex items-center gap-1">
-            <Dumbbell className="w-3 h-3" />
+            <Dumbbell className="w-3 h-3 fc-text-workouts" />
             <span>{template.exercise_count || 0} exercises</span>
           </div>
           <div className={`flex items-center gap-1 ${getUsageColor(template.usage_count || 0)}`}>
@@ -358,7 +345,7 @@ export default function WorkoutTemplateCard({
         </div>
 
         {/* Quick Actions */}
-        <div className={`flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700 transition-opacity duration-200 ${
+        <div className={`flex items-center gap-2 pt-2 border-t border-[color:var(--fc-glass-border)] transition-opacity duration-200 ${
           showActions ? 'opacity-100' : 'opacity-0'
         }`}>
           <Button
@@ -368,7 +355,7 @@ export default function WorkoutTemplateCard({
               e.stopPropagation()
               onView(template)
             }}
-            className="flex-1"
+            className="flex-1 fc-btn fc-btn-secondary"
           >
             <Play className="w-3 h-3 mr-1" />
             View
@@ -380,7 +367,7 @@ export default function WorkoutTemplateCard({
               e.stopPropagation()
               onEdit(template)
             }}
-            className="text-blue-600 hover:text-blue-700"
+            className="fc-btn fc-btn-secondary"
           >
             <Edit className="w-3 h-3" />
           </Button>
@@ -391,7 +378,7 @@ export default function WorkoutTemplateCard({
               e.stopPropagation()
               onDuplicate(template)
             }}
-            className="text-green-600 hover:text-green-700"
+            className="fc-btn fc-btn-secondary fc-text-success"
           >
             <Copy className="w-3 h-3" />
           </Button>
@@ -402,12 +389,12 @@ export default function WorkoutTemplateCard({
               e.stopPropagation()
               onDelete(template.id)
             }}
-            className="text-red-600 hover:text-red-700"
+            className="fc-btn fc-btn-secondary fc-text-error"
           >
             <Trash2 className="w-3 h-3" />
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

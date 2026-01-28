@@ -4,6 +4,9 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +20,7 @@ export default function EditMealPlanPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const { getThemeStyles } = useTheme();
+  const { getThemeStyles, performanceSettings } = useTheme();
   const theme = getThemeStyles();
 
   const mealPlanId = params.id as string;
@@ -94,16 +97,19 @@ export default function EditMealPlanPage() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="p-4 sm:p-6">
             <div className="max-w-2xl mx-auto">
-              <div className="animate-pulse space-y-4">
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
-                <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-              </div>
+              <GlassCard elevation={2} className="fc-glass fc-card p-8">
+                <div className="animate-pulse space-y-4">
+                  <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded w-1/3"></div>
+                  <div className="h-64 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
+                </div>
+              </GlassCard>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -111,47 +117,52 @@ export default function EditMealPlanPage() {
   if (!mealPlan) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="p-4 sm:p-6">
             <div className="max-w-2xl mx-auto">
-              <div className="text-center py-12">
-                <h2 className={`text-2xl font-bold ${theme.text} mb-4`}>
+              <GlassCard elevation={2} className="fc-glass fc-card p-10 text-center">
+                <h2 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
                   Meal Plan Not Found
                 </h2>
                 <Link href="/coach/nutrition/meal-plans">
-                  <Button className="rounded-xl">Back to Meal Plans</Button>
+                  <Button className="fc-btn fc-btn-primary">Back to Meal Plans</Button>
                 </Link>
-              </div>
+              </GlassCard>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="coach">
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="p-4 sm:p-6">
           <div className="max-w-2xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-6">
-              <Link href={`/coach/nutrition/meal-plans/${mealPlan.id}`}>
-                <Button variant="outline" size="icon" className="rounded-xl">
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-              </Link>
-              <div className="flex-1">
-                <h1 className={`text-3xl font-bold ${theme.text}`}>
-                  Edit Meal Plan
-                </h1>
-                <p className={`${theme.textSecondary}`}>
-                  Update meal plan details
-                </p>
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8">
+              <div className="flex items-center gap-4">
+                <Link href={`/coach/nutrition/meal-plans/${mealPlan.id}`}>
+                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
+                </Link>
+                <div className="flex-1">
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Meal Plan Editor
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    Edit Meal Plan
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Update meal plan details.
+                  </p>
+                </div>
               </div>
-            </div>
+            </GlassCard>
 
-            {/* Form */}
             <form
               onSubmit={handleSubmit}
               className={`${theme.card} ${theme.shadow} rounded-3xl p-6 sm:p-8 space-y-6`}
@@ -220,7 +231,7 @@ export default function EditMealPlanPage() {
                 <Button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white"
+                  className="flex-1 fc-btn fc-btn-primary"
                 >
                   {saving ? "Saving..." : "Save Changes"}
                 </Button>
@@ -228,7 +239,7 @@ export default function EditMealPlanPage() {
             </form>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

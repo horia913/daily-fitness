@@ -1,9 +1,7 @@
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useEffect, useState, useRef } from "react";
 import { Timer } from "lucide-react";
 
 interface RestTimerModalProps {
@@ -22,114 +20,190 @@ export function RestTimerModal({
   nextLabel = "Next Set",
 }: RestTimerModalProps) {
   const [timeLeft, setTimeLeft] = useState(restSeconds);
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const onCompleteRef = useRef(onComplete);
+
+  // Keep onComplete ref updated
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
-    if (!isOpen) return;
-
-    setTimeLeft(restSeconds);
-
-    if (restSeconds === 0) {
-      onComplete();
+    if (!isOpen) {
+      // Clear timer when modal closes
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setTimeLeft(restSeconds);
       return;
     }
 
-    const timer = setInterval(() => {
+    // Reset timer when modal opens or restSeconds changes
+    setTimeLeft(restSeconds);
+
+    if (restSeconds === 0) {
+      // Use setTimeout to avoid calling onComplete during render
+      setTimeout(() => {
+        onCompleteRef.current();
+      }, 0);
+      return;
+    }
+
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    // Start new timer
+    timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          onComplete();
+        const newTime = prev - 1;
+        
+        if (newTime <= 0) {
+          // Clear timer first
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          // Use setTimeout to avoid calling onComplete during render
+          setTimeout(() => {
+            onCompleteRef.current();
+          }, 0);
           return 0;
         }
-        return prev - 1;
+        return newTime;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [isOpen, restSeconds, onComplete]);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isOpen, restSeconds]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
-  const progressPercentage = ((restSeconds - timeLeft) / restSeconds) * 100;
+  const totalMinutes = Math.floor(restSeconds / 60);
+  const totalSeconds = restSeconds % 60;
+  const safeRestSeconds = restSeconds === 0 ? 1 : restSeconds;
+  const progressPercentage = Math.min(
+    100,
+    Math.max(0, ((restSeconds - timeLeft) / safeRestSeconds) * 100)
+  );
+
+  if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden">
-        <DialogHeader className="px-6 pt-6 pb-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl">
-              <Timer className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="fc-modal fc-card w-full max-w-lg overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-[color:var(--fc-glass-border)] text-left">
+          <div className="flex items-start gap-4">
+            <div className="fc-icon-tile fc-icon-workouts">
+              <Timer className="w-5 h-5" />
             </div>
-            <DialogTitle className={`text-xl font-bold ${theme.text}`}>
-              Rest Time
-            </DialogTitle>
+            <div className="space-y-2">
+              <span className="fc-pill fc-pill-glass fc-text-workouts">
+                Rest Timer
+              </span>
+              <div className="text-2xl font-bold fc-text-primary">
+                Recover and reset
+              </div>
+              <p className="text-sm fc-text-dim">
+                Next up: {nextLabel}
+              </p>
+            </div>
           </div>
-          <DialogDescription className={`${theme.textSecondary} text-base`}>
-            Get ready for {nextLabel}
-          </DialogDescription>
-        </DialogHeader>
+        </div>
 
-        <div className="px-6 pb-6">
-          {/* Timer Display with Progress Ring */}
-          <div className="flex flex-col items-center justify-center space-y-6 py-6">
-            {/* Circular Progress Indicator */}
-            <div className="relative w-48 h-48 flex items-center justify-center">
-              {/* Background Circle */}
-              <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 200 200">
+        <div className="px-6 py-6">
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative w-52 h-52 flex items-center justify-center">
+              <svg
+                className="absolute inset-0 w-full h-full fc-rotate-ring"
+                viewBox="0 0 200 200"
+              >
                 <circle
                   cx="100"
                   cy="100"
                   r="90"
                   fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  className="text-slate-200 dark:text-slate-700"
+                  stroke="var(--fc-glass-border-strong)"
+                  strokeWidth="10"
                 />
-                {/* Progress Circle */}
                 <circle
                   cx="100"
                   cy="100"
                   r="90"
                   fill="none"
-                  stroke="url(#gradient)"
-                  strokeWidth="8"
+                  stroke="url(#rest-gradient)"
+                  strokeWidth="10"
                   strokeLinecap="round"
                   strokeDasharray={`${2 * Math.PI * 90}`}
                   strokeDashoffset={`${2 * Math.PI * 90 * (1 - progressPercentage / 100)}`}
                   className="transition-all duration-1000 ease-linear"
                 />
                 <defs>
-                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#2563eb" />
-                    <stop offset="100%" stopColor="#6366f1" />
+                  <linearGradient
+                    id="rest-gradient"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop offset="0%" stopColor="var(--fc-accent-cyan)" />
+                    <stop offset="100%" stopColor="var(--fc-domain-workouts)" />
                   </linearGradient>
                 </defs>
               </svg>
-              
-              {/* Timer Text */}
+
               <div className="relative z-10 text-center">
-                <div className="text-5xl sm:text-6xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                  {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+                <div className="text-5xl sm:text-6xl font-bold font-mono tracking-tight fc-text-primary">
+                  {String(minutes).padStart(2, "0")}:
+                  {String(seconds).padStart(2, "0")}
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                <p className="text-sm fc-text-dim mt-2">
                   {timeLeft === 1 ? "Almost there!" : "Take a breather"}
                 </p>
               </div>
             </div>
 
-            {/* Skip Button */}
-            <Button
-              variant="outline"
-              onClick={onSkip}
-              className="w-full border-2 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 dark:hover:border-slate-500 transition-all duration-200 text-slate-700 dark:text-slate-300 font-medium py-6 text-base"
-            >
-              Skip Rest
-            </Button>
+            <div className="grid grid-cols-2 gap-3 w-full">
+              <div className="fc-glass-soft rounded-2xl px-4 py-3">
+                <div className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle">
+                  Remaining
+                </div>
+                <div className="text-lg font-semibold fc-text-primary font-mono">
+                  {String(minutes).padStart(2, "0")}:
+                  {String(seconds).padStart(2, "0")}
+                </div>
+              </div>
+              <div className="fc-glass-soft rounded-2xl px-4 py-3">
+                <div className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle">
+                  Total
+                </div>
+                <div className="text-lg font-semibold fc-text-primary font-mono">
+                  {String(totalMinutes).padStart(2, "0")}:
+                  {String(totalSeconds).padStart(2, "0")}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="px-6 pb-6 pt-4 border-t border-[color:var(--fc-glass-border)]">
+          <Button
+            variant="default"
+            onClick={onSkip}
+            className="w-full fc-btn fc-btn-primary fc-press py-6 text-base"
+          >
+            Skip Rest
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

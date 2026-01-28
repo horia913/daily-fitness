@@ -174,18 +174,16 @@ function ProgramDetailsContent() {
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen p-4 sm:p-6">
         <div className="max-w-5xl mx-auto space-y-6 relative z-10">
-          {/* Back Button */}
           <Button
             variant="ghost"
             onClick={() => (window.location.href = "/coach/programs")}
-            className="mb-4"
+            className="fc-btn fc-btn-ghost"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Programs
           </Button>
 
-          {/* Header */}
-          <GlassCard elevation={3} className="p-6">
+          <GlassCard elevation={3} className="fc-glass fc-card p-6 sm:p-10">
             <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
               <div className="flex items-start gap-4 flex-1 min-w-0">
                 <div
@@ -200,10 +198,10 @@ function ProgramDetailsContent() {
                   <Calendar className="w-7 h-7 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h1
-                    className="text-3xl font-bold mb-2 break-words"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Program Overview
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] break-words">
                     {program.name}
                   </h1>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -219,16 +217,8 @@ function ProgramDetailsContent() {
                     >
                       {program.difficulty_level}
                     </span>
-                    <span
-                      className="text-sm"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
-                      Created{" "}
-                      {new Date(program.created_at).toLocaleDateString()}
+                    <span className="text-sm text-[color:var(--fc-text-dim)]">
+                      Created {new Date(program.created_at).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
@@ -238,13 +228,7 @@ function ProgramDetailsContent() {
                   onClick={() =>
                     (window.location.href = `/coach/programs/${program.id}/edit`)
                   }
-                  className="rounded-xl flex-1 sm:flex-initial"
-                  style={{
-                    background: getSemanticColor("trust").gradient,
-                    boxShadow: `0 4px 12px ${
-                      getSemanticColor("trust").primary
-                    }30`,
-                  }}
+                  className="fc-btn fc-btn-primary flex-1 sm:flex-initial"
                 >
                   <Edit className="w-4 h-4 mr-2" /> Edit Program
                 </Button>
@@ -254,7 +238,7 @@ function ProgramDetailsContent() {
 
           {/* Stats Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <GlassCard elevation={2} className="p-5 text-center">
+            <GlassCard elevation={2} className="fc-glass fc-card p-5 text-center">
               <div
                 className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
                 style={{
@@ -272,17 +256,12 @@ function ProgramDetailsContent() {
                 weight="bold"
                 color={isDark ? "#fff" : "#1A1A1A"}
               />
-              <div
-                className="text-xs mt-1"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
+              <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
                 Total Weeks
               </div>
             </GlassCard>
 
-            <GlassCard elevation={2} className="p-5 text-center">
+            <GlassCard elevation={2} className="fc-glass fc-card p-5 text-center">
               <div
                 className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
                 style={{
@@ -300,17 +279,12 @@ function ProgramDetailsContent() {
                 weight="bold"
                 color={isDark ? "#fff" : "#1A1A1A"}
               />
-              <div
-                className="text-xs mt-1"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
+              <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
                 Active Clients
               </div>
             </GlassCard>
 
-            <GlassCard elevation={2} className="p-5 text-center">
+            <GlassCard elevation={2} className="fc-glass fc-card p-5 text-center">
               <div
                 className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
                 style={{
@@ -328,17 +302,12 @@ function ProgramDetailsContent() {
                 weight="bold"
                 color={isDark ? "#fff" : "#1A1A1A"}
               />
-              <div
-                className="text-xs mt-1"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
+              <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
                 Avg Duration (w)
               </div>
             </GlassCard>
 
-            <GlassCard elevation={2} className="p-5 text-center">
+            <GlassCard elevation={2} className="fc-glass fc-card p-5 text-center">
               <div
                 className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
                 style={{
@@ -356,12 +325,7 @@ function ProgramDetailsContent() {
               >
                 {program.target_audience.replace("_", " ")}
               </div>
-              <div
-                className="text-xs mt-1"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
+              <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
                 Target Audience
               </div>
             </GlassCard>
@@ -369,30 +333,18 @@ function ProgramDetailsContent() {
 
           {/* Description */}
           {program.description && (
-            <GlassCard elevation={2} className="p-6">
-              <h3
-                className="text-lg font-bold mb-3"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
+            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+              <h3 className="text-lg font-bold mb-3 text-[color:var(--fc-text-primary)]">
                 Program Description
               </h3>
-              <p
-                className="text-sm leading-relaxed"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.8)",
-                }}
-              >
+              <p className="text-sm leading-relaxed text-[color:var(--fc-text-secondary)]">
                 {program.description}
               </p>
             </GlassCard>
           )}
 
-          {/* Week 1 Schedule */}
-          <GlassCard elevation={2} className="p-6">
-            <h3
-              className="text-lg font-bold mb-4"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
+          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <h3 className="text-lg font-bold mb-4 text-[color:var(--fc-text-primary)]">
               Weekly Schedule (Week 1)
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -14,6 +14,7 @@ import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useLoggingReset } from "../hooks/useLoggingReset";
 
 export function RestPauseExecutor({
   block,
@@ -51,6 +52,7 @@ export function RestPauseExecutor({
   const [initialReps, setInitialReps] = useState("");
   const [restPauseAttempts, setRestPauseAttempts] = useState<string[]>([]);
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [showTimer, setShowTimer] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(restPauseDuration);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -302,6 +304,8 @@ export function RestPauseExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <LargeInput
             label="Reps"
@@ -309,6 +313,8 @@ export function RestPauseExecutor({
             onChange={setInitialReps}
             placeholder="0"
             step="1"
+            showStepper
+            stepAmount={1}
           />
         </div>
       </GlassCard>
@@ -345,6 +351,8 @@ export function RestPauseExecutor({
                     }}
                     placeholder="0"
                     step="1"
+                    showStepper
+                    stepAmount={1}
                   />
                 </div>
                 <Button

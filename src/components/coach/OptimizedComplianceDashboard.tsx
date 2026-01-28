@@ -224,9 +224,9 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
 
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
-      case 'up': return <TrendingUp className="w-4 h-4 text-green-600" />
-      case 'down': return <TrendingDown className="w-4 h-4 text-red-600" />
-      default: return <Minus className="w-4 h-4 text-slate-400" />
+      case 'up': return <TrendingUp className="w-4 h-4 text-[color:var(--fc-status-success)]" />
+      case 'down': return <TrendingDown className="w-4 h-4 text-[color:var(--fc-status-error)]" />
+      default: return <Minus className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
     }
   }
 
@@ -275,34 +275,34 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
   }
 
   const getComplianceColor = (score: number) => {
-    if (score >= 90) return 'text-green-600 dark:text-green-400'
-    if (score >= 75) return 'text-blue-600 dark:text-blue-400'
-    if (score >= 60) return 'text-orange-600 dark:text-orange-400'
-    if (score >= 50) return 'text-red-600 dark:text-red-400'
-    return 'text-red-700 dark:text-red-300'
+    if (score >= 90) return 'text-[color:var(--fc-status-success)]'
+    if (score >= 75) return 'text-[color:var(--fc-accent-cyan)]'
+    if (score >= 60) return 'text-[color:var(--fc-status-warning)]'
+    if (score >= 50) return 'text-[color:var(--fc-status-error)]'
+    return 'text-[color:var(--fc-status-error)]'
   }
 
   const getComplianceBgColor = (score: number) => {
-    if (score >= 90) return 'bg-green-100 dark:bg-green-900/30'
-    if (score >= 75) return 'bg-blue-100 dark:bg-blue-900/30'
-    if (score >= 60) return 'bg-orange-100 dark:bg-orange-900/30'
-    if (score >= 50) return 'bg-red-100 dark:bg-red-900/30'
-    return 'bg-red-200 dark:bg-red-900/50'
+    if (score >= 90) return 'bg-[color:var(--fc-glass-soft)]'
+    if (score >= 75) return 'bg-[color:var(--fc-glass-soft)]'
+    if (score >= 60) return 'bg-[color:var(--fc-glass-soft)]'
+    if (score >= 50) return 'bg-[color:var(--fc-glass-soft)]'
+    return 'bg-[color:var(--fc-glass-soft)]'
   }
 
   if (loading) {
     return (
       <div className={`min-h-screen ${theme.background}`}>
         <div className="animate-pulse">
-          <div className="h-64 bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className={`${theme.card} rounded-2xl p-6`}>
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+              <div className="fc-glass fc-card rounded-2xl p-6">
+                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
                 </div>
               </div>
             </div>
@@ -319,116 +319,121 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen">
         {/* Enhanced Header */}
-      <div className={`p-6 ${theme.background} relative overflow-hidden`}>
-        {/* Floating background elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className={`text-3xl font-bold ${theme.text} mb-2`}>
-                Client Compliance Dashboard 📊
-              </h1>
-              <p className={`text-lg ${theme.textSecondary}`}>
-                Monitor client progress and engagement across all areas
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={loadClientData}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </Button>
-              <Button
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </Button>
-            </div>
+        <div className={`p-6 ${theme.background} relative overflow-hidden`}>
+          {/* Floating background elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-domain-habits)]/10 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-status-warning)]/10 rounded-full blur-3xl"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-2xl"></div>
           </div>
 
-          {/* Overall Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-blue-300 transition-all duration-300`}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                    <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <div className="max-w-7xl mx-auto relative z-10 space-y-6">
+            <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+              <CardContent className="p-5 sm:p-6 space-y-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="space-y-2">
+                    <Badge className="fc-badge">Compliance Overview</Badge>
+                    <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                      Client Compliance Dashboard 📊
+                    </h1>
+                    <p className="text-lg text-[color:var(--fc-text-dim)]">
+                      Monitor client progress and engagement across all areas
+                    </p>
                   </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{stats.totalClients}</p>
-                    <p className={`text-sm ${theme.textSecondary}`}>Active Clients</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-green-300 transition-all duration-300`}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
-                    <Target className="w-6 h-6 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{stats.avgCompliance.toFixed(1)}%</p>
-                    <p className={`text-sm ${theme.textSecondary}`}>Avg Compliance</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-purple-300 transition-all duration-300`}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
-                    <Activity className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{stats.avgEngagement.toFixed(1)}%</p>
-                    <p className={`text-sm ${theme.textSecondary}`}>Avg Engagement</p>
+                  
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={loadClientData}
+                      className="fc-btn fc-btn-ghost flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="fc-btn fc-btn-ghost flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export
+                    </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-orange-300 transition-all duration-300`}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
-                    <AlertTriangle className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{stats.criticalAlerts}</p>
-                    <p className={`text-sm ${theme.textSecondary}`}>Critical Alerts</p>
-                  </div>
+                {/* Overall Stats */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                          <Users className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.totalClients}</p>
+                          <p className="text-sm text-[color:var(--fc-text-dim)]">Active Clients</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                          <Target className="w-5 h-5 text-[color:var(--fc-status-success)]" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.avgCompliance.toFixed(1)}%</p>
+                          <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Compliance</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                          <Activity className="w-5 h-5 text-[color:var(--fc-accent-purple)]" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.avgEngagement.toFixed(1)}%</p>
+                          <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Engagement</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                          <AlertTriangle className="w-5 h-5 text-[color:var(--fc-status-warning)]" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.criticalAlerts}</p>
+                          <p className="text-sm text-[color:var(--fc-text-dim)]">Critical Alerts</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
-      </div>
 
       {/* Main Content */}
       <div className="p-6">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Filters */}
-          <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
             <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex items-center gap-2 flex-1">
-                  <Search className="w-4 h-4 text-slate-400" />
+              <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_1fr] gap-4">
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                   <Select value={selectedClient} onValueChange={setSelectedClient}>
-                    <SelectTrigger className="w-full md:w-48">
+                    <SelectTrigger className="fc-select w-full h-11">
                       <SelectValue placeholder="All Clients" />
                     </SelectTrigger>
                     <SelectContent>
@@ -443,9 +448,9 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-slate-400" />
+                  <Filter className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                   <Select value={filterLevel} onValueChange={setFilterLevel}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="fc-select w-full h-11">
                       <SelectValue placeholder="All Levels" />
                     </SelectTrigger>
                     <SelectContent>
@@ -460,9 +465,9 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-slate-400" />
+                  <BarChart3 className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                   <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="fc-select w-full h-11">
                       <SelectValue placeholder="Sort By" />
                     </SelectTrigger>
                     <SelectContent>
@@ -486,43 +491,43 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
               const engagementLevel = getEngagementLevel(client.compliance.engagement_score)
               
               return (
-                <Card key={client.client.id} className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-lg transition-all duration-300`}>
+                <Card key={client.client.id} className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:shadow-lg transition-all duration-300">
                   <CardHeader className="pb-4">
-                    <div className="flex items-start justify-between">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                       <div className="flex items-center gap-4">
                         {/* Client Avatar */}
                         <div className="relative">
-                          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                          <div className="w-12 h-12 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold text-lg">
                             {client.client.first_name?.[0]}{client.client.last_name?.[0]}
                           </div>
                           {/* Status indicator */}
-                          <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                            complianceLevel.level === 'excellent' ? 'bg-green-500' :
-                            complianceLevel.level === 'good' ? 'bg-blue-500' :
-                            complianceLevel.level === 'fair' ? 'bg-orange-500' :
-                            complianceLevel.level === 'poor' ? 'bg-red-500' : 'bg-red-700'
+                          <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[color:var(--fc-glass-border)] ${
+                            complianceLevel.level === 'excellent' ? 'bg-[color:var(--fc-status-success)]' :
+                            complianceLevel.level === 'good' ? 'bg-[color:var(--fc-accent-cyan)]' :
+                            complianceLevel.level === 'fair' ? 'bg-[color:var(--fc-status-warning)]' :
+                            complianceLevel.level === 'poor' ? 'bg-[color:var(--fc-status-error)]' : 'bg-[color:var(--fc-status-error)]'
                           }`}></div>
                         </div>
 
                         <div className="flex-1">
-                          <CardTitle className={`text-xl ${theme.text}`}>
+                          <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">
                             {client.client.first_name} {client.client.last_name}
                           </CardTitle>
-                          <p className={`text-sm ${theme.textSecondary} mb-3`}>{client.client.email}</p>
+                          <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{client.client.email}</p>
                           
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <Badge 
-                              className={`${getComplianceBgColor(client.compliance.overall_compliance)} ${getComplianceColor(client.compliance.overall_compliance)} border-0`}
+                              className={`${getComplianceBgColor(client.compliance.overall_compliance)} ${getComplianceColor(client.compliance.overall_compliance)} border border-[color:var(--fc-glass-border)]`}
                             >
                               {complianceLevel.level} compliance
                             </Badge>
                             <Badge 
-                              className={`${getComplianceBgColor(client.compliance.engagement_score)} ${getComplianceColor(client.compliance.engagement_score)} border-0`}
+                              className={`${getComplianceBgColor(client.compliance.engagement_score)} ${getComplianceColor(client.compliance.engagement_score)} border border-[color:var(--fc-glass-border)]`}
                             >
                               {engagementLevel.level} engagement
                             </Badge>
                             {client.alerts.length > 0 && (
-                              <Badge className="bg-red-500 text-white border-0">
+                              <Badge className="bg-[color:var(--fc-status-error)] text-white border-0">
                                 {client.alerts.length} alert{client.alerts.length > 1 ? 's' : ''}
                               </Badge>
                             )}
@@ -531,13 +536,13 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                        <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button variant="outline" size="sm" className="hover:bg-green-50 dark:hover:bg-green-900/20">
+                        <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
                           <MessageSquare className="w-4 h-4" />
                         </Button>
-                        <Button variant="outline" size="sm" className="hover:bg-purple-50 dark:hover:bg-purple-900/20">
+                        <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
                           <Settings className="w-4 h-4" />
                         </Button>
                       </div>
@@ -549,8 +554,8 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <Dumbbell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          <span className={`text-sm font-medium ${theme.text}`}>Workouts</span>
+                          <Dumbbell className="w-4 h-4 text-[color:var(--fc-domain-workouts)]" />
+                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Workouts</span>
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
@@ -565,8 +570,8 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                       
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <Apple className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          <span className={`text-sm font-medium ${theme.text}`}>Nutrition</span>
+                          <Apple className="w-4 h-4 text-[color:var(--fc-domain-meals)]" />
+                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Nutrition</span>
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
@@ -581,15 +586,15 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                       
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                          <span className={`text-sm font-medium ${theme.text}`}>Habits</span>
+                          <Zap className="w-4 h-4 text-[color:var(--fc-domain-habits)]" />
+                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Habits</span>
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className={`text-lg font-bold ${getComplianceColor(client.compliance.habit_compliance)}`}>
                               {client.compliance.habit_compliance.toFixed(1)}%
                             </span>
-                            <Minus className="w-4 h-4 text-slate-400" />
+                          <Minus className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                           </div>
                           <Progress value={client.compliance.habit_compliance} className="h-2" />
                         </div>
@@ -597,15 +602,15 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                       
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                          <span className={`text-sm font-medium ${theme.text}`}>Sessions</span>
+                          <Calendar className="w-4 h-4 text-[color:var(--fc-status-warning)]" />
+                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Sessions</span>
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className={`text-lg font-bold ${getComplianceColor(client.compliance.session_attendance)}`}>
                               {client.compliance.session_attendance.toFixed(1)}%
                             </span>
-                            <Minus className="w-4 h-4 text-slate-400" />
+                            <Minus className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                           </div>
                           <Progress value={client.compliance.session_attendance} className="h-2" />
                         </div>
@@ -614,40 +619,40 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
 
                     {/* Engagement Metrics */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className={`${theme.card} rounded-xl p-4 border-2 border-blue-200 dark:border-blue-800`}>
+                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Dumbbell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          <span className={`text-sm font-medium ${theme.text}`}>Workouts</span>
+                          <Dumbbell className="w-4 h-4 text-[color:var(--fc-domain-workouts)]" />
+                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Workouts</span>
                         </div>
-                        <p className={`text-xl font-bold ${theme.text}`}>{client.engagement.workout_sessions}</p>
-                        <p className={`text-xs ${theme.textSecondary}`}>This week</p>
+                        <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">{client.engagement.workout_sessions}</p>
+                        <p className="text-xs text-[color:var(--fc-text-dim)]">This week</p>
                       </div>
                       
-                      <div className={`${theme.card} rounded-xl p-4 border-2 border-green-200 dark:border-green-800`}>
+                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Apple className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          <span className={`text-sm font-medium ${theme.text}`}>Nutrition</span>
+                          <Apple className="w-4 h-4 text-[color:var(--fc-domain-meals)]" />
+                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Nutrition</span>
                         </div>
-                        <p className={`text-xl font-bold ${theme.text}`}>{client.engagement.nutrition_logs}</p>
-                        <p className={`text-xs ${theme.textSecondary}`}>Logs this week</p>
+                        <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">{client.engagement.nutrition_logs}</p>
+                        <p className="text-xs text-[color:var(--fc-text-dim)]">Logs this week</p>
                       </div>
                       
-                      <div className={`${theme.card} rounded-xl p-4 border-2 border-purple-200 dark:border-purple-800`}>
+                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                          <span className={`text-sm font-medium ${theme.text}`}>Habits</span>
+                          <Zap className="w-4 h-4 text-[color:var(--fc-domain-habits)]" />
+                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Habits</span>
                         </div>
-                        <p className={`text-xl font-bold ${theme.text}`}>{client.engagement.habit_completions}</p>
-                        <p className={`text-xs ${theme.textSecondary}`}>Completed</p>
+                        <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">{client.engagement.habit_completions}</p>
+                        <p className="text-xs text-[color:var(--fc-text-dim)]">Completed</p>
                       </div>
                       
-                      <div className={`${theme.card} rounded-xl p-4 border-2 border-orange-200 dark:border-orange-800`}>
+                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                         <div className="flex items-center gap-2 mb-2">
-                          <MessageSquare className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                          <span className={`text-sm font-medium ${theme.text}`}>Messages</span>
+                          <MessageSquare className="w-4 h-4 text-[color:var(--fc-status-warning)]" />
+                          <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Messages</span>
                         </div>
-                        <p className={`text-xl font-bold ${theme.text}`}>{client.engagement.messages_sent}</p>
-                        <p className={`text-xs ${theme.textSecondary}`}>This week</p>
+                        <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">{client.engagement.messages_sent}</p>
+                        <p className="text-xs text-[color:var(--fc-text-dim)]">This week</p>
                       </div>
                     </div>
 
@@ -656,16 +661,16 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Insights */}
                         {client.insights.length > 0 && (
-                          <div className={`${theme.card} rounded-xl p-4 border-2 border-green-200 dark:border-green-800`}>
+                          <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                             <div className="flex items-center gap-2 mb-3">
-                              <Sparkles className="w-4 h-4 text-green-600 dark:text-green-400" />
-                              <span className={`font-medium ${theme.text}`}>Insights</span>
+                              <Sparkles className="w-4 h-4 text-[color:var(--fc-status-success)]" />
+                              <span className="font-medium text-[color:var(--fc-text-primary)]">Insights</span>
                             </div>
                             <div className="space-y-2">
                               {client.insights.slice(0, 2).map((insight, index) => (
                                 <div key={index} className="flex items-start gap-2 text-sm">
-                                  <Star className="w-3 h-3 text-yellow-500 mt-1 flex-shrink-0" />
-                                  <span className={`${theme.textSecondary}`}>{insight}</span>
+                                  <Star className="w-3 h-3 text-[color:var(--fc-status-warning)] mt-1 flex-shrink-0" />
+                                  <span className="text-[color:var(--fc-text-dim)]">{insight}</span>
                                 </div>
                               ))}
                             </div>
@@ -674,19 +679,19 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
 
                         {/* Alerts */}
                         {client.alerts.length > 0 && (
-                          <div className={`${theme.card} rounded-xl p-4 border-2 border-red-200 dark:border-red-800`}>
+                          <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
                             <div className="flex items-center gap-2 mb-3">
-                              <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                              <span className={`font-medium ${theme.text}`}>Alerts</span>
+                              <AlertTriangle className="w-4 h-4 text-[color:var(--fc-status-error)]" />
+                              <span className="font-medium text-[color:var(--fc-text-primary)]">Alerts</span>
                             </div>
                             <div className="space-y-2">
                               {client.alerts.slice(0, 2).map((alert, index) => (
                                 <div key={index} className="flex items-start gap-2 text-sm">
                                   <AlertTriangle className={`w-3 h-3 mt-1 flex-shrink-0 ${
-                                    alert.alert_level === 'critical' ? 'text-red-500' : 
-                                    alert.alert_level === 'warning' ? 'text-orange-500' : 'text-blue-500'
+                                    alert.alert_level === 'critical' ? 'text-[color:var(--fc-status-error)]' : 
+                                    alert.alert_level === 'warning' ? 'text-[color:var(--fc-status-warning)]' : 'text-[color:var(--fc-accent-cyan)]'
                                   }`} />
-                                  <span className={`${theme.textSecondary}`}>{alert.alert_message}</span>
+                                  <span className="text-[color:var(--fc-text-dim)]">{alert.alert_message}</span>
                                 </div>
                               ))}
                             </div>
@@ -701,11 +706,11 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
               </div>
 
               {filteredAndSortedClients.length === 0 && (
-                <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+                <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
                   <CardContent className="text-center py-12">
-                    <Users className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                    <h3 className={`text-lg font-medium ${theme.text} mb-2`}>No clients found</h3>
-                    <p className={`${theme.textSecondary} mb-4`}>
+                    <Users className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-[color:var(--fc-text-primary)] mb-2">No clients found</h3>
+                    <p className="text-[color:var(--fc-text-dim)] mb-4">
                       {selectedClient !== 'all' || filterLevel !== 'all'
                         ? 'Try adjusting your filters to see more clients'
                         : 'No clients are currently assigned to you'

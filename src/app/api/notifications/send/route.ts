@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendPushNotification, sendEmail } from '@/lib/notifications'
+import { validateApiAuth, createUnauthorizedResponse } from '@/lib/apiAuth'
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate authentication - only authenticated users can send notifications
+    await validateApiAuth(request)
+    
     const body = await request.json()
     const { 
       userIds, 
@@ -56,7 +60,10 @@ export async function POST(request: NextRequest) {
       results
     })
 
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === 'Missing authorization header' || error.message === 'Invalid or expired token' || error.message === 'User not authenticated') {
+      return createUnauthorizedResponse('Authentication required to send notifications')
+    }
     console.error('Notification API error:', error)
     return NextResponse.json(
       { success: false, error: 'Internal server error' },

@@ -623,14 +623,14 @@ export default function WorkoutDetailModal({
     >
       {/* Modal */}
       <div
-        className={`relative ${theme.card} ${theme.shadow} rounded-3xl border ${theme.border} max-w-5xl w-full max-h-[95vh] flex flex-col transform transition-all duration-300 ease-out`}
+        className={`relative ${theme.card} ${theme.shadow} fc-glass fc-card rounded-3xl border ${theme.border} max-w-5xl w-full max-h-[95vh] flex flex-col transform transition-all duration-300 ease-out`}
         style={{
           animation: "modalSlideIn 0.3s ease-out",
         }}
       >
         {/* Header */}
         <div
-          className={`sticky top-0 ${theme.card} border-b ${theme.border} px-6 py-5 rounded-t-3xl`}
+          className={`sticky top-0 ${theme.card} fc-glass fc-card border-b ${theme.border} px-6 py-5 rounded-t-3xl`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -699,11 +699,7 @@ export default function WorkoutDetailModal({
         <div className="flex-1 overflow-y-auto px-6 pb-6">
           {/* Workout Overview */}
           <Card
-            className={`${
-              isDark
-                ? "bg-slate-800 border-slate-700"
-                : "bg-gradient-to-br from-purple-50 via-white to-orange-50 border-purple-200"
-            } rounded-2xl mb-6`}
+            className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl mb-6`}
           >
             <CardHeader className="p-6">
               <div className="flex items-center justify-between">
@@ -719,7 +715,7 @@ export default function WorkoutDetailModal({
                       }`}
                     />
                   </div>
-                  <span className={`text-lg font-semibold ${theme.text}`}>
+                  <span className={`text-lg font-semibold ${theme.text} fc-text-primary`}>
                     Workout Overview
                   </span>
                 </div>
@@ -747,7 +743,7 @@ export default function WorkoutDetailModal({
             <CardContent className="p-6 pt-0">
               <div className="space-y-4">
                 <p
-                  className={`text-base leading-relaxed ${theme.textSecondary}`}
+                  className={`text-base leading-relaxed ${theme.textSecondary} fc-text-dim`}
                 >
                   {template.description}
                 </p>
@@ -1107,7 +1103,7 @@ export default function WorkoutDetailModal({
                 {workoutExercises.map((workoutExercise, index) => (
                   <Card
                     key={workoutExercise.id}
-                    className={`${theme.card} border ${theme.border} rounded-2xl hover:shadow-lg transition-all duration-200`}
+                    className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl hover:shadow-lg transition-all duration-200`}
                   >
                     <CardHeader className="p-6">
                       <div className="flex items-start justify-between">

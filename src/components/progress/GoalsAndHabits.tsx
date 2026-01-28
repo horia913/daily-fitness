@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,12 +17,8 @@ import {
   Camera,
   X,
   Flame,
-  TrendingUp,
-  Award,
   Trash2,
-  Upload,
 } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { GoalsService, Goal as DBGoal } from "@/lib/progressTrackingService";
@@ -177,9 +172,7 @@ const GOAL_TYPES = [
 ] as const;
 
 export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
-  const { isDark, getThemeStyles } = useTheme();
   const { user } = useAuth();
-  const theme = getThemeStyles();
 
   const [activeTab, setActiveTab] = useState<"goals" | "habits">("goals");
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -412,109 +405,90 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
   return (
     <div className="space-y-6">
       {/* Header with Tabs */}
-      <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-        <Card
-          className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}
-        >
-          <CardHeader className="p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center">
-                <Target className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <CardTitle className={`text-2xl font-bold ${theme.text}`}>
-                  Goals & Habits
-                </CardTitle>
-                <p className={`${theme.textSecondary}`}>
-                  Track targets and daily wellness
-                </p>
-              </div>
+      <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-[0_8px_18px_rgba(34,211,238,0.35)]">
+              <Target className="h-6 w-6" />
             </div>
+            <div>
+              <h2 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                Goals & Habits
+              </h2>
+              <p className="text-sm text-[color:var(--fc-text-dim)]">
+                Track targets and daily wellness.
+              </p>
+            </div>
+          </div>
 
-            {/* Tabs */}
-            <div className="flex gap-3">
-              <Button
-                onClick={() => setActiveTab("goals")}
-                className={cn(
-                  "flex-1 rounded-xl transition-all",
-                  activeTab === "goals"
-                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white"
-                    : `${isDark ? "bg-slate-700" : "bg-slate-100"} ${
-                        theme.text
-                      }`
-                )}
-              >
-                <Target className="w-4 h-4 mr-2" />
-                Goals
-              </Button>
-              <Button
-                onClick={() => setActiveTab("habits")}
-                className={cn(
-                  "flex-1 rounded-xl transition-all",
-                  activeTab === "habits"
-                    ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white"
-                    : `${isDark ? "bg-slate-700" : "bg-slate-100"} ${
-                        theme.text
-                      }`
-                )}
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Habits
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
-      </div>
+          <div className="flex w-full gap-3 sm:w-auto">
+            <Button
+              onClick={() => setActiveTab("goals")}
+              className={cn(
+                "fc-btn flex-1 sm:flex-none",
+                activeTab === "goals"
+                  ? "fc-btn-primary"
+                  : "fc-btn-secondary text-[color:var(--fc-text-primary)]"
+              )}
+            >
+              <Target className="w-4 h-4 mr-2" />
+              Goals
+            </Button>
+            <Button
+              onClick={() => setActiveTab("habits")}
+              className={cn(
+                "fc-btn flex-1 sm:flex-none",
+                activeTab === "habits"
+                  ? "fc-btn-primary"
+                  : "fc-btn-secondary text-[color:var(--fc-text-primary)]"
+              )}
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Habits
+            </Button>
+          </div>
+        </div>
+      </GlassCard>
 
       {/* ========== GOALS TAB ========== */}
       {activeTab === "goals" && (
         <>
           {/* Create Goal Button */}
-          <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-            <Card
-              className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}
+          <GlassCard elevation={1} className="fc-glass fc-card p-4">
+            <Button
+              onClick={() => setShowCreateGoal(true)}
+              className="w-full fc-btn fc-btn-primary"
             >
-              <CardContent className="p-4">
-                <Button
-                  onClick={() => setShowCreateGoal(true)}
-                  className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create New Goal
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+              <Plus className="w-4 h-4 mr-2" />
+              Create New Goal
+            </Button>
+          </GlassCard>
 
           {/* Active Goals */}
           {activeGoals.length > 0 && (
-            <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
-              <Card
-                className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}
-              >
-                <CardHeader className="p-6 pb-4">
-                  <CardTitle className={`text-xl ${theme.text}`}>
-                    Active Goals
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 pt-0 space-y-3">
-                  {activeGoals.map((goal) => {
-                    const goalInfo = getGoalInfo(goal.type);
-                    const progress =
-                      (goal.currentValue / goal.targetValue) * 100;
+            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                  Active Goals
+                </h3>
+                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                  {activeGoals.length} active
+                </span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {activeGoals.map((goal) => {
+                  const goalInfo = getGoalInfo(goal.type);
+                  const progress =
+                    (goal.currentValue / goal.targetValue) * 100;
 
-                    return (
-                      <div
-                        key={goal.id}
-                        onClick={() => setSelectedGoal(goal)}
-                        className={cn(
-                          "rounded-xl p-4 border-2 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg",
-                          isDark
-                            ? "bg-slate-800 border-slate-700"
-                            : "bg-white border-slate-200"
-                        )}
-                      >
-                        <div className="flex items-start gap-3 mb-3">
+                  return (
+                    <div
+                      key={goal.id}
+                      onClick={() => setSelectedGoal(goal)}
+                      className="fc-glass-soft fc-card border border-[color:var(--fc-glass-border)] p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                        <div className="flex items-start gap-3">
                           <div
                             className={cn(
                               "w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br",
@@ -523,137 +497,114 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                           >
                             <span className="text-2xl">{goalInfo.icon}</span>
                           </div>
-                          <div className="flex-1">
-                            <h3 className={`font-bold ${theme.text} mb-1`}>
+                          <div>
+                            <h4 className="font-bold text-[color:var(--fc-text-primary)]">
                               {goalInfo.label}
-                            </h3>
-                            <p className={`text-sm ${theme.textSecondary}`}>
+                            </h4>
+                            <p className="text-sm text-[color:var(--fc-text-dim)]">
                               {goalInfo.description}
                             </p>
                             {goal.deadline && (
-                              <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 mt-2">
-                                Due:{" "}
-                                {new Date(goal.deadline).toLocaleDateString()}
-                              </Badge>
+                              <span className="fc-badge mt-2 inline-flex bg-[color:var(--fc-status-warning)]/15 text-[color:var(--fc-status-warning)]">
+                                Due: {new Date(goal.deadline).toLocaleDateString()}
+                              </span>
                             )}
                           </div>
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteGoal(goal.id);
-                            }}
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg p-2"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className={theme.textSecondary}>
-                              Progress
-                            </span>
-                            <span className={`font-bold ${theme.text}`}>
-                              {goal.currentValue} / {goal.targetValue}{" "}
-                              {goalInfo.unit}
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
-                            <div
-                              className={cn(
-                                "h-full rounded-full bg-gradient-to-r",
-                                goalInfo.gradient
-                              )}
-                              style={{ width: `${Math.min(progress, 100)}%` }}
-                            />
-                          </div>
-                          <p className={`text-xs ${theme.textSecondary}`}>
-                            {Math.round(progress)}% complete • Auto-tracked from
-                            workouts
-                          </p>
-                        </div>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteGoal(goal.id);
+                          }}
+                          variant="ghost"
+                          size="icon"
+                          className="fc-btn fc-btn-ghost h-10 w-10 text-[color:var(--fc-status-error)]"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[color:var(--fc-text-dim)]">
+                            Progress
+                          </span>
+                          <span className="font-semibold text-[color:var(--fc-text-primary)]">
+                            {goal.currentValue} / {goal.targetValue} {goalInfo.unit}
+                          </span>
+                        </div>
+                        <div className="w-full bg-[color:var(--fc-glass-highlight)] rounded-full h-2.5">
+                          <div
+                            className={cn(
+                              "h-full rounded-full bg-gradient-to-r",
+                              goalInfo.gradient
+                            )}
+                            style={{ width: `${Math.min(progress, 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-[color:var(--fc-text-subtle)]">
+                          {Math.round(progress)}% complete • Auto-tracked from workouts
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </GlassCard>
           )}
 
           {/* Completed Goals */}
           {completedGoals.length > 0 && (
-            <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl mb-24">
-              <Card
-                className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}
-              >
-                <CardHeader className="p-6 pb-4">
-                  <div className="flex items-center gap-3">
-                    <Trophy className="w-5 h-5 text-green-600" />
-                    <CardTitle className={`text-xl ${theme.text}`}>
-                      Completed Goals
-                    </CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-6 pt-0 space-y-3">
-                  {completedGoals.map((goal) => {
-                    const goalInfo = getGoalInfo(goal.type);
-                    return (
-                      <div
-                        key={goal.id}
-                        className="rounded-xl p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-700"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-3xl">{goalInfo.icon}</span>
-                          <div className="flex-1">
-                            <h3 className={`font-bold ${theme.text} mb-1`}>
-                              {goalInfo.label}
-                            </h3>
-                            <p className={`text-sm ${theme.textSecondary}`}>
-                              {goal.targetValue} {goalInfo.unit} •{" "}
-                              {new Date(goal.completedAt!).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <CheckCircle className="w-6 h-6 text-green-600" />
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 mb-24">
+              <div className="flex items-center gap-3">
+                <Trophy className="w-5 h-5 text-[color:var(--fc-status-success)]" />
+                <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                  Completed Goals
+                </h3>
+              </div>
+              <div className="mt-4 space-y-3">
+                {completedGoals.map((goal) => {
+                  const goalInfo = getGoalInfo(goal.type);
+                  return (
+                    <div
+                      key={goal.id}
+                      className="fc-glass-soft fc-card border border-[color:var(--fc-status-success)]/25 p-4"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">{goalInfo.icon}</span>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-[color:var(--fc-text-primary)]">
+                            {goalInfo.label}
+                          </h4>
+                          <p className="text-sm text-[color:var(--fc-text-dim)]">
+                            {goal.targetValue} {goalInfo.unit} •{" "}
+                            {new Date(goal.completedAt!).toLocaleDateString()}
+                          </p>
                         </div>
+                        <CheckCircle className="w-6 h-6 text-[color:var(--fc-status-success)]" />
                       </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </GlassCard>
           )}
 
           {/* Empty State - Goals */}
           {activeGoals.length === 0 && completedGoals.length === 0 && (
-            <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl mb-24">
-              <Card
-                className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}
-              >
-                <CardContent className="p-12">
-                  <div className="text-center">
-                    <Target
-                      className={`w-16 h-16 ${theme.textSecondary} mx-auto mb-4`}
-                    />
-                    <h3 className={`text-xl font-bold ${theme.text} mb-2`}>
-                      No Goals Set Yet
-                    </h3>
-                    <p className={`${theme.textSecondary} mb-6`}>
-                      Create a goal and it will be automatically tracked from
-                      your workouts!
-                    </p>
-                    <Button
-                      onClick={() => setShowCreateGoal(true)}
-                      className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Your First Goal
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center mb-24">
+              <Target className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
+                No Goals Set Yet
+              </h3>
+              <p className="text-sm text-[color:var(--fc-text-dim)] mb-6">
+                Create a goal and it will be automatically tracked from your workouts.
+              </p>
+              <Button onClick={() => setShowCreateGoal(true)} className="fc-btn fc-btn-primary">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Your First Goal
+              </Button>
+            </GlassCard>
           )}
         </>
       )}
@@ -662,147 +613,99 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
       {activeTab === "habits" && (
         <>
           {/* Habit Cards - Preset 4 habits */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Water Intake */}
-            <div
-              onClick={() => {
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <GlassCard
+              elevation={2}
+              pressable
+              onPress={() => {
                 setSelectedHabitType("water");
                 setShowLogHabit(true);
               }}
-              className={cn(
-                "rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl cursor-pointer transition-all hover:scale-105"
-              )}
+              className="fc-glass fc-card p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
             >
-              <Card
-                className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl h-full`}
-              >
-                <CardContent className="p-6">
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center">
-                      <Droplets className="w-8 h-8 text-white" />
-                    </div>
-                    <h3 className={`font-bold ${theme.text} mb-1`}>
-                      Water Intake
-                    </h3>
-                    <p className={`text-2xl font-bold ${theme.text}`}>
-                      {todayLog.water || 0}
-                    </p>
-                    <p className={`text-xs ${theme.textSecondary}`}>
-                      glasses today
-                    </p>
-                    <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 mt-2">
-                      <Flame className="w-3 h-3 mr-1" />
-                      {getStreak("water")} day streak
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white">
+                <Droplets className="h-8 w-8" />
+              </div>
+              <h3 className="font-semibold text-[color:var(--fc-text-primary)]">Water Intake</h3>
+              <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                {todayLog.water || 0}
+              </p>
+              <p className="text-xs text-[color:var(--fc-text-dim)]">glasses today</p>
+              <span className="fc-badge mt-2 inline-flex bg-[color:var(--fc-accent-cyan)]/15 text-[color:var(--fc-accent-cyan)]">
+                <Flame className="w-3 h-3 mr-1" />
+                {getStreak("water")} day streak
+              </span>
+            </GlassCard>
 
-            {/* Sleep */}
-            <div
-              onClick={() => {
+            <GlassCard
+              elevation={2}
+              pressable
+              onPress={() => {
                 setSelectedHabitType("sleep");
                 setShowLogHabit(true);
               }}
-              className={cn(
-                "rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl cursor-pointer transition-all hover:scale-105"
-              )}
+              className="fc-glass fc-card p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
             >
-              <Card
-                className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl h-full`}
-              >
-                <CardContent className="p-6">
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center">
-                      <Moon className="w-8 h-8 text-white" />
-                    </div>
-                    <h3 className={`font-bold ${theme.text} mb-1`}>Sleep</h3>
-                    <p className={`text-2xl font-bold ${theme.text}`}>
-                      {todayLog.sleep?.hours || 0}h{" "}
-                      {todayLog.sleep
-                        ? getSleepEmoji(todayLog.sleep.quality)
-                        : ""}
-                    </p>
-                    <p className={`text-xs ${theme.textSecondary}`}>
-                      logged today
-                    </p>
-                    <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 mt-2">
-                      <Flame className="w-3 h-3 mr-1" />
-                      {getStreak("sleep")} day streak
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                <Moon className="h-8 w-8" />
+              </div>
+              <h3 className="font-semibold text-[color:var(--fc-text-primary)]">Sleep</h3>
+              <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                {todayLog.sleep?.hours || 0}h{" "}
+                {todayLog.sleep ? getSleepEmoji(todayLog.sleep.quality) : ""}
+              </p>
+              <p className="text-xs text-[color:var(--fc-text-dim)]">logged today</p>
+              <span className="fc-badge mt-2 inline-flex bg-[color:var(--fc-accent-purple)]/15 text-[color:var(--fc-accent-purple)]">
+                <Flame className="w-3 h-3 mr-1" />
+                {getStreak("sleep")} day streak
+              </span>
+            </GlassCard>
 
-            {/* Steps */}
-            <div
-              onClick={() => {
+            <GlassCard
+              elevation={2}
+              pressable
+              onPress={() => {
                 setSelectedHabitType("steps");
                 setShowLogHabit(true);
               }}
-              className={cn(
-                "rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl cursor-pointer transition-all hover:scale-105"
-              )}
+              className="fc-glass fc-card p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
             >
-              <Card
-                className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl h-full`}
-              >
-                <CardContent className="p-6">
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center">
-                      <Footprints className="w-8 h-8 text-white" />
-                    </div>
-                    <h3 className={`font-bold ${theme.text} mb-1`}>Steps</h3>
-                    <p className={`text-2xl font-bold ${theme.text}`}>
-                      {(todayLog.steps || 0).toLocaleString()}
-                    </p>
-                    <p className={`text-xs ${theme.textSecondary}`}>
-                      steps today
-                    </p>
-                    <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 mt-2">
-                      <Flame className="w-3 h-3 mr-1" />
-                      {getStreak("steps")} day streak
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+                <Footprints className="h-8 w-8" />
+              </div>
+              <h3 className="font-semibold text-[color:var(--fc-text-primary)]">Steps</h3>
+              <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                {(todayLog.steps || 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-[color:var(--fc-text-dim)]">steps today</p>
+              <span className="fc-badge mt-2 inline-flex bg-[color:var(--fc-status-success)]/15 text-[color:var(--fc-status-success)]">
+                <Flame className="w-3 h-3 mr-1" />
+                {getStreak("steps")} day streak
+              </span>
+            </GlassCard>
 
-            {/* Cardio */}
-            <div
-              onClick={() => {
+            <GlassCard
+              elevation={2}
+              pressable
+              onPress={() => {
                 setSelectedHabitType("cardio");
                 setShowLogHabit(true);
               }}
-              className={cn(
-                "rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl cursor-pointer transition-all hover:scale-105"
-              )}
+              className="fc-glass fc-card p-6 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
             >
-              <Card
-                className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl h-full`}
-              >
-                <CardContent className="p-6">
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center">
-                      <Dumbbell className="w-8 h-8 text-white" />
-                    </div>
-                    <h3 className={`font-bold ${theme.text} mb-1`}>Cardio</h3>
-                    <p className={`text-2xl font-bold ${theme.text}`}>
-                      {todayLog.cardio?.duration || 0}
-                    </p>
-                    <p className={`text-xs ${theme.textSecondary}`}>
-                      mins today
-                    </p>
-                    <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 mt-2">
-                      <Flame className="w-3 h-3 mr-1" />
-                      {getStreak("cardio")} day streak
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 text-white">
+                <Dumbbell className="h-8 w-8" />
+              </div>
+              <h3 className="font-semibold text-[color:var(--fc-text-primary)]">Cardio</h3>
+              <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                {todayLog.cardio?.duration || 0}
+              </p>
+              <p className="text-xs text-[color:var(--fc-text-dim)]">mins today</p>
+              <span className="fc-badge mt-2 inline-flex bg-[color:var(--fc-status-warning)]/15 text-[color:var(--fc-status-warning)]">
+                <Flame className="w-3 h-3 mr-1" />
+                {getStreak("cardio")} day streak
+              </span>
+            </GlassCard>
           </div>
 
           {/* Today's Summary */}
@@ -810,119 +713,64 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
             todayLog.water ||
             todayLog.steps ||
             todayLog.cardio) && (
-            <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl mb-24">
-              <Card
-                className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}
-              >
-                <CardHeader className="p-6 pb-4">
-                  <CardTitle className={`text-xl ${theme.text}`}>
-                    Today's Wellness Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 pt-0">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {todayLog.sleep && (
-                      <div
-                        className={cn(
-                          "rounded-xl p-3 text-center",
-                          isDark ? "bg-slate-800" : "bg-slate-50"
-                        )}
-                      >
-                        <Moon
-                          className={`w-5 h-5 ${theme.textSecondary} mx-auto mb-1`}
-                        />
-                        <p className={`text-lg font-bold ${theme.text}`}>
-                          {todayLog.sleep.hours}h
-                        </p>
-                        <p className="text-2xl">
-                          {getSleepEmoji(todayLog.sleep.quality)}
-                        </p>
-                      </div>
-                    )}
-                    {todayLog.water && (
-                      <div
-                        className={cn(
-                          "rounded-xl p-3 text-center",
-                          isDark ? "bg-slate-800" : "bg-slate-50"
-                        )}
-                      >
-                        <Droplets
-                          className={`w-5 h-5 ${theme.textSecondary} mx-auto mb-1`}
-                        />
-                        <p className={`text-lg font-bold ${theme.text}`}>
-                          {todayLog.water}
-                        </p>
-                        <p className={`text-xs ${theme.textSecondary}`}>
-                          glasses
-                        </p>
-                      </div>
-                    )}
-                    {todayLog.steps && (
-                      <div
-                        className={cn(
-                          "rounded-xl p-3 text-center",
-                          isDark ? "bg-slate-800" : "bg-slate-50"
-                        )}
-                      >
-                        <Footprints
-                          className={`w-5 h-5 ${theme.textSecondary} mx-auto mb-1`}
-                        />
-                        <p className={`text-lg font-bold ${theme.text}`}>
-                          {todayLog.steps.toLocaleString()}
-                        </p>
-                        <p className={`text-xs ${theme.textSecondary}`}>
-                          steps
-                        </p>
-                      </div>
-                    )}
-                    {todayLog.cardio && (
-                      <div
-                        className={cn(
-                          "rounded-xl p-3 text-center",
-                          isDark ? "bg-slate-800" : "bg-slate-50"
-                        )}
-                      >
-                        <Dumbbell
-                          className={`w-5 h-5 ${theme.textSecondary} mx-auto mb-1`}
-                        />
-                        <p className={`text-lg font-bold ${theme.text}`}>
-                          {todayLog.cardio.duration}min
-                        </p>
-                        <p className={`text-xs ${theme.textSecondary}`}>
-                          {todayLog.cardio.calories} kcal
-                        </p>
-                      </div>
-                    )}
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 mb-24">
+              <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                Today's Wellness Summary
+              </h3>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {todayLog.sleep && (
+                  <div className="fc-glass-soft fc-card p-3 text-center">
+                    <Moon className="w-5 h-5 text-[color:var(--fc-text-subtle)] mx-auto mb-1" />
+                    <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                      {todayLog.sleep.hours}h
+                    </p>
+                    <p className="text-2xl">{getSleepEmoji(todayLog.sleep.quality)}</p>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                )}
+                {todayLog.water && (
+                  <div className="fc-glass-soft fc-card p-3 text-center">
+                    <Droplets className="w-5 h-5 text-[color:var(--fc-text-subtle)] mx-auto mb-1" />
+                    <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                      {todayLog.water}
+                    </p>
+                    <p className="text-xs text-[color:var(--fc-text-dim)]">glasses</p>
+                  </div>
+                )}
+                {todayLog.steps && (
+                  <div className="fc-glass-soft fc-card p-3 text-center">
+                    <Footprints className="w-5 h-5 text-[color:var(--fc-text-subtle)] mx-auto mb-1" />
+                    <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                      {todayLog.steps.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-[color:var(--fc-text-dim)]">steps</p>
+                  </div>
+                )}
+                {todayLog.cardio && (
+                  <div className="fc-glass-soft fc-card p-3 text-center">
+                    <Dumbbell className="w-5 h-5 text-[color:var(--fc-text-subtle)] mx-auto mb-1" />
+                    <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                      {todayLog.cardio.duration}min
+                    </p>
+                    <p className="text-xs text-[color:var(--fc-text-dim)]">
+                      {todayLog.cardio.calories} kcal
+                    </p>
+                  </div>
+                )}
+              </div>
+            </GlassCard>
           )}
 
           {/* Empty State - Goals */}
           {activeGoals.length === 0 && completedGoals.length === 0 && (
-            <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl mb-24">
-              <Card
-                className={`border-0 ${theme.card} bg-white/95 dark:bg-slate-800/95 backdrop-blur-md overflow-hidden rounded-3xl`}
-              >
-                <CardContent className="p-12">
-                  <div className="text-center">
-                    <Target
-                      className={`w-16 h-16 ${theme.textSecondary} mx-auto mb-4`}
-                    />
-                    <h3 className={`text-xl font-bold ${theme.text} mb-2`}>
-                      No Goals Set Yet
-                    </h3>
-                    <p
-                      className={`${theme.textSecondary} mb-6 max-w-md mx-auto`}
-                    >
-                      Set goals like "Bench 100kg" or "Complete 50 workouts" -
-                      they'll be tracked automatically from your workout data!
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center mb-24">
+              <Target className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
+                No Goals Set Yet
+              </h3>
+              <p className="text-sm text-[color:var(--fc-text-dim)] mb-6 max-w-md mx-auto">
+                Set goals like "Bench 100kg" or "Complete 50 workouts" — they will be tracked automatically from your workouts.
+              </p>
+            </GlassCard>
           )}
         </>
       )}
@@ -934,10 +782,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
           onClick={() => setShowCreateGoal(false)}
         >
           <div
-            className={cn(
-              "w-full max-w-2xl my-8 rounded-3xl shadow-2xl overflow-hidden",
-              isDark ? "bg-slate-900" : "bg-white"
-            )}
+            className="w-full max-w-2xl my-8 fc-glass fc-card border border-[color:var(--fc-glass-border-strong)] shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-t-3xl">
@@ -959,7 +804,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
 
             <div className="p-6 space-y-4">
               <div>
-                <Label className={`text-sm ${theme.text} mb-3 block`}>
+                <Label className="text-sm text-[color:var(--fc-text-primary)] mb-3 block">
                   Select Goal Type
                 </Label>
                 <div className="grid grid-cols-1 gap-2">
@@ -978,10 +823,8 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       className={cn(
                         "h-auto py-4 px-4 rounded-xl transition-all text-left justify-start",
                         newGoal.type === goalType.type
-                          ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg"
-                          : `${isDark ? "bg-slate-700" : "bg-slate-100"} ${
-                              theme.text
-                            }`
+                          ? "fc-btn fc-btn-primary text-white shadow-lg"
+                          : "fc-btn fc-btn-secondary text-[color:var(--fc-text-primary)]"
                       )}
                     >
                       <span className="text-2xl mr-3">{goalType.icon}</span>
@@ -992,7 +835,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                             "text-xs",
                             newGoal.type === goalType.type
                               ? "text-white/80"
-                              : theme.textSecondary
+                              : "text-[color:var(--fc-text-dim)]"
                           )}
                         >
                           {goalType.description}
@@ -1011,19 +854,12 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                   )!;
 
                   return (
-                    <div
-                      className={cn(
-                        "rounded-xl p-4 border-2",
-                        isDark
-                          ? "bg-slate-800/50 border-slate-700"
-                          : "bg-slate-50 border-slate-200"
-                      )}
-                    >
+                    <div className="fc-glass-soft fc-card p-4 border border-[color:var(--fc-glass-border)]">
                       <div className="flex items-center gap-2 mb-4">
                         <span className="text-2xl">
                           {selectedGoalType.icon}
                         </span>
-                        <h3 className={`font-bold ${theme.text}`}>
+                        <h3 className="font-bold text-[color:var(--fc-text-primary)]">
                           {selectedGoalType.label} Goal
                         </h3>
                       </div>
@@ -1034,9 +870,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                         newGoal.type === "deadlift") && (
                         <div className="space-y-3">
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Target Weight
                             </Label>
                             <Input
@@ -1049,23 +883,15 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 100"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               In kilograms (kg)
                             </p>
                           </div>
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Current Personal Record
                             </Label>
                             <Input
@@ -1078,16 +904,10 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 80"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               Your best lift so far
                             </p>
                           </div>
@@ -1098,9 +918,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       {newGoal.type === "total_weight_lifted" && (
                         <div className="space-y-3">
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Target Total Volume
                             </Label>
                             <Input
@@ -1113,24 +931,16 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 50000"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               Total weight to lift (kg) - cumulative across all
                               workouts
                             </p>
                           </div>
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Current Total Volume
                             </Label>
                             <Input
@@ -1143,16 +953,10 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 25000"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               Your total so far
                             </p>
                           </div>
@@ -1163,9 +967,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       {newGoal.type === "workout_count" && (
                         <div className="space-y-3">
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Target Number of Workouts
                             </Label>
                             <Input
@@ -1178,23 +980,15 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 50"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               Number of workouts to complete
                             </p>
                           </div>
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Current Workouts Completed
                             </Label>
                             <Input
@@ -1207,16 +1001,10 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 25"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               Workouts logged so far
                             </p>
                           </div>
@@ -1227,9 +1015,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       {newGoal.type === "body_weight" && (
                         <div className="space-y-3">
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Target Body Weight
                             </Label>
                             <Input
@@ -1243,23 +1029,15 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 75"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               Your goal weight in kg
                             </p>
                           </div>
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Current Body Weight
                             </Label>
                             <Input
@@ -1273,16 +1051,10 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 85"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               From your latest check-in
                             </p>
                           </div>
@@ -1293,9 +1065,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       {newGoal.type === "body_measurement" && (
                         <div className="space-y-3">
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Body Part to Track
                             </Label>
                             <div className="grid grid-cols-2 gap-2">
@@ -1322,12 +1092,8 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                   className={cn(
                                     "rounded-xl transition-all",
                                     newGoal.bodyPart === part.value
-                                      ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white"
-                                      : `${
-                                          isDark
-                                            ? "bg-slate-700"
-                                            : "bg-slate-100"
-                                        } ${theme.text}`
+                                      ? "fc-btn fc-btn-primary text-white"
+                                      : "fc-btn fc-btn-secondary text-[color:var(--fc-text-primary)]"
                                   )}
                                 >
                                   <span className="mr-2">{part.icon}</span>
@@ -1337,9 +1103,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                             </div>
                           </div>
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               {newGoal.bodyPart === "total"
                                 ? "Target Total Reduction"
                                 : `Target ${newGoal.bodyPart
@@ -1359,25 +1123,17 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 10"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                                className="rounded-xl"
+                                variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                              <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               {newGoal.bodyPart === "total"
                                 ? "Total cm to lose across all measurements"
                                 : `Cm to lose from ${newGoal.bodyPart}`}
                             </p>
                           </div>
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                              <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Current Measurement
                             </Label>
                             <Input
@@ -1391,16 +1147,10 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 90"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                                className="rounded-xl"
+                                variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                              <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               {newGoal.bodyPart === "total"
                                 ? "Total cm lost so far"
                                 : `Current ${newGoal.bodyPart} measurement in cm`}
@@ -1413,9 +1163,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       {newGoal.type === "body_fat" && (
                         <div className="space-y-3">
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Target Body Fat %
                             </Label>
                             <Input
@@ -1429,23 +1177,15 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 15"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               Your goal body fat percentage
                             </p>
                           </div>
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Current Body Fat %
                             </Label>
                             <Input
@@ -1459,16 +1199,10 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 22"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               From your latest check-in
                             </p>
                           </div>
@@ -1479,9 +1213,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       {newGoal.type === "muscle_mass" && (
                         <div className="space-y-3">
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Target Muscle Mass
                             </Label>
                             <Input
@@ -1495,23 +1227,15 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 65"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               Your goal muscle mass in kg
                             </p>
                           </div>
                           <div>
-                            <Label
-                              className={`text-sm ${theme.text} mb-2 block`}
-                            >
+                            <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                               Current Muscle Mass
                             </Label>
                             <Input
@@ -1525,16 +1249,10 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                                 })
                               }
                               placeholder="e.g., 58"
-                              className={cn(
-                                "rounded-xl",
-                                isDark
-                                  ? "bg-slate-800 border-slate-700"
-                                  : "bg-white border-slate-200"
-                              )}
+                              className="rounded-xl"
+                              variant="fc"
                             />
-                            <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
-                            >
+                            <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                               From your latest check-in
                             </p>
                           </div>
@@ -1542,8 +1260,8 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       )}
 
                       {/* Deadline (Common for all goals) */}
-                      <div className="pt-3 mt-3 border-t border-slate-300 dark:border-slate-700">
-                        <Label className={`text-sm ${theme.text} mb-2 block`}>
+                      <div className="pt-3 mt-3 border-t border-[color:var(--fc-glass-border)]">
+                        <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                           Target Deadline (Optional)
                         </Label>
                         <Input
@@ -1552,14 +1270,10 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                           onChange={(e) =>
                             setNewGoal({ ...newGoal, deadline: e.target.value })
                           }
-                          className={cn(
-                            "rounded-xl",
-                            isDark
-                              ? "bg-slate-800 border-slate-700"
-                              : "bg-white border-slate-200"
-                          )}
+                          className="rounded-xl"
+                          variant="fc"
                         />
-                        <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                        <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                           When do you want to achieve this goal?
                         </p>
                       </div>
@@ -1571,14 +1285,14 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                 <Button
                   onClick={() => setShowCreateGoal(false)}
                   variant="outline"
-                  className="flex-1 rounded-xl"
+                  className="flex-1 fc-btn fc-btn-secondary"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleCreateGoal}
                   disabled={!newGoal.targetValue}
-                  className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl disabled:opacity-50"
+                  className="flex-1 fc-btn fc-btn-primary disabled:opacity-50"
                 >
                   Create Goal
                 </Button>
@@ -1595,10 +1309,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
           onClick={() => setShowLogHabit(false)}
         >
           <div
-            className={cn(
-              "w-full max-w-2xl my-8 rounded-3xl shadow-2xl overflow-hidden",
-              isDark ? "bg-slate-900" : "bg-white"
-            )}
+            className="w-full max-w-2xl my-8 fc-glass fc-card border border-[color:var(--fc-glass-border-strong)] shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div
@@ -1643,21 +1354,17 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
             <div className="p-6 space-y-4">
               {/* Date Field (Auto-detected, shown for all habits) */}
               <div>
-                <Label className={`text-sm ${theme.text} mb-2 block`}>
+                <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                   Date
                 </Label>
                 <Input
                   type="date"
                   value={new Date().toISOString().split("T")[0]}
                   disabled
-                  className={cn(
-                    "rounded-xl",
-                    isDark
-                      ? "bg-slate-800 border-slate-700"
-                      : "bg-white border-slate-200"
-                  )}
+                  className="rounded-xl"
+                  variant="fc"
                 />
-                <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                <p className="text-xs text-[color:var(--fc-text-dim)] mt-1">
                   Auto-detected (today)
                 </p>
               </div>
@@ -1665,7 +1372,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
               {/* Water Intake Form */}
               {selectedHabitType === "water" && (
                 <div>
-                  <Label className={`text-sm ${theme.text} mb-2 block`}>
+                  <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                     Glasses of Water
                   </Label>
                   <Input
@@ -1678,14 +1385,10 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       })
                     }
                     placeholder="8"
-                    className={cn(
-                      "rounded-xl",
-                      isDark
-                        ? "bg-slate-800 border-slate-700"
-                        : "bg-white border-slate-200"
-                    )}
+                    className="rounded-xl"
+                    variant="fc"
                   />
-                  <p className={`text-xs ${theme.textSecondary} mt-2`}>
+                  <p className="text-xs text-[color:var(--fc-text-dim)] mt-2">
                     Goal: 8 glasses/day
                   </p>
                 </div>
@@ -1695,7 +1398,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
               {selectedHabitType === "sleep" && (
                 <>
                   <div>
-                    <Label className={`text-sm ${theme.text} mb-2 block`}>
+                    <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                       Hours Slept
                     </Label>
                     <Input
@@ -1712,16 +1415,12 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                         })
                       }
                       placeholder="8"
-                      className={cn(
-                        "rounded-xl",
-                        isDark
-                          ? "bg-slate-800 border-slate-700"
-                          : "bg-white border-slate-200"
-                      )}
+                      className="rounded-xl"
+                      variant="fc"
                     />
                   </div>
                   <div>
-                    <Label className={`text-sm ${theme.text} mb-2 block`}>
+                    <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                       Sleep Quality
                     </Label>
                     <div className="flex gap-2 justify-center">
@@ -1740,8 +1439,8 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                           className={cn(
                             "text-4xl p-4 rounded-xl transition-all",
                             habitLogForm.sleep.quality === quality
-                              ? "bg-purple-500 scale-125 shadow-lg"
-                              : `${isDark ? "bg-slate-700" : "bg-slate-100"}`
+                              ? "bg-[color:var(--fc-accent-purple)] text-white scale-125 shadow-lg"
+                              : "fc-btn fc-btn-secondary"
                           )}
                         >
                           {getSleepEmoji(quality)}
@@ -1755,7 +1454,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
               {/* Steps Form */}
               {selectedHabitType === "steps" && (
                 <div>
-                  <Label className={`text-sm ${theme.text} mb-2 block`}>
+                  <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                     Steps Today
                   </Label>
                   <Input
@@ -1768,14 +1467,10 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       })
                     }
                     placeholder="10000"
-                    className={cn(
-                      "rounded-xl",
-                      isDark
-                        ? "bg-slate-800 border-slate-700"
-                        : "bg-white border-slate-200"
-                    )}
+                    className="rounded-xl"
+                    variant="fc"
                   />
-                  <p className={`text-xs ${theme.textSecondary} mt-2`}>
+                  <p className="text-xs text-[color:var(--fc-text-dim)] mt-2">
                     Goal: 10,000 steps/day
                   </p>
                 </div>
@@ -1785,7 +1480,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
               {selectedHabitType === "cardio" && (
                 <>
                   <div>
-                    <Label className={`text-sm ${theme.text} mb-2 block`}>
+                    <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                       Activity Type
                     </Label>
                     <Input
@@ -1800,17 +1495,13 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                         })
                       }
                       placeholder="Running, Cycling, Swimming..."
-                      className={cn(
-                        "rounded-xl",
-                        isDark
-                          ? "bg-slate-800 border-slate-700"
-                          : "bg-white border-slate-200"
-                      )}
+                      className="rounded-xl"
+                      variant="fc"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className={`text-sm ${theme.text} mb-2 block`}>
+                      <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                         Duration (minutes)
                       </Label>
                       <Input
@@ -1826,16 +1517,12 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                           })
                         }
                         placeholder="30"
-                        className={cn(
-                          "rounded-xl",
-                          isDark
-                            ? "bg-slate-800 border-slate-700"
-                            : "bg-white border-slate-200"
-                        )}
+                        className="rounded-xl"
+                        variant="fc"
                       />
                     </div>
                     <div>
-                      <Label className={`text-sm ${theme.text} mb-2 block`}>
+                      <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                         Calories Burned
                       </Label>
                       <Input
@@ -1851,25 +1538,19 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                           })
                         }
                         placeholder="250"
-                        className={cn(
-                          "rounded-xl",
-                          isDark
-                            ? "bg-slate-800 border-slate-700"
-                            : "bg-white border-slate-200"
-                        )}
+                        className="rounded-xl"
+                        variant="fc"
                       />
                     </div>
                   </div>
                   <div>
-                    <Label className={`text-sm ${theme.text} mb-2 block`}>
+                    <Label className="text-sm text-[color:var(--fc-text-primary)] mb-2 block">
                       Proof Screenshot (Required)
                     </Label>
                     <div
                       className={cn(
                         "border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all hover:border-orange-500",
-                        isDark
-                          ? "border-slate-700 bg-slate-800"
-                          : "border-slate-300 bg-slate-50"
+                        "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]"
                       )}
                     >
                       <input
@@ -1887,18 +1568,18 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                               alt="Proof"
                               className="w-full h-48 object-cover rounded-lg mb-2"
                             />
-                            <p className={`text-sm ${theme.text}`}>
+                            <p className="text-sm text-[color:var(--fc-text-primary)]">
                               ✓ Screenshot uploaded
                             </p>
                           </div>
                         ) : (
                           <div>
                             <Camera
-                              className={`w-12 h-12 ${theme.textSecondary} mx-auto mb-2`}
+                              className="w-12 h-12 text-[color:var(--fc-text-subtle)] mx-auto mb-2"
                             />
-                            <p className={theme.text}>Upload Screenshot</p>
+                            <p className="text-[color:var(--fc-text-primary)]">Upload Screenshot</p>
                             <p
-                              className={`text-xs ${theme.textSecondary} mt-1`}
+                              className="text-xs text-[color:var(--fc-text-dim)] mt-1"
                             >
                               Required for verification
                             </p>
@@ -1914,7 +1595,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                 <Button
                   onClick={() => setShowLogHabit(false)}
                   variant="outline"
-                  className="flex-1 rounded-xl"
+                  className="flex-1 fc-btn fc-btn-secondary"
                 >
                   Cancel
                 </Button>
@@ -1926,17 +1607,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       !habitLogForm.cardio.duration ||
                       !habitLogForm.cardio.proofImage)
                   }
-                  className={cn(
-                    "flex-1 rounded-xl text-white disabled:opacity-50 bg-gradient-to-r",
-                    selectedHabitType === "water" &&
-                      "from-blue-500 to-cyan-600",
-                    selectedHabitType === "sleep" &&
-                      "from-indigo-500 to-purple-600",
-                    selectedHabitType === "steps" &&
-                      "from-green-500 to-emerald-600",
-                    selectedHabitType === "cardio" &&
-                      "from-orange-500 to-red-600"
-                  )}
+                  className="flex-1 fc-btn fc-btn-primary disabled:opacity-50"
                 >
                   Log{" "}
                   {selectedHabitType === "water"
@@ -1960,10 +1631,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
           onClick={() => setSelectedGoal(null)}
         >
           <div
-            className={cn(
-              "w-full max-w-2xl my-8 rounded-3xl shadow-2xl overflow-hidden",
-              isDark ? "bg-slate-900" : "bg-white"
-            )}
+            className="w-full max-w-2xl my-8 fc-glass fc-card border border-[color:var(--fc-glass-border-strong)] shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {
@@ -2002,20 +1670,17 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
 
                   <div className="p-6 space-y-6">
                     <div
-                      className={cn(
-                        "rounded-xl p-5",
-                        isDark ? "bg-slate-800" : "bg-slate-50"
-                      )}
+                      className="fc-glass-soft fc-card p-5"
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <span className={`text-3xl font-bold ${theme.text}`}>
+                        <span className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
                           {selectedGoal.currentValue}
                         </span>
-                        <span className={`text-lg ${theme.textSecondary}`}>
+                        <span className="text-lg text-[color:var(--fc-text-dim)]">
                           / {selectedGoal.targetValue} {goalInfo.unit}
                         </span>
                       </div>
-                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3">
+                      <div className="w-full bg-[color:var(--fc-glass-highlight)] rounded-full h-3">
                         <div
                           className={cn(
                             "h-full rounded-full bg-gradient-to-r",
@@ -2024,7 +1689,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                           style={{ width: `${Math.min(progress, 100)}%` }}
                         />
                       </div>
-                      <p className={`text-sm ${theme.textSecondary} mt-2`}>
+                      <p className="text-sm text-[color:var(--fc-text-dim)] mt-2">
                         {Math.round(progress)}% complete
                       </p>
                     </div>
@@ -2033,14 +1698,14 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
                       <Button
                         onClick={() => handleDeleteGoal(selectedGoal.id)}
                         variant="outline"
-                        className="flex-1 rounded-xl text-red-600 border-red-600"
+                        className="flex-1 fc-btn fc-btn-secondary text-[color:var(--fc-status-error)] border-[color:var(--fc-status-error)]"
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
                         Delete
                       </Button>
                       <Button
                         onClick={() => setSelectedGoal(null)}
-                        className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl"
+                        className="flex-1 fc-btn fc-btn-primary"
                       >
                         Close
                       </Button>

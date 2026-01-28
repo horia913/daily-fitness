@@ -57,9 +57,7 @@ interface WorkoutSet {
 
 export default function WorkoutLogsPage() {
   const { user, loading: authLoading } = useAuth();
-  const { isDark, getThemeStyles, getSemanticColor, performanceSettings } =
-    useTheme();
-  const theme = getThemeStyles();
+  const { performanceSettings } = useTheme();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -84,6 +82,10 @@ export default function WorkoutLogsPage() {
 
     try {
       setLoading(true);
+
+      // Ensure user is authenticated before querying
+      const { ensureAuthenticated } = await import('@/lib/supabase');
+      await ensureAuthenticated();
 
       console.log("🔍 Loading workout logs for user:", user.id);
 
@@ -164,38 +166,52 @@ export default function WorkoutLogsPage() {
         }
       }
 
-      // Process each log individually (show ALL logs, not grouped)
-      const processedLogs: WorkoutLog[] = await Promise.all(
-        workoutLogs.map(async (log) => {
-          // Get workout name from assignment -> template
-          let workoutName = "Workout"; // Default fallback
-          if (log.workout_assignment_id) {
-            workoutName =
-              assignmentTemplateMap.get(log.workout_assignment_id) || "Workout";
-          }
+      // OPTIMIZED: Batch fetch ALL sets for ALL logs at once instead of N+1 queries
+      const logIds = workoutLogs.map(log => log.id);
+      const { data: allSets, error: setsError } = await supabase
+        .from("workout_set_logs")
+        .select(
+          `
+          id,
+          weight,
+          reps,
+          exercise_id,
+          workout_log_id,
+          exercises (
+            id,
+            name,
+            category
+          )
+        `
+        )
+        .in("workout_log_id", logIds)
+        .eq("client_id", user.id);
 
-          // Get sets for THIS specific workout_log_id only
-          const { data: sets, error: setsError } = await supabase
-            .from("workout_set_logs")
-            .select(
-              `
-              id,
-              weight,
-              reps,
-              exercise_id,
-              exercises (
-                id,
-                name,
-                category
-              )
-            `
-            )
-            .eq("workout_log_id", log.id)
-            .eq("client_id", user.id);
+      if (setsError) {
+        console.error("Error fetching sets:", setsError);
+      }
 
-          if (setsError) {
-            console.error("Error fetching sets for log:", log.id, setsError);
-          }
+      // Group sets by workout_log_id for quick lookup
+      const setsByLogId = new Map<string, any[]>();
+      (allSets || []).forEach((set: any) => {
+        const logId = set.workout_log_id;
+        if (!setsByLogId.has(logId)) {
+          setsByLogId.set(logId, []);
+        }
+        setsByLogId.get(logId)!.push(set);
+      });
+
+      // Process each log with batched data
+      const processedLogs: WorkoutLog[] = workoutLogs.map((log) => {
+        // Get workout name from assignment -> template
+        let workoutName = "Workout"; // Default fallback
+        if (log.workout_assignment_id) {
+          workoutName =
+            assignmentTemplateMap.get(log.workout_assignment_id) || "Workout";
+        }
+
+        // Get sets for this log from map (no query needed!)
+        const sets = setsByLogId.get(log.id) || [];
 
           const workoutSets = (sets || []) as any[];
 
@@ -235,8 +251,7 @@ export default function WorkoutLogsPage() {
             uniqueExercises,
             workoutName,
           } as WorkoutLog;
-        })
-      );
+        });
 
       console.log("✅ Processed workout logs:", processedLogs.length);
       setWorkoutLogs(processedLogs);
@@ -253,11 +268,14 @@ export default function WorkoutLogsPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className={`min-h-screen ${theme.background}`}>
-            <div className="max-w-7xl mx-auto p-4 sm:p-6">
-              <div className="animate-pulse">
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-4"></div>
-                <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
+          <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-6xl">
+              <div className="fc-glass fc-card p-8">
+                <div className="animate-pulse space-y-4">
+                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-8 w-3/5 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-64 rounded-3xl bg-[color:var(--fc-glass-highlight)]" />
+                </div>
               </div>
             </div>
           </div>
@@ -270,135 +288,81 @@ export default function WorkoutLogsPage() {
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className={`min-h-screen ${theme.background}`}>
-          <div className="relative z-10 max-w-7xl mx-auto px-4 py-8">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
-              <Link href="/client/progress">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
-                </Button>
-              </Link>
-              <div className="flex items-center gap-3 flex-1">
-                <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 shadow-lg">
-                  <FileText className="w-6 h-6 text-white" />
+        <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="mx-auto w-full max-w-6xl space-y-8">
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <Link href="/client/progress">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="fc-btn fc-btn-ghost h-10 w-10"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <div>
+                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                      Progress Hub
+                    </span>
+                    <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                      Workout Logs
+                    </h1>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Your complete workout history
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h1
-                    className={`text-2xl sm:text-3xl font-bold ${theme.text}`}
-                  >
-                    Workout Logs
-                  </h1>
-                  <p className={`text-sm ${theme.textSecondary}`}>
-                    Your complete workout history
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                    {workoutLogs.length} sessions
+                  </div>
                 </div>
               </div>
-            </div>
+            </GlassCard>
 
             {/* Summary Stats */}
             {workoutLogs.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <GlassCard elevation={2} className="p-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Activity
-                      className="w-5 h-5"
-                      style={{ color: getSemanticColor("trust").primary }}
-                    />
-                    <span
-                      className="text-sm font-semibold"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
-                      Total Workouts
-                    </span>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                    <span>Total Workouts</span>
+                    <Activity className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
                   </div>
-                  <p
-                    className="text-3xl font-bold"
-                    style={{ color: getSemanticColor("trust").primary }}
-                  >
+                  <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
                     {workoutLogs.length}
                   </p>
                 </GlassCard>
-
-                <GlassCard elevation={2} className="p-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Dumbbell
-                      className="w-5 h-5"
-                      style={{ color: getSemanticColor("energy").primary }}
-                    />
-                    <span
-                      className="text-sm font-semibold"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
-                      Total Sets
-                    </span>
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                    <span>Total Sets</span>
+                    <Dumbbell className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
                   </div>
-                  <p
-                    className="text-3xl font-bold"
-                    style={{ color: getSemanticColor("energy").primary }}
-                  >
+                  <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
                     {workoutLogs.reduce((sum, log) => sum + log.totalSets, 0)}
                   </p>
                 </GlassCard>
-
-                <GlassCard elevation={2} className="p-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <TrendingUp
-                      className="w-5 h-5"
-                      style={{ color: getSemanticColor("success").primary }}
-                    />
-                    <span
-                      className="text-sm font-semibold"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
-                      Total Weight
-                    </span>
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                    <span>Total Weight</span>
+                    <TrendingUp className="h-4 w-4 text-[color:var(--fc-status-success)]" />
                   </div>
-                  <p
-                    className="text-3xl font-bold"
-                    style={{ color: getSemanticColor("success").primary }}
-                  >
+                  <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
                     {workoutLogs
                       .reduce((sum, log) => sum + log.totalWeight, 0)
                       .toLocaleString()}
-                    <span className="text-lg ml-1">kg</span>
+                    <span className="ml-2 text-sm text-[color:var(--fc-text-dim)]">
+                      kg
+                    </span>
                   </p>
                 </GlassCard>
-
-                <GlassCard elevation={2} className="p-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Clock
-                      className="w-5 h-5"
-                      style={{ color: getSemanticColor("trust").primary }}
-                    />
-                    <span
-                      className="text-sm font-semibold"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
-                      Avg Duration
-                    </span>
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                    <span>Avg Duration</span>
+                    <Clock className="h-4 w-4 text-[color:var(--fc-accent-cyan)]" />
                   </div>
-                  <p
-                    className="text-3xl font-bold"
-                    style={{ color: getSemanticColor("trust").primary }}
-                  >
+                  <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
                     {workoutLogs.length > 0
                       ? Math.round(
                           workoutLogs.reduce(
@@ -408,7 +372,9 @@ export default function WorkoutLogsPage() {
                           ) / workoutLogs.length
                         )
                       : 0}
-                    <span className="text-lg ml-1">min</span>
+                    <span className="ml-2 text-sm text-[color:var(--fc-text-dim)]">
+                      min
+                    </span>
                   </p>
                 </GlassCard>
               </div>
@@ -416,20 +382,13 @@ export default function WorkoutLogsPage() {
 
             {/* Workout Logs List */}
             {workoutLogs.length === 0 ? (
-              <GlassCard elevation={2} className="p-12">
+              <GlassCard elevation={2} className="fc-glass fc-card p-12">
                 <div className="text-center">
-                  <FileText
-                    className="w-16 h-16 mx-auto mb-4"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.4)"
-                        : "rgba(0,0,0,0.4)",
-                    }}
-                  />
-                  <h3 className={`text-xl font-bold mb-2 ${theme.text}`}>
+                  <FileText className="mx-auto mb-4 h-16 w-16 text-[color:var(--fc-text-subtle)]" />
+                  <h3 className="mb-2 text-xl font-bold text-[color:var(--fc-text-primary)]">
                     No Workout Logs Yet
                   </h3>
-                  <p className={theme.textSecondary}>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
                     Complete your first workout to see it here!
                   </p>
                 </div>
@@ -469,27 +428,18 @@ export default function WorkoutLogsPage() {
                     >
                       <GlassCard
                         elevation={2}
-                        className="p-6 transition-all hover:scale-[1.01] hover:shadow-xl"
+                        className="fc-glass fc-card p-6 transition-all hover:-translate-y-1 hover:shadow-xl"
                       >
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <h3
-                              className={`text-xl font-bold mb-2 ${theme.text}`}
-                            >
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div>
+                            <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                               {workoutName}
                             </h3>
-                            <div className="flex flex-wrap gap-4 text-sm">
+                            <div className="mt-2 flex flex-wrap gap-4 text-sm text-[color:var(--fc-text-dim)]">
                               {completedDate && (
                                 <div className="flex items-center gap-2">
-                                  <Calendar
-                                    className="w-4 h-4"
-                                    style={{
-                                      color: isDark
-                                        ? "rgba(255,255,255,0.6)"
-                                        : "rgba(0,0,0,0.6)",
-                                    }}
-                                  />
-                                  <span className={theme.textSecondary}>
+                                  <Calendar className="h-4 w-4" />
+                                  <span>
                                     {completedDate.toLocaleDateString("en-US", {
                                       month: "short",
                                       day: "numeric",
@@ -500,113 +450,52 @@ export default function WorkoutLogsPage() {
                               )}
                               {duration && (
                                 <div className="flex items-center gap-2">
-                                  <Clock
-                                    className="w-4 h-4"
-                                    style={{
-                                      color: isDark
-                                        ? "rgba(255,255,255,0.6)"
-                                        : "rgba(0,0,0,0.6)",
-                                    }}
-                                  />
-                                  <span className={theme.textSecondary}>
-                                    {duration} min
-                                  </span>
+                                  <Clock className="h-4 w-4" />
+                                  <span>{duration} min</span>
                                 </div>
                               )}
                               <div className="flex items-center gap-2">
-                                <Dumbbell
-                                  className="w-4 h-4"
-                                  style={{
-                                    color: isDark
-                                      ? "rgba(255,255,255,0.6)"
-                                      : "rgba(0,0,0,0.6)",
-                                  }}
-                                />
-                                <span className={theme.textSecondary}>
-                                  {log.totalSets} sets
-                                </span>
+                                <Dumbbell className="h-4 w-4" />
+                                <span>{log.totalSets} sets</span>
                               </div>
                             </div>
                           </div>
-                          <ChevronRight
-                            className="w-6 h-6 flex-shrink-0"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.4)"
-                                : "rgba(0,0,0,0.4)",
-                            }}
-                          />
+                          <div className="flex items-center gap-2 text-sm text-[color:var(--fc-text-dim)]">
+                            View details
+                            <ChevronRight className="h-5 w-5" />
+                          </div>
                         </div>
 
-                        {/* Exercise Summary */}
-                        {log.workout_set_logs &&
-                          log.workout_set_logs.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
-                                <div>
-                                  <p
-                                    className="text-xs font-semibold mb-1"
-                                    style={{
-                                      color: isDark
-                                        ? "rgba(255,255,255,0.5)"
-                                        : "rgba(0,0,0,0.5)",
-                                    }}
-                                  >
-                                    EXERCISES
-                                  </p>
-                                  <p
-                                    className="text-lg font-bold"
-                                    style={{
-                                      color: getSemanticColor("trust").primary,
-                                    }}
-                                  >
-                                    {log.uniqueExercises}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p
-                                    className="text-xs font-semibold mb-1"
-                                    style={{
-                                      color: isDark
-                                        ? "rgba(255,255,255,0.5)"
-                                        : "rgba(0,0,0,0.5)",
-                                    }}
-                                  >
-                                    TOTAL WEIGHT
-                                  </p>
-                                  <p
-                                    className="text-lg font-bold"
-                                    style={{
-                                      color:
-                                        getSemanticColor("success").primary,
-                                    }}
-                                  >
-                                    {log.totalWeight.toLocaleString()} kg
-                                  </p>
-                                </div>
-                                <div>
-                                  <p
-                                    className="text-xs font-semibold mb-1"
-                                    style={{
-                                      color: isDark
-                                        ? "rgba(255,255,255,0.5)"
-                                        : "rgba(0,0,0,0.5)",
-                                    }}
-                                  >
-                                    SETS
-                                  </p>
-                                  <p
-                                    className="text-lg font-bold"
-                                    style={{
-                                      color: getSemanticColor("energy").primary,
-                                    }}
-                                  >
-                                    {log.totalSets}
-                                  </p>
-                                </div>
+                        {log.workout_set_logs && log.workout_set_logs.length > 0 && (
+                          <div className="mt-5 border-t border-[color:var(--fc-glass-border)] pt-4">
+                            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                              <div>
+                                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                                  Exercises
+                                </p>
+                                <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                                  {log.uniqueExercises}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                                  Total Weight
+                                </p>
+                                <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                                  {log.totalWeight.toLocaleString()} kg
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                                  Sets
+                                </p>
+                                <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                                  {log.totalSets}
+                                </p>
                               </div>
                             </div>
-                          )}
+                          </div>
+                        )}
                       </GlassCard>
                     </div>
                   );

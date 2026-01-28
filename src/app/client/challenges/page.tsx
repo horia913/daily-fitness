@@ -13,10 +13,11 @@ import Link from "next/link";
 import { Challenge, getActiveChallenges, joinChallenge, getClientChallenges } from "@/lib/challengeService";
 import { ChallengeCard } from "@/components/client/ChallengeCard";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 function ChallengesPageContent() {
   const { user, loading: authLoading } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
   const router = useRouter();
 
   const [activeChallenges, setActiveChallenges] = useState<Challenge[]>([]);
@@ -101,12 +102,14 @@ function ChallengesPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 container mx-auto px-4 py-8">
-            <div className="animate-pulse space-y-6">
-              <div className="h-24 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-                <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="fc-glass fc-card p-8">
+              <div className="animate-pulse space-y-6">
+                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -119,101 +122,86 @@ function ChallengesPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-4">
-                <Link href="/client/progress">
-                  <Button variant="ghost" size="sm">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                </Link>
-                <div>
-                  <h1
-                    className="text-3xl font-bold mb-1"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
-                    Challenges
-                  </h1>
-                  <p
-                    className="text-sm"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    }}
-                  >
-                    Join challenges and compete with others
-                  </p>
-                </div>
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <Link href="/client/progress">
+                <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </Link>
+              <div>
+                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                  Progress Hub
+                </span>
+                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                  Challenges
+                </h1>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  Join challenges and compete with others.
+                </p>
               </div>
             </div>
+            <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+              {activeChallenges.length} active challenges
+            </div>
+          </div>
+        </GlassCard>
 
-            {/* Tabs */}
+        <GlassCard elevation={2} className="fc-glass fc-card p-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                Browse Challenges
+              </h2>
+              <p className="text-sm text-[color:var(--fc-text-dim)]">
+                Pick a challenge track and start competing.
+              </p>
+            </div>
             <div className="flex gap-2">
               <Button
-                variant={activeTab === "all" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setActiveTab("all")}
-                style={
+                className={cn(
+                  "fc-btn",
                   activeTab === "all"
-                    ? {
-                        background: getSemanticColor("trust").gradient,
-                        boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-                      }
-                    : {}
-                }
+                    ? "fc-btn-primary"
+                    : "fc-btn-secondary text-[color:var(--fc-text-primary)]"
+                )}
               >
                 <Trophy className="w-4 h-4 mr-2" />
-                All Challenges ({activeChallenges.length})
+                All ({activeChallenges.length})
               </Button>
               <Button
-                variant={activeTab === "my" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setActiveTab("my")}
-                style={
+                className={cn(
+                  "fc-btn",
                   activeTab === "my"
-                    ? {
-                        background: getSemanticColor("trust").gradient,
-                        boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-                      }
-                    : {}
-                }
+                    ? "fc-btn-primary"
+                    : "fc-btn-secondary text-[color:var(--fc-text-primary)]"
+                )}
               >
                 <Users className="w-4 h-4 mr-2" />
                 My Challenges ({myChallenges.length})
               </Button>
             </div>
-          </GlassCard>
-        </div>
+          </div>
+        </GlassCard>
 
         {/* Challenges Grid */}
         {displayedChallenges.length === 0 ? (
-          <GlassCard elevation={2} className="p-12">
-            <div className="text-center">
-              <Trophy
-                className="w-24 h-24 mx-auto mb-6"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                }}
-              />
-              <h2
-                className="text-2xl font-bold mb-2"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
-                {activeTab === "my" ? "No Active Challenges" : "No Challenges Available"}
-              </h2>
-              <p
-                className="text-sm"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
-                {activeTab === "my"
-                  ? "Join a challenge to start competing!"
-                  : "Check back later for new challenges"}
-              </p>
-            </div>
+          <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+            <Trophy className="w-20 h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />
+            <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
+              {activeTab === "my" ? "No Active Challenges" : "No Challenges Available"}
+            </h2>
+            <p className="text-sm text-[color:var(--fc-text-dim)]">
+              {activeTab === "my"
+                ? "Join a challenge to start competing."
+                : "Check back later for new challenges."}
+            </p>
           </GlassCard>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -233,85 +221,49 @@ function ChallengesPageContent() {
       {/* Join Modal for Recomp Challenges */}
       {showJoinModal && selectedChallenge && (
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.5)" }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
         >
           <div
-            className="w-full max-w-md rounded-2xl shadow-2xl p-6"
-            style={{
-              background: isDark ? "#1E1E1E" : "#FFFFFF",
-            }}
+            className="w-full max-w-md fc-glass fc-card border border-[color:var(--fc-glass-border-strong)] shadow-2xl p-6"
           >
-            <h2
-              className="text-2xl font-bold mb-4"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
+            <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-4">
               Select Your Track
             </h2>
-            <p
-              className="text-sm mb-6"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-              }}
-            >
+            <p className="text-sm text-[color:var(--fc-text-dim)] mb-6">
               Choose which recomp track you want to compete in
             </p>
 
             <div className="space-y-3 mb-6">
               <button
                 onClick={() => setSelectedTrack("fat_loss")}
-                className={`w-full p-4 rounded-lg text-left transition-all ${
-                  selectedTrack === "fat_loss" ? "ring-2" : ""
-                }`}
-                style={{
-                  background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
-                  ...(selectedTrack === "fat_loss" && {
-                    border: `2px solid ${getSemanticColor("success").primary}`,
-                    boxShadow: `0 0 0 2px ${getSemanticColor("success").primary}40`,
-                  }),
-                }}
+                className={cn(
+                  "w-full p-4 rounded-xl text-left transition-all border",
+                  selectedTrack === "fat_loss"
+                    ? "border-[color:var(--fc-status-success)] bg-[color:var(--fc-status-success)]/10"
+                    : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]"
+                )}
               >
-                <p
-                  className="font-semibold"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
+                <p className="font-semibold text-[color:var(--fc-text-primary)]">
                   Fat Loss Track
                 </p>
-                <p
-                  className="text-xs mt-1"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                  }}
-                >
+                <p className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
                   Reduce waist measurement while maintaining strength
                 </p>
               </button>
 
               <button
                 onClick={() => setSelectedTrack("muscle_gain")}
-                className={`w-full p-4 rounded-lg text-left transition-all ${
-                  selectedTrack === "muscle_gain" ? "ring-2" : ""
-                }`}
-                style={{
-                  background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)",
-                  ...(selectedTrack === "muscle_gain" && {
-                    border: `2px solid ${getSemanticColor("success").primary}`,
-                    boxShadow: `0 0 0 2px ${getSemanticColor("success").primary}40`,
-                  }),
-                }}
+                className={cn(
+                  "w-full p-4 rounded-xl text-left transition-all border",
+                  selectedTrack === "muscle_gain"
+                    ? "border-[color:var(--fc-status-success)] bg-[color:var(--fc-status-success)]/10"
+                    : "border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)]"
+                )}
               >
-                <p
-                  className="font-semibold"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
+                <p className="font-semibold text-[color:var(--fc-text-primary)]">
                   Muscle Gain Track
                 </p>
-                <p
-                  className="text-xs mt-1"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                  }}
-                >
+                <p className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
                   Gain bodyweight multiples in key lifts
                 </p>
               </button>
@@ -321,18 +273,14 @@ function ChallengesPageContent() {
               <Button
                 variant="ghost"
                 onClick={() => setShowJoinModal(false)}
-                className="flex-1"
+                className="flex-1 fc-btn fc-btn-secondary"
               >
                 Cancel
               </Button>
               <Button
                 onClick={() => selectedTrack && handleJoin(selectedChallenge, selectedTrack)}
                 disabled={!selectedTrack || joining}
-                className="flex-1"
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-                }}
+                className="flex-1 fc-btn fc-btn-primary"
               >
                 {joining ? "Joining..." : "Join Challenge"}
               </Button>

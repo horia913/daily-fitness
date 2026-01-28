@@ -117,25 +117,25 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
 
   const getCategoryColor = (category: string) => {
     const colors = {
-      'Protein': 'from-red-500 to-pink-500',
-      'Grains': 'from-yellow-500 to-orange-500',
-      'Vegetables': 'from-green-500 to-emerald-500',
-      'Fruits': 'from-purple-500 to-violet-500',
-      'Dairy': 'from-blue-500 to-cyan-500',
-      'Nuts': 'from-amber-500 to-yellow-500',
-      'Beverages': 'from-teal-500 to-blue-500',
-      'Snacks': 'from-orange-500 to-red-500',
-      'General': 'from-gray-500 to-slate-500'
+      'Protein': 'from-[color:var(--fc-domain-workouts)] to-[color:var(--fc-accent-cyan)]',
+      'Grains': 'from-[color:var(--fc-status-warning)] to-[color:var(--fc-accent-purple)]',
+      'Vegetables': 'from-[color:var(--fc-domain-meals)] to-[color:var(--fc-accent-cyan)]',
+      'Fruits': 'from-[color:var(--fc-accent-purple)] to-[color:var(--fc-accent-cyan)]',
+      'Dairy': 'from-[color:var(--fc-accent-cyan)] to-[color:var(--fc-domain-workouts)]',
+      'Nuts': 'from-[color:var(--fc-status-warning)] to-[color:var(--fc-domain-meals)]',
+      'Beverages': 'from-[color:var(--fc-accent-cyan)] to-[color:var(--fc-accent-purple)]',
+      'Snacks': 'from-[color:var(--fc-status-warning)] to-[color:var(--fc-status-error)]',
+      'General': 'from-[color:var(--fc-domain-neutral)] to-[color:var(--fc-text-subtle)]'
     }
-    return colors[category as keyof typeof colors] || 'from-gray-500 to-slate-500'
+    return colors[category as keyof typeof colors] || 'from-[color:var(--fc-domain-neutral)] to-[color:var(--fc-text-subtle)]'
   }
 
   const getNutritionalHighlight = (food: Food) => {
-    if (food.protein >= 20) return { label: 'High Protein', color: 'text-red-600', icon: Target }
-    if (food.calories_per_serving <= 50) return { label: 'Low Calorie', color: 'text-green-600', icon: Leaf }
-    if (food.fiber >= 5) return { label: 'High Fiber', color: 'text-purple-600', icon: Activity }
-    if (food.fat <= 2) return { label: 'Low Fat', color: 'text-blue-600', icon: Heart }
-    return { label: 'Balanced', color: 'text-gray-600', icon: BarChart3 }
+    if (food.protein >= 20) return { label: 'High Protein', color: 'text-[color:var(--fc-status-error)]', icon: Target }
+    if (food.calories_per_serving <= 50) return { label: 'Low Calorie', color: 'text-[color:var(--fc-status-success)]', icon: Leaf }
+    if (food.fiber >= 5) return { label: 'High Fiber', color: 'text-[color:var(--fc-accent-purple)]', icon: Activity }
+    if (food.fat <= 2) return { label: 'Low Fat', color: 'text-[color:var(--fc-accent-cyan)]', icon: Heart }
+    return { label: 'Balanced', color: 'text-[color:var(--fc-text-subtle)]', icon: BarChart3 }
   }
 
   useEffect(() => {
@@ -311,15 +311,15 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
     return (
       <div className={`min-h-screen ${theme.background}`}>
         <div className="animate-pulse">
-          <div className="h-64 bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className={`${theme.card} rounded-2xl p-6`}>
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+              <div className="fc-glass fc-card rounded-2xl p-6">
+                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
                 </div>
               </div>
             </div>
@@ -330,249 +330,112 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
   }
 
   return (
-    <div style={{ backgroundColor: '#E8E9F3', minHeight: '100vh', paddingBottom: '100px', borderRadius: '24px' }}>
+    <div className="min-h-screen pb-24">
       {/* Header Section */}
-      <div style={{ padding: '24px 20px', backgroundColor: '#E8E9F3', borderRadius: '24px' }}>
+      <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/coach')}
-                style={{ padding: '8px', borderRadius: '20px' }}
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Utensils style={{ width: '24px', height: '24px', color: '#FFFFFF' }} />
+          <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
+            <CardContent className="p-5 sm:p-6 space-y-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <Button
+                    variant="ghost"
+                    onClick={() => router.push('/coach')}
+                    className="fc-btn fc-btn-ghost h-10 w-10"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center">
+                      <Utensils className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl sm:text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                        Food Database
+                      </h1>
+                      <p className="text-sm sm:text-base text-[color:var(--fc-text-dim)]">
+                        Manage your food database and nutritional information
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h1 style={{ fontSize: '14px', fontWeight: '700', color: '#1A1A1A', marginBottom: '8px' }}>
-                    Food Database
-                  </h1>
-                  <p style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>
-                    Manage your food database and nutritional information
-                  </p>
+                
+                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    onClick={loadFoods}
+                    className="fc-btn fc-btn-ghost"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                  <Button
+                    onClick={() => setShowAddForm(true)}
+                    className="fc-btn fc-btn-primary"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Food
+                  </Button>
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-              <Button
-                variant="outline"
-                onClick={loadFoods}
-                style={{ borderRadius: '20px', padding: '16px 32px', fontSize: '16px', fontWeight: '600' }}
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
-              <Button
-                onClick={() => setShowAddForm(true)}
-                style={{ backgroundColor: '#6C5CE7', borderRadius: '20px', padding: '16px 32px', fontSize: '16px', fontWeight: '600', color: '#FFFFFF' }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Food
-              </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      <div style={{ padding: '24px 20px', backgroundColor: '#E8E9F3', borderRadius: '24px' }}>
+      <div className="p-4 sm:p-6">
         {/* Action Buttons */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          marginBottom: '20px'
-        }}>
-          <div style={{
-            display: 'flex',
-            gap: '12px'
-          }}>
+        <div className="flex flex-col gap-3 mb-5">
+          <div className="flex gap-3">
             <Button
               onClick={loadFoods}
-              style={{
-                flex: 1,
-                borderRadius: '20px',
-                padding: '16px 32px',
-                fontSize: '14px',
-                fontWeight: '600',
-                border: '2px solid #E5E7EB',
-                color: '#6B7280',
-                backgroundColor: '#FFFFFF',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
+              className="fc-btn fc-btn-ghost flex-1 flex items-center justify-center gap-2"
             >
-              <RefreshCw style={{ width: '16px', height: '16px' }} />
+              <RefreshCw className="w-4 h-4" />
               Refresh
             </Button>
             <Button
               onClick={() => setShowAddForm(true)}
-              style={{
-                flex: 1,
-                borderRadius: '20px',
-                padding: '16px 32px',
-                fontSize: '14px',
-                fontWeight: '600',
-                background: 'linear-gradient(135deg, #4CAF50 0%, #81C784 100%)',
-                color: '#FFFFFF',
-                border: 'none',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
+              className="fc-btn fc-btn-primary flex-1 flex items-center justify-center gap-2"
             >
-              <Plus style={{ width: '16px', height: '16px' }} />
+              <Plus className="w-4 h-4" />
               Add Food
             </Button>
           </div>
         </div>
 
         {/* Stats Overview */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '20px'
-        }}>
-          <div style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '24px',
-            padding: '24px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-            border: '2px solid #4CAF50',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              margin: '0 auto 12px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #4CAF50 0%, #81C784 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Utensils style={{ width: '24px', height: '24px', color: '#FFFFFF' }} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] text-center p-5">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[color:var(--fc-glass-soft)] flex items-center justify-center text-[color:var(--fc-domain-meals)]">
+              <Utensils className="w-6 h-6" />
             </div>
-            <p style={{
-              fontSize: '32px',
-              fontWeight: '800',
-              color: '#1A1A1A',
-              marginBottom: '4px'
-            }}>{foods.length}</p>
-            <p style={{
-              fontSize: '14px',
-              fontWeight: '400',
-              color: '#6B7280'
-            }}>Total Foods</p>
+            <p className="text-3xl font-extrabold text-[color:var(--fc-text-primary)] mb-1">{foods.length}</p>
+            <p className="text-sm text-[color:var(--fc-text-dim)]">Total Foods</p>
           </div>
 
-          <div style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '24px',
-            padding: '24px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-            border: '2px solid #2196F3',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              margin: '0 auto 12px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Star style={{ width: '24px', height: '24px', color: '#FFFFFF' }} />
+          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] text-center p-5">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[color:var(--fc-glass-soft)] flex items-center justify-center text-[color:var(--fc-accent-cyan)]">
+              <Star className="w-6 h-6" />
             </div>
-            <p style={{
-              fontSize: '32px',
-              fontWeight: '800',
-              color: '#1A1A1A',
-              marginBottom: '4px'
-            }}>{foods.filter(f => f.is_custom).length}</p>
-            <p style={{
-              fontSize: '14px',
-              fontWeight: '400',
-              color: '#6B7280'
-            }}>Custom Foods</p>
+            <p className="text-3xl font-extrabold text-[color:var(--fc-text-primary)] mb-1">{foods.filter(f => f.is_custom).length}</p>
+            <p className="text-sm text-[color:var(--fc-text-dim)]">Custom Foods</p>
           </div>
 
-          <div style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '24px',
-            padding: '24px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-            border: '2px solid #6C5CE7',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              margin: '0 auto 12px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Target style={{ width: '24px', height: '24px', color: '#FFFFFF' }} />
+          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] text-center p-5">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[color:var(--fc-glass-soft)] flex items-center justify-center text-[color:var(--fc-accent-purple)]">
+              <Target className="w-6 h-6" />
             </div>
-            <p style={{
-              fontSize: '32px',
-              fontWeight: '800',
-              color: '#1A1A1A',
-              marginBottom: '4px'
-            }}>{foods.filter(f => f.protein >= 20).length}</p>
-            <p style={{
-              fontSize: '14px',
-              fontWeight: '400',
-              color: '#6B7280'
-            }}>High Protein</p>
+            <p className="text-3xl font-extrabold text-[color:var(--fc-text-primary)] mb-1">{foods.filter(f => f.protein >= 20).length}</p>
+            <p className="text-sm text-[color:var(--fc-text-dim)]">High Protein</p>
           </div>
 
-          <div style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '24px',
-            padding: '24px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-            border: '2px solid #FF9800',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              margin: '0 auto 12px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #FF9800 0%, #FFB74D 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Layers style={{ width: '24px', height: '24px', color: '#FFFFFF' }} />
+          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] text-center p-5">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[color:var(--fc-glass-soft)] flex items-center justify-center text-[color:var(--fc-status-warning)]">
+              <Layers className="w-6 h-6" />
             </div>
-            <p style={{
-              fontSize: '32px',
-              fontWeight: '800',
-              color: '#1A1A1A',
-              marginBottom: '4px'
-            }}>{new Set(foods.map(f => f.category)).size}</p>
-            <p style={{
-              fontSize: '14px',
-              fontWeight: '400',
-              color: '#6B7280'
-            }}>Categories</p>
+            <p className="text-3xl font-extrabold text-[color:var(--fc-text-primary)] mb-1">{new Set(foods.map(f => f.category)).size}</p>
+            <p className="text-sm text-[color:var(--fc-text-dim)]">Categories</p>
           </div>
         </div>
       </div>
@@ -581,24 +444,24 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
           {/* Enhanced Search and Filters */}
-          <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
             <CardContent className="p-4 sm:p-6">
               <div className="space-y-4 sm:space-y-6">
                 {/* Search Bar */}
                 <div className="relative">
-                  <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-5 sm:h-5" />
+                  <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-[color:var(--fc-text-subtle)] w-4 h-4 sm:w-5 sm:h-5" />
                   <Input
                     placeholder="Search foods by name, brand, or category..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 sm:pl-12 h-10 sm:h-12 rounded-xl border-2 text-base sm:text-lg focus:border-green-500 transition-all duration-200"
+                    className="fc-input pl-10 sm:pl-12 h-10 sm:h-12 text-base sm:text-lg"
                   />
                 </div>
 
                 {/* Filters - Mobile First */}
                 <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
                   <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 focus:border-green-500 transition-all duration-200">
+                    <SelectTrigger className="fc-select h-10 sm:h-12">
                       <SelectValue placeholder="Category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -618,7 +481,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                   </Select>
 
                   <Select value={selectedSource} onValueChange={setSelectedSource}>
-                    <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 focus:border-green-500 transition-all duration-200">
+                    <SelectTrigger className="fc-select h-10 sm:h-12">
                       <SelectValue placeholder="Source" />
                     </SelectTrigger>
                     <SelectContent>
@@ -630,7 +493,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
 
                   <div className="flex gap-2">
                     <Select value={sortBy} onValueChange={(value: 'name' | 'calories' | 'protein' | 'date') => setSortBy(value)}>
-                      <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 flex-1 focus:border-green-500 transition-all duration-200">
+                      <SelectTrigger className="fc-select h-10 sm:h-12 flex-1">
                         <SelectValue placeholder="Sort by" />
                       </SelectTrigger>
                       <SelectContent>
@@ -643,19 +506,19 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                     <Button
                       variant="outline"
                       onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                      className="h-10 sm:h-12 px-3 rounded-xl border-2 hover:border-green-300 transition-all duration-200"
+                      className="fc-btn fc-btn-ghost h-10 sm:h-12 px-3"
                     >
                       {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
                     </Button>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm ${theme.textSecondary}`}>View:</span>
+                    <span className="text-sm text-[color:var(--fc-text-dim)]">View:</span>
                     <Button
                       variant={viewMode === 'grid' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setViewMode('grid')}
-                      className="rounded-xl"
+                      className={viewMode === 'grid' ? 'fc-btn fc-btn-primary' : 'fc-btn fc-btn-ghost'}
                     >
                       <Grid3X3 className="w-4 h-4" />
                     </Button>
@@ -663,7 +526,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                       variant={viewMode === 'list' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setViewMode('list')}
-                      className="rounded-xl"
+                      className={viewMode === 'list' ? 'fc-btn fc-btn-primary' : 'fc-btn fc-btn-ghost'}
                     >
                       <List className="w-4 h-4" />
                     </Button>
@@ -684,7 +547,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                 return (
                   <Card 
                     key={food.id} 
-                    className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-xl transition-all duration-300 cursor-pointer group hover:scale-105`}
+                    className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 cursor-pointer group hover:scale-105"
                     onClick={() => handleFoodClick(food)}
                   >
                     <CardContent className="p-4 sm:p-6">
@@ -695,16 +558,16 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                             <CategoryIcon className="w-5 h-5" />
                           </div>
                           <div className="min-w-0">
-                            <h3 className={`font-semibold ${theme.text} text-sm sm:text-base truncate`}>
+                            <h3 className="font-semibold text-[color:var(--fc-text-primary)] text-sm sm:text-base truncate">
                               {food.name}
                             </h3>
-                            <p className={`text-xs ${theme.textSecondary} truncate`}>
+                            <p className="text-xs text-[color:var(--fc-text-dim)] truncate">
                               {food.brand || food.category}
                             </p>
                           </div>
                         </div>
                         
-                        <Badge className={`${highlight.color} border-0 text-xs px-2 py-1 bg-opacity-10`}>
+                        <Badge className={`${highlight.color} border border-[color:var(--fc-glass-border)] text-xs px-2 py-1 bg-[color:var(--fc-glass-soft)]`}>
                           <highlight.icon className="w-3 h-3 mr-1" />
                           {highlight.label}
                         </Badge>
@@ -713,43 +576,43 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                       {/* Serving Info */}
                       <div className="mb-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className={`text-xs ${theme.textSecondary}`}>Serving Size</span>
-                          <span className={`text-xs font-medium ${theme.text}`}>
+                          <span className="text-xs text-[color:var(--fc-text-subtle)]">Serving Size</span>
+                          <span className="text-xs font-medium text-[color:var(--fc-text-primary)]">
                             {food.serving_size} {food.serving_unit}
                           </span>
                         </div>
-                        <div className="text-center p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl">
-                          <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                        <div className="text-center p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                          <div className="text-lg font-bold text-[color:var(--fc-domain-meals)]">
                             {food.calories_per_serving} cal
                           </div>
-                          <div className="text-xs text-green-500 dark:text-green-500">per serving</div>
+                          <div className="text-xs text-[color:var(--fc-text-subtle)]">per serving</div>
                         </div>
                       </div>
 
                       {/* Macro Breakdown */}
                       <div className="grid grid-cols-3 gap-2 text-xs mb-4">
-                        <div className="text-center p-2 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                          <div className="font-semibold text-red-600 dark:text-red-400">
+                        <div className="text-center p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                          <div className="font-semibold text-[color:var(--fc-status-error)]">
                             {food.protein}g
                           </div>
-                          <div className="text-red-500 dark:text-red-500">Protein</div>
+                          <div className="text-[color:var(--fc-text-subtle)]">Protein</div>
                         </div>
-                        <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                          <div className="font-semibold text-blue-600 dark:text-blue-400">
+                        <div className="text-center p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                          <div className="font-semibold text-[color:var(--fc-accent-cyan)]">
                             {food.carbs}g
                           </div>
-                          <div className="text-blue-500 dark:text-blue-500">Carbs</div>
+                          <div className="text-[color:var(--fc-text-subtle)]">Carbs</div>
                         </div>
-                        <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                          <div className="font-semibold text-yellow-600 dark:text-yellow-400">
+                        <div className="text-center p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
+                          <div className="font-semibold text-[color:var(--fc-status-warning)]">
                             {food.fat}g
                           </div>
-                          <div className="text-yellow-500 dark:text-yellow-500">Fat</div>
+                          <div className="text-[color:var(--fc-text-subtle)]">Fat</div>
                         </div>
                       </div>
 
                       {/* Quick Actions */}
-                      <div className="flex items-center gap-1 sm:gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-1 sm:gap-2 pt-3 border-t border-[color:var(--fc-glass-border)]">
                         <Button
                           variant="outline"
                           size="sm"
@@ -757,7 +620,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                             e.stopPropagation()
                             handleFoodClick(food)
                           }}
-                          className="flex-1 text-xs sm:text-sm rounded-xl"
+                          className="flex-1 text-xs sm:text-sm fc-btn fc-btn-ghost"
                         >
                           <Eye className="w-3 h-3 mr-1" />
                           <span className="hidden sm:inline">View</span>
@@ -769,7 +632,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                             e.stopPropagation()
                             // Edit food action
                           }}
-                          className="rounded-xl p-2"
+                          className="fc-btn fc-btn-ghost p-2"
                         >
                           <Edit className="w-3 h-3" />
                         </Button>
@@ -780,7 +643,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                             e.stopPropagation()
                             handleDeleteFood(food.id)
                           }}
-                          className="rounded-xl p-2 text-red-600 hover:text-red-700"
+                          className="fc-btn fc-btn-ghost p-2 text-[color:var(--fc-status-error)]"
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
@@ -800,7 +663,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                 return (
                   <Card 
                     key={food.id} 
-                    className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-xl transition-all duration-300 cursor-pointer group`}
+                    className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 cursor-pointer group"
                     onClick={() => handleFoodClick(food)}
                   >
                     <CardContent className="p-4 sm:p-6">
@@ -814,14 +677,14 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1 min-w-0">
-                              <h3 className={`font-semibold ${theme.text} text-base sm:text-lg mb-1 truncate`}>
+                            <h3 className="font-semibold text-[color:var(--fc-text-primary)] text-base sm:text-lg mb-1 truncate">
                                 {food.name}
                               </h3>
-                              <p className={`text-sm ${theme.textSecondary} mb-2`}>
+                            <p className="text-sm text-[color:var(--fc-text-dim)] mb-2">
                                 {food.brand && `${food.brand} • `}{food.serving_size} {food.serving_unit}
                               </p>
                               <div className="flex items-center gap-2 mb-2">
-                                <Badge className={`${highlight.color} border-0 text-xs px-2 py-1 bg-opacity-10`}>
+                                <Badge className={`${highlight.color} border border-[color:var(--fc-glass-border)] text-xs px-2 py-1 bg-[color:var(--fc-glass-soft)]`}>
                                   <highlight.icon className="w-3 h-3 mr-1" />
                                   {highlight.label}
                                 </Badge>
@@ -829,7 +692,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                                   {food.category}
                                 </Badge>
                                 {food.is_custom && (
-                                  <Badge variant="outline" className="text-xs text-blue-600">
+                                  <Badge variant="outline" className="text-xs text-[color:var(--fc-accent-cyan)]">
                                     Custom
                                   </Badge>
                                 )}
@@ -840,28 +703,28 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                           {/* Nutritional Summary */}
                           <div className="mb-3">
                             <div className="flex items-center justify-between mb-2">
-                              <span className={`text-sm ${theme.textSecondary}`}>Nutrition per serving</span>
-                              <span className={`text-sm font-medium ${theme.text}`}>
+                              <span className="text-sm text-[color:var(--fc-text-dim)]">Nutrition per serving</span>
+                              <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">
                                 {food.calories_per_serving} calories
                               </span>
                             </div>
-                            <div className="flex items-center gap-4 text-sm">
+                            <div className="flex flex-wrap items-center gap-4 text-sm">
                               <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                                <span className={theme.textSecondary}>Protein: {food.protein}g</span>
+                                <div className="w-2 h-2 bg-[color:var(--fc-status-error)] rounded-full"></div>
+                                <span className="text-[color:var(--fc-text-subtle)]">Protein: {food.protein}g</span>
                               </div>
                               <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                <span className={theme.textSecondary}>Carbs: {food.carbs}g</span>
+                                <div className="w-2 h-2 bg-[color:var(--fc-accent-cyan)] rounded-full"></div>
+                                <span className="text-[color:var(--fc-text-subtle)]">Carbs: {food.carbs}g</span>
                               </div>
                               <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                                <span className={theme.textSecondary}>Fat: {food.fat}g</span>
+                                <div className="w-2 h-2 bg-[color:var(--fc-status-warning)] rounded-full"></div>
+                                <span className="text-[color:var(--fc-text-subtle)]">Fat: {food.fat}g</span>
                               </div>
                               {food.fiber > 0 && (
                                 <div className="flex items-center gap-1">
-                                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                                  <span className={theme.textSecondary}>Fiber: {food.fiber}g</span>
+                                  <div className="w-2 h-2 bg-[color:var(--fc-accent-purple)] rounded-full"></div>
+                                  <span className="text-[color:var(--fc-text-subtle)]">Fiber: {food.fiber}g</span>
                                 </div>
                               )}
                             </div>
@@ -870,37 +733,37 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
 
                         {/* Actions */}
                         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleFoodClick(food)
-                            }}
-                            className="rounded-xl p-2"
-                          >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleFoodClick(food)
+                          }}
+                          className="fc-btn fc-btn-ghost p-2"
+                        >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              // Edit food action
-                            }}
-                            className="rounded-xl p-2"
-                          >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // Edit food action
+                          }}
+                          className="fc-btn fc-btn-ghost p-2"
+                        >
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteFood(food.id)
-                            }}
-                            className="rounded-xl p-2 text-red-600 hover:text-red-700"
-                          >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteFood(food.id)
+                          }}
+                          className="fc-btn fc-btn-ghost p-2 text-[color:var(--fc-status-error)]"
+                        >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
@@ -914,18 +777,18 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
 
           {/* Empty State */}
           {filteredAndSortedFoods.length === 0 && (
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
               <CardContent className="text-center py-12 sm:py-16">
                 <div className="relative">
-                  <Utensils className="w-16 h-16 sm:w-20 sm:h-20 text-slate-400 mx-auto mb-6" />
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <Utensils className="w-16 h-16 sm:w-20 sm:h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-[color:var(--fc-domain-meals)] rounded-full flex items-center justify-center">
                     <Plus className="w-3 h-3 text-white" />
                   </div>
                 </div>
-                <h3 className={`text-xl sm:text-2xl font-semibold ${theme.text} mb-3`}>
+                <h3 className="text-xl sm:text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-3">
                   {foods.length === 0 ? 'No foods in database yet' : 'No foods found'}
                 </h3>
-                <p className={`text-base sm:text-lg ${theme.textSecondary} mb-8 max-w-md mx-auto`}>
+                <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)] mb-8 max-w-md mx-auto">
                   {foods.length === 0 
                     ? 'Start building your food database by adding nutritional information.'
                     : 'Try adjusting your search or filter criteria to find the foods you\'re looking for.'
@@ -934,7 +797,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Button 
                     onClick={() => setShowAddForm(true)}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 px-8"
+                    className="fc-btn fc-btn-primary px-8"
                   >
                     <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                     Add Food
@@ -942,7 +805,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                   <Button 
                     variant="outline"
                     onClick={() => router.push('/coach/nutrition')}
-                    className="rounded-xl"
+                    className="fc-btn fc-btn-ghost"
                   >
                     <Utensils className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                     View All
@@ -956,9 +819,9 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
 
       {/* Food Detail Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className={`${theme.card} ${theme.shadow} rounded-2xl border-2 max-w-2xl max-h-[90vh] overflow-y-auto`}>
+        <DialogContent className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className={`text-xl font-bold ${theme.text} flex items-center gap-3`}>
+            <DialogTitle className="text-xl font-bold text-[color:var(--fc-text-primary)] flex items-center gap-3">
               {selectedFood && (
                 <>
                   <div className={`w-8 h-8 bg-gradient-to-br ${getCategoryColor(selectedFood.category)} rounded-lg flex items-center justify-center text-white`}>
@@ -973,7 +836,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
           {selectedFood && (
             <div className="space-y-6">
               {/* Food Image Placeholder */}
-              <div className="w-full h-48 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl flex items-center justify-center">
+              <div className="w-full h-48 bg-[color:var(--fc-glass-soft)] rounded-xl flex items-center justify-center">
                 <div className={`w-16 h-16 bg-gradient-to-br ${getCategoryColor(selectedFood.category)} rounded-xl flex items-center justify-center text-white`}>
                   {React.createElement(getCategoryIcon(selectedFood.category), { className: "w-8 h-8" })}
                 </div>
@@ -982,69 +845,69 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={`text-sm font-medium ${theme.textSecondary}`}>Brand</label>
-                  <p className={`text-base ${theme.text}`}>{selectedFood.brand || 'Generic'}</p>
+                  <label className="text-sm font-medium text-[color:var(--fc-text-dim)]">Brand</label>
+                  <p className="text-base text-[color:var(--fc-text-primary)]">{selectedFood.brand || 'Generic'}</p>
                 </div>
                 <div>
-                  <label className={`text-sm font-medium ${theme.textSecondary}`}>Category</label>
-                  <p className={`text-base ${theme.text}`}>{selectedFood.category}</p>
+                  <label className="text-sm font-medium text-[color:var(--fc-text-dim)]">Category</label>
+                  <p className="text-base text-[color:var(--fc-text-primary)]">{selectedFood.category}</p>
                 </div>
               </div>
 
               {/* Serving Size */}
               <div>
-                <label className={`text-sm font-medium ${theme.textSecondary}`}>Serving Size</label>
-                <p className={`text-base ${theme.text}`}>{selectedFood.serving_size} {selectedFood.serving_unit}</p>
+                <label className="text-sm font-medium text-[color:var(--fc-text-dim)]">Serving Size</label>
+                <p className="text-base text-[color:var(--fc-text-primary)]">{selectedFood.serving_size} {selectedFood.serving_unit}</p>
               </div>
 
               {/* Nutritional Breakdown */}
               <div>
-                <h3 className={`text-lg font-semibold ${theme.text} mb-4`}>Nutritional Information</h3>
+                <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)] mb-4">Nutritional Information</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  <div className="p-4 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                    <div className="text-2xl font-bold text-[color:var(--fc-domain-meals)]">
                       {selectedFood.calories_per_serving}
                     </div>
-                    <div className="text-sm text-green-500 dark:text-green-500">Calories</div>
+                    <div className="text-sm text-[color:var(--fc-text-subtle)]">Calories</div>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-xl">
-                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  <div className="p-4 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                    <div className="text-2xl font-bold text-[color:var(--fc-status-error)]">
                       {selectedFood.protein}g
                     </div>
-                    <div className="text-sm text-red-500 dark:text-red-500">Protein</div>
+                    <div className="text-sm text-[color:var(--fc-text-subtle)]">Protein</div>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  <div className="p-4 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                    <div className="text-2xl font-bold text-[color:var(--fc-accent-cyan)]">
                       {selectedFood.carbs}g
                     </div>
-                    <div className="text-sm text-blue-500 dark:text-blue-500">Carbohydrates</div>
+                    <div className="text-sm text-[color:var(--fc-text-subtle)]">Carbohydrates</div>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-xl">
-                    <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                  <div className="p-4 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                    <div className="text-2xl font-bold text-[color:var(--fc-status-warning)]">
                       {selectedFood.fat}g
                     </div>
-                    <div className="text-sm text-yellow-500 dark:text-yellow-500">Fat</div>
+                    <div className="text-sm text-[color:var(--fc-text-subtle)]">Fat</div>
                   </div>
                 </div>
                 {selectedFood.fiber > 0 && (
-                  <div className="mt-4 p-4 bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 rounded-xl">
-                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  <div className="mt-4 p-4 bg-[color:var(--fc-glass-soft)] rounded-xl">
+                    <div className="text-2xl font-bold text-[color:var(--fc-accent-purple)]">
                       {selectedFood.fiber}g
                     </div>
-                    <div className="text-sm text-purple-500 dark:text-purple-500">Fiber</div>
+                    <div className="text-sm text-[color:var(--fc-text-subtle)]">Fiber</div>
                   </div>
                 )}
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div className="flex gap-3 pt-4 border-t border-[color:var(--fc-glass-border)]">
                 <Button
                   variant="outline"
                   onClick={() => {
                     // Edit food action
                     setShowDetailModal(false)
                   }}
-                  className="flex-1 rounded-xl"
+                  className="fc-btn fc-btn-ghost flex-1"
                 >
                   <Edit className="w-4 h-4 mr-2" />
                   Edit Food
@@ -1055,7 +918,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                     // Add to meal plan action
                     setShowDetailModal(false)
                   }}
-                  className="flex-1 rounded-xl"
+                  className="fc-btn fc-btn-ghost flex-1"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add to Meal Plan
@@ -1066,7 +929,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                     handleDeleteFood(selectedFood.id)
                     setShowDetailModal(false)
                   }}
-                  className="rounded-xl text-red-600 hover:text-red-700"
+                  className="fc-btn fc-btn-ghost text-[color:var(--fc-status-error)]"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>

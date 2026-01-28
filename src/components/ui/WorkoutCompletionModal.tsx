@@ -115,7 +115,7 @@ export function WorkoutCompletionModal({
 
       <GlassCard
         elevation={4}
-        className="max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="max-w-2xl w-full max-h-[90vh] overflow-y-auto fc-glass fc-card"
       >
         <div className="p-8">
           {/* Close Button */}

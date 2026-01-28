@@ -14,6 +14,7 @@ import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useLoggingReset } from "../hooks/useLoggingReset";
 
 export function AmrapExecutor({
   block,
@@ -52,6 +53,7 @@ export function AmrapExecutor({
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [timeRemaining, setTimeRemaining] = useState(durationSeconds);
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -190,79 +192,81 @@ export function AmrapExecutor({
       }
     } catch (e) {}
 
-    // Log the final set
-    // Ensure exercise_id is a valid string
-    const exerciseIdToLog = String(currentExercise.exercise_id || "").trim();
-    if (!exerciseIdToLog) {
-      addToast({
-        title: "Error",
-        description: "Exercise ID is invalid. Please refresh the page.",
-        variant: "destructive",
-        duration: 5000,
-      });
-      setIsLoggingSet(false);
-      return;
-    }
-
-    // Calculate actual duration used (durationSeconds - timeRemaining)
-    const actualDurationSeconds = durationSeconds - timeRemaining;
-
-    console.log("AmrapExecutor handleLogSet: Calling logSetToDatabase with:", {
-      block_type: 'amrap',
-      exercise_id: exerciseIdToLog,
-      amrap_total_reps: repsNum,
-      amrap_duration_seconds: actualDurationSeconds,
-      amrap_target_reps: targetReps || null,
-    });
-
-    const logData: any = {
-      block_type: 'amrap',
-    };
-    
-    // Only add fields if they're defined
-    if (exerciseIdToLog) logData.exercise_id = exerciseIdToLog;
-    if (repsNum !== undefined && repsNum !== null && !isNaN(repsNum)) logData.amrap_total_reps = repsNum;
-    if (actualDurationSeconds !== undefined && actualDurationSeconds !== null) logData.amrap_duration_seconds = actualDurationSeconds;
-    if (targetReps !== undefined && targetReps !== null) logData.amrap_target_reps = targetReps;
-    
-    const result = await logSetToDatabase(logData);
-
-    if (result.success) {
-      if (result.e1rm && onE1rmUpdate) {
-        onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
+    try {
+      // Log the final set
+      // Ensure exercise_id is a valid string
+      const exerciseIdToLog = String(currentExercise.exercise_id || "").trim();
+      if (!exerciseIdToLog) {
+        addToast({
+          title: "Error",
+          description: "Exercise ID is invalid. Please refresh the page.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        return;
       }
 
-      const loggedSetsArray: LoggedSet[] = [
-        {
-          id: `temp-${Date.now()}`,
-          exercise_id: currentExercise.exercise_id,
-          block_id: block.block.id,
-          set_number: 1,
-          weight_kg: weightNum,
-          reps_completed: repsNum,
-          completed_at: new Date(),
-        } as LoggedSet,
-      ];
+      // Calculate actual duration used (durationSeconds - timeRemaining)
+      const actualDurationSeconds = durationSeconds - timeRemaining;
 
-      addToast({
-        title: "AMRAP Set Logged!",
-        description: `${weightNum}kg × ${repsNum} total reps`,
-        variant: "success",
-        duration: 2000,
+      console.log("AmrapExecutor handleLogSet: Calling logSetToDatabase with:", {
+        block_type: 'amrap',
+        exercise_id: exerciseIdToLog,
+        amrap_total_reps: repsNum,
+        amrap_duration_seconds: actualDurationSeconds,
+        amrap_target_reps: targetReps || null,
       });
 
-      // Complete the block
-      onBlockComplete(block.block.id, loggedSetsArray);
-    } else {
-      addToast({
-        title: "Failed to Save",
-        description: "Failed to save set. Please try again.",
-        variant: "destructive",
-        duration: 5000,
-      });
+      const logData: any = {
+        block_type: 'amrap',
+      };
+      
+      // Only add fields if they're defined
+      if (exerciseIdToLog) logData.exercise_id = exerciseIdToLog;
+      if (repsNum !== undefined && repsNum !== null && !isNaN(repsNum)) logData.amrap_total_reps = repsNum;
+      if (actualDurationSeconds !== undefined && actualDurationSeconds !== null) logData.amrap_duration_seconds = actualDurationSeconds;
+      if (targetReps !== undefined && targetReps !== null) logData.amrap_target_reps = targetReps;
+      if (!isNaN(weightNum) && weightNum > 0) logData.weight = weightNum;
+      
+      const result = await logSetToDatabase(logData);
+
+      if (result.success) {
+        if (result.e1rm && onE1rmUpdate) {
+          onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
+        }
+
+        const loggedSetsArray: LoggedSet[] = [
+          {
+            id: `temp-${Date.now()}`,
+            exercise_id: currentExercise.exercise_id,
+            block_id: block.block.id,
+            set_number: 1,
+            weight_kg: weightNum,
+            reps_completed: repsNum,
+            completed_at: new Date(),
+          } as LoggedSet,
+        ];
+
+        addToast({
+          title: "AMRAP Set Logged!",
+          description: `${weightNum}kg × ${repsNum} total reps`,
+          variant: "success",
+          duration: 2000,
+        });
+
+        // Complete the block
+        onBlockComplete(block.block.id, loggedSetsArray);
+      } else {
+        addToast({
+          title: "Failed to Save",
+          description: "Failed to save set. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+    } finally {
+      setIsLoggingSet(false);
     }
-
-    setIsLoggingSet(false);
   };
 
   const loggingInputs = (
@@ -333,6 +337,8 @@ export function AmrapExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <LargeInput
             label="Total Reps"
@@ -340,6 +346,8 @@ export function AmrapExecutor({
             onChange={setReps}
             placeholder="0"
             step="1"
+            showStepper
+            stepAmount={1}
           />
         </div>
       </GlassCard>

@@ -459,28 +459,28 @@ export default function CoachNutritionPage() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen pb-24">
           <div className="max-w-7xl mx-auto p-6">
-            {/* Header */}
-            <GlassCard elevation={2} className="mb-6">
-              <div className="p-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
-                    <Apple className="w-8 h-8 text-green-600 dark:text-green-400" />
+            <GlassCard elevation={2} className="fc-glass fc-card mb-6">
+              <div className="p-6 sm:p-10">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-[color:var(--fc-aurora-green)]/20">
+                    <Apple className="w-8 h-8 text-[color:var(--fc-accent-green)]" />
                   </div>
                   <div>
-                    <h1 className={`text-2xl font-bold ${theme.text}`}>
-                      Nutrition Planning Hub
+                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                      Nutrition Hub
+                    </span>
+                    <h1 className="mt-3 text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                      Nutrition Planning
                     </h1>
-                    <p className={`${theme.textSecondary}`}>
-                      Create meal plans, manage food databases, and assign
-                      nutrition programs to your clients
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Create meal plans, manage foods, and assign nutrition programs.
                     </p>
                   </div>
                 </div>
               </div>
             </GlassCard>
 
-            {/* Search */}
-            <GlassCard elevation={1} className="mb-6">
+            <GlassCard elevation={1} className="fc-glass fc-card mb-6">
               <div className="p-6">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -494,8 +494,7 @@ export default function CoachNutritionPage() {
               </div>
             </GlassCard>
 
-            {/* Tab Buttons */}
-            <GlassCard elevation={2} className="p-2">
+            <GlassCard elevation={2} className="fc-glass fc-card p-2">
               <div className="flex gap-2">
                 <Button
                   variant={activeTab === "meal-plans" ? "default" : "ghost"}

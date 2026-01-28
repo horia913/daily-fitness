@@ -2,11 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { FloatingParticles } from "@/components/ui/FloatingParticles";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { supabase } from "@/lib/supabase";
 import {
   ArrowLeft,
@@ -96,9 +97,7 @@ const calculateNutritionForServing = (food: Food, servingSize: number) => {
 export default function FoodDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
+  const { performanceSettings } = useTheme();
 
   const foodId = params.id as string;
   const [food, setFood] = useState<Food | null>(null);
@@ -148,16 +147,20 @@ export default function FoodDetailPage() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
-          <div className="p-4 sm:p-6">
-            <div className="max-w-2xl mx-auto">
-              <div className="animate-pulse space-y-4">
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
-                <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-4xl">
+              <div className="fc-glass fc-card p-6 sm:p-10">
+                <div className="animate-pulse space-y-4">
+                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-10 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-48 rounded-3xl bg-[color:var(--fc-glass-highlight)]" />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -165,18 +168,28 @@ export default function FoodDetailPage() {
   if (!food) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
-          <div className="p-4 sm:p-6">
-            <div className="max-w-2xl mx-auto text-center py-12">
-              <h2 className={`text-2xl font-bold ${theme.text} mb-4`}>
-                Food Not Found
-              </h2>
-              <Link href="/client/nutrition">
-                <Button className="rounded-xl">Back to Nutrition</Button>
-              </Link>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-4xl">
+              <div className="fc-glass fc-card p-10 text-center">
+                <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                  Food not found
+                </h2>
+                <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+                  This food item is no longer available.
+                </p>
+                <div className="mt-6 flex justify-center">
+                  <Link href="/client/nutrition">
+                    <Button className="fc-btn fc-btn-secondary">
+                      Back to Nutrition
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -185,44 +198,60 @@ export default function FoodDetailPage() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-green-50 to-teal-100 dark:from-slate-900 dark:via-slate-800 dark:to-teal-900">
-        <div className="p-4 sm:p-6">
-          <div className="max-w-2xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-6">
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+          <div className="mx-auto w-full max-w-4xl space-y-8">
+            <div className="flex items-center gap-3">
               <Link href="/client/nutrition">
-                <Button variant="outline" size="icon" className="rounded-xl">
-                  <ArrowLeft className="w-4 h-4" />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="fc-btn fc-btn-secondary h-10 w-10 rounded-xl"
+                >
+                  <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
-              <div
-                className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${getFoodColor(
-                  food.category
-                )} flex items-center justify-center text-3xl shadow-lg`}
-              >
-                {getFoodIcon(food.category)}
-              </div>
-              <div className="flex-1">
-                <h1 className={`text-3xl font-bold ${theme.text}`}>
-                  {food.name}
-                </h1>
-                {food.brand && (
-                  <p className={`${theme.textSecondary}`}>{food.brand}</p>
-                )}
-                <Badge className="bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600 mt-1">
-                  {food.category}
-                </Badge>
-              </div>
+              <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                Nutrition
+              </span>
             </div>
 
-            {/* Serving Size Selector */}
-            <div
-              className={`${theme.card} rounded-3xl p-6 border-2 border-slate-200 dark:border-slate-700`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`text-lg font-semibold ${theme.text}`}>
-                  Serving Size
-                </h3>
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+              <div className="flex flex-wrap items-center gap-4">
+                <div
+                  className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${getFoodColor(
+                    food.category
+                  )} text-3xl shadow-lg`}
+                >
+                  {getFoodIcon(food.category)}
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    {food.name}
+                  </h1>
+                  {food.brand && (
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      {food.brand}
+                    </p>
+                  )}
+                  <span className="fc-badge fc-glass-soft mt-2 inline-flex text-[color:var(--fc-text-primary)]">
+                    {food.category}
+                  </span>
+                </div>
+              </div>
+            </GlassCard>
+
+            <GlassCard elevation={1} className="fc-glass fc-card p-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                    Serving size
+                  </h3>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Adjust the serving size to see nutrition totals.
+                  </p>
+                </div>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -230,113 +259,116 @@ export default function FoodDetailPage() {
                     onClick={() =>
                       setFoodServingSize(Math.max(0.1, foodServingSize - 0.1))
                     }
-                    className="rounded-xl"
+                    className="fc-btn fc-btn-secondary"
                   >
                     -
                   </Button>
-                  <span className="w-20 text-center font-semibold">
+                  <span className="w-20 text-center text-sm font-semibold text-[color:var(--fc-text-primary)]">
                     {foodServingSize}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setFoodServingSize(foodServingSize + 0.1)}
-                    className="rounded-xl"
+                    className="fc-btn fc-btn-secondary"
                   >
                     +
                   </Button>
                 </div>
               </div>
-              <div className={`text-sm ${theme.textSecondary}`}>
+              <div className="mt-3 text-sm text-[color:var(--fc-text-dim)]">
                 {foodServingSize} {food.serving_unit}
               </div>
-            </div>
+            </GlassCard>
 
-            {/* Nutritional Information */}
-            <div
-              className={`${theme.card} rounded-3xl p-6 border-2 border-slate-200 dark:border-slate-700 space-y-6`}
+            <GlassCard
+              elevation={2}
+              className="fc-glass fc-card p-6 space-y-6"
             >
-              <h3 className={`text-lg font-semibold ${theme.text}`}>
-                Nutritional Information
-              </h3>
+              <div>
+                <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                  Nutritional information
+                </h3>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  Macro totals for the selected serving size.
+                </p>
+              </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl">
-                  <Flame className="w-6 h-6 text-red-600 dark:text-red-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div className="text-center p-4 rounded-2xl fc-glass-soft">
+                  <Flame className="mx-auto mb-2 h-6 w-6 text-[color:var(--fc-domain-challenges)]" />
+                  <div className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                     {nutrition.calories}
                   </div>
-                  <div className="text-sm text-red-700 dark:text-red-300">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
                     Calories
                   </div>
                 </div>
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-2xl">
-                  <Target className="w-6 h-6 text-green-600 dark:text-green-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                <div className="text-center p-4 rounded-2xl fc-glass-soft">
+                  <Target className="mx-auto mb-2 h-6 w-6 text-[color:var(--fc-domain-meals)]" />
+                  <div className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                     {nutrition.protein}g
                   </div>
-                  <div className="text-sm text-green-700 dark:text-green-300">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
                     Protein
                   </div>
                 </div>
-                <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl">
-                  <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <div className="text-center p-4 rounded-2xl fc-glass-soft">
+                  <TrendingUp className="mx-auto mb-2 h-6 w-6 text-[color:var(--fc-domain-workouts)]" />
+                  <div className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                     {nutrition.carbs}g
                   </div>
-                  <div className="text-sm text-blue-700 dark:text-blue-300">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
                     Carbs
                   </div>
                 </div>
-                <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-2xl">
-                  <Droplets className="w-6 h-6 text-yellow-600 dark:text-yellow-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                <div className="text-center p-4 rounded-2xl fc-glass-soft">
+                  <Droplets className="mx-auto mb-2 h-6 w-6 text-[color:var(--fc-domain-habits)]" />
+                  <div className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                     {nutrition.fat}g
                   </div>
-                  <div className="text-sm text-yellow-700 dark:text-yellow-300">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
                     Fat
                   </div>
                 </div>
               </div>
 
-              {/* Additional Nutrients */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                  <div className={`text-sm ${theme.textSecondary}`}>Fiber</div>
-                  <div className={`text-lg font-semibold ${theme.text}`}>
+                <div className="fc-glass-soft rounded-xl p-3">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                    Fiber
+                  </div>
+                  <div className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                     {nutrition.fiber}g
                   </div>
                 </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                  <div className={`text-sm ${theme.textSecondary}`}>
-                    Base Serving Size
+                <div className="fc-glass-soft rounded-xl p-3">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                    Base serving
                   </div>
-                  <div className={`text-lg font-semibold ${theme.text}`}>
+                  <div className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                     {food.serving_size} {food.serving_unit}
                   </div>
                 </div>
               </div>
-            </div>
+            </GlassCard>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 variant="outline"
                 onClick={handleAddToLog}
-                className="flex-1 rounded-2xl"
+                className="fc-btn fc-btn-secondary flex-1"
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="mr-2 h-4 w-4" />
                 Add to Manual Log
               </Button>
               <Link href="/client/nutrition" className="flex-1">
-                <Button className="w-full bg-green-600 hover:bg-green-700 text-white rounded-2xl">
-                  Close
-                </Button>
+                <Button className="fc-btn fc-btn-primary w-full">Close</Button>
               </Link>
             </div>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

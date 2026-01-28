@@ -1,0 +1,935 @@
+table_name,constraint_type,column_name,foreign_table,foreign_column
+sessions,PRIMARY KEY,id,sessions,id
+sessions,PRIMARY KEY,id,sessions,id
+sessions,CHECK,null,sessions,status
+clients,UNIQUE,coach_id,clients,client_id
+clients,UNIQUE,coach_id,clients,coach_id
+clients,UNIQUE,client_id,clients,client_id
+clients,UNIQUE,client_id,clients,coach_id
+clients,PRIMARY KEY,id,clients,id
+clients,CHECK,null,clients,status
+challenges,CHECK,null,challenges,challenge_type
+challenges,FOREIGN KEY,created_by,profiles,id
+challenges,PRIMARY KEY,id,challenges,id
+challenges,FOREIGN KEY,program_id,workout_programs,id
+challenges,CHECK,null,challenges,recomp_track
+challenges,CHECK,null,challenges,status
+challenge_participants,UNIQUE,challenge_id,challenge_participants,challenge_id
+challenge_participants,UNIQUE,challenge_id,challenge_participants,client_id
+challenge_participants,UNIQUE,client_id,challenge_participants,challenge_id
+challenge_participants,UNIQUE,client_id,challenge_participants,client_id
+challenge_participants,FOREIGN KEY,challenge_id,challenges,id
+challenge_participants,FOREIGN KEY,client_id,profiles,id
+challenge_participants,PRIMARY KEY,id,challenge_participants,id
+challenge_participants,CHECK,null,challenge_participants,selected_track
+challenge_participants,CHECK,null,challenge_participants,status
+exercise_instructions,FOREIGN KEY,exercise_id,exercises,id
+exercise_instructions,PRIMARY KEY,id,exercise_instructions,id
+exercise_instructions,UNIQUE,exercise_id,exercise_instructions,exercise_id
+exercise_instructions,UNIQUE,exercise_id,exercise_instructions,instruction_order
+exercise_instructions,UNIQUE,instruction_order,exercise_instructions,exercise_id
+exercise_instructions,UNIQUE,instruction_order,exercise_instructions,instruction_order
+exercise_tips,FOREIGN KEY,exercise_id,exercises,id
+exercise_tips,PRIMARY KEY,id,exercise_tips,id
+exercise_tips,UNIQUE,exercise_id,exercise_tips,exercise_id
+exercise_tips,UNIQUE,exercise_id,exercise_tips,tip_order
+exercise_tips,UNIQUE,tip_order,exercise_tips,exercise_id
+exercise_tips,UNIQUE,tip_order,exercise_tips,tip_order
+leaderboard_rankings,UNIQUE,client_id,leaderboard_rankings,category
+leaderboard_rankings,UNIQUE,client_id,leaderboard_rankings,client_id
+leaderboard_rankings,UNIQUE,client_id,leaderboard_rankings,sex_filter
+leaderboard_rankings,UNIQUE,client_id,leaderboard_rankings,time_filter
+leaderboard_rankings,UNIQUE,category,leaderboard_rankings,category
+leaderboard_rankings,UNIQUE,category,leaderboard_rankings,client_id
+leaderboard_rankings,UNIQUE,category,leaderboard_rankings,sex_filter
+leaderboard_rankings,UNIQUE,category,leaderboard_rankings,time_filter
+leaderboard_rankings,UNIQUE,sex_filter,leaderboard_rankings,category
+leaderboard_rankings,UNIQUE,sex_filter,leaderboard_rankings,client_id
+leaderboard_rankings,UNIQUE,sex_filter,leaderboard_rankings,sex_filter
+leaderboard_rankings,UNIQUE,sex_filter,leaderboard_rankings,time_filter
+leaderboard_rankings,UNIQUE,time_filter,leaderboard_rankings,category
+leaderboard_rankings,UNIQUE,time_filter,leaderboard_rankings,client_id
+leaderboard_rankings,UNIQUE,time_filter,leaderboard_rankings,sex_filter
+leaderboard_rankings,UNIQUE,time_filter,leaderboard_rankings,time_filter
+leaderboard_rankings,FOREIGN KEY,client_id,profiles,id
+leaderboard_rankings,PRIMARY KEY,id,leaderboard_rankings,id
+leaderboard_rankings,CHECK,null,leaderboard_rankings,sex_filter
+leaderboard_rankings,CHECK,null,leaderboard_rankings,time_filter
+exercise_muscle_groups,FOREIGN KEY,exercise_id,exercises,id
+exercise_muscle_groups,PRIMARY KEY,id,exercise_muscle_groups,id
+exercise_muscle_groups,UNIQUE,exercise_id,exercise_muscle_groups,exercise_id
+exercise_muscle_groups,UNIQUE,exercise_id,exercise_muscle_groups,muscle_group
+exercise_muscle_groups,UNIQUE,muscle_group,exercise_muscle_groups,exercise_id
+exercise_muscle_groups,UNIQUE,muscle_group,exercise_muscle_groups,muscle_group
+exercise_equipment,FOREIGN KEY,exercise_id,exercises,id
+exercise_equipment,PRIMARY KEY,id,exercise_equipment,id
+exercise_equipment,UNIQUE,exercise_id,exercise_equipment,equipment_type
+exercise_equipment,UNIQUE,exercise_id,exercise_equipment,exercise_id
+exercise_equipment,UNIQUE,equipment_type,exercise_equipment,equipment_type
+exercise_equipment,UNIQUE,equipment_type,exercise_equipment,exercise_id
+workout_set_details,UNIQUE,workout_exercise_log_id,workout_set_details,set_number
+workout_set_details,UNIQUE,workout_exercise_log_id,workout_set_details,workout_exercise_log_id
+workout_set_details,UNIQUE,set_number,workout_set_details,set_number
+workout_set_details,UNIQUE,set_number,workout_set_details,workout_exercise_log_id
+workout_set_details,PRIMARY KEY,id,workout_set_details,id
+workout_set_details,CHECK,null,workout_set_details,rpe
+workout_set_details,FOREIGN KEY,workout_exercise_log_id,workout_exercise_logs,id
+assigned_meal_plans,PRIMARY KEY,id,assigned_meal_plans,id
+clip_cards,PRIMARY KEY,id,clip_cards,id
+meal_completions,FOREIGN KEY,client_id,profiles,id
+meal_completions,FOREIGN KEY,meal_id,meals,id
+meal_completions,PRIMARY KEY,id,meal_completions,id
+assigned_workouts,PRIMARY KEY,id,assigned_workouts,id
+workout_giant_set_exercise_logs,UNIQUE,workout_set_log_id,workout_giant_set_exercise_logs,exercise_id
+workout_giant_set_exercise_logs,UNIQUE,workout_set_log_id,workout_giant_set_exercise_logs,exercise_order
+workout_giant_set_exercise_logs,UNIQUE,workout_set_log_id,workout_giant_set_exercise_logs,workout_set_log_id
+workout_giant_set_exercise_logs,UNIQUE,exercise_id,workout_giant_set_exercise_logs,exercise_id
+workout_giant_set_exercise_logs,UNIQUE,exercise_id,workout_giant_set_exercise_logs,exercise_order
+workout_giant_set_exercise_logs,UNIQUE,exercise_id,workout_giant_set_exercise_logs,workout_set_log_id
+workout_giant_set_exercise_logs,UNIQUE,exercise_order,workout_giant_set_exercise_logs,exercise_id
+workout_giant_set_exercise_logs,UNIQUE,exercise_order,workout_giant_set_exercise_logs,exercise_order
+workout_giant_set_exercise_logs,UNIQUE,exercise_order,workout_giant_set_exercise_logs,workout_set_log_id
+workout_giant_set_exercise_logs,FOREIGN KEY,exercise_id,exercises,id
+workout_giant_set_exercise_logs,PRIMARY KEY,id,workout_giant_set_exercise_logs,id
+workout_giant_set_exercise_logs,FOREIGN KEY,workout_set_log_id,workout_set_logs,id
+muscle_groups,UNIQUE,name,muscle_groups,name
+muscle_groups,PRIMARY KEY,id,muscle_groups,id
+challenge_scoring_categories,FOREIGN KEY,challenge_id,challenges,id
+challenge_scoring_categories,FOREIGN KEY,exercise_id,exercises,id
+challenge_scoring_categories,PRIMARY KEY,id,challenge_scoring_categories,id
+challenge_scoring_categories,CHECK,null,challenge_scoring_categories,scoring_method
+challenge_video_submissions,FOREIGN KEY,participant_id,challenge_participants,id
+challenge_video_submissions,PRIMARY KEY,id,challenge_video_submissions,id
+challenge_video_submissions,FOREIGN KEY,reviewed_by,profiles,id
+challenge_video_submissions,FOREIGN KEY,scoring_category_id,challenge_scoring_categories,id
+challenge_video_submissions,CHECK,null,challenge_video_submissions,status
+foods,PRIMARY KEY,id,foods,id
+meal_plans,FOREIGN KEY,coach_id,null,null
+meal_plans,PRIMARY KEY,id,meal_plans,id
+meals,FOREIGN KEY,meal_plan_id,meal_plans,id
+meals,PRIMARY KEY,id,meals,id
+meal_food_items,FOREIGN KEY,food_id,foods,id
+meal_food_items,FOREIGN KEY,meal_id,meals,id
+meal_food_items,PRIMARY KEY,id,meal_food_items,id
+meal_plan_assignments,FOREIGN KEY,client_id,null,null
+meal_plan_assignments,FOREIGN KEY,coach_id,null,null
+meal_plan_assignments,FOREIGN KEY,meal_plan_id,meal_plans,id
+meal_plan_assignments,PRIMARY KEY,id,meal_plan_assignments,id
+profiles,FOREIGN KEY,id,null,null
+profiles,PRIMARY KEY,id,profiles,id
+profiles,CHECK,null,profiles,role
+profiles,CHECK,null,profiles,sex
+progression_guidelines,CHECK,null,progression_guidelines,category
+progression_guidelines,UNIQUE,category,progression_guidelines,category
+progression_guidelines,UNIQUE,category,progression_guidelines,difficulty
+progression_guidelines,UNIQUE,difficulty,progression_guidelines,category
+progression_guidelines,UNIQUE,difficulty,progression_guidelines,difficulty
+progression_guidelines,CHECK,null,progression_guidelines,difficulty
+progression_guidelines,PRIMARY KEY,id,progression_guidelines,id
+workout_set_logs,FOREIGN KEY,client_id,null,null
+workout_set_logs,FOREIGN KEY,exercise_id,exercises,id
+workout_set_logs,CHECK,null,workout_set_logs,hr_average_percentage
+workout_set_logs,CHECK,null,workout_set_logs,hr_distance_meters
+workout_set_logs,CHECK,null,workout_set_logs,hr_duration_seconds
+workout_set_logs,CHECK,null,workout_set_logs,hr_interval_round
+workout_set_logs,CHECK,null,workout_set_logs,hr_percentage
+workout_set_logs,CHECK,null,workout_set_logs,hr_rest_duration_seconds
+workout_set_logs,CHECK,null,workout_set_logs,hr_work_duration_seconds
+workout_set_logs,CHECK,null,workout_set_logs,hr_zone
+workout_set_logs,PRIMARY KEY,id,workout_set_logs,id
+workout_set_logs,FOREIGN KEY,workout_log_id,workout_logs,id
+meal_items,FOREIGN KEY,meal_id,meals,id
+meal_items,PRIMARY KEY,id,meal_items,id
+workout_templates,FOREIGN KEY,coach_id,profiles,id
+workout_templates,CHECK,null,workout_templates,difficulty_level
+workout_templates,PRIMARY KEY,id,workout_templates,id
+workout_blocks,CHECK,null,workout_blocks,hr_percentage_max
+workout_blocks,CHECK,null,workout_blocks,hr_percentage_min
+workout_blocks,CHECK,null,workout_blocks,hr_zone_target
+workout_blocks,PRIMARY KEY,id,workout_blocks,id
+workout_blocks,FOREIGN KEY,template_id,workout_templates,id
+invite_codes,FOREIGN KEY,coach_id,null,null
+invite_codes,UNIQUE,code,invite_codes,code
+invite_codes,PRIMARY KEY,id,invite_codes,id
+invite_codes,FOREIGN KEY,used_by,null,null
+daily_workout_cache,FOREIGN KEY,client_id,null,null
+daily_workout_cache,UNIQUE,client_id,daily_workout_cache,client_id
+daily_workout_cache,UNIQUE,client_id,daily_workout_cache,program_id
+daily_workout_cache,UNIQUE,client_id,daily_workout_cache,workout_date
+daily_workout_cache,UNIQUE,program_id,daily_workout_cache,client_id
+daily_workout_cache,UNIQUE,program_id,daily_workout_cache,program_id
+daily_workout_cache,UNIQUE,program_id,daily_workout_cache,workout_date
+daily_workout_cache,UNIQUE,workout_date,daily_workout_cache,client_id
+daily_workout_cache,UNIQUE,workout_date,daily_workout_cache,program_id
+daily_workout_cache,UNIQUE,workout_date,daily_workout_cache,workout_date
+daily_workout_cache,PRIMARY KEY,id,daily_workout_cache,id
+program_schedule,CHECK,null,program_schedule,day_of_week
+program_schedule,PRIMARY KEY,id,program_schedule,id
+program_schedule,UNIQUE,program_id,program_schedule,day_of_week
+program_schedule,UNIQUE,program_id,program_schedule,program_id
+program_schedule,UNIQUE,program_id,program_schedule,week_number
+program_schedule,UNIQUE,day_of_week,program_schedule,day_of_week
+program_schedule,UNIQUE,day_of_week,program_schedule,program_id
+program_schedule,UNIQUE,day_of_week,program_schedule,week_number
+program_schedule,UNIQUE,week_number,program_schedule,day_of_week
+program_schedule,UNIQUE,week_number,program_schedule,program_id
+program_schedule,UNIQUE,week_number,program_schedule,week_number
+program_schedule,CHECK,null,program_schedule,week_number
+workout_block_exercises,FOREIGN KEY,block_id,workout_blocks,id
+workout_block_exercises,FOREIGN KEY,exercise_id,exercises,id
+workout_block_exercises,PRIMARY KEY,id,workout_block_exercises,id
+workout_cluster_sets,FOREIGN KEY,block_id,workout_blocks,id
+workout_cluster_sets,FOREIGN KEY,exercise_id,exercises,id
+workout_cluster_sets,PRIMARY KEY,id,workout_cluster_sets,id
+coach_availability,UNIQUE,coach_id,coach_availability,coach_id
+coach_availability,UNIQUE,coach_id,coach_availability,day_of_week
+coach_availability,UNIQUE,coach_id,coach_availability,end_time
+coach_availability,UNIQUE,coach_id,coach_availability,start_time
+coach_availability,UNIQUE,day_of_week,coach_availability,coach_id
+coach_availability,UNIQUE,day_of_week,coach_availability,day_of_week
+coach_availability,UNIQUE,day_of_week,coach_availability,end_time
+coach_availability,UNIQUE,day_of_week,coach_availability,start_time
+coach_availability,UNIQUE,start_time,coach_availability,coach_id
+coach_availability,UNIQUE,start_time,coach_availability,day_of_week
+coach_availability,UNIQUE,start_time,coach_availability,end_time
+coach_availability,UNIQUE,start_time,coach_availability,start_time
+coach_availability,UNIQUE,end_time,coach_availability,coach_id
+coach_availability,UNIQUE,end_time,coach_availability,day_of_week
+coach_availability,UNIQUE,end_time,coach_availability,end_time
+coach_availability,UNIQUE,end_time,coach_availability,start_time
+coach_availability,FOREIGN KEY,coach_id,null,null
+coach_availability,CHECK,null,coach_availability,day_of_week
+coach_availability,PRIMARY KEY,id,coach_availability,id
+clipcard_types,FOREIGN KEY,coach_id,null,null
+clipcard_types,PRIMARY KEY,id,clipcard_types,id
+exercise_categories,UNIQUE,name,exercise_categories,name
+exercise_categories,PRIMARY KEY,id,exercise_categories,id
+clipcards,FOREIGN KEY,client_id,null,null
+clipcards,FOREIGN KEY,clipcard_type_id,clipcard_types,id
+clipcards,FOREIGN KEY,coach_id,null,null
+clipcards,PRIMARY KEY,id,clipcards,id
+workout_rest_pause_sets,FOREIGN KEY,block_id,workout_blocks,id
+workout_rest_pause_sets,FOREIGN KEY,exercise_id,exercises,id
+workout_rest_pause_sets,PRIMARY KEY,id,workout_rest_pause_sets,id
+workout_time_protocols,FOREIGN KEY,block_id,workout_blocks,id
+workout_time_protocols,FOREIGN KEY,exercise_id,exercises,id
+workout_time_protocols,PRIMARY KEY,id,workout_time_protocols,id
+workout_ladder_sets,FOREIGN KEY,block_id,workout_blocks,id
+workout_ladder_sets,FOREIGN KEY,exercise_id,exercises,id
+workout_ladder_sets,PRIMARY KEY,id,workout_ladder_sets,id
+workout_programs,CHECK,null,workout_programs,category
+workout_programs,FOREIGN KEY,coach_id,profiles,id
+workout_programs,CHECK,null,workout_programs,difficulty_level
+workout_programs,PRIMARY KEY,id,workout_programs,id
+program_days,CHECK,null,program_days,day_type
+program_days,CHECK,null,program_days,intensity_level
+program_days,PRIMARY KEY,id,program_days,id
+program_days,UNIQUE,program_id,program_days,day_number
+program_days,UNIQUE,program_id,program_days,program_id
+program_days,UNIQUE,day_number,program_days,day_number
+program_days,UNIQUE,day_number,program_days,program_id
+program_days,FOREIGN KEY,program_id,workout_programs,id
+program_days,FOREIGN KEY,workout_template_id,workout_templates,id
+program_assignments,FOREIGN KEY,client_id,profiles,id
+program_assignments,FOREIGN KEY,coach_id,profiles,id
+program_assignments,PRIMARY KEY,id,program_assignments,id
+program_assignments,UNIQUE,program_id,program_assignments,client_id
+program_assignments,UNIQUE,program_id,program_assignments,program_id
+program_assignments,UNIQUE,client_id,program_assignments,client_id
+program_assignments,UNIQUE,client_id,program_assignments,program_id
+program_assignments,FOREIGN KEY,program_id,workout_programs,id
+program_assignments,CHECK,null,program_assignments,status
+program_day_assignments,CHECK,null,program_day_assignments,day_type
+program_day_assignments,PRIMARY KEY,id,program_day_assignments,id
+program_day_assignments,UNIQUE,program_assignment_id,program_day_assignments,day_number
+program_day_assignments,UNIQUE,program_assignment_id,program_day_assignments,program_assignment_id
+program_day_assignments,UNIQUE,day_number,program_day_assignments,day_number
+program_day_assignments,UNIQUE,day_number,program_day_assignments,program_assignment_id
+program_day_assignments,FOREIGN KEY,program_assignment_id,program_assignments,id
+program_day_assignments,FOREIGN KEY,program_day_id,program_days,id
+program_day_assignments,FOREIGN KEY,workout_assignment_id,workout_assignments,id
+workout_assignments,FOREIGN KEY,client_id,profiles,id
+workout_assignments,FOREIGN KEY,coach_id,profiles,id
+workout_assignments,PRIMARY KEY,id,workout_assignments,id
+workout_assignments,CHECK,null,workout_assignments,status
+workout_assignments,FOREIGN KEY,workout_template_id,workout_templates,id
+workout_block_assignments,PRIMARY KEY,id,workout_block_assignments,id
+workout_block_assignments,FOREIGN KEY,workout_assignment_id,workout_assignments,id
+workout_block_assignments,FOREIGN KEY,workout_block_id,workout_blocks,id
+workout_exercise_assignments,FOREIGN KEY,exercise_id,exercises,id
+workout_exercise_assignments,PRIMARY KEY,id,workout_exercise_assignments,id
+workout_exercise_assignments,FOREIGN KEY,workout_block_assignment_id,workout_block_assignments,id
+workout_exercise_assignments,FOREIGN KEY,workout_block_exercise_id,workout_block_exercises,id
+workout_sessions,PRIMARY KEY,id,workout_sessions,id
+workout_categories,UNIQUE,coach_id,workout_categories,coach_id
+workout_categories,UNIQUE,coach_id,workout_categories,name
+workout_categories,UNIQUE,name,workout_categories,coach_id
+workout_categories,UNIQUE,name,workout_categories,name
+workout_categories,PRIMARY KEY,id,workout_categories,id
+habits,FOREIGN KEY,coach_id,null,null
+habits,CHECK,null,habits,frequency_type
+habits,PRIMARY KEY,id,habits,id
+habits,CHECK,null,habits,target_days
+meal_photo_logs,FOREIGN KEY,client_id,profiles,id
+meal_photo_logs,FOREIGN KEY,meal_id,meals,id
+meal_photo_logs,PRIMARY KEY,id,meal_photo_logs,id
+meal_photo_logs,UNIQUE,client_id,meal_photo_logs,client_id
+meal_photo_logs,UNIQUE,client_id,meal_photo_logs,log_date
+meal_photo_logs,UNIQUE,client_id,meal_photo_logs,meal_id
+meal_photo_logs,UNIQUE,meal_id,meal_photo_logs,client_id
+meal_photo_logs,UNIQUE,meal_id,meal_photo_logs,log_date
+meal_photo_logs,UNIQUE,meal_id,meal_photo_logs,meal_id
+meal_photo_logs,UNIQUE,log_date,meal_photo_logs,client_id
+meal_photo_logs,UNIQUE,log_date,meal_photo_logs,log_date
+meal_photo_logs,UNIQUE,log_date,meal_photo_logs,meal_id
+habit_assignments,FOREIGN KEY,client_id,null,null
+habit_assignments,UNIQUE,habit_id,habit_assignments,client_id
+habit_assignments,UNIQUE,habit_id,habit_assignments,habit_id
+habit_assignments,UNIQUE,habit_id,habit_assignments,start_date
+habit_assignments,UNIQUE,client_id,habit_assignments,client_id
+habit_assignments,UNIQUE,client_id,habit_assignments,habit_id
+habit_assignments,UNIQUE,client_id,habit_assignments,start_date
+habit_assignments,UNIQUE,start_date,habit_assignments,client_id
+habit_assignments,UNIQUE,start_date,habit_assignments,habit_id
+habit_assignments,UNIQUE,start_date,habit_assignments,start_date
+habit_assignments,FOREIGN KEY,habit_id,habits,id
+habit_assignments,PRIMARY KEY,id,habit_assignments,id
+habit_logs,FOREIGN KEY,assignment_id,habit_assignments,id
+habit_logs,UNIQUE,assignment_id,habit_logs,assignment_id
+habit_logs,UNIQUE,assignment_id,habit_logs,log_date
+habit_logs,UNIQUE,log_date,habit_logs,assignment_id
+habit_logs,UNIQUE,log_date,habit_logs,log_date
+habit_logs,FOREIGN KEY,client_id,null,null
+habit_logs,PRIMARY KEY,id,habit_logs,id
+leaderboard_titles,UNIQUE,client_id,leaderboard_titles,category
+leaderboard_titles,UNIQUE,client_id,leaderboard_titles,client_id
+leaderboard_titles,UNIQUE,client_id,leaderboard_titles,earned_at
+leaderboard_titles,UNIQUE,client_id,leaderboard_titles,sex_filter
+leaderboard_titles,UNIQUE,category,leaderboard_titles,category
+leaderboard_titles,UNIQUE,category,leaderboard_titles,client_id
+leaderboard_titles,UNIQUE,category,leaderboard_titles,earned_at
+leaderboard_titles,UNIQUE,category,leaderboard_titles,sex_filter
+leaderboard_titles,UNIQUE,sex_filter,leaderboard_titles,category
+leaderboard_titles,UNIQUE,sex_filter,leaderboard_titles,client_id
+leaderboard_titles,UNIQUE,sex_filter,leaderboard_titles,earned_at
+leaderboard_titles,UNIQUE,sex_filter,leaderboard_titles,sex_filter
+leaderboard_titles,UNIQUE,earned_at,leaderboard_titles,category
+leaderboard_titles,UNIQUE,earned_at,leaderboard_titles,client_id
+leaderboard_titles,UNIQUE,earned_at,leaderboard_titles,earned_at
+leaderboard_titles,UNIQUE,earned_at,leaderboard_titles,sex_filter
+leaderboard_titles,FOREIGN KEY,client_id,profiles,id
+leaderboard_titles,PRIMARY KEY,id,leaderboard_titles,id
+leaderboard_titles,CHECK,null,leaderboard_titles,sex_filter
+client_workout_blocks,FOREIGN KEY,client_id,clients,id
+client_workout_blocks,PRIMARY KEY,id,client_workout_blocks,id
+client_workout_blocks,UNIQUE,workout_assignment_id,client_workout_blocks,block_order
+client_workout_blocks,UNIQUE,workout_assignment_id,client_workout_blocks,workout_assignment_id
+client_workout_blocks,UNIQUE,block_order,client_workout_blocks,block_order
+client_workout_blocks,UNIQUE,block_order,client_workout_blocks,workout_assignment_id
+client_workout_blocks,FOREIGN KEY,workout_assignment_id,workout_assignments,id
+client_workout_block_exercises,UNIQUE,client_block_id,client_workout_block_exercises,client_block_id
+client_workout_block_exercises,UNIQUE,client_block_id,client_workout_block_exercises,exercise_order
+client_workout_block_exercises,UNIQUE,exercise_order,client_workout_block_exercises,client_block_id
+client_workout_block_exercises,UNIQUE,exercise_order,client_workout_block_exercises,exercise_order
+client_workout_block_exercises,FOREIGN KEY,client_block_id,client_workout_blocks,id
+client_workout_block_exercises,FOREIGN KEY,client_id,clients,id
+client_workout_block_exercises,FOREIGN KEY,exercise_id,exercises,id
+client_workout_block_exercises,PRIMARY KEY,id,client_workout_block_exercises,id
+client_workout_block_exercises,FOREIGN KEY,workout_assignment_id,workout_assignments,id
+meal_plan_items,FOREIGN KEY,coach_id,profiles,id
+meal_plan_items,CHECK,null,meal_plan_items,day_of_week
+meal_plan_items,FOREIGN KEY,food_id,foods,id
+meal_plan_items,FOREIGN KEY,meal_plan_id,meal_plans,id
+meal_plan_items,CHECK,null,meal_plan_items,meal_type
+meal_plan_items,PRIMARY KEY,id,meal_plan_items,id
+program_assignment_progress,FOREIGN KEY,client_id,profiles,id
+program_assignment_progress,UNIQUE,client_id,program_assignment_progress,client_id
+program_assignment_progress,UNIQUE,client_id,program_assignment_progress,program_id
+program_assignment_progress,UNIQUE,program_id,program_assignment_progress,client_id
+program_assignment_progress,UNIQUE,program_id,program_assignment_progress,program_id
+program_assignment_progress,CHECK,null,program_assignment_progress,current_day
+program_assignment_progress,PRIMARY KEY,id,program_assignment_progress,id
+program_workout_completions,FOREIGN KEY,assignment_progress_id,program_assignment_progress,id
+program_workout_completions,FOREIGN KEY,client_id,profiles,id
+program_workout_completions,PRIMARY KEY,id,program_workout_completions,id
+program_workout_completions,CHECK,null,program_workout_completions,program_day
+program_workout_completions,UNIQUE,assignment_progress_id,program_workout_completions,assignment_progress_id
+program_workout_completions,UNIQUE,assignment_progress_id,program_workout_completions,program_day
+program_workout_completions,UNIQUE,assignment_progress_id,program_workout_completions,week_number
+program_workout_completions,UNIQUE,week_number,program_workout_completions,assignment_progress_id
+program_workout_completions,UNIQUE,week_number,program_workout_completions,program_day
+program_workout_completions,UNIQUE,week_number,program_workout_completions,week_number
+program_workout_completions,UNIQUE,program_day,program_workout_completions,assignment_progress_id
+program_workout_completions,UNIQUE,program_day,program_workout_completions,program_day
+program_workout_completions,UNIQUE,program_day,program_workout_completions,week_number
+performance_tests,FOREIGN KEY,client_id,profiles,id
+performance_tests,CHECK,null,performance_tests,perceived_effort
+performance_tests,PRIMARY KEY,id,performance_tests,id
+performance_tests,CHECK,null,performance_tests,test_type
+coach_time_slots,FOREIGN KEY,coach_id,profiles,id
+coach_time_slots,PRIMARY KEY,id,coach_time_slots,id
+coach_time_slots,CHECK,null,coach_time_slots,date
+coach_time_slots,CHECK,null,coach_time_slots,recurring_end_date
+coach_time_slots,CHECK,null,coach_time_slots,recurring_pattern
+coach_time_slots,CHECK,null,coach_time_slots,end_time
+coach_time_slots,CHECK,null,coach_time_slots,start_time
+booked_sessions,FOREIGN KEY,cancelled_by,profiles,id
+booked_sessions,FOREIGN KEY,client_id,profiles,id
+booked_sessions,FOREIGN KEY,coach_id,profiles,id
+booked_sessions,PRIMARY KEY,id,booked_sessions,id
+booked_sessions,FOREIGN KEY,time_slot_id,coach_time_slots,id
+booked_sessions,CHECK,null,booked_sessions,session_rating
+booked_sessions,CHECK,null,booked_sessions,session_type
+booked_sessions,CHECK,null,booked_sessions,status
+workout_hr_sets,CHECK,null,workout_hr_sets,duration_seconds
+workout_hr_sets,CHECK,null,workout_hr_sets,is_intervals
+workout_hr_sets,CHECK,null,workout_hr_sets,rest_duration_seconds
+workout_hr_sets,CHECK,null,workout_hr_sets,target_rounds
+workout_hr_sets,CHECK,null,workout_hr_sets,work_duration_seconds
+workout_hr_sets,CHECK,null,workout_hr_sets,hr_percentage_max
+workout_hr_sets,CHECK,null,workout_hr_sets,hr_percentage_min
+workout_hr_sets,CHECK,null,workout_hr_sets,hr_zone
+workout_hr_sets,CHECK,null,workout_hr_sets,average_hr_percentage
+workout_hr_sets,FOREIGN KEY,block_id,workout_blocks,id
+workout_hr_sets,CHECK,null,workout_hr_sets,distance_meters
+workout_hr_sets,CHECK,null,workout_hr_sets,duration_seconds
+workout_hr_sets,FOREIGN KEY,exercise_id,exercises,id
+workout_hr_sets,CHECK,null,workout_hr_sets,hr_percentage_max
+workout_hr_sets,CHECK,null,workout_hr_sets,hr_percentage_min
+workout_hr_sets,CHECK,null,workout_hr_sets,hr_zone
+workout_hr_sets,PRIMARY KEY,id,workout_hr_sets,id
+workout_hr_sets,CHECK,null,workout_hr_sets,rest_duration_seconds
+workout_hr_sets,CHECK,null,workout_hr_sets,rounds_completed
+workout_hr_sets,CHECK,null,workout_hr_sets,target_rounds
+workout_hr_sets,CHECK,null,workout_hr_sets,work_duration_seconds
+exercise_alternatives,FOREIGN KEY,alternative_exercise_id,exercises,id
+exercise_alternatives,PRIMARY KEY,id,exercise_alternatives,id
+exercise_alternatives,UNIQUE,primary_exercise_id,exercise_alternatives,alternative_exercise_id
+exercise_alternatives,UNIQUE,primary_exercise_id,exercise_alternatives,primary_exercise_id
+exercise_alternatives,UNIQUE,alternative_exercise_id,exercise_alternatives,alternative_exercise_id
+exercise_alternatives,UNIQUE,alternative_exercise_id,exercise_alternatives,primary_exercise_id
+exercise_alternatives,FOREIGN KEY,primary_exercise_id,exercises,id
+exercise_alternatives,CHECK,null,exercise_alternatives,reason
+workout_logs,CHECK,null,workout_logs,average_hr_percentage
+workout_logs,FOREIGN KEY,client_id,profiles,id
+workout_logs,CHECK,null,workout_logs,energy_level
+workout_logs,CHECK,null,workout_logs,max_hr_percentage
+workout_logs,CHECK,null,workout_logs,muscle_fatigue_level
+workout_logs,CHECK,null,workout_logs,overall_difficulty_rating
+workout_logs,CHECK,null,workout_logs,perceived_effort
+workout_logs,PRIMARY KEY,id,workout_logs,id
+workout_logs,CHECK,null,workout_logs,total_distance_meters
+workout_logs,CHECK,null,workout_logs,total_hr_zone2_minutes
+workout_logs,CHECK,null,workout_logs,total_hr_zone45_minutes
+workout_logs,FOREIGN KEY,workout_assignment_id,workout_assignments,id
+workout_logs,FOREIGN KEY,workout_session_id,workout_sessions,id
+exercises,PRIMARY KEY,id,exercises,id
+exercises,FOREIGN KEY,primary_muscle_group_id,muscle_groups,id
+exercises,FOREIGN KEY,secondary_muscle_group_1_id,muscle_groups,id
+exercises,FOREIGN KEY,secondary_muscle_group_2_id,muscle_groups,id
+exercises,UNIQUE,name,exercises,coach_id
+exercises,UNIQUE,name,exercises,name
+exercises,UNIQUE,coach_id,exercises,coach_id
+exercises,UNIQUE,coach_id,exercises,name
+workout_exercise_logs,CHECK,null,workout_exercise_logs,difficulty_rating
+workout_exercise_logs,FOREIGN KEY,exercise_id,exercises,id
+workout_exercise_logs,CHECK,null,workout_exercise_logs,form_quality_rating
+workout_exercise_logs,PRIMARY KEY,id,workout_exercise_logs,id
+workout_exercise_logs,FOREIGN KEY,workout_exercise_assignment_id,workout_exercise_assignments,id
+workout_exercise_logs,FOREIGN KEY,workout_log_id,workout_logs,id
+body_metrics,FOREIGN KEY,client_id,profiles,id
+body_metrics,UNIQUE,client_id,body_metrics,client_id
+body_metrics,UNIQUE,client_id,body_metrics,measured_date
+body_metrics,UNIQUE,measured_date,body_metrics,client_id
+body_metrics,UNIQUE,measured_date,body_metrics,measured_date
+body_metrics,FOREIGN KEY,coach_id,profiles,id
+body_metrics,PRIMARY KEY,id,body_metrics,id
+body_metrics,CHECK,null,body_metrics,visceral_fat_level
+mobility_metrics,UNIQUE,client_id,mobility_metrics,assessed_date
+mobility_metrics,UNIQUE,client_id,mobility_metrics,client_id
+mobility_metrics,UNIQUE,assessed_date,mobility_metrics,assessed_date
+mobility_metrics,UNIQUE,assessed_date,mobility_metrics,client_id
+mobility_metrics,FOREIGN KEY,client_id,profiles,id
+mobility_metrics,FOREIGN KEY,coach_id,profiles,id
+mobility_metrics,PRIMARY KEY,id,mobility_metrics,id
+fms_assessments,CHECK,null,fms_assessments,active_straight_leg_raise_left
+fms_assessments,CHECK,null,fms_assessments,active_straight_leg_raise_right
+fms_assessments,UNIQUE,client_id,fms_assessments,assessed_date
+fms_assessments,UNIQUE,client_id,fms_assessments,client_id
+fms_assessments,UNIQUE,assessed_date,fms_assessments,assessed_date
+fms_assessments,UNIQUE,assessed_date,fms_assessments,client_id
+fms_assessments,FOREIGN KEY,client_id,profiles,id
+fms_assessments,FOREIGN KEY,coach_id,profiles,id
+fms_assessments,CHECK,null,fms_assessments,deep_squat
+fms_assessments,CHECK,null,fms_assessments,hurdle_step_left
+fms_assessments,CHECK,null,fms_assessments,hurdle_step_right
+fms_assessments,CHECK,null,fms_assessments,inline_lunge_left
+fms_assessments,CHECK,null,fms_assessments,inline_lunge_right
+fms_assessments,PRIMARY KEY,id,fms_assessments,id
+fms_assessments,CHECK,null,fms_assessments,rotary_stability_left
+fms_assessments,CHECK,null,fms_assessments,rotary_stability_right
+fms_assessments,CHECK,null,fms_assessments,shoulder_mobility_left
+fms_assessments,CHECK,null,fms_assessments,shoulder_mobility_right
+fms_assessments,CHECK,null,fms_assessments,total_score
+fms_assessments,CHECK,null,fms_assessments,trunk_stability_pushup
+goals,CHECK,null,goals,category
+goals,FOREIGN KEY,client_id,profiles,id
+goals,FOREIGN KEY,coach_id,profiles,id
+goals,PRIMARY KEY,id,goals,id
+goals,CHECK,null,goals,priority
+goals,CHECK,null,goals,status
+achievements,CHECK,null,achievements,achievement_type
+achievements,FOREIGN KEY,client_id,profiles,id
+achievements,FOREIGN KEY,goal_id,goals,id
+achievements,PRIMARY KEY,id,achievements,id
+achievements,FOREIGN KEY,workout_id,workout_assignments,id
+personal_records,FOREIGN KEY,client_id,profiles,id
+personal_records,FOREIGN KEY,exercise_id,exercises,id
+personal_records,PRIMARY KEY,id,personal_records,id
+personal_records,CHECK,null,personal_records,record_type
+personal_records,FOREIGN KEY,workout_assignment_id,workout_assignments,id
+leaderboard_entries,FOREIGN KEY,client_id,profiles,id
+leaderboard_entries,FOREIGN KEY,exercise_id,exercises,id
+leaderboard_entries,PRIMARY KEY,id,leaderboard_entries,id
+client_program_progression_rules,FOREIGN KEY,client_id,profiles,id
+client_program_progression_rules,FOREIGN KEY,compound_exercise_id,exercises,id
+client_program_progression_rules,FOREIGN KEY,exercise_id,exercises,id
+client_program_progression_rules,PRIMARY KEY,id,client_program_progression_rules,id
+client_program_progression_rules,FOREIGN KEY,program_assignment_id,program_assignments,id
+client_program_progression_rules,FOREIGN KEY,second_exercise_id,exercises,id
+program_progression_rules,FOREIGN KEY,compound_exercise_id,exercises,id
+program_progression_rules,FOREIGN KEY,exercise_id,exercises,id
+program_progression_rules,PRIMARY KEY,id,program_progression_rules,id
+program_progression_rules,FOREIGN KEY,program_schedule_id,program_schedule,id
+program_progression_rules,FOREIGN KEY,second_exercise_id,exercises,id
+program_progression_rules,CHECK,null,program_progression_rules,sets
+program_progression_rules,CHECK,null,program_progression_rules,week_number
+user_exercise_metrics,FOREIGN KEY,exercise_id,exercises,id
+user_exercise_metrics,PRIMARY KEY,id,user_exercise_metrics,id
+user_exercise_metrics,UNIQUE,user_id,user_exercise_metrics,exercise_id
+user_exercise_metrics,UNIQUE,user_id,user_exercise_metrics,user_id
+user_exercise_metrics,UNIQUE,exercise_id,user_exercise_metrics,exercise_id
+user_exercise_metrics,UNIQUE,exercise_id,user_exercise_metrics,user_id
+user_exercise_metrics,FOREIGN KEY,user_id,null,null
+workout_drop_sets,FOREIGN KEY,block_id,workout_blocks,id
+workout_drop_sets,FOREIGN KEY,exercise_id,exercises,id
+workout_drop_sets,PRIMARY KEY,id,workout_drop_sets,id
+workout_pyramid_sets,FOREIGN KEY,block_id,workout_blocks,id
+workout_pyramid_sets,FOREIGN KEY,exercise_id,exercises,id
+workout_pyramid_sets,PRIMARY KEY,id,workout_pyramid_sets,id
+achievement_templates,PRIMARY KEY,id,achievement_templates,id
+user_achievements,FOREIGN KEY,achievement_template_id,achievement_templates,id
+user_achievements,FOREIGN KEY,client_id,profiles,id
+user_achievements,UNIQUE,client_id,user_achievements,achievement_template_id
+user_achievements,UNIQUE,client_id,user_achievements,client_id
+user_achievements,UNIQUE,client_id,user_achievements,tier
+user_achievements,UNIQUE,achievement_template_id,user_achievements,achievement_template_id
+user_achievements,UNIQUE,achievement_template_id,user_achievements,client_id
+user_achievements,UNIQUE,achievement_template_id,user_achievements,tier
+user_achievements,UNIQUE,tier,user_achievements,achievement_template_id
+user_achievements,UNIQUE,tier,user_achievements,client_id
+user_achievements,UNIQUE,tier,user_achievements,tier
+user_achievements,PRIMARY KEY,id,user_achievements,id
+user_achievements,FOREIGN KEY,user_id,null,null
+rp_volume_landmarks,FOREIGN KEY,muscle_group_id,muscle_groups,id
+rp_volume_landmarks,UNIQUE,muscle_group_name,rp_volume_landmarks,muscle_group_name
+rp_volume_landmarks,PRIMARY KEY,id,rp_volume_landmarks,id
+volume_guidelines,CHECK,null,volume_guidelines,category
+volume_guidelines,UNIQUE,category,volume_guidelines,category
+volume_guidelines,UNIQUE,category,volume_guidelines,difficulty
+volume_guidelines,UNIQUE,difficulty,volume_guidelines,category
+volume_guidelines,UNIQUE,difficulty,volume_guidelines,difficulty
+volume_guidelines,CHECK,null,volume_guidelines,difficulty
+volume_guidelines,PRIMARY KEY,id,volume_guidelines,id
+sessions,CHECK,null,null,null
+sessions,CHECK,null,null,null
+sessions,CHECK,null,null,null
+sessions,CHECK,null,null,null
+sessions,CHECK,null,null,null
+sessions,CHECK,null,null,null
+clients,CHECK,null,null,null
+clients,CHECK,null,null,null
+clients,CHECK,null,null,null
+clients,CHECK,null,null,null
+challenges,CHECK,null,null,null
+challenges,CHECK,null,null,null
+challenges,CHECK,null,null,null
+challenges,CHECK,null,null,null
+challenges,CHECK,null,null,null
+challenges,CHECK,null,null,null
+challenges,CHECK,null,null,null
+challenge_participants,CHECK,null,null,null
+challenge_participants,CHECK,null,null,null
+challenge_participants,CHECK,null,null,null
+challenge_participants,CHECK,null,null,null
+exercise_instructions,CHECK,null,null,null
+exercise_instructions,CHECK,null,null,null
+exercise_instructions,CHECK,null,null,null
+exercise_instructions,CHECK,null,null,null
+exercise_tips,CHECK,null,null,null
+exercise_tips,CHECK,null,null,null
+exercise_tips,CHECK,null,null,null
+exercise_tips,CHECK,null,null,null
+leaderboard_rankings,CHECK,null,null,null
+leaderboard_rankings,CHECK,null,null,null
+leaderboard_rankings,CHECK,null,null,null
+leaderboard_rankings,CHECK,null,null,null
+leaderboard_rankings,CHECK,null,null,null
+leaderboard_rankings,CHECK,null,null,null
+exercise_muscle_groups,CHECK,null,null,null
+exercise_muscle_groups,CHECK,null,null,null
+exercise_muscle_groups,CHECK,null,null,null
+exercise_equipment,CHECK,null,null,null
+exercise_equipment,CHECK,null,null,null
+exercise_equipment,CHECK,null,null,null
+workout_set_details,CHECK,null,null,null
+workout_set_details,CHECK,null,null,null
+workout_set_details,CHECK,null,null,null
+assigned_meal_plans,CHECK,null,null,null
+assigned_meal_plans,CHECK,null,null,null
+assigned_meal_plans,CHECK,null,null,null
+assigned_meal_plans,CHECK,null,null,null
+assigned_meal_plans,CHECK,null,null,null
+clip_cards,CHECK,null,null,null
+clip_cards,CHECK,null,null,null
+clip_cards,CHECK,null,null,null
+clip_cards,CHECK,null,null,null
+clip_cards,CHECK,null,null,null
+meal_completions,CHECK,null,null,null
+meal_completions,CHECK,null,null,null
+meal_completions,CHECK,null,null,null
+meal_completions,CHECK,null,null,null
+assigned_workouts,CHECK,null,null,null
+assigned_workouts,CHECK,null,null,null
+assigned_workouts,CHECK,null,null,null
+assigned_workouts,CHECK,null,null,null
+assigned_workouts,CHECK,null,null,null
+workout_giant_set_exercise_logs,CHECK,null,null,null
+workout_giant_set_exercise_logs,CHECK,null,null,null
+workout_giant_set_exercise_logs,CHECK,null,null,null
+workout_giant_set_exercise_logs,CHECK,null,null,null
+muscle_groups,CHECK,null,null,null
+muscle_groups,CHECK,null,null,null
+challenge_scoring_categories,CHECK,null,null,null
+challenge_scoring_categories,CHECK,null,null,null
+challenge_scoring_categories,CHECK,null,null,null
+challenge_scoring_categories,CHECK,null,null,null
+challenge_video_submissions,CHECK,null,null,null
+challenge_video_submissions,CHECK,null,null,null
+challenge_video_submissions,CHECK,null,null,null
+challenge_video_submissions,CHECK,null,null,null
+challenge_video_submissions,CHECK,null,null,null
+challenge_video_submissions,CHECK,null,null,null
+foods,CHECK,null,null,null
+foods,CHECK,null,null,null
+foods,CHECK,null,null,null
+foods,CHECK,null,null,null
+foods,CHECK,null,null,null
+meal_plans,CHECK,null,null,null
+meal_plans,CHECK,null,null,null
+meal_plans,CHECK,null,null,null
+meals,CHECK,null,null,null
+meals,CHECK,null,null,null
+meals,CHECK,null,null,null
+meals,CHECK,null,null,null
+meal_food_items,CHECK,null,null,null
+meal_food_items,CHECK,null,null,null
+meal_food_items,CHECK,null,null,null
+meal_food_items,CHECK,null,null,null
+meal_food_items,CHECK,null,null,null
+meal_plan_assignments,CHECK,null,null,null
+meal_plan_assignments,CHECK,null,null,null
+meal_plan_assignments,CHECK,null,null,null
+meal_plan_assignments,CHECK,null,null,null
+meal_plan_assignments,CHECK,null,null,null
+profiles,CHECK,null,null,null
+profiles,CHECK,null,null,null
+profiles,CHECK,null,null,null
+profiles,CHECK,null,null,null
+profiles,CHECK,null,null,null
+progression_guidelines,CHECK,null,null,null
+progression_guidelines,CHECK,null,null,null
+progression_guidelines,CHECK,null,null,null
+progression_guidelines,CHECK,null,null,null
+progression_guidelines,CHECK,null,null,null
+progression_guidelines,CHECK,null,null,null
+progression_guidelines,CHECK,null,null,null
+progression_guidelines,CHECK,null,null,null
+workout_set_logs,CHECK,null,null,null
+workout_set_logs,CHECK,null,null,null
+workout_set_logs,CHECK,null,null,null
+workout_set_logs,CHECK,null,null,null
+meal_items,CHECK,null,null,null
+meal_items,CHECK,null,null,null
+meal_items,CHECK,null,null,null
+meal_items,CHECK,null,null,null
+meal_items,CHECK,null,null,null
+meal_items,CHECK,null,null,null
+meal_items,CHECK,null,null,null
+meal_items,CHECK,null,null,null
+meal_items,CHECK,null,null,null
+meal_items,CHECK,null,null,null
+workout_templates,CHECK,null,null,null
+workout_templates,CHECK,null,null,null
+workout_templates,CHECK,null,null,null
+workout_blocks,CHECK,null,null,null
+workout_blocks,CHECK,null,null,null
+workout_blocks,CHECK,null,null,null
+workout_blocks,CHECK,null,null,null
+invite_codes,CHECK,null,null,null
+invite_codes,CHECK,null,null,null
+invite_codes,CHECK,null,null,null
+daily_workout_cache,CHECK,null,null,null
+daily_workout_cache,CHECK,null,null,null
+daily_workout_cache,CHECK,null,null,null
+daily_workout_cache,CHECK,null,null,null
+daily_workout_cache,CHECK,null,null,null
+program_schedule,CHECK,null,null,null
+program_schedule,CHECK,null,null,null
+program_schedule,CHECK,null,null,null
+program_schedule,CHECK,null,null,null
+program_schedule,CHECK,null,null,null
+workout_block_exercises,CHECK,null,null,null
+workout_block_exercises,CHECK,null,null,null
+workout_block_exercises,CHECK,null,null,null
+workout_block_exercises,CHECK,null,null,null
+workout_cluster_sets,CHECK,null,null,null
+workout_cluster_sets,CHECK,null,null,null
+workout_cluster_sets,CHECK,null,null,null
+coach_availability,CHECK,null,null,null
+coach_availability,CHECK,null,null,null
+coach_availability,CHECK,null,null,null
+coach_availability,CHECK,null,null,null
+coach_availability,CHECK,null,null,null
+clipcard_types,CHECK,null,null,null
+clipcard_types,CHECK,null,null,null
+clipcard_types,CHECK,null,null,null
+clipcard_types,CHECK,null,null,null
+clipcard_types,CHECK,null,null,null
+clipcard_types,CHECK,null,null,null
+exercise_categories,CHECK,null,null,null
+exercise_categories,CHECK,null,null,null
+clipcards,CHECK,null,null,null
+clipcards,CHECK,null,null,null
+clipcards,CHECK,null,null,null
+clipcards,CHECK,null,null,null
+clipcards,CHECK,null,null,null
+clipcards,CHECK,null,null,null
+clipcards,CHECK,null,null,null
+workout_rest_pause_sets,CHECK,null,null,null
+workout_time_protocols,CHECK,null,null,null
+workout_time_protocols,CHECK,null,null,null
+workout_time_protocols,CHECK,null,null,null
+workout_ladder_sets,CHECK,null,null,null
+workout_ladder_sets,CHECK,null,null,null
+workout_programs,CHECK,null,null,null
+workout_programs,CHECK,null,null,null
+workout_programs,CHECK,null,null,null
+program_days,CHECK,null,null,null
+program_days,CHECK,null,null,null
+program_days,CHECK,null,null,null
+program_days,CHECK,null,null,null
+program_days,CHECK,null,null,null
+program_assignments,CHECK,null,null,null
+program_assignments,CHECK,null,null,null
+program_assignments,CHECK,null,null,null
+program_assignments,CHECK,null,null,null
+program_assignments,CHECK,null,null,null
+program_assignments,CHECK,null,null,null
+program_day_assignments,CHECK,null,null,null
+program_day_assignments,CHECK,null,null,null
+program_day_assignments,CHECK,null,null,null
+program_day_assignments,CHECK,null,null,null
+program_day_assignments,CHECK,null,null,null
+workout_assignments,CHECK,null,null,null
+workout_assignments,CHECK,null,null,null
+workout_assignments,CHECK,null,null,null
+workout_assignments,CHECK,null,null,null
+workout_assignments,CHECK,null,null,null
+workout_block_assignments,CHECK,null,null,null
+workout_block_assignments,CHECK,null,null,null
+workout_block_assignments,CHECK,null,null,null
+workout_exercise_assignments,CHECK,null,null,null
+workout_exercise_assignments,CHECK,null,null,null
+workout_exercise_assignments,CHECK,null,null,null
+workout_exercise_assignments,CHECK,null,null,null
+workout_sessions,CHECK,null,null,null
+workout_sessions,CHECK,null,null,null
+workout_sessions,CHECK,null,null,null
+workout_categories,CHECK,null,null,null
+workout_categories,CHECK,null,null,null
+habits,CHECK,null,null,null
+habits,CHECK,null,null,null
+habits,CHECK,null,null,null
+habits,CHECK,null,null,null
+meal_photo_logs,CHECK,null,null,null
+meal_photo_logs,CHECK,null,null,null
+meal_photo_logs,CHECK,null,null,null
+meal_photo_logs,CHECK,null,null,null
+meal_photo_logs,CHECK,null,null,null
+meal_photo_logs,CHECK,null,null,null
+habit_assignments,CHECK,null,null,null
+habit_assignments,CHECK,null,null,null
+habit_assignments,CHECK,null,null,null
+habit_assignments,CHECK,null,null,null
+habit_logs,CHECK,null,null,null
+habit_logs,CHECK,null,null,null
+habit_logs,CHECK,null,null,null
+habit_logs,CHECK,null,null,null
+leaderboard_titles,CHECK,null,null,null
+leaderboard_titles,CHECK,null,null,null
+leaderboard_titles,CHECK,null,null,null
+leaderboard_titles,CHECK,null,null,null
+leaderboard_titles,CHECK,null,null,null
+client_workout_blocks,CHECK,null,null,null
+client_workout_blocks,CHECK,null,null,null
+client_workout_blocks,CHECK,null,null,null
+client_workout_blocks,CHECK,null,null,null
+client_workout_blocks,CHECK,null,null,null
+client_workout_blocks,CHECK,null,null,null
+client_workout_blocks,CHECK,null,null,null
+client_workout_block_exercises,CHECK,null,null,null
+client_workout_block_exercises,CHECK,null,null,null
+client_workout_block_exercises,CHECK,null,null,null
+client_workout_block_exercises,CHECK,null,null,null
+client_workout_block_exercises,CHECK,null,null,null
+client_workout_block_exercises,CHECK,null,null,null
+meal_plan_items,CHECK,null,null,null
+meal_plan_items,CHECK,null,null,null
+meal_plan_items,CHECK,null,null,null
+meal_plan_items,CHECK,null,null,null
+meal_plan_items,CHECK,null,null,null
+meal_plan_items,CHECK,null,null,null
+program_assignment_progress,CHECK,null,null,null
+program_assignment_progress,CHECK,null,null,null
+program_assignment_progress,CHECK,null,null,null
+program_assignment_progress,CHECK,null,null,null
+program_assignment_progress,CHECK,null,null,null
+program_assignment_progress,CHECK,null,null,null
+program_assignment_progress,CHECK,null,null,null
+program_workout_completions,CHECK,null,null,null
+program_workout_completions,CHECK,null,null,null
+program_workout_completions,CHECK,null,null,null
+program_workout_completions,CHECK,null,null,null
+program_workout_completions,CHECK,null,null,null
+program_workout_completions,CHECK,null,null,null
+program_workout_completions,CHECK,null,null,null
+program_workout_completions,CHECK,null,null,null
+performance_tests,CHECK,null,null,null
+performance_tests,CHECK,null,null,null
+performance_tests,CHECK,null,null,null
+performance_tests,CHECK,null,null,null
+coach_time_slots,CHECK,null,null,null
+coach_time_slots,CHECK,null,null,null
+coach_time_slots,CHECK,null,null,null
+coach_time_slots,CHECK,null,null,null
+coach_time_slots,CHECK,null,null,null
+booked_sessions,CHECK,null,null,null
+booked_sessions,CHECK,null,null,null
+booked_sessions,CHECK,null,null,null
+booked_sessions,CHECK,null,null,null
+booked_sessions,CHECK,null,null,null
+booked_sessions,CHECK,null,null,null
+workout_hr_sets,CHECK,null,null,null
+workout_hr_sets,CHECK,null,null,null
+workout_hr_sets,CHECK,null,null,null
+workout_hr_sets,CHECK,null,null,null
+workout_hr_sets,CHECK,null,null,null
+exercise_alternatives,CHECK,null,null,null
+exercise_alternatives,CHECK,null,null,null
+exercise_alternatives,CHECK,null,null,null
+exercise_alternatives,CHECK,null,null,null
+workout_logs,CHECK,null,null,null
+workout_logs,CHECK,null,null,null
+workout_logs,CHECK,null,null,null
+workout_logs,CHECK,null,null,null
+exercises,CHECK,null,null,null
+exercises,CHECK,null,null,null
+exercises,CHECK,null,null,null
+exercises,CHECK,null,null,null
+workout_exercise_logs,CHECK,null,null,null
+workout_exercise_logs,CHECK,null,null,null
+workout_exercise_logs,CHECK,null,null,null
+body_metrics,CHECK,null,null,null
+body_metrics,CHECK,null,null,null
+body_metrics,CHECK,null,null,null
+mobility_metrics,CHECK,null,null,null
+mobility_metrics,CHECK,null,null,null
+mobility_metrics,CHECK,null,null,null
+fms_assessments,CHECK,null,null,null
+fms_assessments,CHECK,null,null,null
+fms_assessments,CHECK,null,null,null
+goals,CHECK,null,null,null
+goals,CHECK,null,null,null
+goals,CHECK,null,null,null
+goals,CHECK,null,null,null
+goals,CHECK,null,null,null
+achievements,CHECK,null,null,null
+achievements,CHECK,null,null,null
+achievements,CHECK,null,null,null
+achievements,CHECK,null,null,null
+achievements,CHECK,null,null,null
+personal_records,CHECK,null,null,null
+personal_records,CHECK,null,null,null
+personal_records,CHECK,null,null,null
+personal_records,CHECK,null,null,null
+personal_records,CHECK,null,null,null
+personal_records,CHECK,null,null,null
+personal_records,CHECK,null,null,null
+leaderboard_entries,CHECK,null,null,null
+leaderboard_entries,CHECK,null,null,null
+leaderboard_entries,CHECK,null,null,null
+leaderboard_entries,CHECK,null,null,null
+leaderboard_entries,CHECK,null,null,null
+client_program_progression_rules,CHECK,null,null,null
+client_program_progression_rules,CHECK,null,null,null
+client_program_progression_rules,CHECK,null,null,null
+client_program_progression_rules,CHECK,null,null,null
+program_progression_rules,CHECK,null,null,null
+program_progression_rules,CHECK,null,null,null
+program_progression_rules,CHECK,null,null,null
+program_progression_rules,CHECK,null,null,null
+program_progression_rules,CHECK,null,null,null
+user_exercise_metrics,CHECK,null,null,null
+user_exercise_metrics,CHECK,null,null,null
+user_exercise_metrics,CHECK,null,null,null
+user_exercise_metrics,CHECK,null,null,null
+workout_drop_sets,CHECK,null,null,null
+workout_drop_sets,CHECK,null,null,null
+workout_pyramid_sets,CHECK,null,null,null
+workout_pyramid_sets,CHECK,null,null,null
+achievement_templates,CHECK,null,null,null
+achievement_templates,CHECK,null,null,null
+achievement_templates,CHECK,null,null,null
+achievement_templates,CHECK,null,null,null
+achievement_templates,CHECK,null,null,null
+achievement_templates,CHECK,null,null,null
+user_achievements,CHECK,null,null,null
+user_achievements,CHECK,null,null,null
+user_achievements,CHECK,null,null,null
+user_achievements,CHECK,null,null,null
+user_achievements,CHECK,null,null,null
+user_achievements,CHECK,null,null,null
+user_achievements,CHECK,null,null,null
+user_achievements,CHECK,null,null,null
+rp_volume_landmarks,CHECK,null,null,null
+rp_volume_landmarks,CHECK,null,null,null
+rp_volume_landmarks,CHECK,null,null,null
+rp_volume_landmarks,CHECK,null,null,null
+rp_volume_landmarks,CHECK,null,null,null
+rp_volume_landmarks,CHECK,null,null,null
+rp_volume_landmarks,CHECK,null,null,null
+rp_volume_landmarks,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null
+volume_guidelines,CHECK,null,null,null

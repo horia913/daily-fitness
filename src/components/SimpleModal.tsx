@@ -104,14 +104,14 @@ export default function SimpleModal({
       data-theme={isDark ? 'dark' : 'light'}
     >
       <div 
-        className={`relative w-full ${sizeStyles} max-h-[90vh] ${theme.card} ${theme.shadow} rounded-3xl border ${variantStyles.borderColor} flex flex-col transform transition-all duration-300 ease-out`}
+        className={`relative w-full ${sizeStyles} max-h-[90vh] ${theme.card} ${theme.shadow} fc-glass fc-card rounded-3xl border ${variantStyles.borderColor} flex flex-col transform transition-all duration-300 ease-out`}
         onClick={(e) => e.stopPropagation()}
         style={{
           animation: 'modalSlideIn 0.3s ease-out'
         }}
       >
         {/* Header */}
-        <div className={`px-6 py-5 border-b ${variantStyles.borderColor} flex-shrink-0`}>
+        <div className={`px-6 py-5 border-b ${variantStyles.borderColor} flex-shrink-0 fc-glass fc-card`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {showIcon && IconComponent && (
@@ -140,7 +140,7 @@ export default function SimpleModal({
 
         {/* Footer */}
         {footer && (
-          <div className={`px-6 py-5 border-t ${variantStyles.borderColor} flex-shrink-0`}>
+          <div className={`px-6 py-5 border-t ${variantStyles.borderColor} flex-shrink-0 fc-glass fc-card`}>
             {footer}
           </div>
         )}

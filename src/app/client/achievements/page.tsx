@@ -5,13 +5,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -570,68 +564,27 @@ export default function ClientAchievements() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 dark:from-slate-900 dark:to-slate-800">
-          <div className="p-4">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Header Skeleton */}
-              <div className="text-center space-y-4 py-8">
-                <div className="animate-pulse">
-                  <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded-2xl w-80 mx-auto mb-4"></div>
-                  <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-96 mx-auto mb-6"></div>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="fc-glass fc-card p-8">
+              <div className="animate-pulse space-y-6">
+                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  ))}
                 </div>
-              </div>
-
-              {/* Stats Cards Skeleton */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                        <div>
-                          <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg mb-2"></div>
-                          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Filter Skeleton */}
-              <div className="animate-pulse">
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg">
-                  <div className="flex gap-4">
-                    <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg w-32"></div>
-                    <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg w-32"></div>
-                  </div>
+                <div className="h-16 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="space-y-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-28 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  ))}
                 </div>
-              </div>
-
-              {/* Achievement Cards Skeleton */}
-              <div className="space-y-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                          <div>
-                            <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-48 mb-2"></div>
-                            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32"></div>
-                          </div>
-                        </div>
-                        <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
-                      </div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full mb-2"></div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/3"></div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -642,191 +595,172 @@ export default function ClientAchievements() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen">
-        <div className="p-4">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="text-center space-y-4 py-8">
-              <div className="flex items-center justify-center gap-3 mb-4">
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Trophy className="w-7 h-7 text-white" />
+                  <Trophy className="w-6 h-6 text-white" />
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
-                  Trophy Room
-                </h1>
+                <div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Trophy Room
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                    Achievements
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    {getMotivationalMessage()}
+                  </p>
+                </div>
               </div>
-              <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-                {getMotivationalMessage()}
-              </p>
-              <div className="flex items-center justify-center gap-3">
-                <Button className="bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white rounded-xl px-5 py-2 shadow-lg">
+              <div className="flex flex-wrap gap-3">
+                <Button className="fc-btn fc-btn-primary">
                   <Share2 className="w-4 h-4 mr-2" />
                   Share Trophy Room
                 </Button>
-                <Button variant="outline" className="rounded-xl">
+                <Button variant="outline" className="fc-btn fc-btn-secondary">
                   <ExternalLink className="w-4 h-4 mr-2" />
                   View Public Profile
                 </Button>
               </div>
             </div>
+          </GlassCard>
 
-            {/* Achievement Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
-                      <Award className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Earned
-                      </p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-                        {stats.earned}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-slate-500 to-slate-600 rounded-xl flex items-center justify-center">
-                      <Star className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Available
-                      </p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-                        {stats.locked}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                      <Flame className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Streaks
-                      </p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-                        {stats.streaks}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                      <TrendingUp className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        PRs
-                      </p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-                        {stats.prs}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Filters and Sorting */}
-            <Card className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg border-0">
-              <CardContent className="p-0">
-                <div className="flex flex-col lg:flex-row gap-4">
-                  <div className="flex-1">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
-                      Category
-                    </label>
-                    <Tabs
-                      value={activeTab}
-                      onValueChange={setActiveTab}
-                      className="w-full"
-                    >
-                      <TabsList className="grid w-full grid-cols-3 lg:grid-cols-5 bg-slate-100 dark:bg-slate-700">
-                        <TabsTrigger value="all" className="text-xs">
-                          All
-                        </TabsTrigger>
-                        <TabsTrigger value="streak" className="text-xs">
-                          <Flame className="w-3 h-3 mr-1" />
-                          Streaks
-                        </TabsTrigger>
-                        <TabsTrigger value="pr" className="text-xs">
-                          <TrendingUp className="w-3 h-3 mr-1" />
-                          PRs
-                        </TabsTrigger>
-                        <TabsTrigger value="goal" className="text-xs">
-                          <Target className="w-3 h-3 mr-1" />
-                          Goals
-                        </TabsTrigger>
-                        <TabsTrigger value="milestone" className="text-xs">
-                          <Trophy className="w-3 h-3 mr-1" />
-                          Milestones
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
-                        Status
-                      </label>
-                      <select
-                        value={filterStatus}
-                        onChange={(e) =>
-                          setFilterStatus(
-                            e.target.value as "all" | "earned" | "locked"
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                      >
-                        <option value="all">All Achievements</option>
-                        <option value="earned">Earned Only</option>
-                        <option value="locked">Locked Only</option>
-                      </select>
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
-                        Sort by
-                      </label>
-                      <select
-                        value={sortBy}
-                        onChange={(e) =>
-                          setSortBy(
-                            e.target.value as
-                              | "newest"
-                              | "oldest"
-                              | "progress"
-                              | "rarity"
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                      >
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                        <option value="progress">Progress</option>
-                        <option value="rarity">Rarity</option>
-                      </select>
-                    </div>
-                  </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <GlassCard elevation={1} className="fc-glass fc-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
+                  <Award className="w-6 h-6 text-white" />
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <p className="text-sm text-[color:var(--fc-text-subtle)]">Earned</p>
+                  <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                    {stats.earned}
+                  </p>
+                </div>
+              </div>
+            </GlassCard>
+            <GlassCard elevation={1} className="fc-glass fc-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-slate-500 to-slate-600 rounded-xl flex items-center justify-center">
+                  <Star className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-[color:var(--fc-text-subtle)]">Available</p>
+                  <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                    {stats.locked}
+                  </p>
+                </div>
+              </div>
+            </GlassCard>
+            <GlassCard elevation={1} className="fc-glass fc-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                  <Flame className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-[color:var(--fc-text-subtle)]">Streaks</p>
+                  <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                    {stats.streaks}
+                  </p>
+                </div>
+              </div>
+            </GlassCard>
+            <GlassCard elevation={1} className="fc-glass fc-card p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-[color:var(--fc-text-subtle)]">PRs</p>
+                  <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                    {stats.prs}
+                  </p>
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+
+          <GlassCard elevation={2} className="fc-glass fc-card p-4">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-medium text-[color:var(--fc-text-dim)] mb-2 block">
+                  Category
+                </label>
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="w-full"
+                >
+                  <TabsList className="grid w-full grid-cols-3 lg:grid-cols-5 bg-[color:var(--fc-glass-highlight)]">
+                    <TabsTrigger value="all" className="text-xs">
+                      All
+                    </TabsTrigger>
+                    <TabsTrigger value="streak" className="text-xs">
+                      <Flame className="w-3 h-3 mr-1" />
+                      Streaks
+                    </TabsTrigger>
+                    <TabsTrigger value="pr" className="text-xs">
+                      <TrendingUp className="w-3 h-3 mr-1" />
+                      PRs
+                    </TabsTrigger>
+                    <TabsTrigger value="goal" className="text-xs">
+                      <Target className="w-3 h-3 mr-1" />
+                      Goals
+                    </TabsTrigger>
+                    <TabsTrigger value="milestone" className="text-xs">
+                      <Trophy className="w-3 h-3 mr-1" />
+                      Milestones
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-[color:var(--fc-text-dim)] mb-2 block">
+                    Status
+                  </label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) =>
+                      setFilterStatus(
+                        e.target.value as "all" | "earned" | "locked"
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-[color:var(--fc-glass-border)] rounded-xl bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-primary)]"
+                  >
+                    <option value="all">All Achievements</option>
+                    <option value="earned">Earned Only</option>
+                    <option value="locked">Locked Only</option>
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-[color:var(--fc-text-dim)] mb-2 block">
+                    Sort by
+                  </label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) =>
+                      setSortBy(
+                        e.target.value as
+                          | "newest"
+                          | "oldest"
+                          | "progress"
+                          | "rarity"
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-[color:var(--fc-glass-border)] rounded-xl bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-primary)]"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="progress">Progress</option>
+                    <option value="rarity">Rarity</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
 
             {/* Achievements List */}
             <div className="space-y-4">
@@ -838,26 +772,26 @@ export default function ClientAchievements() {
                 const rarityColor = getRarityColor(rarity);
 
                 return (
-                  <Card
+                  <GlassCard
                     key={achievement.id}
-                    className={`bg-gradient-to-r ${getAchievementGradient(
+                    elevation={2}
+                    className={`fc-glass fc-card p-6 ${getAchievementGradient(
                       achievement
-                    )} rounded-2xl p-6 shadow-lg border-0 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] ${
+                    )} ${
                       achievement.is_earned
-                        ? "ring-2 ring-yellow-200 dark:ring-yellow-900/30 animate-in fade-in"
-                        : "opacity-75"
+                        ? "ring-2 ring-[color:var(--fc-status-warning)]/40 animate-in fade-in"
+                        : "opacity-85"
                     }`}
                   >
-                    <CardContent className="p-0">
                       <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                         {/* Left Section - Icon and Info */}
                         <div className="flex items-start gap-4 flex-1">
-                          <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-lg">
+                          <div className="w-20 h-20 bg-[color:var(--fc-glass-highlight)] rounded-2xl flex items-center justify-center shadow-lg">
                             {getAchievementIcon(achievement)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 truncate">
+                              <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)] truncate">
                                 {achievement.title}
                               </h3>
                               <Badge
@@ -866,7 +800,7 @@ export default function ClientAchievements() {
                                 {rarity}
                               </Badge>
                               {achievement.is_earned ? (
-                                <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full px-3 py-1">
+                                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 rounded-full px-3 py-1">
                                   <CheckCircle className="w-3 h-3 mr-1" />
                                   Earned
                                 </Badge>
@@ -877,10 +811,10 @@ export default function ClientAchievements() {
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-slate-600 dark:text-slate-300 mb-3">
+                            <p className="text-[color:var(--fc-text-dim)] mb-3">
                               {achievement.description}
                             </p>
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-[color:var(--fc-text-subtle)]">
                               {achievement.value && (
                                 <span className="flex items-center gap-1">
                                   <TargetIcon className="w-4 h-4" />
@@ -905,7 +839,7 @@ export default function ClientAchievements() {
                         <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                           {/* Progress Circle */}
                           <div className="flex items-center gap-4">
-                            <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-lg">
+                            <div className="w-20 h-20 bg-[color:var(--fc-glass-highlight)] rounded-full flex items-center justify-center shadow-lg">
                               <div
                                 className="w-16 h-16 rounded-full flex items-center justify-center text-sm font-bold"
                                 style={{
@@ -924,7 +858,7 @@ export default function ClientAchievements() {
                                   }deg, #E5E7EB 0deg)`,
                                 }}
                               >
-                                <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center">
+                                <div className="w-12 h-12 bg-[color:var(--fc-glass-highlight)] rounded-full flex items-center justify-center">
                                   <span
                                     className={`text-xs font-bold ${
                                       achievement.is_earned
@@ -946,12 +880,12 @@ export default function ClientAchievements() {
                               </div>
                             </div>
                             <div className="text-center">
-                              <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+                              <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                                 {achievement.is_earned
                                   ? "100%"
                                   : `${Math.round(progressPercentage)}%`}
                               </p>
-                              <p className="text-sm text-slate-500 dark:text-slate-400">
+                              <p className="text-sm text-[color:var(--fc-text-subtle)]">
                                 {achievement.is_earned
                                   ? "complete"
                                   : "progress"}
@@ -964,10 +898,10 @@ export default function ClientAchievements() {
                             achievement.max_progress && (
                               <div className="w-full lg:w-48">
                                 <div className="flex justify-between text-sm mb-2">
-                                  <span className="text-slate-600 dark:text-slate-400">
+                                  <span className="text-[color:var(--fc-text-subtle)]">
                                     Progress
                                   </span>
-                                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                                  <span className="font-medium text-[color:var(--fc-text-primary)]">
                                     {progress}/{maxProgress}
                                   </span>
                                 </div>
@@ -983,7 +917,7 @@ export default function ClientAchievements() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="rounded-xl"
+                              className="fc-btn fc-btn-secondary"
                             >
                               <ExternalLink className="w-3 h-3 mr-1" />
                               View Details
@@ -991,7 +925,7 @@ export default function ClientAchievements() {
                             {achievement.is_earned && (
                               <Button
                                 size="sm"
-                                className="rounded-xl bg-gradient-to-r from-yellow-500 to-orange-600 text-white"
+                                className="fc-btn fc-btn-primary"
                               >
                                 <Share2 className="w-3 h-3 mr-1" />
                                 Share
@@ -1000,46 +934,41 @@ export default function ClientAchievements() {
                           </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                  </GlassCard>
                 );
               })}
 
               {filteredAndSortedAchievements().length === 0 && (
-                <Card className="bg-white dark:bg-slate-800 rounded-2xl p-12 shadow-lg border-0">
-                  <CardContent className="text-center">
-                    <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                      <Trophy className="w-12 h-12 text-slate-400" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-4">
-                      {filterStatus === "earned"
-                        ? "No Achievements Earned Yet"
-                        : filterStatus === "locked"
-                        ? "No Locked Achievements"
-                        : "No Achievements Found"}
-                    </h3>
-                    <p className="text-slate-600 dark:text-slate-300 mb-8 max-w-md mx-auto">
-                      {filterStatus === "earned"
-                        ? "You haven't earned any achievements yet. Keep working towards your goals!"
-                        : filterStatus === "locked"
-                        ? "All achievements are unlocked! You're doing amazing!"
-                        : "No achievements match your current filters."}
-                    </p>
-                    {filterStatus !== "all" && (
-                      <Button
-                        onClick={() => setFilterStatus("all")}
-                        className="bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white rounded-xl px-8 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                      >
-                        <Eye className="w-5 h-5 mr-2" />
-                        View All Achievements
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
+                <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+                  <div className="w-24 h-24 bg-[color:var(--fc-glass-highlight)] rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <Trophy className="w-12 h-12 text-[color:var(--fc-text-subtle)]" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
+                    {filterStatus === "earned"
+                      ? "No Achievements Earned Yet"
+                      : filterStatus === "locked"
+                      ? "No Locked Achievements"
+                      : "No Achievements Found"}
+                  </h3>
+                  <p className="text-[color:var(--fc-text-dim)] mb-8 max-w-md mx-auto">
+                    {filterStatus === "earned"
+                      ? "You haven't earned any achievements yet. Keep working towards your goals!"
+                      : filterStatus === "locked"
+                      ? "All achievements are unlocked! You're doing amazing!"
+                      : "No achievements match your current filters."}
+                  </p>
+                  {filterStatus !== "all" && (
+                    <Button
+                      onClick={() => setFilterStatus("all")}
+                      className="fc-btn fc-btn-primary"
+                    >
+                      <Eye className="w-5 h-5 mr-2" />
+                      View All Achievements
+                    </Button>
+                  )}
+                </GlassCard>
               )}
-            </div>
           </div>
-        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

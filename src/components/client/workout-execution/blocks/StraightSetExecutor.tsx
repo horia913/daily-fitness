@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { LargeInput } from "../ui/LargeInput";
+import { useLoggingReset } from "../hooks/useLoggingReset";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import {
@@ -36,10 +37,16 @@ export function StraightSetExecutor({
   onAlternativesClick,
   onRestTimerClick,
   onSetComplete,
+  progressionSuggestion,
 }: StraightSetExecutorProps) {
   const { addToast } = useToast();
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
-  const totalSets = block.block.total_sets || 1;
+  // Use exercise.sets if available, otherwise fall back to block.total_sets, then default to 1
+  const totalSets = (currentExercise?.sets !== null && currentExercise?.sets !== undefined)
+    ? currentExercise.sets
+    : (block.block.total_sets !== null && block.block.total_sets !== undefined)
+      ? block.block.total_sets
+      : 1;
   const completedSets = block.completedSets || 0;
 
   // Use block.completedSets for progress display (1-indexed)
@@ -47,6 +54,7 @@ export function StraightSetExecutor({
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [loggedSetsArray, setLoggedSetsArray] = useState<LoggedSet[]>([]);
 
   // Pre-fill with suggested weight when set number or exercise changes
@@ -198,6 +206,19 @@ export function StraightSetExecutor({
         const updatedLoggedSets = [...loggedSetsArray, loggedSet];
         setLoggedSetsArray(updatedLoggedSets);
 
+        console.log("[StraightSetExecutor] set logged", {
+          currentSetNumber,
+          totalSets,
+          isLastSet: currentSetNumber >= totalSets,
+        });
+        console.log("[log-set success]", {
+          blockId: block.block.id,
+          setNumber: currentSetNumber,
+          isLastSet: currentSetNumber >= totalSets,
+          completedSets: currentSetNumber,
+          totalSets,
+        });
+
         if (result.e1rm && onE1rmUpdate) {
           onE1rmUpdate(currentExercise.exercise_id, result.e1rm);
         }
@@ -215,6 +236,11 @@ export function StraightSetExecutor({
 
         // Check if this was the last set
         if (currentSetNumber >= totalSets) {
+          console.log("[StraightSetExecutor] triggering onBlockComplete", {
+            blockId: block.block.id,
+            currentSetNumber,
+            totalSets,
+          });
           // Complete the block
           onBlockComplete(block.block.id, updatedLoggedSets);
         } else {
@@ -254,7 +280,7 @@ export function StraightSetExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       <GlassCard elevation={1} className="p-4 space-y-4">
-        <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+        <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
           Set {currentSetNumber} of {totalSets}
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -265,6 +291,8 @@ export function StraightSetExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <LargeInput
             label="Reps"
@@ -272,6 +300,8 @@ export function StraightSetExecutor({
             onChange={setReps}
             placeholder="0"
             step="1"
+            showStepper
+            stepAmount={1}
           />
         </div>
       </GlassCard>
@@ -321,6 +351,7 @@ export function StraightSetExecutor({
         onVideoClick,
         onAlternativesClick,
         onRestTimerClick,
+        progressionSuggestion,
       }}
       exerciseName={currentExercise?.exercise?.name || "Exercise"}
       blockDetails={blockDetails}
@@ -335,6 +366,7 @@ export function StraightSetExecutor({
       showRestTimer={
         !!(block.block.rest_seconds || currentExercise?.rest_seconds)
       }
+      progressionSuggestion={progressionSuggestion}
     />
   );
 }

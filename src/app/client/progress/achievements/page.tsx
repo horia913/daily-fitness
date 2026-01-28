@@ -28,7 +28,7 @@ interface Achievement {
 
 function AchievementsPageContent() {
   const { user } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
 
   const [achievements, setAchievements] = useState<Achievement[]>([]);
 
@@ -45,7 +45,11 @@ function AchievementsPageContent() {
   }, [user]);
 
   const loadAchievementsData = async () => {
-    if (!user) return;
+    if (!user) {
+      setAchievements([]);
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
@@ -162,210 +166,218 @@ function AchievementsPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
-          {/* Header */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-4">
-            <Link href="/client/progress">
-                  <Button variant="ghost" size="sm">
-                    <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-              <div>
-                  <h1
-                    className="text-3xl font-bold mb-1"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+        <div className="space-y-8">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-6">
+              <div className="flex items-start gap-4">
+                <Link href="/client/progress">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="fc-btn fc-btn-ghost h-10 w-10"
                   >
-                  Achievements
-                </h1>
-                  <p
-                    className="text-sm"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.6)"
-                        : "rgba(0,0,0,0.6)",
-                    }}
-                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                </Link>
+                <div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Progress Hub
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                    Achievements
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
                     {unlockedCount} unlocked · {inProgressCount} in progress ·{" "}
                     {lockedCount} locked
-                      </p>
-                    </div>
-                  </div>
+                  </p>
+                </div>
+              </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-sm font-medium"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.7)"
-                        : "rgba(0,0,0,0.7)",
-                    }}
-                  >
-                    Status:
-                  </span>
-                  <Button
-                    variant={filterStatus === "all" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterStatus("all")}
-                    style={
-                      filterStatus === "all"
-                        ? {
-                            background: getSemanticColor("trust").gradient,
-                            boxShadow: `0 4px 12px ${
-                              getSemanticColor("trust").primary
-                            }30`,
-                          }
-                        : {}
-                    }
-                  >
-                    All
-                  </Button>
-                  <Button
-                    variant={filterStatus === "unlocked" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterStatus("unlocked")}
-                    style={
-                      filterStatus === "unlocked"
-                        ? {
-                            background: getSemanticColor("success").gradient,
-                            boxShadow: `0 4px 12px ${
-                              getSemanticColor("success").primary
-                            }30`,
-                          }
-                        : {}
-                    }
-                  >
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="fc-glass-soft fc-card p-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
                     Unlocked
-                  </Button>
-                  <Button
-                    variant={filterStatus === "progress" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterStatus("progress")}
-                    style={
-                      filterStatus === "progress"
-                        ? {
-                            background: getSemanticColor("warning").gradient,
-                            boxShadow: `0 4px 12px ${
-                              getSemanticColor("warning").primary
-                            }30`,
-                          }
-                        : {}
-                    }
-                  >
+                  </p>
+                  <p className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                    {unlockedCount}
+                  </p>
+                </div>
+                <div className="fc-glass-soft fc-card p-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
                     In Progress
-                  </Button>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <span
-                    className="text-sm font-medium"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.7)"
-                        : "rgba(0,0,0,0.7)",
-                    }}
-                  >
-                    Rarity:
-                                </span>
-                  <Button
-                    variant={filterRarity === "all" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterRarity("all")}
-                  >
-                    All
-                  </Button>
-                  <Button
-                    variant={filterRarity === "common" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterRarity("common")}
-                  >
-                    Common
-                  </Button>
-                  <Button
-                    variant={filterRarity === "uncommon" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterRarity("uncommon")}
-                  >
-                    Uncommon
-                  </Button>
-                  <Button
-                    variant={filterRarity === "rare" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterRarity("rare")}
-                  >
-                    Rare
-                  </Button>
-                  <Button
-                    variant={filterRarity === "epic" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterRarity("epic")}
-                  >
-                    Epic
-                  </Button>
-                  <Button
-                    variant={filterRarity === "legendary" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterRarity("legendary")}
-                  >
-                    Legendary
-                  </Button>
+                  </p>
+                  <p className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                    {inProgressCount}
+                  </p>
+                </div>
+                <div className="fc-glass-soft fc-card p-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                    Locked
+                  </p>
+                  <p className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                    {lockedCount}
+                  </p>
                 </div>
               </div>
             </div>
           </GlassCard>
-        </div>
 
-        {/* Achievements Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAchievements.map((achievement) => (
-            <AchievementCard key={achievement.id} achievement={achievement} />
-          ))}
-        </div>
+          <GlassCard elevation={1} className="fc-glass fc-card p-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--fc-glass-soft)]">
+                <Filter className="h-5 w-5 text-[color:var(--fc-text-dim)]" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                  Filters
+                </h2>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  Narrow by status or rarity tier.
+                </p>
+              </div>
+            </div>
 
-        {/* Empty State */}
-        {filteredAchievements.length === 0 && (
-          <GlassCard elevation={2} className="p-12 text-center">
-            <Award
-              className="w-16 h-16 mx-auto mb-4"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-              }}
-            />
-            <p
-              className="text-lg font-semibold mb-2"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-              }}
-            >
-              No achievements found
-            </p>
-            <p
-              className="text-sm mb-4"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              }}
-            >
-              Try adjusting your filters to see more achievements
-            </p>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setFilterRarity("all");
-                setFilterStatus("all");
-              }}
-              style={{
-                background: getSemanticColor("trust").gradient,
-                boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-              }}
-            >
-              Reset Filters
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                  Status
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFilterStatus("all")}
+                    className={`fc-btn ${
+                      filterStatus === "all" ? "fc-btn-primary" : "fc-btn-ghost"
+                    }`}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFilterStatus("unlocked")}
+                    className={`fc-btn ${
+                      filterStatus === "unlocked"
+                        ? "fc-btn-primary"
+                        : "fc-btn-ghost"
+                    }`}
+                  >
+                    Unlocked
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFilterStatus("progress")}
+                    className={`fc-btn ${
+                      filterStatus === "progress"
+                        ? "fc-btn-primary"
+                        : "fc-btn-ghost"
+                    }`}
+                  >
+                    In Progress
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFilterStatus("locked")}
+                    className={`fc-btn ${
+                      filterStatus === "locked"
+                        ? "fc-btn-primary"
+                        : "fc-btn-ghost"
+                    }`}
+                  >
+                    Locked
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                  Rarity
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[
+                    "all",
+                    "common",
+                    "uncommon",
+                    "rare",
+                    "epic",
+                    "legendary",
+                  ].map((rarity) => (
+                    <Button
+                      key={rarity}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setFilterRarity(
+                          rarity as
+                            | "all"
+                            | "common"
+                            | "uncommon"
+                            | "rare"
+                            | "epic"
+                            | "legendary"
+                        )
+                      }
+                      className={`fc-btn ${
+                        filterRarity === rarity
+                          ? "fc-btn-primary"
+                          : "fc-btn-ghost"
+                      }`}
+                    >
+                      {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
                     </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </GlassCard>
+
+          {loading ? (
+            <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[color:var(--fc-accent-purple)]" />
+              <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
+                Loading achievements...
+              </p>
+            </GlassCard>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {filteredAchievements.map((achievement) => (
+                  <AchievementCard key={achievement.id} achievement={achievement} />
+                ))}
+              </div>
+
+              {filteredAchievements.length === 0 && (
+                <GlassCard
+                  elevation={2}
+                  className="fc-glass fc-card p-12 text-center"
+                >
+                  <Award className="mx-auto mb-4 h-16 w-16 text-[color:var(--fc-text-subtle)]" />
+                  <p className="mb-2 text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                    No achievements found
+                  </p>
+                  <p className="mb-4 text-sm text-[color:var(--fc-text-dim)]">
+                    Try adjusting your filters to see more achievements.
+                  </p>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setFilterRarity("all");
+                      setFilterStatus("all");
+                    }}
+                    className="fc-btn fc-btn-secondary"
+                  >
+                    Reset Filters
+                  </Button>
+                </GlassCard>
+              )}
+            </>
           )}
         </div>
+      </div>
     </AnimatedBackground>
   );
 }

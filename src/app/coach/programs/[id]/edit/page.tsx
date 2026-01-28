@@ -30,21 +30,25 @@ import {
   Dumbbell,
   Coffee,
   Info,
+  Target,
 } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
 import { useExerciseLibrary } from "@/hooks/useCoachData";
 import ProgramProgressionRulesEditor from "@/components/coach/ProgramProgressionRulesEditor";
 import ProgramProgressionService from "@/lib/programProgressionService";
+import ProgramVolumeCalculator from "@/components/coach/ProgramVolumeCalculator";
+import ProgressionSuggestionsModal from "@/components/coach/ProgressionSuggestionsModal";
 
 interface Program {
   id: string;
   name: string;
   description?: string;
   coach_id: string;
-  difficulty_level: "beginner" | "intermediate" | "advanced";
+  difficulty_level: "beginner" | "intermediate" | "advanced" | "athlete";
   duration_weeks: number;
   target_audience: string;
+  category?: string | null; // Training category for volume calculator
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -238,6 +242,10 @@ function EditProgramContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Program | null>(null);
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string; color?: string }>
+  >([]);
+  const [categoryId, setCategoryId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<
     "basic" | "schedule" | "progression"
   >("basic");
@@ -252,9 +260,55 @@ function EditProgramContent() {
   );
   const [selectedScheduleForProgression, setSelectedScheduleForProgression] =
     useState<ProgramSchedule | null>(null);
+  const [showProgressionSuggestions, setShowProgressionSuggestions] = useState(false);
+  const [lastDeloadWeek, setLastDeloadWeek] = useState<number>(0);
 
   // Available exercises list for ExerciseBlockCard
   const availableExercisesList = availableExercises;
+
+  // Load categories from workout_categories table (same as workouts)
+  const loadCategories = useCallback(async () => {
+    try {
+      if (!user?.id) return;
+
+      const { data, error } = await supabase
+        .from("workout_categories")
+        .select("id, name, color")
+        .eq("coach_id", user.id)
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.error("Error loading categories:", error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setCategories(data);
+      } else {
+        setCategories([]);
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+      setCategories([]);
+    }
+  }, [user?.id]);
+
+  // Set categoryId when form loads or category changes
+  useEffect(() => {
+    if (form?.category && categories.length > 0) {
+      const matchingCategory = categories.find(
+        (c) => c.name === form.category
+      );
+      if (matchingCategory) {
+        setCategoryId(matchingCategory.id);
+      } else {
+        setCategoryId("none");
+      }
+    } else {
+      setCategoryId("none");
+    }
+  }, [form?.category, categories]);
 
   const load = useCallback(async () => {
     if (!programId) return;
@@ -341,18 +395,25 @@ function EditProgramContent() {
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadCategories();
+  }, [load, loadCategories]);
 
   const onSave = async () => {
     if (!form || !form.name.trim()) return;
     setSaving(true);
     try {
+      // Get category name from selected categoryId
+      const selectedCategory = categoryId && categoryId !== "none" 
+        ? categories.find((c) => c.id === categoryId)
+        : null;
+      const categoryName = selectedCategory?.name || null;
+
       await WorkoutTemplateService.updateProgram(form.id, {
         name: form.name,
         description: form.description,
         difficulty_level: form.difficulty_level,
         duration_weeks: form.duration_weeks,
-        target_audience: form.target_audience,
+        category: categoryName,
         is_active: form.is_active,
         coach_id: form.coach_id,
       });
@@ -392,20 +453,18 @@ function EditProgramContent() {
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen p-4 sm:p-6">
         <div className="max-w-5xl mx-auto space-y-6 relative z-10">
-          {/* Back Button */}
           <Button
             variant="ghost"
             onClick={() =>
               (window.location.href = `/coach/programs/${form.id}`)
             }
-            className="mb-4"
+            className="fc-btn fc-btn-ghost"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Program
           </Button>
 
-          {/* Header */}
-          <GlassCard elevation={3} className="p-6">
+          <GlassCard elevation={3} className="fc-glass fc-card p-6 sm:p-10">
             <div className="flex items-start gap-4">
               <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -419,26 +478,20 @@ function EditProgramContent() {
                 <BookOpen className="w-7 h-7 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h1
-                  className="text-3xl font-bold mb-2 break-words"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
+                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                  Program Editor
+                </span>
+                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] break-words">
                   Edit Program
                 </h1>
-                <p
-                  className="text-sm break-words"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="text-sm text-[color:var(--fc-text-dim)] break-words">
                   {form.name}
                 </p>
               </div>
             </div>
           </GlassCard>
 
-          {/* Tab Buttons */}
-          <GlassCard elevation={2} className="p-2">
+          <GlassCard elevation={2} className="fc-glass fc-card p-2">
             <div className="flex gap-2">
               <Button
                 variant={activeTab === "basic" ? "default" : "ghost"}
@@ -598,6 +651,7 @@ function EditProgramContent() {
                           Intermediate
                         </SelectItem>
                         <SelectItem value="advanced">Advanced</SelectItem>
+                        <SelectItem value="athlete">Athlete</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -636,7 +690,7 @@ function EditProgramContent() {
                   </div>
                 </div>
 
-                {/* Target Audience */}
+                {/* Category */}
                 <div>
                   <label
                     className="text-sm font-semibold block mb-2"
@@ -646,13 +700,29 @@ function EditProgramContent() {
                         : "rgba(0,0,0,0.9)",
                     }}
                   >
-                    Target Audience
+                    Training Category
+                    <span className="text-xs text-slate-500 ml-2">
+                      (optional - for volume calculator)
+                    </span>
                   </label>
                   <Select
-                    value={form.target_audience}
-                    onValueChange={(v) =>
-                      setForm({ ...form, target_audience: v })
-                    }
+                    value={categoryId || "none"}
+                    onValueChange={(v) => {
+                      if (v === "none") {
+                        setCategoryId("");
+                        setForm({
+                          ...form,
+                          category: null,
+                        });
+                      } else {
+                        setCategoryId(v);
+                        const selectedCat = categories.find((c) => c.id === v);
+                        setForm({
+                          ...form,
+                          category: selectedCat?.name || null,
+                        });
+                      }
+                    }}
                   >
                     <SelectTrigger
                       style={{
@@ -665,21 +735,22 @@ function EditProgramContent() {
                         color: isDark ? "#fff" : "#1A1A1A",
                       }}
                     >
-                      <SelectValue />
+                      <SelectValue placeholder="Select category (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="general_fitness">
-                        General Fitness
-                      </SelectItem>
-                      <SelectItem value="weight_loss">Weight Loss</SelectItem>
-                      <SelectItem value="muscle_gain">Muscle Gain</SelectItem>
-                      <SelectItem value="strength">Strength</SelectItem>
-                      <SelectItem value="endurance">Endurance</SelectItem>
-                      <SelectItem value="athletic_performance">
-                        Athletic Performance
-                      </SelectItem>
+                      <SelectItem value="none">None (No progression guidelines)</SelectItem>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  {categories.length === 0 && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      No categories available. Create categories in the Categories section.
+                    </p>
+                  )}
                 </div>
 
                 {/* Active Toggle */}
@@ -1137,22 +1208,50 @@ function EditProgramContent() {
                   </p>
                 </div>
               </GlassCard>
+
+              {/* Program Volume Calculator */}
+              {form && form.category && (
+                <ProgramVolumeCalculator
+                  programId={form.id}
+                  programCategory={form.category}
+                  programDifficulty={form.difficulty_level}
+                  schedule={schedule}
+                  templates={templates.map((t) => ({
+                    ...t,
+                    category: t.category || "",
+                    blocks: templateBlocks[t.id] || [],
+                  }))}
+                />
+              )}
             </div>
           )}
 
           {activeTab === "progression" && (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">
-                  Progression Rules
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                  Edit workout parameters week by week. Changes apply only to
-                  this program.
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">
+                    Progression Rules
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    Edit workout parameters week by week. Changes apply only to
+                    this program.
+                  </p>
+                </div>
+                {form && form.category && (
+                  <Button
+                    onClick={() => setShowProgressionSuggestions(true)}
+                    variant="outline"
+                    className="rounded-xl"
+                  >
+                    <Target className="w-4 h-4 mr-2" />
+                    Get Progression Suggestions
+                  </Button>
+                )}
+              </div>
 
-                {schedule.filter((s) => (s.week_number || 1) === selectedWeek)
-                  .length === 0 ? (
+              {schedule.filter((s) => (s.week_number || 1) === selectedWeek)
+                .length === 0 ? (
                   <div className="text-center py-8 text-slate-500 dark:text-slate-400">
                     <Calendar className="w-16 h-16 mx-auto mb-4" />
                     <h4 className="text-lg font-medium mb-2">
@@ -1249,8 +1348,20 @@ function EditProgramContent() {
                     )}
                   </div>
                 )}
-              </div>
             </div>
+          )}
+
+          {/* Progression Suggestions Modal */}
+          {form && form.category && (
+            <ProgressionSuggestionsModal
+              isOpen={showProgressionSuggestions}
+              onClose={() => setShowProgressionSuggestions(false)}
+              programId={form.id}
+              currentWeek={selectedWeek}
+              category={form.category}
+              difficulty={form.difficulty_level}
+              lastDeloadWeek={lastDeloadWeek}
+            />
           )}
         </div>
       </div>

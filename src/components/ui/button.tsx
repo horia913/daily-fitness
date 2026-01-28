@@ -20,6 +20,10 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
+        "fc-primary": "fc-btn fc-btn-primary fc-press",
+        "fc-secondary": "fc-btn fc-btn-secondary fc-press",
+        "fc-ghost": "fc-btn fc-btn-ghost fc-press",
+        "fc-destructive": "fc-btn fc-btn-destructive fc-press",
         // New gradient variants
         energy:
           "bg-gradient-to-r from-[#FF6B35] to-[#FF4E50] text-white shadow-md hover:shadow-xl hover:from-[#FF8A5B] hover:to-[#FF6B6B]",

@@ -1,20 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { validateApiAuth, validateOwnership, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
 
 export async function POST(request: NextRequest) {
-  // Create Supabase client inside function to avoid build-time initialization
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return NextResponse.json(
-      { error: "Missing Supabase configuration" },
-      { status: 500 }
-    );
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
   try {
+    // Validate authentication
+    const { user, supabaseAdmin } = await validateApiAuth(request)
+    const supabase = supabaseAdmin
     const { sessionId, clientId } = await request.json();
 
     if (!sessionId || !clientId) {
@@ -22,6 +13,13 @@ export async function POST(request: NextRequest) {
         { error: "Missing sessionId or clientId" },
         { status: 400 }
       );
+    }
+
+    // SECURITY: Validate that clientId matches authenticated user
+    try {
+      validateOwnership(user.id, clientId)
+    } catch (error: any) {
+      return createForbiddenResponse('Cannot cancel session for another user')
     }
 
     // Get session details
@@ -103,10 +101,23 @@ export async function POST(request: NextRequest) {
         ? "Session cancelled. Credit has been returned."
         : "Session cancelled. Credit was not returned due to late cancellation (< 8 hours).",
     });
-  } catch (error) {
+  } catch (error: any) {
+    // Handle auth errors specifically
+    if (error.message === 'Missing authorization header' || error.message === 'Invalid or expired token' || error.message === 'User not authenticated') {
+      return createUnauthorizedResponse(error.message)
+    }
+    if (error.message === 'Forbidden - Cannot access another user\'s resource') {
+      return createForbiddenResponse(error.message)
+    }
+    if (error.message === 'Service role key not configured') {
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      )
+    }
     console.error("Error cancelling session:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error.message || "Internal server error" },
       { status: 500 }
     );
   }

@@ -54,14 +54,37 @@ self.addEventListener('activate', (event) => {
   )
 })
 
-// Fetch event - serve from cache when offline
+// Fetch event - cache static assets/pages, never intercept API calls
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url)
+
+  // IMPORTANT: Do not intercept API calls at all.
+  // If we call respondWith() here, Chrome may show 2 entries (page + sw internal fetch).
+  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) {
+    return
+  }
+
+  // Only handle GET
+  if (event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request))
+    return
+  }
+
+  // Cache-first for same-origin only
+  if (url.origin !== self.location.origin) return
+
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version or fetch from network
-        return response || fetch(event.request)
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached
+
+      return fetch(event.request).then((response) => {
+        if (response && response.status === 200) {
+          const copy = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy))
+        }
+        return response
       })
+    })
   )
 })
 

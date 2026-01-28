@@ -4,34 +4,27 @@
 export function registerServiceWorker() {
   const isBrowser = typeof window !== 'undefined' && typeof navigator !== 'undefined'
   const isProduction = process.env.NODE_ENV === 'production'
+  const isEnabled = process.env.NEXT_PUBLIC_ENABLE_SW === 'true'
 
   if (!isBrowser) return
 
   if (!isProduction) {
+    // SW disabled in dev to avoid cache/update loops.
     console.info('[serviceWorker] Skipping registration in non-production environment')
     return
   }
 
+  if (!isEnabled) {
+    console.info('[serviceWorker] Skipping registration (NEXT_PUBLIC_ENABLE_SW !== "true")')
+    return
+  }
+
   if ('serviceWorker' in navigator) {
+    // After updating SW, DevTools → Application → Service Workers → Unregister, then hard refresh.
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
         .then((registration) => {
           console.log('SW registered: ', registration)
-          
-          // Check for updates
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing
-            if (newWorker) {
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // New content is available, show update notification
-                  if (confirm('New version available! Reload to update?')) {
-                    window.location.reload()
-                  }
-                }
-              })
-            }
-          })
         })
         .catch((registrationError) => {
           console.log('SW registration failed: ', registrationError)

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -232,62 +232,23 @@ export default function ClientClipCards() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="min-h-screen">
-            <div className="p-4">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Header Skeleton */}
-              <div className="text-center space-y-4 py-8">
-                <div className="animate-pulse">
-                  <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded-2xl w-64 mx-auto mb-4"></div>
-                  <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-96 mx-auto mb-6"></div>
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <GlassCard elevation={2} className="fc-glass fc-card p-8">
+              <div className="animate-pulse space-y-6">
+                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  ))}
+                </div>
+                <div className="h-16 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-28 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  ))}
                 </div>
               </div>
-
-              {/* Summary Cards Skeleton */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                      <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg mb-2"></div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Filter Skeleton */}
-              <div className="animate-pulse">
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg">
-                  <div className="flex gap-4">
-                    <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg w-32"></div>
-                    <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg w-32"></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ClipCard Skeleton */}
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                          <div>
-                            <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-48 mb-2"></div>
-                            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32"></div>
-                          </div>
-                        </div>
-                        <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
-                      </div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full mb-2"></div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/3"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+            </GlassCard>
           </div>
         </AnimatedBackground>
       </ProtectedRoute>
@@ -298,72 +259,41 @@ export default function ClientClipCards() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen">
-          <div className="p-4">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="text-center space-y-4 py-8">
-              <div className="flex items-center justify-center gap-3 mb-4">
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <CreditCard className="w-7 h-7 text-white" />
+                  <CreditCard className="w-6 h-6 text-white" />
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                  My ClipCards
-                </h1>
+                <div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    ClipCard Wallet
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                    My ClipCards
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Track your packages and session balance at a glance.
+                  </p>
+                </div>
               </div>
-              <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-                Manage your fitness packages and track your session usage
-              </p>
+              <div className="flex flex-wrap gap-3">
+                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                  {getActiveClipcardsCount()} active
+                </div>
+                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                  {getTotalRemainingSessions()} sessions left
+                </div>
+                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                  {clipcards.length} total
+                </div>
+              </div>
             </div>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                      <Crown className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Active ClipCards</p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{getActiveClipcardsCount()}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                      <Target className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Remaining Sessions</p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{getTotalRemainingSessions()}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border-0">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                      <Award className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Total ClipCards</p>
-                      <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{clipcards.length}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          </GlassCard>
 
             {/* Filters and Sorting */}
-            <Card className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg border-0">
-              <CardContent className="p-0">
+            <GlassCard elevation={2} className="fc-glass fc-card p-4">
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
                     <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Filter by Status</label>
@@ -397,8 +327,7 @@ export default function ClientClipCards() {
                     </Select>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </GlassCard>
 
             {/* ClipCards List */}
             <div className="space-y-4">
@@ -408,17 +337,16 @@ export default function ClientClipCards() {
                 const daysRemaining = getDaysRemaining(clipcard.end_date)
                 
                 return (
-                  <Card key={clipcard.id} className={`bg-gradient-to-r ${getClipCardGradient(clipcard)} rounded-2xl p-6 shadow-lg border-0 hover:shadow-xl transition-all duration-300 hover:scale-[1.02]`}>
-                    <CardContent className="p-0">
-                      <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                  <GlassCard key={clipcard.id} elevation={2} className={`fc-glass fc-card p-6 ${getClipCardGradient(clipcard)}`}>
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                         {/* Left Section - Icon and Info */}
                         <div className="flex items-start gap-4 flex-1">
-                          <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-lg">
+                          <div className="w-16 h-16 bg-[color:var(--fc-glass-highlight)] rounded-2xl flex items-center justify-center shadow-lg">
                             {getClipCardIcon(clipcard)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 truncate">
+                              <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)] truncate">
                                 {clipcard.clipcard_type.name}
                               </h3>
                               <Badge className={`${getStatusColor(status)} rounded-full px-3 py-1`}>
@@ -431,10 +359,10 @@ export default function ClientClipCards() {
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-slate-600 dark:text-slate-300 mb-3">
+                            <p className="text-[color:var(--fc-text-dim)] mb-3">
                               {clipcard.sessions_used}/{clipcard.sessions_total} sessions used • {clipcard.clipcard_type.price} RON
                             </p>
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-[color:var(--fc-text-subtle)]">
                               <span className="flex items-center gap-1">
                                 <Calendar className="w-4 h-4" />
                                 Purchased: {formatDate(clipcard.created_at)}
@@ -451,7 +379,7 @@ export default function ClientClipCards() {
                         <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                           {/* Progress Circle */}
                           <div className="flex items-center gap-4">
-                            <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-lg">
+                            <div className="w-20 h-20 bg-[color:var(--fc-glass-highlight)] rounded-full flex items-center justify-center shadow-lg">
                               <div 
                                 className="w-16 h-16 rounded-full flex items-center justify-center text-sm font-bold"
                                 style={{
@@ -462,7 +390,7 @@ export default function ClientClipCards() {
                                   } ${usagePercentage * 3.6}deg, #E5E7EB 0deg)`
                                 }}
                               >
-                                <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center">
+                                <div className="w-12 h-12 bg-[color:var(--fc-glass-highlight)] rounded-full flex items-center justify-center">
                                   <span className={`text-xs font-bold ${
                                     usagePercentage >= 100 ? 'text-red-600' :
                                     usagePercentage >= 80 ? 'text-orange-600' :
@@ -474,8 +402,8 @@ export default function ClientClipCards() {
                               </div>
                             </div>
                             <div className="text-center">
-                              <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">{clipcard.sessions_remaining}</p>
-                              <p className="text-sm text-slate-500 dark:text-slate-400">remaining</p>
+                              <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{clipcard.sessions_remaining}</p>
+                              <p className="text-sm text-[color:var(--fc-text-subtle)]">remaining</p>
                             </div>
                           </div>
 
@@ -483,18 +411,18 @@ export default function ClientClipCards() {
                           <div className="flex flex-col sm:flex-row gap-2">
                             {status === 'active' && clipcard.sessions_remaining > 0 && (
                               <Link href="/client/scheduling">
-                                <Button className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white rounded-xl px-6 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
+                                <Button className="fc-btn fc-btn-primary w-full sm:w-auto">
                                   <BookOpen className="w-4 h-4 mr-2" />
                                   Book Session
                                 </Button>
                               </Link>
                             )}
-                            <Button variant="outline" className="w-full sm:w-auto border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl px-6 py-3 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300">
+                            <Button variant="outline" className="fc-btn fc-btn-secondary w-full sm:w-auto">
                               <Eye className="w-4 h-4 mr-2" />
                               View Details
                             </Button>
                             {(status === 'used_up' || status === 'expired') && (
-                              <Button className="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-yellow-600 hover:from-orange-600 hover:to-yellow-700 text-white rounded-xl px-6 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
+                              <Button className="fc-btn fc-btn-primary w-full sm:w-auto">
                                 <ShoppingCart className="w-4 h-4 mr-2" />
                                 Purchase More
                               </Button>
@@ -502,46 +430,41 @@ export default function ClientClipCards() {
                           </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                  </GlassCard>
                 )
               })}
 
               {filteredAndSortedClipcards().length === 0 && (
-                <Card className="bg-white dark:bg-slate-800 rounded-2xl p-12 shadow-lg border-0">
-                  <CardContent className="text-center">
-                    <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                      <CreditCard className="w-12 h-12 text-slate-400" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-4">
-                      {filter === 'all' ? 'No ClipCards Found' : `No ${filter.replace('_', ' ')} ClipCards`}
-                    </h3>
-                    <p className="text-slate-600 dark:text-slate-300 mb-8 max-w-md mx-auto">
-                      {filter === 'all' 
-                        ? "You don't have any ClipCards yet. Contact your coach to purchase a ClipCard package and start your fitness journey!"
-                        : `You don't have any ${filter.replace('_', ' ')} ClipCards at the moment.`
-                      }
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <Link href="/client/scheduling">
-                        <Button className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white rounded-xl px-8 py-3 font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
-                          <BookOpen className="w-5 h-5 mr-2" />
-                          Book a Session
-                        </Button>
-                      </Link>
-                      <Button variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl px-8 py-3 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300">
-                        <Plus className="w-5 h-5 mr-2" />
-                        Contact Coach
+                <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+                  <div className="w-24 h-24 bg-[color:var(--fc-glass-highlight)] rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <CreditCard className="w-12 h-12 text-[color:var(--fc-text-subtle)]" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
+                    {filter === 'all' ? 'No ClipCards Found' : `No ${filter.replace('_', ' ')} ClipCards`}
+                  </h3>
+                  <p className="text-[color:var(--fc-text-dim)] mb-8 max-w-md mx-auto">
+                    {filter === 'all' 
+                      ? "You don't have any ClipCards yet. Contact your coach to purchase a ClipCard package and start your fitness journey!"
+                      : `You don't have any ${filter.replace('_', ' ')} ClipCards at the moment.`
+                    }
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <Link href="/client/scheduling">
+                      <Button className="fc-btn fc-btn-primary">
+                        <BookOpen className="w-5 h-5 mr-2" />
+                        Book a Session
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </Link>
+                    <Button variant="outline" className="fc-btn fc-btn-secondary">
+                      <Plus className="w-5 h-5 mr-2" />
+                      Contact Coach
+                    </Button>
+                  </div>
+                </GlassCard>
               )}
             </div>
           </div>
-        </div>
-        </div>
-      </AnimatedBackground>
+        </AnimatedBackground>
     </ProtectedRoute>
   )
 }

@@ -1130,118 +1130,92 @@ export default function ClientGoals() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen pb-24 md:pb-8">
           <div className="p-4 pb-8">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Header */}
-              <div className="text-center space-y-4 py-4 md:py-8">
-                <div className="flex items-center justify-center gap-3 mb-4">
-                  <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <Target className="w-5 h-5 md:w-7 md:h-7 text-white" />
+            <div className="max-w-6xl mx-auto space-y-6">
+              <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <Target className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                        Goal Center
+                      </span>
+                      <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                        My Goals
+                      </h1>
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
+                        {getMotivationalMessage()}
+                      </p>
+                    </div>
                   </div>
-                  <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                    My Goals
-                  </h1>
+                  <Button
+                    onClick={() => setShowPresetSelection(true)}
+                    className="fc-btn fc-btn-primary"
+                  >
+                    <Target className="w-5 h-5 mr-2" />
+                    Select a Goal
+                  </Button>
                 </div>
-                <p className="text-sm md:text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto px-2">
-                  {getMotivationalMessage()}
-                </p>
+              </GlassCard>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                      <Target className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Total Goals</p>
+                      <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                        {stats.total}
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Active Goals</p>
+                      <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                        {stats.active}
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl flex items-center justify-center">
+                      <Trophy className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Completed</p>
+                      <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                        {stats.completed}
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Avg Progress</p>
+                      <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">
+                        {stats.avgProgress}%
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
               </div>
 
-              {/* Goal Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
-                <Card className="bg-white dark:bg-slate-800 rounded-2xl p-4 md:p-6 shadow-lg border-0">
-                  <CardContent className="p-0">
-                    <div className="flex items-center gap-2 md:gap-4">
-                      <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Target className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 truncate">
-                          Total Goals
-                        </p>
-                        <p className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-200">
-                          {stats.total}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white dark:bg-slate-800 rounded-2xl p-4 md:p-6 shadow-lg border-0">
-                  <CardContent className="p-0">
-                    <div className="flex items-center gap-2 md:gap-4">
-                      <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 truncate">
-                          Active Goals
-                        </p>
-                        <p className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-200">
-                          {stats.active}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white dark:bg-slate-800 rounded-2xl p-4 md:p-6 shadow-lg border-0">
-                  <CardContent className="p-0">
-                    <div className="flex items-center gap-2 md:gap-4">
-                      <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Trophy className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 truncate">
-                          Completed
-                        </p>
-                        <p className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-200">
-                          {stats.completed}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white dark:bg-slate-800 rounded-2xl p-4 md:p-6 shadow-lg border-0">
-                  <CardContent className="p-0">
-                    <div className="flex items-center gap-2 md:gap-4">
-                      <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 truncate">
-                          Avg Progress
-                        </p>
-                        <p className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-200">
-                          {stats.avgProgress}%
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Select Preset Goal Button */}
-              <div className="mb-8">
-                <Button
-                  onClick={() => setShowPresetSelection(true)}
-                  className="w-full md:w-auto"
-                  size="lg"
-                  style={{
-                    background: getSemanticColor("success").gradient,
-                    boxShadow: `0 4px 12px ${
-                      getSemanticColor("success").primary
-                    }30`,
-                  }}
-                >
-                  <Target className="w-5 h-5 mr-2" />
-                  Select a Goal
-                </Button>
-              </div>
-
-              {/* Filters and Sorting */}
-              <Card className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg border-0">
-                <CardContent className="p-0">
+              <GlassCard elevation={2} className="fc-glass fc-card p-4">
+                <div className="flex flex-col gap-4 lg:flex-row">
                   <div className="flex flex-col gap-4 lg:flex-row">
                     <div className="flex-1 w-full">
                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
@@ -1322,8 +1296,8 @@ export default function ClientGoals() {
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </GlassCard>
 
               {/* SECTION 1: PRESET GOALS (Auto-tracked) */}
               <div className="mb-12">

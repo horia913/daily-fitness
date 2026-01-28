@@ -6,7 +6,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -311,21 +311,22 @@ export default function ClientHabitsPage() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-          <div className="p-4">
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="animate-pulse">
-                <div className="h-8 bg-slate-200 rounded mb-2"></div>
-                <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <GlassCard elevation={2} className="fc-glass fc-card p-8">
+              <div className="animate-pulse space-y-6">
+                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  ))}
+                </div>
+                <div className="h-80 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-32 bg-slate-200 rounded-2xl"></div>
-                ))}
-              </div>
-            </div>
+            </GlassCard>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     )
   }
@@ -334,131 +335,105 @@ export default function ClientHabitsPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen">
-        <div className="p-4">
-          <div className="max-w-4xl mx-auto space-y-6">
-            
-            {/* Enhanced Header with Motivational Messaging */}
-            <Card className="bg-gradient-to-br from-green-500 via-emerald-600 to-teal-700 border-0 shadow-2xl rounded-3xl overflow-hidden">
-              <CardContent className="p-8 text-center relative">
-                {/* Floating Sparkles Animation */}
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="absolute top-4 left-8 w-3 h-3 bg-yellow-300 rounded-full animate-bounce"></div>
-                  <div className="absolute top-8 right-12 w-2 h-2 bg-yellow-200 rounded-full animate-pulse"></div>
-                  <div className="absolute bottom-6 left-16 w-2 h-2 bg-white/60 rounded-full animate-bounce delay-1000"></div>
-                  <div className="absolute bottom-4 right-8 w-3 h-3 bg-yellow-300/80 rounded-full animate-pulse delay-500"></div>
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                  <Flame className="w-6 h-6 text-white" />
                 </div>
-                
-                <div className="relative z-10">
-                  <div className="flex justify-center mb-6">
-                    <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center animate-bounce">
-                      <Flame className="w-10 h-10 text-white" />
-                    </div>
-                  </div>
-                  
-                  <h1 className="text-3xl font-bold text-white mb-3">
-                    My Habits
+                <div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Habit Studio
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                    Daily Habits
                   </h1>
-                  <p className="text-white/90 text-lg mb-6">
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
                     {getMotivationalMessage()}
                   </p>
-                  
-                  {/* Daily Overview */}
-                  <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
-                    <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4">
-                      <div className="text-2xl font-bold text-white">
-                        {completedHabitsCount}/{habits.length}
-                      </div>
-                      <div className="text-white/80 text-sm">Completed</div>
-                    </div>
-                    <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4">
-                      <div className="text-2xl font-bold text-white">
-                        {totalStreakDays}
-                      </div>
-                      <div className="text-white/80 text-sm">Total Streak</div>
-                    </div>
-                    <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4">
-                      <div className="text-2xl font-bold text-white">
-                        {averageCompletionRate}%
-                      </div>
-                      <div className="text-white/80 text-sm">This Week</div>
-                    </div>
-                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                  {completedHabitsCount}/{habits.length} completed
+                </div>
+                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                  {totalStreakDays} total streak
+                </div>
+                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                  {averageCompletionRate}% this week
+                </div>
+              </div>
+            </div>
+          </GlassCard>
 
-            {/* Overall Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl overflow-hidden">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                    <Target className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-800 mb-1">
-                    {habits.length}
-                  </div>
-                  <div className="text-sm text-slate-500">Total Habits</div>
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <Target className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1">
+                  {habits.length}
+                </div>
+                <div className="text-sm text-[color:var(--fc-text-subtle)]">Total Habits</div>
+              </GlassCard>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl overflow-hidden">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                    <CheckCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-800 mb-1">
-                    {completedHabitsCount}
-                  </div>
-                  <div className="text-sm text-slate-500">Completed Today</div>
-                </CardContent>
-              </Card>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1">
+                  {completedHabitsCount}
+                </div>
+                <div className="text-sm text-[color:var(--fc-text-subtle)]">Completed Today</div>
+              </GlassCard>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl overflow-hidden">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                    <Flame className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-800 mb-1">
-                    {Math.max(...habits.map(h => h.streak_days), 0)}
-                  </div>
-                  <div className="text-sm text-slate-500">Best Streak</div>
-                </CardContent>
-              </Card>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <Flame className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1">
+                  {Math.max(...habits.map(h => h.streak_days), 0)}
+                </div>
+                <div className="text-sm text-[color:var(--fc-text-subtle)]">Best Streak</div>
+              </GlassCard>
 
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl overflow-hidden">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                    <Trophy className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-800 mb-1">
-                    {averageCompletionRate}%
-                  </div>
-                  <div className="text-sm text-slate-500">Avg Completion</div>
-                </CardContent>
-              </Card>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <Trophy className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1">
+                  {averageCompletionRate}%
+                </div>
+                <div className="text-sm text-[color:var(--fc-text-subtle)]">Avg Completion</div>
+              </GlassCard>
             </div>
 
-            {/* Habit List Display */}
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl overflow-hidden">
-              <CardHeader className="p-6">
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center">
-                    <Target className="w-5 h-5 text-white" />
-                  </div>
-                  Today&apos;s Habits
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 pt-0 space-y-4">
+            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center">
+                  <Target className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                    Today&apos;s Habits
+                  </h2>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Check off what you&apos;ve completed today.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-4">
                 {habits.length > 0 ? (
                   <div className="space-y-4">
                     {habits.map(habit => (
                       <div 
                         key={habit.id} 
-                        className={`p-6 rounded-2xl border-2 transition-all duration-300 hover:shadow-md ${
+                        className={`fc-glass-soft fc-card p-5 border transition-all duration-300 ${
                           habit.is_logged_today 
-                            ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200' 
-                            : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                            ? 'border-emerald-400/50 shadow-[0_0_16px_rgba(16,185,129,0.2)]' 
+                            : 'border-[color:var(--fc-glass-border)]'
                         }`}
                       >
                         <div className="flex items-center gap-4">
@@ -469,9 +444,9 @@ export default function ClientHabitsPage() {
                           
                           {/* Habit Content */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-3 mb-2">
+                            <div className="flex items-center gap-3 mb-2 flex-wrap">
                               <h3 className={`text-lg font-bold ${
-                                habit.is_logged_today ? 'line-through text-slate-500' : 'text-slate-800'
+                                habit.is_logged_today ? 'line-through text-[color:var(--fc-text-subtle)]' : 'text-[color:var(--fc-text-primary)]'
                               }`}>
                                 {habit.habit_name}
                               </h3>
@@ -482,16 +457,16 @@ export default function ClientHabitsPage() {
                             </div>
                             
                             {habit.habit_description && (
-                              <p className="text-sm text-slate-600 mb-3">{habit.habit_description}</p>
+                              <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{habit.habit_description}</p>
                             )}
                             
                             {/* Progress and Stats */}
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <div className="flex items-center gap-4 flex-wrap">
+                              <div className="flex items-center gap-2 text-sm text-[color:var(--fc-text-subtle)]">
                                 <TrendingUp className="w-4 h-4" />
                                 {habit.completion_rate}% this week
                               </div>
-                              <div className="flex items-center gap-2 text-sm text-slate-500">
+                              <div className="flex items-center gap-2 text-sm text-[color:var(--fc-text-subtle)]">
                                 <Target className="w-4 h-4" />
                                 {habit.frequency_type}
                               </div>
@@ -503,16 +478,16 @@ export default function ClientHabitsPage() {
                             <Button
                               onClick={() => handleHabitToggle(habit.id)}
                               disabled={optimisticUpdates.has(habit.id)}
-                              className={`w-12 h-12 rounded-2xl transition-all duration-300 ${
+                              className={`fc-btn h-11 w-11 rounded-2xl ${
                                 habit.is_logged_today
-                                  ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
-                                  : 'bg-gradient-to-r from-slate-200 to-slate-300 hover:from-slate-300 hover:to-slate-400'
+                                  ? 'fc-btn-primary'
+                                  : 'fc-btn-secondary'
                               }`}
                             >
                               {habit.is_logged_today ? (
-                                <CheckCircle className="w-6 h-6 text-white" />
+                                <CheckCircle className="w-5 h-5" />
                               ) : (
-                                <Circle className="w-6 h-6 text-slate-600" />
+                                <Circle className="w-5 h-5" />
                               )}
                             </Button>
                           </div>
@@ -522,14 +497,14 @@ export default function ClientHabitsPage() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Target className="w-10 h-10 text-slate-400" />
+                    <div className="w-20 h-20 bg-[color:var(--fc-glass-highlight)] rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Target className="w-10 h-10 text-[color:var(--fc-text-subtle)]" />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">No habits assigned yet</h3>
-                    <p className="text-slate-600 mb-6">
+                    <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)] mb-2">No habits assigned yet</h3>
+                    <p className="text-[color:var(--fc-text-dim)] mb-6">
                       Your coach will assign habits for you to track, or you can add your own
                     </p>
-                    <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl">
+                    <Button className="fc-btn fc-btn-primary">
                       <Plus className="w-4 h-4 mr-2" />
                       Add Your First Habit
                     </Button>
@@ -538,16 +513,16 @@ export default function ClientHabitsPage() {
 
                 {/* Completion Celebration */}
                 {habits.length > 0 && (
-                  <div className={`flex items-center justify-between p-6 rounded-2xl transition-all duration-300 ${
+                  <div className={`flex items-center justify-between p-5 rounded-2xl border transition-all duration-300 ${
                     allHabitsCompleted 
-                      ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200' 
-                      : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200'
+                      ? 'border-emerald-300/60 bg-emerald-500/10' 
+                      : 'border-sky-300/60 bg-sky-500/10'
                   }`}>
                     <div className="flex items-center gap-3">
                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
                         allHabitsCompleted 
-                          ? 'bg-gradient-to-br from-green-500 to-green-600' 
-                          : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                          ? 'bg-gradient-to-br from-emerald-500 to-green-600' 
+                          : 'bg-gradient-to-br from-sky-500 to-blue-600'
                       }`}>
                         {allHabitsCompleted ? (
                           <Trophy className="w-6 h-6 text-white" />
@@ -556,14 +531,10 @@ export default function ClientHabitsPage() {
                         )}
                       </div>
                       <div>
-                        <div className={`font-bold text-lg ${
-                          allHabitsCompleted ? 'text-green-800' : 'text-blue-800'
-                        }`}>
+                        <div className="font-bold text-lg text-[color:var(--fc-text-primary)]">
                           {completedHabitsCount}/{habits.length} habits completed
                         </div>
-                        <div className={`text-sm ${
-                          allHabitsCompleted ? 'text-green-600' : 'text-blue-600'
-                        }`}>
+                        <div className="text-sm text-[color:var(--fc-text-dim)]">
                           {allHabitsCompleted ? 'Perfect day! 🎉' : 'Keep going! 💪'}
                         </div>
                       </div>
@@ -571,58 +542,56 @@ export default function ClientHabitsPage() {
                     
                     {allHabitsCompleted && (
                       <div className="flex items-center gap-2">
-                        <Sparkles className="w-6 h-6 text-yellow-500 animate-pulse" />
-                        <span className="text-green-700 font-semibold">All Done!</span>
+                        <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
+                        <span className="text-emerald-600 font-semibold">All Done!</span>
                       </div>
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
-            {/* Action Buttons */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Button 
                 onClick={() => setShowAnalytics(!showAnalytics)}
-                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-2xl h-14 text-lg font-semibold shadow-lg"
+                className="fc-btn fc-btn-secondary h-12 text-base font-semibold"
               >
-                <div className="flex items-center gap-3">
-                  <BarChart3 className="w-6 h-6" />
-                  View Analytics
-                </div>
+                <BarChart3 className="w-5 h-5 mr-2" />
+                View Analytics
               </Button>
               
               <Button 
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl h-14 text-lg font-semibold shadow-lg"
+                className="fc-btn fc-btn-primary h-12 text-base font-semibold"
               >
-                <div className="flex items-center gap-3">
-                  <Plus className="w-6 h-6" />
-                  Add New Habit
-                </div>
+                <Plus className="w-5 h-5 mr-2" />
+                Add New Habit
               </Button>
             </div>
 
-            {/* Analytics Panel */}
             {showAnalytics && (
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl overflow-hidden">
-                <CardHeader className="p-6">
-                  <CardTitle className="flex items-center gap-3 text-xl">
-                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center">
-                      <BarChart3 className="w-5 h-5 text-white" />
-                    </div>
-                    Habit Analytics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 pt-0">
-                  <div className="space-y-6">
+              <GlassCard elevation={2} className="fc-glass fc-card p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center">
+                    <BarChart3 className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                      Habit Analytics
+                    </h3>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Weekly progress snapshots per habit.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-6">
                     {habits.map(habit => (
-                      <div key={habit.id} className="p-4 bg-slate-50 rounded-2xl">
+                      <div key={habit.id} className="fc-glass-soft fc-card p-4">
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-3">
                             <div className="text-2xl">{habit.habit_icon}</div>
                             <div>
-                              <h4 className="font-bold text-slate-800">{habit.habit_name}</h4>
-                              <p className="text-sm text-slate-500">{habit.frequency_type}</p>
+                              <h4 className="font-bold text-[color:var(--fc-text-primary)]">{habit.habit_name}</h4>
+                              <p className="text-sm text-[color:var(--fc-text-subtle)]">{habit.frequency_type}</p>
                             </div>
                           </div>
                           <Badge className={getStreakColor(habit.streak_days)}>
@@ -633,34 +602,31 @@ export default function ClientHabitsPage() {
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div className="text-center">
-                            <div className="text-slate-600 mb-1">Completion Rate</div>
-                            <div className="text-2xl font-bold text-slate-800">{habit.completion_rate}%</div>
+                            <div className="text-[color:var(--fc-text-subtle)] mb-1">Completion Rate</div>
+                            <div className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{habit.completion_rate}%</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-slate-600 mb-1">Current Streak</div>
-                            <div className="text-2xl font-bold text-slate-800">{habit.streak_days}</div>
+                            <div className="text-[color:var(--fc-text-subtle)] mb-1">Current Streak</div>
+                            <div className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{habit.streak_days}</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-slate-600 mb-1">Status</div>
+                            <div className="text-[color:var(--fc-text-subtle)] mb-1">Status</div>
                             <div className={`text-lg font-bold ${
-                              habit.is_logged_today ? 'text-green-600' : 'text-slate-600'
+                              habit.is_logged_today ? 'text-emerald-500' : 'text-[color:var(--fc-text-subtle)]'
                             }`}>
                               {habit.is_logged_today ? 'Completed' : 'Pending'}
                             </div>
                           </div>
                           <div className="text-center">
-                            <div className="text-slate-600 mb-1">Category</div>
-                            <div className="text-lg font-bold text-slate-800 capitalize">{habit.category}</div>
+                            <div className="text-[color:var(--fc-text-subtle)] mb-1">Category</div>
+                            <div className="text-lg font-bold text-[color:var(--fc-text-primary)] capitalize">{habit.category}</div>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+              </GlassCard>
             )}
-          </div>
-        </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

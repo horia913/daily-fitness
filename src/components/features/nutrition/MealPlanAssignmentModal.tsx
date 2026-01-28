@@ -137,7 +137,7 @@ export default function MealPlanAssignmentModal({
                     ${
                       isSelected
                         ? "bg-green-50 dark:bg-green-900/20 border-2 border-green-500"
-                        : `${theme.card} border-2 border-slate-200 dark:border-slate-700`
+                        : `${theme.card} fc-glass fc-card border-2 border-slate-200 dark:border-slate-700`
                     }
                   `}
                 >

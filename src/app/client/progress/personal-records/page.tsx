@@ -6,8 +6,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import {
   Trophy,
@@ -15,7 +14,6 @@ import {
   Flame,
   Target,
   TrendingUp,
-  Award,
   ArrowLeft,
   Dumbbell,
 } from "lucide-react";
@@ -29,8 +27,7 @@ import {
 
 export default function PersonalRecordsPage() {
   const { user, loading: authLoading } = useAuth();
-  const { getThemeStyles, performanceSettings } = useTheme();
-  const theme = getThemeStyles();
+  const { performanceSettings } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
@@ -55,271 +52,285 @@ export default function PersonalRecordsPage() {
     }
   };
 
+  const totalRecords = personalRecords.length;
+  const recentCount = personalRecords.filter((record) => record.isRecent).length;
+  const bestWeight = totalRecords
+    ? Math.max(...personalRecords.map((record) => record.weight ?? 0))
+    : 0;
+  const latestRecordDate = personalRecords[0]?.date;
+  const recordTypeCounts = personalRecords.reduce(
+    (acc, record) => {
+      const type = getRecordType(record.weight, record.reps).type;
+      acc[type] += 1;
+      return acc;
+    },
+    { strength: 0, endurance: 0, power: 0 }
+  );
+
   if (authLoading || loading) {
     return (
       <ProtectedRoute>
-        <div className={`min-h-screen ${theme.background}`}>
-          <div className="animate-pulse p-4">
-            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-4"></div>
-            <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-6xl">
+              <div className="fc-glass fc-card p-8">
+                <div className="animate-pulse space-y-6">
+                  <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div
+                        key={`record-skeleton-${index}`}
+                        className="h-28 rounded-2xl bg-[color:var(--fc-glass-highlight)]"
+                      ></div>
+                    ))}
+                  </div>
+                  <div className="h-72 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute>
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="max-w-7xl mx-auto p-4 sm:p-6">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
-            <Link href="/client/progress">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            </Link>
-            <div className="flex items-center gap-3 flex-1">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 shadow-lg">
-                <Trophy className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className={`text-2xl sm:text-3xl font-bold ${theme.text}`}>
-                  Personal Records
-                </h1>
-                <p className={`text-sm ${theme.textSecondary}`}>
-                  Your best lifts and achievements
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Summary Stats */}
-          {personalRecords.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-orange-100 dark:bg-orange-900/20">
-                      <Trophy className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                    </div>
-                    <div>
-                      <p className={`text-xs ${theme.textSecondary} mb-1`}>
-                        Total PRs
-                      </p>
-                      <p className={`text-2xl font-bold ${theme.text}`}>
-                        {personalRecords.length}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-red-100 dark:bg-red-900/20">
-                      <Flame className="w-5 h-5 text-red-600 dark:text-red-400" />
-                    </div>
-                    <div>
-                      <p className={`text-xs ${theme.textSecondary} mb-1`}>
-                        Recent PRs
-                      </p>
-                      <p className={`text-2xl font-bold ${theme.text}`}>
-                        {personalRecords.filter((r) => r.isRecent).length}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card
-                className={`${theme.card} border ${theme.border} rounded-2xl`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/20">
-                      <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <p className={`text-xs ${theme.textSecondary} mb-1`}>
-                        Best Weight
-                      </p>
-                      <p className={`text-2xl font-bold ${theme.text}`}>
-                        {Math.max(...personalRecords.map((r) => r.weight))} kg
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Personal Records List */}
-          {personalRecords.length > 0 ? (
-            <div className="space-y-4">
-              {personalRecords.map((record) => {
-                const recordType = getRecordType(record.weight, record.reps);
-                const recordDisplay = formatRecordDisplay(
-                  record.weight,
-                  record.reps
-                );
-
-                return (
-                  <Card
-                    key={record.id}
-                    className={`${theme.card} border ${
-                      theme.border
-                    } rounded-2xl transition-all hover:shadow-lg ${
-                      record.isRecent
-                        ? "bg-gradient-to-br from-orange-50/50 to-amber-50/50 dark:from-orange-900/20 dark:to-amber-900/20 border-orange-200 dark:border-orange-800"
-                        : ""
-                    }`}
+      <AnimatedBackground>
+        {performanceSettings.floatingParticles && <FloatingParticles />}
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <Link href="/client/progress">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="fc-btn fc-btn-ghost h-10 w-10"
                   >
-                    <CardHeader className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 flex-1">
-                          <div
-                            className={`p-3 rounded-xl ${
-                              recordType.type === "power"
-                                ? "bg-red-100 dark:bg-red-900/20"
-                                : recordType.type === "endurance"
-                                ? "bg-green-100 dark:bg-green-900/20"
-                                : "bg-blue-100 dark:bg-blue-900/20"
-                            }`}
-                          >
-                            <Trophy
-                              className={`w-6 h-6 ${
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                </Link>
+                <div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Progress Hub
+                  </span>
+                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                    Personal Records
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Your best lifts and standout achievements.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                  {totalRecords} PRs tracked
+                </div>
+                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                  Best {bestWeight} kg
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+
+          {totalRecords > 0 ? (
+            <>
+              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-[0_8px_18px_rgba(249,115,22,0.35)]">
+                      <Trophy className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Total PRs</p>
+                      <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                        {totalRecords}
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-white shadow-[0_8px_18px_rgba(244,63,94,0.35)]">
+                      <Flame className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Recent PRs</p>
+                      <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                        {recentCount}
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-white shadow-[0_8px_18px_rgba(59,130,246,0.35)]">
+                      <TrendingUp className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Best Weight</p>
+                      <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                        {bestWeight} kg
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+
+                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-[0_8px_18px_rgba(16,185,129,0.35)]">
+                      <Target className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Latest PR</p>
+                      <p className="text-base font-semibold text-[color:var(--fc-text-primary)]">
+                        {latestRecordDate
+                          ? new Date(latestRecordDate).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+              </div>
+
+              <div className="mt-6 fc-glass fc-card p-6 sm:p-8">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                      Record Board
+                    </h2>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Latest top performances across your lifts.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                      Strength {recordTypeCounts.strength}
+                    </span>
+                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                      Power {recordTypeCounts.power}
+                    </span>
+                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                      Endurance {recordTypeCounts.endurance}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  {personalRecords.map((record) => {
+                    const recordType = getRecordType(record.weight, record.reps);
+                    const recordDisplay = formatRecordDisplay(record.weight, record.reps);
+
+                    return (
+                      <div
+                        key={record.id}
+                        className={`fc-glass fc-card p-5 transition-all sm:p-6 ${
+                          record.isRecent
+                            ? "border border-[color:var(--fc-status-warning)]/40 bg-[color:var(--fc-status-warning)]/10"
+                            : "border border-[color:var(--fc-glass-border)]"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <div
+                              className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
                                 recordType.type === "power"
-                                  ? "text-red-600 dark:text-red-400"
+                                  ? "bg-[color:var(--fc-status-error)]/15 text-[color:var(--fc-status-error)]"
                                   : recordType.type === "endurance"
-                                  ? "text-green-600 dark:text-green-400"
-                                  : "text-blue-600 dark:text-blue-400"
+                                  ? "bg-[color:var(--fc-status-success)]/15 text-[color:var(--fc-status-success)]"
+                                  : "bg-[color:var(--fc-accent-blue)]/15 text-[color:var(--fc-accent-blue)]"
                               }`}
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <CardTitle
-                              className={`text-xl font-bold ${theme.text} mb-1`}
                             >
-                              {record.exerciseName}
-                            </CardTitle>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge
-                                variant="outline"
-                                className={`${
-                                  recordType.type === "power"
-                                    ? "border-red-300 text-red-700 dark:border-red-700 dark:text-red-300"
-                                    : recordType.type === "endurance"
-                                    ? "border-green-300 text-green-700 dark:border-green-700 dark:text-green-300"
-                                    : "border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-300"
-                                }`}
-                              >
-                                {recordType.label}
-                              </Badge>
-                              {record.isRecent && (
-                                <Badge className="bg-orange-500 text-white">
-                                  <Flame className="w-3 h-3 mr-1" />
-                                  New!
-                                </Badge>
-                              )}
+                              <Trophy className="h-6 w-6" />
+                            </div>
+                            <div className="min-w-0">
+                              <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+                                {record.exerciseName}
+                              </h3>
+                              <p className="mt-1 text-sm text-[color:var(--fc-text-dim)]">
+                                {recordDisplay}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                              {recordType.label}
+                            </span>
+                            {record.isRecent && (
+                              <span className="fc-badge bg-[color:var(--fc-status-warning)] text-white">
+                                <Flame className="mr-1 h-3 w-3" />
+                                New
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                          <div className="fc-glass-soft fc-card p-3">
+                            <p className="text-xs text-[color:var(--fc-text-subtle)]">Record</p>
+                            <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                              {recordDisplay}
+                            </p>
+                          </div>
+                          <div className="fc-glass-soft fc-card p-3">
+                            <p className="text-xs text-[color:var(--fc-text-subtle)]">Weight</p>
+                            <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                              {record.weight} kg
+                            </p>
+                          </div>
+                          <div className="fc-glass-soft fc-card p-3">
+                            <p className="text-xs text-[color:var(--fc-text-subtle)]">Reps</p>
+                            <p className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                              {record.reps}
+                            </p>
+                          </div>
+                          <div className="fc-glass-soft fc-card p-3">
+                            <p className="text-xs text-[color:var(--fc-text-subtle)]">Date</p>
+                            <div className="mt-1 flex items-center gap-2 text-sm font-medium text-[color:var(--fc-text-primary)]">
+                              <Calendar className="h-4 w-4 text-[color:var(--fc-text-subtle)]" />
+                              {new Date(record.date).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })}
                             </div>
                           </div>
                         </div>
                       </div>
-                    </CardHeader>
-                    <CardContent className="p-6 pt-0">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                          <span
-                            className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
-                          >
-                            Record
-                          </span>
-                          <p className={`text-2xl font-bold ${theme.text}`}>
-                            {recordDisplay}
-                          </p>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                          <span
-                            className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
-                          >
-                            Weight
-                          </span>
-                          <p className={`text-2xl font-bold ${theme.text}`}>
-                            {record.weight} kg
-                          </p>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                          <span
-                            className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
-                          >
-                            Reps
-                          </span>
-                          <p className={`text-2xl font-bold ${theme.text}`}>
-                            {record.reps}
-                          </p>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                          <span
-                            className={`text-xs font-medium ${theme.textSecondary} block mb-1`}
-                          >
-                            Date
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-slate-400" />
-                            <p className={`text-sm font-medium ${theme.text}`}>
-                              {new Date(record.date).toLocaleDateString(
-                                "en-US",
-                                {
-                                  year: "numeric",
-                                  month: "short",
-                                  day: "numeric",
-                                }
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <Card
-              className={`${theme.card} border ${theme.border} rounded-2xl`}
-            >
-              <CardContent className="p-12 text-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/20 dark:to-amber-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                  <Trophy className="w-12 h-12 text-orange-500 dark:text-orange-400" />
+                    );
+                  })}
                 </div>
-                <h3 className={`text-xl font-semibold ${theme.text} mb-2`}>
-                  No Records Yet
-                </h3>
-                <p className={`${theme.textSecondary} mb-6`}>
-                  Complete some workouts to start building your personal
-                  records! Your best lifts will automatically be tracked here.
-                </p>
-                <Link href="/client/workouts">
-                  <Button className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700">
-                    <Dumbbell className="w-4 h-4 mr-2" />
-                    Start a Workout
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+              </div>
+            </>
+          ) : (
+            <div className="mt-6 fc-glass fc-card p-10 text-center">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-orange-500/20 to-amber-500/30 text-[color:var(--fc-accent-blue)]">
+                <Trophy className="h-10 w-10 text-[color:var(--fc-accent-orange)]" />
+              </div>
+              <h3 className="mt-6 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                No Records Yet
+              </h3>
+              <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+                Complete workouts to start building your personal records. We will
+                automatically track your best lifts here.
+              </p>
+              <Link href="/client/workouts">
+                <Button className="fc-btn fc-btn-primary mt-6">
+                  <Dumbbell className="mr-2 h-5 w-5" />
+                  Start a Workout
+                </Button>
+              </Link>
+            </div>
           )}
         </div>
-      </div>
+      </AnimatedBackground>
     </ProtectedRoute>
   );
 }

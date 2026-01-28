@@ -54,7 +54,7 @@ export default function ResponsiveModal({
       {gradientFrame ? (
         <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
           <div 
-            className={`relative ${theme.card} shadow-2xl rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
+            className={`relative ${theme.card} fc-glass fc-card shadow-2xl rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
             style={{
               animation: 'modalSlideIn 0.3s ease-out',
               maxWidth: `min(95vw, ${maxWidthMap[maxWidth]})`,
@@ -64,7 +64,7 @@ export default function ResponsiveModal({
           >
         {/* Header */}
         {showHeader && (
-          <div className={`sticky top-0 ${theme.card} border-b ${theme.border} px-6 py-5 rounded-t-3xl`} style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid #E5E7EB', padding: '24px', flexShrink: 0 }}>
+          <div className={`sticky top-0 ${theme.card} fc-glass fc-card border-b ${theme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 {icon && (
@@ -100,13 +100,13 @@ export default function ResponsiveModal({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6" style={{ padding: '24px', backgroundColor: '#FFFFFF' }}>
+        <div className="flex-1 overflow-y-auto px-6 py-6">
           {children}
         </div>
 
         {/* Footer Actions */}
         {actions && (
-          <div className={`flex-shrink-0 ${theme.card} border-t ${theme.border} px-6 py-4 rounded-b-3xl`} style={{ backgroundColor: '#FFFFFF', borderTop: '1px solid #E5E7EB', padding: '24px', paddingTop: '16px', flexShrink: 0 }}>
+          <div className={`flex-shrink-0 ${theme.card} fc-glass fc-card border-t ${theme.border} px-6 py-4 rounded-b-3xl`}>
             {actions}
           </div>
         )}
@@ -114,7 +114,7 @@ export default function ResponsiveModal({
         </div>
       ) : (
         <div 
-          className={`relative ${theme.card} shadow-2xl rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
+          className={`relative ${theme.card} fc-glass fc-card shadow-2xl rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
           style={{
             animation: 'modalSlideIn 0.3s ease-out',
             maxWidth: `min(95vw, ${maxWidthMap[maxWidth]})`,
@@ -124,7 +124,7 @@ export default function ResponsiveModal({
         >
           {/* Header */}
           {showHeader && (
-            <div className={`sticky top-0 ${theme.card} border-b ${theme.border} px-6 py-5 rounded-t-3xl`} style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid #E5E7EB', padding: '24px', flexShrink: 0 }}>
+            <div className={`sticky top-0 ${theme.card} fc-glass fc-card border-b ${theme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {icon && (
@@ -160,13 +160,13 @@ export default function ResponsiveModal({
           )}
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-6" style={{ padding: '24px', backgroundColor: '#FFFFFF' }}>
+          <div className="flex-1 overflow-y-auto px-6 py-6">
             {children}
           </div>
 
           {/* Footer Actions */}
           {actions && (
-            <div className={`flex-shrink-0 ${theme.card} border-t ${theme.border} px-6 py-4 rounded-b-3xl`} style={{ backgroundColor: '#FFFFFF', borderTop: '1px solid #E5E7EB', padding: '24px', paddingTop: '16px', flexShrink: 0 }}>
+            <div className={`flex-shrink-0 ${theme.card} fc-glass fc-card border-t ${theme.border} px-6 py-4 rounded-b-3xl`}>
               {actions}
             </div>
           )}

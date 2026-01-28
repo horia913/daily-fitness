@@ -183,17 +183,58 @@ function NutritionDashboardContent() {
 
       const mealsWithData: Meal[] = [];
 
-      // STEP 3: For each meal, get foods and today's completion
-      for (const meal of planMeals) {
-        // 3a: Get meal food items
-        const { data: foodItems, error: foodError } = await supabase
-          .from("meal_food_items")
-          .select("id, quantity, unit, food_id")
-          .eq("meal_id", meal.id);
+      // STEP 3: OPTIMIZED - Batch fetch all data at once instead of N+1 queries
+      const mealIds = planMeals.map(m => m.id);
 
-        if (foodError) {
-          console.error("Error fetching meal food items:", foodError);
-        }
+      // 3a: Batch fetch ALL meal food items for all meals at once
+      const { data: allFoodItems, error: foodError } = await supabase
+        .from("meal_food_items")
+        .select("id, quantity, unit, food_id, meal_id")
+        .in("meal_id", mealIds);
+
+      if (foodError) {
+        console.error("Error fetching meal food items:", foodError);
+      }
+
+      // 3b: Batch fetch ALL foods at once (get unique food IDs)
+      const uniqueFoodIds = [...new Set((allFoodItems || []).map((item: any) => item.food_id).filter(Boolean))];
+      const { data: allFoods, error: foodsError } = await supabase
+        .from("foods")
+        .select("id, name, serving_size, serving_unit, calories_per_serving, protein, carbs, fat")
+        .in("id", uniqueFoodIds);
+
+      if (foodsError) {
+        console.error("Error fetching foods:", foodsError);
+      }
+
+      // Create a map for quick food lookup
+      const foodMap = new Map((allFoods || []).map((food: any) => [food.id, food]));
+
+      // 3c: Batch fetch ALL photo logs for all meals at once
+      const { data: allPhotoLogs } = await supabase
+        .from("meal_photo_logs")
+        .select("*")
+        .in("meal_id", mealIds)
+        .eq("client_id", user.id)
+        .eq("log_date", today);
+
+      // 3d: Batch fetch ALL completions for all meals at once (backward compatibility)
+      const { data: allCompletions } = await supabase
+        .from("meal_completions")
+        .select("*")
+        .in("meal_id", mealIds)
+        .eq("client_id", user.id)
+        .gte("completed_at", `${today}T00:00:00`)
+        .lt("completed_at", `${today}T23:59:59`);
+
+      // Create maps for quick lookup
+      const photoLogMap = new Map((allPhotoLogs || []).map((log: any) => [log.meal_id, log]));
+      const completionMap = new Map((allCompletions || []).map((comp: any) => [comp.meal_id, comp]));
+
+      // STEP 4: Process meals with batched data
+      for (const meal of planMeals) {
+        // Get food items for this meal from batched data
+        const foodItems = (allFoodItems || []).filter((item: any) => item.meal_id === meal.id);
 
         let mappedFoodItems: MealFoodItem[] = [];
         let totalCalories = 0;
@@ -203,19 +244,8 @@ function NutritionDashboardContent() {
 
         if (foodItems && foodItems.length > 0) {
           for (const item of foodItems as any[]) {
-            // 3b: Get food details from foods table
-            const { data: foodData, error: foodDetailsError } = await supabase
-              .from("foods")
-              .select(
-                "id, name, serving_size, serving_unit, calories_per_serving, protein, carbs, fat"
-              )
-              .eq("id", item.food_id)
-              .maybeSingle();
-
-            if (foodDetailsError) {
-              console.error("Error fetching food details:", foodDetailsError);
-              continue;
-            }
+            // Get food details from map (no query needed!)
+            const foodData = foodMap.get(item.food_id);
 
             if (foodData) {
               const servingSize = foodData.serving_size || 1;
@@ -249,29 +279,13 @@ function NutritionDashboardContent() {
           }
         }
 
-        // 3c: Get today's photo log for this meal (from meal_photo_logs table)
-        const { data: photoLogs } = await supabase
-          .from("meal_photo_logs")
-          .select("*")
-          .eq("meal_id", meal.id)
-          .eq("client_id", user.id)
-          .eq("log_date", today);
+        // Get photo log/completion from maps (no query needed!)
+        const photoLogs = photoLogMap.has(meal.id) ? [photoLogMap.get(meal.id)] : null;
+        const completion = completionMap.get(meal.id) || null;
 
-        // Backward compatibility: also check meal_completions if no photo log
-        const { data: completions } =
-          photoLogs && photoLogs.length > 0
-            ? { data: null }
-            : await supabase
-                .from("meal_completions")
-                .select("*")
-                .eq("meal_id", meal.id)
-                .eq("client_id", user.id)
-                .gte("completed_at", `${today}T00:00:00`)
-                .lt("completed_at", `${today}T23:59:59`);
-
-        // Use photo logs first, fall back to completions
+        // Use photo logs first, fall back to completions (from maps)
         const hasPhotoLog = photoLogs && photoLogs.length > 0;
-        const hasCompletion = completions && completions.length > 0;
+        const hasCompletion = !hasPhotoLog && completionMap.has(meal.id);
 
         mealsWithData.push({
           id: meal.id,
@@ -290,12 +304,12 @@ function NutritionDashboardContent() {
           photoUrl: hasPhotoLog
             ? photoLogs[0].photo_url
             : hasCompletion
-            ? completions[0].photo_url
+            ? completion?.photo_url
             : undefined,
           logged_at: hasPhotoLog
             ? photoLogs[0].created_at
             : hasCompletion
-            ? completions[0].completed_at
+            ? completion?.completed_at
             : undefined,
         });
       }
@@ -781,38 +795,24 @@ function NutritionDashboardContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-
       <div className="relative z-10 container mx-auto px-6 md:px-8 py-6 md:py-8 pb-32 max-w-6xl">
         {/* Header Section */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1
-              className={`text-3xl font-bold tracking-tight ${
-                isDark ? "text-white" : "text-slate-900"
-              }`}
-            >
+            <p className="text-xs uppercase tracking-[0.3em] fc-text-dim mb-2">
+              Nutrition Overview
+            </p>
+            <h1 className="text-3xl font-bold tracking-tight fc-text-primary">
               Nutrition Tracking
             </h1>
             <div className="flex items-center gap-2 mt-1">
-              <span
-                className={`text-sm font-medium uppercase tracking-widest ${
-                  isDark ? "text-neutral-400" : "text-neutral-600"
-                }`}
-              >
+              <span className="text-sm font-medium uppercase tracking-widest fc-text-dim">
                 {formattedDate}
               </span>
               {hasActivePlan && meals.length > 0 && (
                 <>
-                  <span
-                    className={`w-1 h-1 rounded-full ${
-                      isDark ? "bg-neutral-600" : "bg-neutral-400"
-                    }`}
-                  ></span>
-                  <span
-                    className={`text-sm font-semibold ${
-                      isDark ? "text-green-400" : "text-green-600"
-                    }`}
-                  >
+                  <span className="w-1 h-1 rounded-full bg-slate-400"></span>
+                  <span className="text-sm font-semibold fc-text-meals">
                     {getLoggedMealsCount()} of {meals.length} meals logged
                   </span>
                 </>
@@ -821,12 +821,8 @@ function NutritionDashboardContent() {
           </div>
           <Link href="/client/nutrition/log">
             <Button
-              className="h-12 px-8 rounded-xl flex items-center justify-center gap-2 font-semibold bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 text-white shadow-lg shadow-red-500/30 hover:shadow-red-500/40 transition-all"
-              style={{
-                boxShadow: isDark
-                  ? "0 4px 16px rgba(239, 68, 68, 0.3)"
-                  : "0 4px 12px rgba(239, 68, 68, 0.2)",
-              }}
+              variant="success"
+              className="h-12 px-8 rounded-xl flex items-center justify-center gap-2 font-semibold w-full md:w-auto"
             >
               <Plus className="w-5 h-5" />
               Log Food

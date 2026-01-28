@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase, ensureAuthenticated } from './supabase'
 
 // Types
 export interface Profile {
@@ -30,7 +30,7 @@ export interface Workout {
   name: string
   description?: string
   duration_minutes?: number
-  difficulty?: 'beginner' | 'intermediate' | 'advanced'
+  difficulty?: 'beginner' | 'intermediate' | 'advanced' | 'athlete'
   created_at: string
   updated_at: string
 }
@@ -102,6 +102,9 @@ export class DatabaseService {
   // Profile functions
   static async getProfile(userId: string): Promise<Profile | null> {
     try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated()
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -133,19 +136,30 @@ export class DatabaseService {
   }
 
   static async getCurrentUserProfile(): Promise<Profile | null> {
-    const { data, error } = await supabase
-      .rpc('get_user_profile')
+    try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated()
+      
+      const { data, error } = await supabase
+        .rpc('get_user_profile')
 
-    if (error) {
-      console.error('Error fetching current user profile:', error)
+      if (error) {
+        console.error('Error fetching current user profile:', error)
+        return null
+      }
+
+      return data
+    } catch (error) {
+      console.error('Unexpected error fetching current user profile:', error)
       return null
     }
-
-    return data
   }
 
   static async createProfile(userId: string, email: string, role: 'client' | 'coach' = 'client'): Promise<Profile | null> {
     try {
+      // Ensure user is authenticated before creating profile
+      await ensureAuthenticated()
+      
       const { data, error } = await supabase
         .from('profiles')
         .insert({
@@ -171,24 +185,35 @@ export class DatabaseService {
   }
 
   static async updateProfile(userId: string, updates: Partial<Profile>): Promise<Profile | null> {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', userId)
-      .select()
-      .single()
+    try {
+      // Ensure user is authenticated before updating profile
+      await ensureAuthenticated()
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        .select()
+        .single()
 
-    if (error) {
-      console.error('Error updating profile:', error)
+      if (error) {
+        console.error('Error updating profile:', error)
+        return null
+      }
+
+      return data
+    } catch (error) {
+      console.error('Unexpected error updating profile:', error)
       return null
     }
-
-    return data
   }
 
   // Client functions (for coaches)
   static async getClients(coachId: string): Promise<Client[]> {
     try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated()
+      
       // First, get the client relationships
       const { data: clientsData, error: clientsError } = await supabase
         .from('clients')
@@ -236,130 +261,181 @@ export class DatabaseService {
 
   // Workout functions
   static async getWorkouts(coachId: string): Promise<Workout[]> {
-    const { data, error } = await supabase
-      .from('workouts')
-      .select('*')
-      .eq('coach_id', coachId)
-      .order('created_at', { ascending: false })
+    try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated()
+      
+      const { data, error } = await supabase
+        .from('workouts')
+        .select('*')
+        .eq('coach_id', coachId)
+        .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Error fetching workouts:', error)
+      if (error) {
+        console.error('Error fetching workouts:', error)
+        return []
+      }
+
+      return data || []
+    } catch (error) {
+      console.error('Unexpected error fetching workouts:', error)
       return []
     }
-
-    return data || []
   }
 
   // Workout assignment functions
   static async getTodaysWorkout(clientId: string): Promise<WorkoutAssignment | null> {
-    const today = new Date().toISOString().split('T')[0]
-    
-    const { data, error } = await supabase
-      .from('workout_assignments')
-      .select(`
-        *,
-        template:workout_templates(*)
-      `)
-      .eq('client_id', clientId)
-      .eq('scheduled_date', today)
-      .eq('status', 'assigned')
-      .order('created_at', { ascending: false })
-      .limit(1)
+    try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated()
+      
+      const today = new Date().toISOString().split('T')[0]
+      
+      const { data, error } = await supabase
+        .from('workout_assignments')
+        .select(`
+          *,
+          template:workout_templates(*)
+        `)
+        .eq('client_id', clientId)
+        .eq('scheduled_date', today)
+        .eq('status', 'assigned')
+        .order('created_at', { ascending: false })
+        .limit(1)
 
-    if (error) {
-      console.error('Error fetching today\'s workout:', error)
+      if (error) {
+        console.error('Error fetching today\'s workout:', error)
+        return null
+      }
+
+      // Return the first result or null if no workout found
+      return data && data.length > 0 ? data[0] : null
+    } catch (error) {
+      console.error('Unexpected error fetching today\'s workout:', error)
       return null
     }
-
-    // Return the first result or null if no workout found
-    return data && data.length > 0 ? data[0] : null
   }
 
   static async getWorkoutStats(clientId: string): Promise<{
     thisWeek: number
     goalCompletion: number
   }> {
-    const startOfWeek = new Date()
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
-    const startOfWeekStr = startOfWeek.toISOString().split('T')[0]
+    try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated()
+      
+      const startOfWeek = new Date()
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
+      const startOfWeekStr = startOfWeek.toISOString().split('T')[0]
 
-    const { data, error } = await supabase
-      .from('workout_assignments')
-      .select('status')
-      .eq('client_id', clientId)
-      .gte('scheduled_date', startOfWeekStr)
+      const { data, error } = await supabase
+        .from('workout_assignments')
+        .select('status')
+        .eq('client_id', clientId)
+        .gte('scheduled_date', startOfWeekStr)
 
-    if (error) {
-      console.error('Error fetching workout stats:', error)
+      if (error) {
+        console.error('Error fetching workout stats:', error)
+        return { thisWeek: 0, goalCompletion: 0 }
+      }
+
+      const completed = data?.filter(assignment => assignment.status === 'completed').length || 0
+      const total = data?.length || 0
+      const goalCompletion = total > 0 ? Math.round((completed / total) * 100) : 0
+
+      return {
+        thisWeek: completed,
+        goalCompletion
+      }
+    } catch (error) {
+      console.error('Unexpected error fetching workout stats:', error)
       return { thisWeek: 0, goalCompletion: 0 }
-    }
-
-    const completed = data?.filter(assignment => assignment.status === 'completed').length || 0
-    const total = data?.length || 0
-    const goalCompletion = total > 0 ? Math.round((completed / total) * 100) : 0
-
-    return {
-      thisWeek: completed,
-      goalCompletion
     }
   }
 
   // Achievement functions
   static async getRecentAchievements(clientId: string): Promise<Achievement[]> {
-    const { data, error } = await supabase
-      .from('achievements')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: false })
-      .limit(5)
+    try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated()
+      
+      const { data, error } = await supabase
+        .from('achievements')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false })
+        .limit(5)
 
-    if (error) {
-      console.error('Error fetching achievements:', error)
+      if (error) {
+        console.error('Error fetching achievements:', error)
+        return []
+      }
+
+      return data || []
+    } catch (error) {
+      console.error('Unexpected error fetching achievements:', error)
       return []
     }
-
-    return data || []
   }
 
   // Session functions (for coaches)
   static async getTodaysSessions(coachId: string): Promise<Session[]> {
-    const today = new Date().toISOString().split('T')[0]
-    
-    const { data, error } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('coach_id', coachId)
-      .gte('scheduled_at', `${today}T00:00:00`)
-      .lt('scheduled_at', `${today}T23:59:59`)
-      .order('scheduled_at', { ascending: true })
+    try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated()
+      
+      const today = new Date().toISOString().split('T')[0]
+      
+      const { data, error } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('coach_id', coachId)
+        .gte('scheduled_at', `${today}T00:00:00`)
+        .lt('scheduled_at', `${today}T23:59:59`)
+        .order('scheduled_at', { ascending: true })
 
-    if (error) {
-      console.error('Error fetching today\'s sessions:', error)
+      if (error) {
+        console.error('Error fetching today\'s sessions:', error)
+        return []
+      }
+
+      return data || []
+    } catch (error) {
+      console.error('Unexpected error fetching today\'s sessions:', error)
       return []
     }
-
-    return data || []
   }
 
   static async getCoachStats(coachId: string): Promise<{
     activeClients: number
     workoutsCreated: number
   }> {
-    const [clientsResult, workoutsResult] = await Promise.all([
-      supabase
-        .from('clients')
-        .select('id', { count: 'exact' })
-        .eq('coach_id', coachId)
-        .eq('status', 'active'),
-      supabase
-        .from('workouts')
-        .select('id', { count: 'exact' })
-        .eq('coach_id', coachId)
-    ])
+    try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated()
+      
+      const [clientsResult, workoutsResult] = await Promise.all([
+        supabase
+          .from('clients')
+          .select('id', { count: 'exact' })
+          .eq('coach_id', coachId)
+          .eq('status', 'active'),
+        supabase
+          .from('workouts')
+          .select('id', { count: 'exact' })
+          .eq('coach_id', coachId)
+      ])
 
-    return {
-      activeClients: clientsResult.count || 0,
-      workoutsCreated: workoutsResult.count || 0
+      return {
+        activeClients: clientsResult.count || 0,
+        workoutsCreated: workoutsResult.count || 0
+      }
+    } catch (error) {
+      console.error('Unexpected error fetching coach stats:', error)
+      return {
+        activeClients: 0,
+        workoutsCreated: 0
+      }
     }
   }
 
@@ -369,36 +445,44 @@ export class DatabaseService {
     progress: number
     recentAchievement?: string
   }>> {
-    const { data, error } = await supabase
-      .from('clients')
-      .select('*')
-      .eq('coach_id', coachId)
-      .eq('status', 'active')
-      .limit(5)
+    try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated()
+      
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('coach_id', coachId)
+        .eq('status', 'active')
+        .limit(5)
 
-    if (error) {
-      console.error('Error fetching client progress:', error)
+      if (error) {
+        console.error('Error fetching client progress:', error)
+        return []
+      }
+
+      // Fetch profiles for each client
+      const clientProgress = []
+      for (const client of data || []) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', client.client_id)
+          .single()
+        
+        if (profile) {
+          clientProgress.push({
+            client: profile,
+            progress: Math.floor(Math.random() * 40) + 60, // Mock progress for now
+            recentAchievement: undefined // Will implement achievements later
+          })
+        }
+      }
+      
+      return clientProgress
+    } catch (error) {
+      console.error('Unexpected error fetching client progress:', error)
       return []
     }
-
-    // Fetch profiles for each client
-    const clientProgress = []
-    for (const client of data || []) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', client.client_id)
-        .single()
-      
-      if (profile) {
-        clientProgress.push({
-          client: profile,
-          progress: Math.floor(Math.random() * 40) + 60, // Mock progress for now
-          recentAchievement: undefined // Will implement achievements later
-        })
-      }
-    }
-    
-    return clientProgress
   }
 }

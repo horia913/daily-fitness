@@ -31,6 +31,7 @@ export interface BaseBlockExecutorProps {
   onAlternativesClick?: (exerciseId: string) => void;
   onRestTimerClick?: () => void;
   onSetComplete?: (completedSets: number) => void;
+  progressionSuggestion?: import("@/lib/clientProgressionService").ProgressionSuggestion | null;
 }
 
 export interface BlockDetail {

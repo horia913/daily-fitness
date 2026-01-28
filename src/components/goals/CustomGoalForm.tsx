@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
 
 interface CreateCustomGoalInput {
   title: string;
@@ -36,7 +34,6 @@ interface CustomGoalFormProps {
 }
 
 export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProps) {
-  const { isDark } = useTheme();
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -90,39 +87,29 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-start justify-center p-4 overflow-y-auto"
-      style={{
-        background: "rgba(0, 0, 0, 0.5)",
-        backdropFilter: "blur(4px)",
-      }}
+      className="fixed inset-0 z-[9999] flex items-start justify-center p-4 overflow-y-auto bg-black/60 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        style={{
-          background: isDark
-            ? "rgba(30, 30, 30, 0.95)"
-            : "rgba(255, 255, 255, 0.98)",
-          border: isDark
-            ? "1px solid rgba(255,255,255,0.1)"
-            : "1px solid rgba(0,0,0,0.1)",
-        }}
+        className="w-full max-w-md mt-8 mb-8 fc-modal fc-card p-6 md:p-8"
         onClick={(e) => e.stopPropagation()}
       >
-      <GlassCard
-        elevation={3}
-        className="w-full max-w-md p-6 md:p-8 mt-8 mb-8"
-      >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-            Create Custom Goal
-          </h2>
+          <div>
+            <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+              Goals
+            </span>
+            <h2 className="text-2xl font-bold fc-text-primary mt-2">
+              Create Custom Goal
+            </h2>
+          </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="h-8 w-8"
+            className="h-8 w-8 fc-press"
           >
             <X className="w-4 h-4" />
           </Button>
@@ -131,7 +118,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div>
-            <Label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
+            <Label className="text-sm font-medium mb-2 block fc-text-subtle">
               Goal Title *
             </Label>
             <Input
@@ -140,13 +127,13 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               required
-              className="w-full"
+              className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
             />
           </div>
 
           {/* Description */}
           <div>
-            <Label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
+            <Label className="text-sm font-medium mb-2 block fc-text-subtle">
               Description (optional)
             </Label>
             <Textarea
@@ -156,13 +143,13 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
                 setFormData({ ...formData, description: e.target.value })
               }
               rows={3}
-              className="w-full"
+              className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
             />
           </div>
 
           {/* Target Value & Unit */}
           <div>
-            <Label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
+            <Label className="text-sm font-medium mb-2 block fc-text-subtle">
               Target *
             </Label>
             <div className="flex gap-2">
@@ -176,7 +163,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
                 required
                 min={0}
                 step="0.01"
-                className="flex-1"
+                className="flex-1 fc-glass-soft border border-[color:var(--fc-glass-border)]"
               />
               <Input
                 type="text"
@@ -185,14 +172,14 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
                 onChange={(e) =>
                   setFormData({ ...formData, target_unit: e.target.value })
                 }
-                className="flex-1"
+                className="flex-1 fc-glass-soft border border-[color:var(--fc-glass-border)]"
               />
             </div>
           </div>
 
           {/* Category */}
           <div>
-            <Label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
+            <Label className="text-sm font-medium mb-2 block fc-text-subtle">
               Category
             </Label>
             <Select
@@ -201,7 +188,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
                 setFormData({ ...formData, category: value })
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -219,7 +206,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
 
           {/* Type */}
           <div>
-            <Label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
+            <Label className="text-sm font-medium mb-2 block fc-text-subtle">
               Type
             </Label>
             <Select
@@ -228,7 +215,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
                 setFormData({ ...formData, type: value })
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -241,7 +228,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
 
           {/* Priority */}
           <div>
-            <Label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
+            <Label className="text-sm font-medium mb-2 block fc-text-subtle">
               Priority
             </Label>
             <Select
@@ -250,7 +237,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
                 setFormData({ ...formData, priority: value })
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -263,7 +250,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
 
           {/* Target Date */}
           <div>
-            <Label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
+            <Label className="text-sm font-medium mb-2 block fc-text-subtle">
               Deadline (optional)
             </Label>
             <Input
@@ -272,7 +259,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
               onChange={(e) =>
                 setFormData({ ...formData, target_date: e.target.value })
               }
-              className="w-full"
+              className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]"
             />
           </div>
 
@@ -281,10 +268,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
             <Button
               type="submit"
               disabled={isSubmitting || !formData.title || !formData.target_value}
-              className="flex-1"
-              style={{
-                background: "linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)",
-              }}
+              className="flex-1 fc-btn fc-btn-primary fc-press"
             >
               {isSubmitting ? "Creating..." : "Create Goal"}
             </Button>
@@ -292,17 +276,16 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
               type="button"
               variant="outline"
               onClick={onClose}
-              className="flex-1"
+              className="flex-1 fc-btn fc-btn-secondary fc-press"
             >
               Cancel
             </Button>
           </div>
         </form>
 
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 text-center">
+        <p className="text-xs fc-text-subtle mt-4 text-center">
           💡 Custom goals are tracked manually - you'll update progress yourself.
         </p>
-      </GlassCard>
       </div>
     </div>
   );

@@ -123,16 +123,16 @@ export function AuthFormContainer({
   children: React.ReactNode 
 }) {
   return (
-    <Card className="bg-white/80 backdrop-blur-sm shadow-2xl border-0 rounded-3xl">
+    <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-2xl border-0 rounded-3xl">
       <CardHeader className="text-center pb-8 pt-8">
         <div className="flex items-center justify-center gap-3 mb-6">
           <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg">
             <Dumbbell className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-800">DailyFitness</h1>
+          <h1 className="text-3xl font-bold text-slate-800 dark:text-white">DailyFitness</h1>
         </div>
-        <CardTitle className="text-2xl font-bold text-slate-800 mb-2">{title}</CardTitle>
-        <CardDescription className="text-slate-600 text-base">{description}</CardDescription>
+        <CardTitle className="text-2xl font-bold text-slate-800 dark:text-white mb-2">{title}</CardTitle>
+        <CardDescription className="text-slate-600 dark:text-slate-300 text-base">{description}</CardDescription>
       </CardHeader>
       <CardContent className="px-8 pb-8">
         {children}
@@ -164,12 +164,12 @@ export function FeatureHighlights() {
   return (
     <div className="grid grid-cols-3 gap-3 mt-6">
       {features.map((feature, index) => (
-        <div key={index} className="text-center p-3 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
+        <div key={index} className="text-center p-3 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 border border-blue-100 dark:border-slate-700">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-sm">
             <feature.icon className="w-5 h-5 text-white" />
           </div>
-          <h3 className="font-semibold text-slate-800 text-sm mb-1">{feature.title}</h3>
-          <p className="text-xs text-slate-600 leading-tight">{feature.description}</p>
+          <h3 className="font-semibold text-slate-800 dark:text-white text-sm mb-1">{feature.title}</h3>
+          <p className="text-xs text-slate-600 dark:text-slate-300 leading-tight">{feature.description}</p>
         </div>
       ))}
     </div>

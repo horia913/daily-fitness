@@ -52,7 +52,7 @@ export default function VideoPlayerModal({
       data-theme={isDark ? 'dark' : 'light'}
     >
       <div 
-        className={`relative ${theme.card} shadow-2xl rounded-3xl border ${theme.border} w-full overflow-hidden transform transition-all duration-300 ease-out flex flex-col`}
+        className={`relative ${theme.card} fc-glass fc-card shadow-2xl rounded-3xl border ${theme.border} w-full overflow-hidden transform transition-all duration-300 ease-out flex flex-col`}
         style={{
           animation: 'modalSlideIn 0.3s ease-out',
           maxWidth: 'min(95vw, 70rem)',
@@ -61,7 +61,7 @@ export default function VideoPlayerModal({
       >
         {/* Header - Sticky */}
         {title && (
-          <div className={`${theme.card} border-b ${theme.border} px-4 sm:px-6 py-4 flex-shrink-0`}>
+          <div className={`${theme.card} fc-glass fc-card border-b ${theme.border} px-4 sm:px-6 py-4 flex-shrink-0`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center shadow-md">
@@ -122,7 +122,7 @@ export default function VideoPlayerModal({
         </div>
 
         {/* Footer with Close Button */}
-        <div className={`${theme.card} border-t ${theme.border} px-4 sm:px-6 py-3 flex-shrink-0`}>
+        <div className={`${theme.card} fc-glass fc-card border-t ${theme.border} px-4 sm:px-6 py-3 flex-shrink-0`}>
           <div className="flex justify-end">
             <Button
               variant="outline"

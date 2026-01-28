@@ -224,6 +224,7 @@ export default function ProgramDetailModal({ isOpen, onClose, program, onEdit }:
         className={`
           fixed inset-4 sm:inset-8 md:inset-16
           ${safeTheme.card} 
+          fc-glass fc-card
           rounded-3xl 
           ${safeTheme.shadow} 
           flex flex-col
@@ -233,7 +234,7 @@ export default function ProgramDetailModal({ isOpen, onClose, program, onEdit }:
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`sticky top-0 ${safeTheme.card} border-b ${safeTheme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
+        <div className={`sticky top-0 ${safeTheme.card} fc-glass fc-card border-b ${safeTheme.border} px-6 py-5 rounded-t-3xl flex-shrink-0`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-2xl bg-gradient-to-br from-purple-400 via-purple-500 to-purple-600 shadow-lg`}>
@@ -279,7 +280,7 @@ export default function ProgramDetailModal({ isOpen, onClose, program, onEdit }:
           ) : (
             <>
               {/* Program Overview */}
-              <Card className={`${safeTheme.card} border ${safeTheme.border} rounded-2xl`}>
+              <Card className={`${safeTheme.card} fc-glass fc-card border ${safeTheme.border} rounded-2xl`}>
                 <CardHeader className="p-6">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-xl bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-lg`}>
@@ -290,7 +291,7 @@ export default function ProgramDetailModal({ isOpen, onClose, program, onEdit }:
                 </CardHeader>
                 <CardContent className="p-6 pt-0 space-y-4">
                   <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                    <p className={`${safeTheme.text} leading-relaxed`}>
+                    <p className={`${safeTheme.text} fc-text-dim leading-relaxed`}>
                       {program.description || 'No description available'}
                     </p>
                   </div>
@@ -333,7 +334,7 @@ export default function ProgramDetailModal({ isOpen, onClose, program, onEdit }:
 
               {/* Program Weeks */}
               {programDetails?.weeks && programDetails.weeks.length > 0 && (
-                <Card className={`${safeTheme.card} border ${safeTheme.border} rounded-2xl`}>
+                <Card className={`${safeTheme.card} fc-glass fc-card border ${safeTheme.border} rounded-2xl`}>
                   <CardHeader className="p-6">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-xl bg-gradient-to-br from-green-400 via-green-500 to-green-600 shadow-lg`}>
@@ -401,7 +402,7 @@ export default function ProgramDetailModal({ isOpen, onClose, program, onEdit }:
         </div>
 
         {/* Footer */}
-        <div className={`${safeTheme.card} border-t ${safeTheme.border} px-6 py-4 rounded-b-3xl flex justify-end gap-3 flex-shrink-0`}>
+        <div className={`${safeTheme.card} fc-glass fc-card border-t ${safeTheme.border} px-6 py-4 rounded-b-3xl flex justify-end gap-3 flex-shrink-0`}>
           <Button
             variant="outline"
             onClick={onClose}

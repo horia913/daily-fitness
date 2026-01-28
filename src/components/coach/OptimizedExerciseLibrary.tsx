@@ -72,7 +72,7 @@ interface OptimizedExerciseLibraryProps {
 }
 
 export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryProps) {
-  const { isDark, getThemeStyles, performanceSettings } = useTheme()
+  const { getThemeStyles, performanceSettings } = useTheme()
   const router = useRouter()
   const theme = getThemeStyles()
 
@@ -309,15 +309,15 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
     return (
       <div className={`min-h-screen ${theme.background}`}>
         <div className="animate-pulse">
-          <div className="h-64 bg-slate-200 dark:bg-slate-800"></div>
+          <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
           <div className="p-6 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className={`${theme.card} rounded-2xl p-6`}>
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+              <div className="fc-glass fc-card rounded-2xl p-6">
+                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                  <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                  <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
                 </div>
               </div>
             </div>
@@ -346,15 +346,15 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
               <Button
                 variant="ghost"
                 onClick={() => router.push('/coach')}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all duration-200"
+                className="fc-btn fc-btn-ghost h-10 w-10"
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className={`text-2xl sm:text-3xl font-bold ${theme.text} mb-1 sm:mb-2`}>
+                <h1 className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] mb-1 sm:mb-2">
                   Exercise Library 💪
                 </h1>
-                <p className={`text-base sm:text-lg ${theme.textSecondary}`}>
+                <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)]">
                   Manage your comprehensive exercise collection with visual richness
                 </p>
               </div>
@@ -364,7 +364,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
               <Button
                 variant="outline"
                 onClick={loadExercises}
-                className="flex items-center gap-2 rounded-xl border-2 hover:border-blue-300 transition-all duration-200"
+                className="fc-btn fc-btn-ghost flex items-center gap-2"
                 size="sm"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -372,7 +372,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
               </Button>
               <Button
                 onClick={() => setShowCreateForm(true)}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex-1 sm:flex-none"
+                className="fc-btn fc-btn-primary flex items-center gap-2 flex-1 sm:flex-none"
                 size="sm"
               >
                 <Plus className="w-4 h-4" />
@@ -384,66 +384,66 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
 
           {/* Stats Overview */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-blue-300 transition-all duration-300 hover:scale-105`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                    <Dumbbell className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
+                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                    <Dumbbell className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
                   </div>
                   <div className="min-w-0">
-                    <p className={`text-lg sm:text-2xl font-bold ${theme.text}`}>{exercises.length}</p>
-                    <p className={`text-xs sm:text-sm ${theme.textSecondary} truncate`}>Exercises</p>
+                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{exercises.length}</p>
+                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Exercises</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-green-300 transition-all duration-300 hover:scale-105`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
-                    <Globe className="w-4 h-4 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
+                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                    <Globe className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
                   </div>
                   <div className="min-w-0">
-                    <p className={`text-lg sm:text-2xl font-bold ${theme.text}`}>
+                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       {exercises.filter(e => e.is_public).length}
                     </p>
-                    <p className={`text-xs sm:text-sm ${theme.textSecondary} truncate`}>Public</p>
+                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Public</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-purple-300 transition-all duration-300 hover:scale-105`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
-                    <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
+                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                    <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
                   </div>
                   <div className="min-w-0">
-                    <p className={`text-lg sm:text-2xl font-bold ${theme.text}`}>
+                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       {exercises.reduce((sum, e) => sum + (e.usage_count || 0), 0)}
                     </p>
-                    <p className={`text-xs sm:text-sm ${theme.textSecondary} truncate`}>Usage</p>
+                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Usage</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:border-orange-300 transition-all duration-300 hover:scale-105`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
               <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
-                    <Star className="w-4 h-4 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400" />
+                  <div className="p-2 sm:p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                    <Star className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
                   </div>
                   <div className="min-w-0">
-                    <p className={`text-lg sm:text-2xl font-bold ${theme.text}`}>
+                    <p className="text-lg sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       {exercises.length > 0 
                         ? (exercises.reduce((sum, e) => sum + (e.rating || 0), 0) / exercises.length).toFixed(1)
                         : '0.0'
                       }
                     </p>
-                    <p className={`text-xs sm:text-sm ${theme.textSecondary} truncate`}>Rating</p>
+                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] truncate">Rating</p>
                   </div>
                 </div>
               </CardContent>
@@ -456,24 +456,24 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
           {/* Enhanced Search and Filters */}
-          <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+          <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
             <CardContent className="p-4 sm:p-6">
               <div className="space-y-4 sm:space-y-6">
                 {/* Search Bar */}
                 <div className="relative">
-                  <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-5 sm:h-5" />
+                  <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-[color:var(--fc-text-subtle)] w-4 h-4 sm:w-5 sm:h-5" />
                   <Input
                     placeholder="Search exercises..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 sm:pl-12 h-10 sm:h-12 rounded-xl border-2 text-base sm:text-lg focus:border-blue-500 transition-all duration-200"
+                    className="fc-input pl-10 sm:pl-12 h-10 sm:h-12 text-base sm:text-lg"
                   />
                 </div>
 
                 {/* Filters - Mobile First */}
                 <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
                   <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 focus:border-blue-500 transition-all duration-200">
+                    <SelectTrigger className="fc-select h-10 sm:h-12">
                       <SelectValue placeholder="Category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -493,7 +493,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                   </Select>
 
                   <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-                    <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 focus:border-blue-500 transition-all duration-200">
+                    <SelectTrigger className="fc-select h-10 sm:h-12">
                       <SelectValue placeholder="Difficulty" />
                     </SelectTrigger>
                     <SelectContent>
@@ -520,7 +520,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                   </Select>
 
                   <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
-                    <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 focus:border-blue-500 transition-all duration-200">
+                    <SelectTrigger className="fc-select h-10 sm:h-12">
                       <SelectValue placeholder="Equipment" />
                     </SelectTrigger>
                     <SelectContent>
@@ -538,7 +538,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
 
                   <div className="flex gap-2">
                     <Select value={sortBy} onValueChange={(value: 'name' | 'created' | 'usage' | 'rating') => setSortBy(value)}>
-                      <SelectTrigger className="h-10 sm:h-12 rounded-xl border-2 flex-1 focus:border-blue-500 transition-all duration-200">
+                      <SelectTrigger className="fc-select h-10 sm:h-12 flex-1">
                         <SelectValue placeholder="Sort by" />
                       </SelectTrigger>
                       <SelectContent>
@@ -551,7 +551,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                     <Button
                       variant="outline"
                       onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                      className="h-10 sm:h-12 px-3 rounded-xl border-2 hover:border-blue-300 transition-all duration-200"
+                      className="fc-btn fc-btn-ghost h-10 sm:h-12 px-3"
                     >
                       {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
                     </Button>
@@ -561,12 +561,12 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                 {/* View Controls and Selection */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm ${theme.textSecondary}`}>View:</span>
+                    <span className="text-sm text-[color:var(--fc-text-dim)]">View:</span>
                     <Button
                       variant={viewMode === 'grid' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setViewMode('grid')}
-                      className="rounded-xl"
+                      className={viewMode === 'grid' ? 'fc-btn fc-btn-primary' : 'fc-btn fc-btn-ghost'}
                     >
                       <Grid3X3 className="w-4 h-4" />
                     </Button>
@@ -574,14 +574,14 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                       variant={viewMode === 'list' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setViewMode('list')}
-                      className="rounded-xl"
+                      className={viewMode === 'list' ? 'fc-btn fc-btn-primary' : 'fc-btn fc-btn-ghost'}
                     >
                       <List className="w-4 h-4" />
                     </Button>
                   </div>
 
                   <div className="flex items-center gap-2">
-                        <span className={`text-sm ${theme.textSecondary}`}>
+                        <span className="text-sm text-[color:var(--fc-text-dim)]">
                       {filteredAndSortedExercises.length} exercise{filteredAndSortedExercises.length !== 1 ? 's' : ''}
                         </span>
                   </div>
@@ -599,14 +599,14 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                 return (
                   <Card 
                     key={exercise.id} 
-                    className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-xl transition-all duration-300 group hover:border-purple-300 dark:hover:border-purple-600 hover:scale-105`}
+                    className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 group hover:scale-105"
                   >
                     <CardContent className="p-4 sm:p-5 space-y-3 sm:space-y-4">
                       {/* Header with Icon and Badges */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <div className="p-2 rounded-xl bg-gradient-to-br from-purple-100 to-orange-100 dark:from-purple-900/30 dark:to-orange-900/30">
-                            <IconComponent className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                          <div className="p-2 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                            <IconComponent className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
                         </div>
                           <div className="flex flex-col gap-1">
                             <Badge className={`${difficultyColors[exercise.difficulty as keyof typeof difficultyColors]} border-0 text-xs px-2 py-1 w-fit`}>
@@ -631,7 +631,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                               e.stopPropagation()
                               setVideoPlayerExercise(exercise)
                             }}
-                            className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700 hover:bg-purple-200 dark:hover:bg-purple-900/50 rounded-xl p-2"
+                            className="fc-btn fc-btn-ghost p-2 text-[color:var(--fc-accent-purple)]"
                             title="Watch Video"
                           >
                             <Play className="w-4 h-4" />
@@ -641,12 +641,12 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
 
                       {/* Exercise Name and Category */}
                       <div>
-                        <h3 className={`font-bold ${theme.text} text-lg sm:text-xl mb-2`}>
+                        <h3 className="font-bold text-[color:var(--fc-text-primary)] text-lg sm:text-xl mb-2">
                             {exercise.name}
                           </h3>
                           <div className="flex items-center gap-2">
-                          <IconComponent className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-                          <span className={`text-sm ${theme.textSecondary}`}>
+                          <IconComponent className="w-4 h-4 text-[color:var(--fc-domain-workouts)] flex-shrink-0" />
+                          <span className="text-sm text-[color:var(--fc-text-dim)]">
                               {exercise.category}
                             </span>
                         </div>
@@ -654,7 +654,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
 
                       {/* Description */}
                       {exercise.description && (
-                        <p className={`text-xs sm:text-sm ${theme.textSecondary} line-clamp-2`}>
+                        <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] line-clamp-2">
                           {exercise.description}
                         </p>
                       )}
@@ -674,12 +674,12 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                       </div>
 
                       {/* Equipment */}
-                      <div className={`text-xs ${theme.textSecondary} truncate`}>
+                      <div className="text-xs text-[color:var(--fc-text-dim)] truncate">
                         {exercise.equipment?.join(', ') || 'No equipment'}
                       </div>
 
                       {/* Stats */}
-                      <div className="flex items-center justify-between text-xs text-slate-500">
+                      <div className="flex items-center justify-between text-xs text-[color:var(--fc-text-subtle)]">
                         <div className="flex items-center gap-1">
                           <Users className="w-3 h-3" />
                           <span>{exercise.usage_count || 0}</span>
@@ -696,7 +696,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                       </div>
 
                       {/* Quick Actions */}
-                      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[color:var(--fc-glass-border)]">
                         <Button
                           variant="outline"
                           size="sm"
@@ -705,7 +705,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                             setEditingExercise(exercise)
                             setShowCreateForm(true)
                           }}
-                          className="text-xs sm:text-sm rounded-xl"
+                          className="text-xs sm:text-sm fc-btn fc-btn-ghost"
                         >
                           <Edit className="w-3 h-3 mr-1" />
                           Edit
@@ -717,7 +717,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                             e.stopPropagation()
                             setAlternativesModalExercise(exercise)
                           }}
-                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 rounded-xl text-xs sm:text-sm"
+                          className="text-xs sm:text-sm fc-btn fc-btn-ghost text-[color:var(--fc-status-warning)]"
                           title="Manage Alternatives"
                         >
                           <Shuffle className="w-3 h-3 mr-1" />
@@ -730,7 +730,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                             e.stopPropagation()
                             deleteExercise(exercise.id)
                           }}
-                          className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 rounded-xl text-xs sm:text-sm"
+                          className="text-xs sm:text-sm fc-btn fc-btn-ghost text-[color:var(--fc-status-error)]"
                           title="Delete Exercise"
                         >
                           <Trash2 className="w-3 h-3 mr-1" />
@@ -750,14 +750,14 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                 return (
                   <Card 
                     key={exercise.id} 
-                    className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-xl transition-all duration-300 group hover:border-purple-300 dark:hover:border-purple-600`}
+                    className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 group"
                   >
                     <CardContent className="p-4 sm:p-6">
                       <div className="flex items-start gap-3 sm:gap-4">
                         {/* Icon and Badges */}
                         <div className="flex flex-col gap-2 items-center">
-                          <div className="p-3 rounded-xl bg-gradient-to-br from-purple-100 to-orange-100 dark:from-purple-900/30 dark:to-orange-900/30">
-                            <IconComponent className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                          <div className="p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
+                            <IconComponent className="w-6 h-6 text-[color:var(--fc-domain-workouts)]" />
                             </div>
                           {exercise.video_url && (
                             <Button
@@ -767,7 +767,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                                 e.stopPropagation()
                                 setVideoPlayerExercise(exercise)
                               }}
-                              className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700 hover:bg-purple-200 dark:hover:bg-purple-900/50 rounded-xl p-2"
+                              className="fc-btn fc-btn-ghost p-2 text-[color:var(--fc-accent-purple)]"
                               title="Watch Video"
                             >
                               <Play className="w-4 h-4" />
@@ -779,13 +779,13 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1 min-w-0">
-                              <h3 className={`font-bold ${theme.text} text-lg sm:text-xl mb-2`}>
+                              <h3 className="font-bold text-[color:var(--fc-text-primary)] text-lg sm:text-xl mb-2">
                                 {exercise.name}
                               </h3>
                               <div className="flex flex-wrap items-center gap-2 mb-3">
                                 <div className="flex items-center gap-1">
-                                  <IconComponent className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                                  <span className={`text-sm ${theme.textSecondary}`}>
+                                  <IconComponent className="w-4 h-4 text-[color:var(--fc-domain-workouts)]" />
+                                  <span className="text-sm text-[color:var(--fc-text-dim)]">
                                   {exercise.category}
                                 </span>
                                 </div>
@@ -806,12 +806,12 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                           </div>
 
                           {exercise.description && (
-                            <p className={`text-sm ${theme.textSecondary} mb-3 line-clamp-2`}>
+                            <p className="text-sm text-[color:var(--fc-text-dim)] mb-3 line-clamp-2">
                               {exercise.description}
                             </p>
                           )}
 
-                          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-slate-500 dark:text-slate-400">
+                          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-[color:var(--fc-text-subtle)]">
                             <span className="truncate">Muscles: {exercise.muscle_groups.slice(0, 2).join(', ')}{exercise.muscle_groups.length > 2 ? '...' : ''}</span>
                             <span className="truncate">Equipment: {exercise.equipment.slice(0, 2).join(', ')}{exercise.equipment.length > 2 ? '...' : ''}</span>
                             <div className="flex items-center gap-1">
@@ -835,7 +835,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                               setEditingExercise(exercise)
                               setShowCreateForm(true)
                             }}
-                            className="rounded-xl p-2"
+                            className="fc-btn fc-btn-ghost p-2"
                           >
                             <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                           </Button>
@@ -846,7 +846,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                               e.stopPropagation()
                               setAlternativesModalExercise(exercise)
                             }}
-                            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 rounded-xl p-2"
+                            className="fc-btn fc-btn-ghost text-[color:var(--fc-status-warning)] p-2"
                             title="Manage Alternatives"
                           >
                             <Shuffle className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -858,7 +858,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                               e.stopPropagation()
                               deleteExercise(exercise.id)
                             }}
-                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 rounded-xl p-2"
+                            className="fc-btn fc-btn-ghost text-[color:var(--fc-status-error)] p-2"
                             title="Delete Exercise"
                           >
                             <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -874,18 +874,18 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
 
           {/* Empty State */}
           {filteredAndSortedExercises.length === 0 && (
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+            <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
               <CardContent className="text-center py-12 sm:py-16">
                 <div className="relative">
-                  <Dumbbell className="w-16 h-16 sm:w-20 sm:h-20 text-slate-400 mx-auto mb-6" />
+                  <Dumbbell className="w-16 h-16 sm:w-20 sm:h-20 text-[color:var(--fc-text-subtle)] mx-auto mb-6" />
                   <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                     <Plus className="w-3 h-3 text-white" />
                   </div>
                 </div>
-                <h3 className={`text-xl sm:text-2xl font-semibold ${theme.text} mb-3`}>
+                <h3 className="text-xl sm:text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-3">
                   {exercises.length === 0 ? 'No exercises yet' : 'No exercises found'}
                 </h3>
-                <p className={`text-base sm:text-lg ${theme.textSecondary} mb-8 max-w-md mx-auto`}>
+                <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)] mb-8 max-w-md mx-auto">
                   {exercises.length === 0 
                     ? 'Start building your exercise library by adding your first exercise with rich media and detailed instructions.'
                     : 'Try adjusting your search or filter criteria to find the exercises you\'re looking for.'
@@ -893,7 +893,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                 </p>
                 <Button 
                   onClick={() => setShowCreateForm(true)}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="fc-btn fc-btn-primary"
                 >
                   <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   <span className="sm:hidden">Add</span>
@@ -907,7 +907,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
           <div className="fixed bottom-6 right-6 z-50">
             <Button
               onClick={() => setShowCreateForm(true)}
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110"
+              className="fc-btn fc-btn-primary w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-2xl transition-all duration-300 hover:scale-110"
             >
               <Plus className="w-6 h-6 sm:w-7 sm:h-7" />
             </Button>

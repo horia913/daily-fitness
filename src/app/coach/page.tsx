@@ -126,41 +126,34 @@ function CoachDashboardContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
         {/* Header */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1
-                  className="text-3xl font-bold mb-1"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  Welcome back, Coach!
-                </h1>
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
+        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                Coach Hub
+              </span>
+              <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                Welcome back, Coach!
+              </h1>
+              <p className="text-sm text-[color:var(--fc-text-dim)]">
+                {new Date().toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
             </div>
-          </GlassCard>
-        </div>
+          </div>
+        </GlassCard>
 
         {/* Hero Stats Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Total Clients */}
           <GlassCard
             elevation={2}
-            className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
+            className="fc-glass fc-card p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
           >
             <div
               className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
@@ -177,12 +170,7 @@ function CoachDashboardContent() {
               weight="bold"
               color={getSemanticColor("trust").primary}
             />
-            <p
-              className="text-sm font-medium mt-2"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-              }}
-            >
+            <p className="text-sm font-medium mt-2 text-[color:var(--fc-text-dim)]">
               Total Clients
             </p>
           </GlassCard>
@@ -190,7 +178,7 @@ function CoachDashboardContent() {
           {/* Active Clients */}
           <GlassCard
             elevation={2}
-            className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
+            className="fc-glass fc-card p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
           >
             <div
               className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
@@ -217,12 +205,7 @@ function CoachDashboardContent() {
                 {activePercentage}%
               </span>
             </div>
-            <p
-              className="text-sm font-medium mt-2"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-              }}
-            >
+            <p className="text-sm font-medium mt-2 text-[color:var(--fc-text-dim)]">
               Active Clients
             </p>
           </GlassCard>
@@ -230,7 +213,7 @@ function CoachDashboardContent() {
           {/* Total Workouts */}
           <GlassCard
             elevation={2}
-            className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
+            className="fc-glass fc-card p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
           >
             <div
               className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
@@ -247,12 +230,7 @@ function CoachDashboardContent() {
               weight="bold"
               color={getSemanticColor("trust").primary}
             />
-            <p
-              className="text-sm font-medium mt-2"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-              }}
-            >
+            <p className="text-sm font-medium mt-2 text-[color:var(--fc-text-dim)]">
               Workout Templates
             </p>
           </GlassCard>
@@ -260,7 +238,7 @@ function CoachDashboardContent() {
           {/* Total Meal Plans */}
           <GlassCard
             elevation={2}
-            className="p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
+            className="fc-glass fc-card p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
           >
             <div
               className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
@@ -277,23 +255,15 @@ function CoachDashboardContent() {
               weight="bold"
               color={getSemanticColor("energy").primary}
             />
-            <p
-              className="text-sm font-medium mt-2"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-              }}
-            >
+            <p className="text-sm font-medium mt-2 text-[color:var(--fc-text-dim)]">
               Meal Plans
             </p>
           </GlassCard>
         </div>
 
         {/* Quick Actions Grid */}
-        <div className="mb-8">
-          <h2
-            className="text-2xl font-bold mb-4"
-            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-          >
+        <div>
+          <h2 className="text-2xl font-bold mb-4 text-[color:var(--fc-text-primary)]">
             Quick Actions
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

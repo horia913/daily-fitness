@@ -15,7 +15,6 @@ import {
   Dumbbell,
   Scale,
   Target,
-  Activity,
   Calendar,
   Search,
 } from "lucide-react";
@@ -44,7 +43,7 @@ interface BodyCompositionData {
 
 function AnalyticsPageContent() {
   const { user } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { performanceSettings } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [workoutFrequency, setWorkoutFrequency] = useState<WorkoutFrequencyData[]>([]);
@@ -73,7 +72,14 @@ function AnalyticsPageContent() {
   }, [showStrengthModal, user]);
 
   const loadAnalyticsData = async () => {
-    if (!user) return;
+    if (!user) {
+      setWorkoutFrequency([]);
+      setStrengthData([]);
+      setBodyComposition([]);
+      setGoalCompletion({ completed: 0, total: 0 });
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -488,80 +494,141 @@ function AnalyticsPageContent() {
     goalCompletion.total > 0
       ? Math.round((goalCompletion.completed / goalCompletion.total) * 100)
       : 0;
+  const recentWorkoutTotal = workoutFrequency.reduce(
+    (sum, week) => sum + week.count,
+    0
+  );
+  const latestBodyWeight =
+    bodyComposition.length > 0
+      ? bodyComposition[bodyComposition.length - 1].weight
+      : null;
+  const latestBodyFat =
+    bodyComposition.length > 0
+      ? bodyComposition[bodyComposition.length - 1].bodyFat
+      : null;
 
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <GlassCard elevation={1} className="p-6">
-            <div className="flex items-center gap-4">
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
               <Link href="/client/progress">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-5 h-5" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="fc-btn fc-btn-ghost h-10 w-10"
+                >
+                  <ArrowLeft className="h-5 w-5" />
                 </Button>
               </Link>
               <div>
-                <h1
-                  className="text-3xl font-bold mb-1"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  Analytics Dashboard
+                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                  Analytics
+                </span>
+                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                  Progress Insights
                 </h1>
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  Track your fitness progress with detailed insights
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  Track your fitness progress with detailed trends.
                 </p>
               </div>
             </div>
-          </GlassCard>
-        </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                className="fc-btn fc-btn-primary"
+                type="button"
+                onClick={() => setShowStrengthModal(true)}
+              >
+                <Search className="mr-2 h-4 w-4" />
+                Explore Exercises
+              </Button>
+            </div>
+          </div>
+        </GlassCard>
 
         {loading ? (
-          <GlassCard elevation={2} className="p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
-            <p
-              className="mt-4 text-sm"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
-            >
+          <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[color:var(--fc-accent-purple)]"></div>
+            <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
               Loading analytics...
             </p>
           </GlassCard>
         ) : (
           <div className="space-y-8">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="flex items-center justify-between">
+                  <Calendar className="h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    5 Weeks
+                  </span>
+                </div>
+                <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                  {recentWorkoutTotal}
+                </p>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  Workouts logged
+                </p>
+              </GlassCard>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="flex items-center justify-between">
+                  <Target className="h-5 w-5 text-[color:var(--fc-status-success)]" />
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Goals
+                  </span>
+                </div>
+                <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                  {completionPercentage}%
+                </p>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  {goalCompletion.completed} of {goalCompletion.total} completed
+                </p>
+              </GlassCard>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="flex items-center justify-between">
+                  <Scale className="h-5 w-5 text-[color:var(--fc-domain-meals)]" />
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Latest
+                  </span>
+                </div>
+                <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                  {latestBodyWeight !== null ? `${latestBodyWeight} kg` : "—"}
+                </p>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  {latestBodyFat !== null
+                    ? `${latestBodyFat}% body fat`
+                    : "Body composition"}
+                </p>
+              </GlassCard>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="flex items-center justify-between">
+                  <Dumbbell className="h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Strength
+                  </span>
+                </div>
+                <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
+                  {strengthByExercise.size}
+                </p>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  Exercises tracked
+                </p>
+              </GlassCard>
+            </div>
             {/* Workout Frequency Chart */}
-            <GlassCard elevation={2} className="p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: "linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)",
-                    boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
-                  }}
-                >
-                  <Calendar className="w-6 h-6 text-white" />
+            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 shadow-[0_10px_20px_rgba(59,130,246,0.25)]">
+                  <Calendar className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2
-                    className="text-xl font-bold"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
+                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                     Workout Frequency
                   </h2>
-                  <p
-                    className="text-sm"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    }}
-                  >
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
                     Last 5 weeks
                   </p>
                 </div>
@@ -581,26 +648,18 @@ function AnalyticsPageContent() {
                           }}
                         >
                           <div className="w-full flex flex-col items-center">
-                            <span
-                              className="text-sm font-bold mb-2"
-                              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                            >
+                            <span className="mb-2 text-sm font-bold text-[color:var(--fc-text-primary)]">
                               {week.count}
                             </span>
                             <div
-                              className="w-full bg-gradient-to-t from-blue-500 to-indigo-600 rounded-t-lg transition-all duration-500 hover:opacity-80"
+                              className="w-full rounded-t-lg bg-gradient-to-t from-sky-500 to-indigo-600 transition-all duration-500 hover:opacity-80"
                               style={{
                                 height: `${Math.max(height, 5)}%`,
                                 minHeight: "20px",
                               }}
                             />
                           </div>
-                          <span
-                            className="text-xs text-center"
-                            style={{
-                              color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                            }}
-                          >
+                          <span className="text-center text-xs text-[color:var(--fc-text-dim)]">
                             {week.week}
                           </span>
                         </div>
@@ -609,12 +668,7 @@ function AnalyticsPageContent() {
                   </div>
                 </div>
               ) : (
-                <p
-                  className="text-center py-12 text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="py-12 text-center text-sm text-[color:var(--fc-text-dim)]">
                   No workout data available
                 </p>
               )}
@@ -622,38 +676,27 @@ function AnalyticsPageContent() {
 
             {/* Strength Progress Charts */}
             {strengthByExercise.size > 0 && (
-              <GlassCard 
-                elevation={2} 
-                className="p-6 transition-all hover:scale-[1.02] hover:shadow-2xl"
+              <GlassCard
+                elevation={2}
+                className="fc-glass fc-card p-6 transition-all hover:-translate-y-1 hover:shadow-2xl"
                 pressable={true}
                 onPress={() => setShowStrengthModal(true)}
               >
-                <div className="flex items-center gap-3 mb-6">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{
-                      background: "linear-gradient(135deg, #F97316 0%, #EA580C 100%)",
-                      boxShadow: "0 4px 12px rgba(249, 115, 22, 0.3)",
-                    }}
-                  >
-                    <Dumbbell className="w-6 h-6 text-white" />
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 shadow-[0_10px_20px_rgba(249,115,22,0.3)]">
+                    <Dumbbell className="h-6 w-6 text-white" />
                   </div>
                   <div className="flex-1">
-                    <h2
-                      className="text-xl font-bold"
-                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                    >
+                    <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                       Best Strength Progressions
                     </h2>
-                    <p
-                      className="text-sm"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                      }}
-                    >
-                      Top 2 exercises by weight increase % - Click to search more
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Top exercises by weight increase. Tap to explore more.
                     </p>
                   </div>
+                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                    Explore
+                  </span>
                 </div>
 
                 <div className="space-y-8">
@@ -665,20 +708,11 @@ function AnalyticsPageContent() {
 
                     return (
                       <div key={exercise}>
-                        <div className="flex items-center justify-between mb-4">
-                          <h3
-                            className="text-lg font-semibold"
-                            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                          >
+                        <div className="mb-4 flex items-center justify-between">
+                          <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                             {exercise}
                           </h3>
-                          <div
-                            className="px-3 py-1 rounded-full text-sm font-semibold"
-                            style={{
-                              background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                              color: "#fff",
-                            }}
-                          >
+                          <div className="rounded-full bg-gradient-to-br from-emerald-500 to-green-600 px-3 py-1 text-sm font-semibold text-white">
                             +{percentIncrease.toFixed(1)}%
                           </div>
                         </div>
@@ -695,26 +729,18 @@ function AnalyticsPageContent() {
                                   }}
                                 >
                                   <div className="w-full flex flex-col items-center">
-                                    <span
-                                      className="text-xs font-bold mb-1"
-                                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                                    >
+                                    <span className="mb-1 text-xs font-bold text-[color:var(--fc-text-primary)]">
                                       {point.weight}kg
                                     </span>
                                     <div
-                                      className="w-full bg-gradient-to-t from-orange-500 to-red-600 rounded-t-lg transition-all duration-500 hover:opacity-80"
+                                      className="w-full rounded-t-lg bg-gradient-to-t from-orange-500 to-red-600 transition-all duration-500 hover:opacity-80"
                                       style={{
                                         height: `${Math.max(height, 10)}%`,
                                         minHeight: "30px",
                                       }}
                                     />
                                   </div>
-                                  <span
-                                    className="text-xs text-center"
-                                    style={{
-                                      color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                                    }}
-                                  >
+                                  <span className="text-center text-xs text-[color:var(--fc-text-subtle)]">
                                     {point.date}
                                   </span>
                                 </div>
@@ -731,30 +757,16 @@ function AnalyticsPageContent() {
 
             {/* Body Composition Chart */}
             {bodyComposition.length > 0 ? (
-              <GlassCard elevation={2} className="p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{
-                      background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                      boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
-                    }}
-                  >
-                    <Scale className="w-6 h-6 text-white" />
+              <GlassCard elevation={2} className="fc-glass fc-card p-6">
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_10px_20px_rgba(16,185,129,0.3)]">
+                    <Scale className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h2
-                      className="text-xl font-bold"
-                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                    >
+                    <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                       Body Composition
                     </h2>
-                    <p
-                      className="text-sm"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Weight and body fat trends
                     </p>
                   </div>
@@ -773,26 +785,18 @@ function AnalyticsPageContent() {
                           }}
                         >
                           <div className="w-full flex flex-col items-center">
-                            <span
-                              className="text-xs font-bold mb-1"
-                              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                            >
+                            <span className="mb-1 text-xs font-bold text-[color:var(--fc-text-primary)]">
                               {point.weight.toFixed(1)}kg
                             </span>
                             <div
-                              className="w-full bg-gradient-to-t from-green-500 to-emerald-600 rounded-t-lg transition-all duration-500 hover:opacity-80"
+                              className="w-full rounded-t-lg bg-gradient-to-t from-emerald-500 to-green-600 transition-all duration-500 hover:opacity-80"
                               style={{
                                 height: `${Math.max(height, 10)}%`,
                                 minHeight: "30px",
                               }}
                             />
                           </div>
-                          <span
-                            className="text-xs text-center"
-                            style={{
-                              color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                            }}
-                          >
+                          <span className="text-center text-xs text-[color:var(--fc-text-subtle)]">
                             {point.date}
                           </span>
                         </div>
@@ -802,39 +806,19 @@ function AnalyticsPageContent() {
                 </div>
 
                 {bodyComposition.length >= 2 && (
-                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <div className="border-t border-[color:var(--fc-glass-border)] pt-4">
                     <div className="flex items-center justify-between">
-                      <span
-                        className="text-sm"
-                        style={{
-                          color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                        }}
-                      >
+                      <span className="text-sm text-[color:var(--fc-text-dim)]">
                         Weight change
                       </span>
                       <div className="flex items-center gap-2">
                         {bodyComposition[bodyComposition.length - 1].weight >
                         bodyComposition[0].weight ? (
-                          <TrendingUp
-                            className="w-4 h-4"
-                            style={{ color: getSemanticColor("warning").primary }}
-                          />
+                          <TrendingUp className="h-4 w-4 text-[color:var(--fc-status-warning)]" />
                         ) : (
-                          <TrendingDown
-                            className="w-4 h-4"
-                            style={{ color: getSemanticColor("success").primary }}
-                          />
+                          <TrendingDown className="h-4 w-4 text-[color:var(--fc-status-success)]" />
                         )}
-                        <span
-                          className="text-sm font-semibold"
-                          style={{
-                            color:
-                              bodyComposition[bodyComposition.length - 1].weight >
-                              bodyComposition[0].weight
-                                ? getSemanticColor("warning").primary
-                                : getSemanticColor("success").primary,
-                          }}
-                        >
+                        <span className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
                           {Math.abs(
                             bodyComposition[bodyComposition.length - 1].weight -
                               bodyComposition[0].weight
@@ -847,70 +831,37 @@ function AnalyticsPageContent() {
                 )}
               </GlassCard>
             ) : (
-              <GlassCard elevation={2} className="p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{
-                      background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                      boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
-                    }}
-                  >
-                    <Scale className="w-6 h-6 text-white" />
+              <GlassCard elevation={2} className="fc-glass fc-card p-6">
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_10px_20px_rgba(16,185,129,0.3)]">
+                    <Scale className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h2
-                      className="text-xl font-bold"
-                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                    >
+                    <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                       Body Composition
                     </h2>
-                    <p
-                      className="text-sm"
-                      style={{
-                        color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Weight and body fat trends
                     </p>
                   </div>
                 </div>
-                <p
-                  className="text-center py-12 text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="py-12 text-center text-sm text-[color:var(--fc-text-dim)]">
                   No body metrics data available
                 </p>
               </GlassCard>
             )}
 
             {/* Goal Completion */}
-            <GlassCard elevation={2} className="p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: "linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)",
-                    boxShadow: "0 4px 12px rgba(139, 92, 246, 0.3)",
-                  }}
-                >
-                  <Target className="w-6 h-6 text-white" />
+            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-[0_10px_20px_rgba(124,58,237,0.3)]">
+                  <Target className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2
-                    className="text-xl font-bold"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
+                  <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                     Goal Completion
                   </h2>
-                  <p
-                    className="text-sm"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    }}
-                  >
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
                     Track your goal achievements
                   </p>
                 </div>
@@ -918,25 +869,17 @@ function AnalyticsPageContent() {
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span
-                    className="text-lg font-semibold"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  >
+                  <span className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                     {completionPercentage}%
                   </span>
-                  <span
-                    className="text-sm"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    }}
-                  >
+                  <span className="text-sm text-[color:var(--fc-text-dim)]">
                     {goalCompletion.completed} of {goalCompletion.total} goals completed
                   </span>
                 </div>
 
-                <div className="relative h-6 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div className="relative h-6 rounded-full bg-[color:var(--fc-glass-soft)] overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full transition-all duration-1000 ease-out"
+                    className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 transition-all duration-1000 ease-out"
                     style={{
                       width: `${completionPercentage}%`,
                       animation: "fadeInLeft 1s ease-out",
@@ -989,13 +932,13 @@ function AnalyticsPageContent() {
         <div className="space-y-6">
           {/* Search Input */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-dim)]" />
             <Input
               type="text"
               placeholder="Search exercises by name..."
               value={exerciseSearchQuery}
               onChange={(e) => setExerciseSearchQuery(e.target.value)}
-              className="pl-10 rounded-xl"
+              className="fc-input rounded-xl pl-10"
             />
           </div>
 
@@ -1010,21 +953,11 @@ function AnalyticsPageContent() {
                   <div
                     key={exercise}
                     onClick={() => handleExerciseSelect(exercise)}
-                    className={`p-4 rounded-xl cursor-pointer transition-all ${
+                    className={`cursor-pointer rounded-xl p-4 transition-all ${
                       selectedExercise === exercise
                         ? "bg-gradient-to-r from-orange-500 to-red-600 text-white"
-                        : isDark
-                        ? "bg-slate-700 hover:bg-slate-600"
-                        : "bg-slate-100 hover:bg-slate-200"
+                        : "fc-glass-soft border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-glass-border-strong)]"
                     }`}
-                    style={{
-                      color:
-                        selectedExercise === exercise
-                          ? "#fff"
-                          : isDark
-                          ? "#fff"
-                          : "#1A1A1A",
-                    }}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold">{exercise}</span>
@@ -1036,12 +969,7 @@ function AnalyticsPageContent() {
                 ))}
             </div>
           ) : (
-            <p
-              className="text-center py-8 text-sm"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
-            >
+            <p className="py-8 text-center text-sm text-[color:var(--fc-text-dim)]">
               No exercises found
             </p>
           )}
@@ -1050,33 +978,19 @@ function AnalyticsPageContent() {
           {selectedExercise && (
             <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
               {loadingExerciseData ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
-                  <p
-                    className="mt-4 text-sm"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                    }}
-                  >
+                <div className="py-12 text-center">
+                  <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-orange-500"></div>
+                  <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
                     Loading progression data...
                   </p>
                 </div>
               ) : selectedExerciseData.length > 0 ? (
                 <div>
                   <div className="flex items-center justify-between mb-6">
-                    <h3
-                      className="text-xl font-bold"
-                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                    >
+                    <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
                       {selectedExercise}
                     </h3>
-                    <div
-                      className="px-4 py-2 rounded-full text-sm font-semibold"
-                      style={{
-                        background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                        color: "#fff",
-                      }}
-                    >
+                    <div className="rounded-full bg-gradient-to-br from-emerald-500 to-green-600 px-4 py-2 text-sm font-semibold text-white">
                       +{selectedExerciseData[0]?.percentIncrease.toFixed(1)}% increase
                     </div>
                   </div>
@@ -1097,10 +1011,7 @@ function AnalyticsPageContent() {
                             }}
                           >
                             <div className="w-full flex flex-col items-center">
-                              <span
-                                className="text-xs font-bold mb-1"
-                                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                              >
+                              <span className="mb-1 text-xs font-bold text-[color:var(--fc-text-primary)]">
                                 {point.weight}kg
                               </span>
                               <div
@@ -1111,12 +1022,7 @@ function AnalyticsPageContent() {
                                 }}
                               />
                             </div>
-                            <span
-                              className="text-xs text-center"
-                              style={{
-                                color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                              }}
-                            >
+                            <span className="text-center text-xs text-[color:var(--fc-text-subtle)]">
                               {point.date}
                             </span>
                           </div>
@@ -1126,12 +1032,7 @@ function AnalyticsPageContent() {
                   </div>
                 </div>
               ) : (
-                <p
-                  className="text-center py-8 text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
+                <p className="py-8 text-center text-sm text-[color:var(--fc-text-dim)]">
                   No progression data available for this exercise
                 </p>
               )}

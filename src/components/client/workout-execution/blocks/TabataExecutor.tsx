@@ -6,6 +6,7 @@ import { CloudLightning, CheckCircle, Play } from "lucide-react";
 import { BaseBlockExecutorLayout } from "../BaseBlockExecutor";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { TabataCircuitTimerModal } from "../ui/TabataCircuitTimerModal";
+import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
 
@@ -144,31 +145,41 @@ export function TabataExecutor({
                 )}
               </div>
               <div className="space-y-2">
-                {set.exercises?.map((exercise: any, exIndex: number) => (
+                {set.exercises?.map((exercise: any, exIndex: number) => {
+                  const exerciseMeta = block.block.exercises?.find(
+                    (ex) => ex.exercise_id === exercise.exercise_id
+                  );
+                  return (
                   <div
                     key={exIndex}
                     className="bg-white dark:bg-slate-700 rounded-lg p-3 border border-slate-200 dark:border-slate-600"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="font-medium text-slate-900 dark:text-slate-100">
-                          {exerciseLookup[exercise.exercise_id]?.name || "Exercise"}
-                        </div>
-                        <div className="flex gap-4 mt-1 text-sm text-slate-600 dark:text-slate-400">
-                          {exercise.work_seconds && (
-                            <span>Work: {exercise.work_seconds}s</span>
-                          )}
-                          {exercise.rest_after && (
-                            <span>Rest: {exercise.rest_after}s</span>
-                          )}
-                          {exercise.target_reps && (
-                            <span>Reps: {exercise.target_reps}</span>
-                          )}
-                        </div>
+                    <div className="flex flex-col gap-2">
+                      <div className="font-medium text-slate-900 dark:text-slate-100">
+                        {exerciseLookup[exercise.exercise_id]?.name || "Exercise"}
                       </div>
+                      <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                        {exercise.work_seconds && (
+                          <span>Work: {exercise.work_seconds}s</span>
+                        )}
+                        {exercise.rest_after && (
+                          <span>Rest: {exercise.rest_after}s</span>
+                        )}
+                        {exercise.target_reps && (
+                          <span>Reps: {exercise.target_reps}</span>
+                        )}
+                      </div>
+                      {exerciseMeta && (
+                        <ExerciseActionButtons
+                          exercise={exerciseMeta}
+                          onVideoClick={onVideoClick}
+                          onAlternativesClick={onAlternativesClick}
+                        />
+                      )}
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
             </GlassCard>
           ))}

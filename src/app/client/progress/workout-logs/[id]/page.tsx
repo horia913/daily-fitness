@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
   Clock,
-  Dumbbell,
   Target,
   TrendingUp,
   Calendar,
@@ -124,9 +123,7 @@ export default function WorkoutLogDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { isDark, getThemeStyles, getSemanticColor, performanceSettings } =
-    useTheme();
-  const theme = getThemeStyles();
+  const { performanceSettings } = useTheme();
   const workoutLogId = useMemo(() => String(params?.id || ""), [params?.id]);
 
   const [loading, setLoading] = useState(true);
@@ -575,13 +572,13 @@ export default function WorkoutLogDetailPage() {
               reps
             </span>
             {set.amrap_target_reps && (
-              <span className="text-gray-600 dark:text-gray-400 ml-2">
+              <span className="ml-2 text-[color:var(--fc-text-dim)]">
                 (target: {set.amrap_target_reps} reps)
               </span>
             )}
             {set.amrap_duration_seconds !== null &&
               set.amrap_duration_seconds !== undefined && (
-                <span className="text-gray-600 dark:text-gray-400 ml-2">
+                <span className="ml-2 text-[color:var(--fc-text-dim)]">
                   (completed in{" "}
                   {Math.floor(set.amrap_duration_seconds / 60)
                     .toString()
@@ -619,13 +616,13 @@ export default function WorkoutLogDetailPage() {
               reps
             </span>
             {forTimeTaken && (
-              <span className="text-gray-600 dark:text-gray-400 ml-2">
+              <span className="ml-2 text-[color:var(--fc-text-dim)]">
                 (completed in {forTimeTaken}
                 {forTimeCap ? ` / ${forTimeCap} cap` : ""})
               </span>
             )}
             {set.fortime_target_reps && (
-              <span className="text-gray-600 dark:text-gray-400 ml-2">
+              <span className="ml-2 text-[color:var(--fc-text-dim)]">
                 (Target: {set.fortime_target_reps} reps)
               </span>
             )}
@@ -650,7 +647,7 @@ export default function WorkoutLogDetailPage() {
                     {set.dropset_final_reps || 0}
                   </span>
                   {set.dropset_percentage && (
-                    <span className="text-gray-600 dark:text-gray-400 ml-2">
+                    <span className="ml-2 text-[color:var(--fc-text-dim)]">
                       ({set.dropset_percentage}% drop)
                     </span>
                   )}
@@ -674,7 +671,7 @@ export default function WorkoutLogDetailPage() {
           <div className="text-sm">
             <span className="font-semibold">
               • Set {set.set_number || 1}:{" "}
-              <span className="text-blue-600 dark:text-blue-400">A:</span>{" "}
+              <span className="text-[color:var(--fc-domain-workouts)]">A:</span>{" "}
               {set.superset_weight_a || set.weight || 0} kg ×{" "}
               {set.superset_reps_a || set.reps || 0} reps
             </span>
@@ -683,7 +680,7 @@ export default function WorkoutLogDetailPage() {
                 <>
                   <span className="mx-2">+</span>
                   <span className="font-semibold">
-                    <span className="text-blue-600 dark:text-blue-400">B:</span>{" "}
+                    <span className="text-[color:var(--fc-domain-workouts)]">B:</span>{" "}
                     {set.superset_weight_b} kg ×{" "}
                     {set.superset_reps_b || 0} reps
                   </span>
@@ -702,7 +699,9 @@ export default function WorkoutLogDetailPage() {
             return (
               <span key={index}>
                 {index > 0 && <span className="mx-1">+</span>}
-                <span className="text-blue-600 dark:text-blue-400">{letter}:</span>{" "}
+                <span className="text-[color:var(--fc-domain-workouts)]">
+                  {letter}:
+                </span>{" "}
                 {ex.weight || 0}kg×{ex.reps || 0}
               </span>
             );
@@ -746,7 +745,7 @@ export default function WorkoutLogDetailPage() {
                     {set.rest_pause_initial_weight || set.weight || 0} kg ×{" "}
                     {set.rest_pause_reps_after} reps
                   </span>
-                  <span className="text-gray-600 dark:text-gray-400 ml-2">
+                  <span className="ml-2 text-[color:var(--fc-text-dim)]">
                     (after rest-pause #{set.rest_pause_number || 1})
                   </span>
                 </>
@@ -759,13 +758,13 @@ export default function WorkoutLogDetailPage() {
           <div className="text-sm">
             <span className="font-semibold">
               • Set {set.set_number || 1}:{" "}
-              <span className="text-blue-600 dark:text-blue-400">A:</span>{" "}
+              <span className="text-[color:var(--fc-domain-workouts)]">A:</span>{" "}
               {set.preexhaust_isolation_weight || 0} kg ×{" "}
               {set.preexhaust_isolation_reps || 0} reps
             </span>
             <span className="mx-2">→</span>
             <span className="font-semibold">
-              <span className="text-blue-600 dark:text-blue-400">B:</span>{" "}
+              <span className="text-[color:var(--fc-domain-workouts)]">B:</span>{" "}
               {set.preexhaust_compound_weight || 0} kg ×{" "}
               {set.preexhaust_compound_reps || 0} reps
             </span>
@@ -788,7 +787,7 @@ export default function WorkoutLogDetailPage() {
               {set.emom_total_reps_this_min || set.reps || 0} reps
             </span>
             {emomDuration && (
-              <span className="text-gray-600 dark:text-gray-400 ml-2">
+              <span className="ml-2 text-[color:var(--fc-text-dim)]">
                 (Duration: {emomDuration})
               </span>
             )}
@@ -810,7 +809,7 @@ export default function WorkoutLogDetailPage() {
               {set.tabata_rounds_completed || 0} rounds completed
             </span>
             {tabataDuration && (
-              <span className="text-gray-600 dark:text-gray-400 ml-2">
+              <span className="ml-2 text-[color:var(--fc-text-dim)]">
                 (Duration: {tabataDuration})
               </span>
             )}
@@ -835,7 +834,7 @@ export default function WorkoutLogDetailPage() {
   ) => {
     if (!block.templateBlock) {
       return (
-        <div className="pl-4 border-l-2 border-slate-200 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400 italic">
+        <div className="pl-4 border-l-2 border-[color:var(--fc-glass-border)] text-sm text-[color:var(--fc-text-subtle)] italic">
           No template data available for this block.
         </div>
       );
@@ -929,15 +928,15 @@ export default function WorkoutLogDetailPage() {
         if (setsMap.size > 0) {
           return (
             <div className="space-y-3">
-              <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+              <div className="mb-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
                 Rounds: {rounds}
               </div>
               {Array.from(setsMap.entries()).map(([setNum, setExercises]) => (
                 <div
                   key={setNum}
-                  className="pl-4 border-l-2 border-slate-200 dark:border-slate-700"
+                  className="pl-4 border-l-2 border-[color:var(--fc-glass-border)]"
                 >
-                  <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                  <div className="mb-1 text-xs font-semibold text-[color:var(--fc-text-subtle)]">
                     Set {setNum}:
                   </div>
                   {setExercises.map((ex, idx) => (
@@ -946,7 +945,7 @@ export default function WorkoutLogDetailPage() {
                       className="text-sm ml-2 mb-1"
                     >
                       <span className="font-medium">{ex.exerciseName}</span>
-                      <span className="ml-2 text-slate-600 dark:text-slate-400">
+                      <span className="ml-2 text-[color:var(--fc-text-dim)]">
                         Work: {ex.work_seconds}s • Rest: {ex.rest_seconds}s
                       </span>
                     </div>
@@ -954,11 +953,11 @@ export default function WorkoutLogDetailPage() {
                 </div>
               ))}
               {restAfterSet && (
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                <div className="mt-2 text-xs text-[color:var(--fc-text-subtle)]">
                   Rest after set: {restAfterSet}s
                 </div>
               )}
-              <div className="text-xs text-slate-500 dark:text-slate-400 italic mt-2">
+              <div className="mt-2 text-xs italic text-[color:var(--fc-text-subtle)]">
                 (No sets logged for this block)
               </div>
             </div>
@@ -983,28 +982,28 @@ export default function WorkoutLogDetailPage() {
 
         return (
           <div className="space-y-3">
-            <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+            <div className="mb-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
               Rounds: {rounds}
             </div>
-            <div className="pl-4 border-l-2 border-slate-200 dark:border-slate-700">
-              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+            <div className="pl-4 border-l-2 border-[color:var(--fc-glass-border)]">
+              <div className="mb-1 text-xs font-semibold text-[color:var(--fc-text-subtle)]">
                 Exercises:
               </div>
               {allExercises.map((ex, idx) => (
                 <div key={ex.exerciseId || idx} className="text-sm ml-2 mb-1">
                   <span className="font-medium">{ex.exerciseName}</span>
-                  <span className="ml-2 text-slate-600 dark:text-slate-400">
+                  <span className="ml-2 text-[color:var(--fc-text-dim)]">
                     Work: {ex.work_seconds}s • Rest: {ex.rest_seconds}s
                   </span>
                 </div>
               ))}
             </div>
             {restAfterSet && (
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              <div className="mt-2 text-xs text-[color:var(--fc-text-subtle)]">
                 Rest after set: {restAfterSet}s
               </div>
             )}
-            <div className="text-xs text-slate-500 dark:text-slate-400 italic mt-2">
+            <div className="mt-2 text-xs italic text-[color:var(--fc-text-subtle)]">
               (No sets logged for this block)
             </div>
           </div>
@@ -1013,7 +1012,7 @@ export default function WorkoutLogDetailPage() {
 
       // Fallback if no exercise names found
       return (
-        <div className="pl-4 border-l-2 border-slate-200 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400 italic">
+        <div className="pl-4 border-l-2 border-[color:var(--fc-glass-border)] text-sm text-[color:var(--fc-text-subtle)] italic">
           No exercises configured for this Tabata block.
         </div>
       );
@@ -1023,7 +1022,7 @@ export default function WorkoutLogDetailPage() {
     const exercises = templateBlock.exercises || [];
     if (exercises.length === 0) {
       return (
-        <div className="pl-4 border-l-2 border-slate-200 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400 italic">
+        <div className="pl-4 border-l-2 border-[color:var(--fc-glass-border)] text-sm text-[color:var(--fc-text-subtle)] italic">
           No exercises configured for this block.
         </div>
       );
@@ -1036,28 +1035,28 @@ export default function WorkoutLogDetailPage() {
           return (
             <div
               key={idx}
-              className="pl-4 border-l-2 border-slate-200 dark:border-slate-700 text-sm"
+              className="pl-4 border-l-2 border-[color:var(--fc-glass-border)] text-sm"
             >
               <span className="font-semibold">{exerciseName}</span>
               {ex.reps && (
-                <span className="text-slate-600 dark:text-slate-400 ml-2">
+                <span className="ml-2 text-[color:var(--fc-text-dim)]">
                   • Reps: {ex.reps}
                 </span>
               )}
               {ex.load_percentage && (
-                <span className="text-slate-600 dark:text-slate-400 ml-2">
+                <span className="ml-2 text-[color:var(--fc-text-dim)]">
                   • Load: {ex.load_percentage}%
                 </span>
               )}
               {ex.weight_kg && (
-                <span className="text-slate-600 dark:text-slate-400 ml-2">
+                <span className="ml-2 text-[color:var(--fc-text-dim)]">
                   • Weight: {ex.weight_kg} kg
                 </span>
               )}
             </div>
           );
         })}
-        <div className="pl-4 border-l-2 border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 italic mt-2">
+        <div className="pl-4 border-l-2 border-[color:var(--fc-glass-border)] mt-2 text-xs italic text-[color:var(--fc-text-subtle)]">
           (No sets logged for this block)
         </div>
       </div>
@@ -1069,11 +1068,14 @@ export default function WorkoutLogDetailPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className={`min-h-screen ${theme.background}`}>
-            <div className="max-w-7xl mx-auto p-4 sm:p-6">
-              <div className="animate-pulse">
-                <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-4"></div>
-                <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
+          <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-6xl">
+              <div className="fc-glass fc-card p-8">
+                <div className="animate-pulse space-y-4">
+                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-8 w-3/5 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-64 rounded-3xl bg-[color:var(--fc-glass-highlight)]" />
+                </div>
               </div>
             </div>
           </div>
@@ -1087,14 +1089,16 @@ export default function WorkoutLogDetailPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className={`min-h-screen ${theme.background}`}>
-            <div className="max-w-7xl mx-auto p-4 sm:p-6">
-              <GlassCard elevation={2} className="p-12">
+          <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-6xl">
+              <GlassCard elevation={2} className="fc-glass fc-card p-12">
                 <div className="text-center">
-                  <p className={theme.textSecondary}>Workout log not found</p>
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Workout log not found
+                  </p>
                   <Button
                     onClick={() => router.push("/client/progress/workout-logs")}
-                    className="mt-4"
+                    className="fc-btn fc-btn-secondary mt-4"
                   >
                     Back to Logs
                   </Button>
@@ -1113,162 +1117,116 @@ export default function WorkoutLogDetailPage() {
     ? new Date(workoutLog.started_at)
     : null;
 
-  const startedDate = workoutLog.started_at
-    ? new Date(workoutLog.started_at)
-    : null;
-
   return (
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className={`min-h-screen ${theme.background}`}>
-          <div className="relative z-10 max-w-7xl mx-auto px-4 py-8">
-            {/* Back Button */}
-            <div className="mb-6">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push("/client/progress/workout-logs")}
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            </div>
-
-            {/* Header Card with Gradient */}
-            <GlassCard
-              elevation={3}
-              className="p-6 mb-8 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h1
-                    className={`text-2xl sm:text-3xl font-bold text-white mb-2`}
+        <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="mx-auto w-full max-w-6xl space-y-8">
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => router.push("/client/progress/workout-logs")}
+                    className="fc-btn fc-btn-ghost h-10 w-10"
                   >
-                    {workoutName}
-                  </h1>
-                  {completedDate && (
-                    <div className="flex items-center gap-2 text-white/90">
-                      <CheckCircle className="w-5 h-5" />
-                      <span>
-                        Completed -{" "}
-                        {completedDate.toLocaleDateString("en-US", {
-                          weekday: "long",
-                          month: "short",
-                          day: "numeric",
-                        })}{" "}
-                        at{" "}
-                        {completedDate.toLocaleTimeString("en-US", {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  {totalStats.duration > 0 && (
-                    <p className="text-white/80 mt-1">
-                      Duration: {totalStats.duration} minutes
-                    </p>
-                  )}
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  <div>
+                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                      Workout Log
+                    </span>
+                    <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                      {workoutName}
+                    </h1>
+                    {completedDate && (
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-[color:var(--fc-text-dim)]">
+                        <span className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-[color:var(--fc-status-success)]" />
+                          Completed
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          {completedDate.toLocaleDateString("en-US", {
+                            weekday: "long",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          {completedDate.toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {totalStats.duration > 0 && (
+                      <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+                        Duration: {totalStats.duration} minutes
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                  {totalStats.uniqueExercises} exercises
                 </div>
               </div>
             </GlassCard>
 
-            {/* Stats Cards - Sets, Reps, Weight, Minutes */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <GlassCard elevation={2} className="p-6 text-center">
-                <Target
-                  className="w-6 h-6 mx-auto mb-2"
-                  style={{ color: getSemanticColor("energy").primary }}
-                />
-                <p
-                  className="text-3xl font-bold"
-                  style={{ color: getSemanticColor("energy").primary }}
-                >
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
+                <Target className="mx-auto h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
+                <p className="mt-2 text-3xl font-bold text-[color:var(--fc-text-primary)]">
                   {totalStats.totalSets}
                 </p>
-                <p
-                  className="text-sm font-semibold mt-1"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  SETS
+                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                  Sets
                 </p>
               </GlassCard>
-
-              <GlassCard elevation={2} className="p-6 text-center">
-                <Activity
-                  className="w-6 h-6 mx-auto mb-2"
-                  style={{ color: getSemanticColor("success").primary }}
-                />
-                <p
-                  className="text-3xl font-bold"
-                  style={{ color: getSemanticColor("success").primary }}
-                >
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
+                <Activity className="mx-auto h-5 w-5 text-[color:var(--fc-status-success)]" />
+                <p className="mt-2 text-3xl font-bold text-[color:var(--fc-text-primary)]">
                   {totalStats.totalReps}
                 </p>
-                <p
-                  className="text-sm font-semibold mt-1"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  REPS
+                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                  Reps
                 </p>
               </GlassCard>
-
-              <GlassCard elevation={2} className="p-6 text-center">
-                <TrendingUp
-                  className="w-6 h-6 mx-auto mb-2"
-                  style={{ color: getSemanticColor("success").primary }}
-                />
-                <p
-                  className="text-3xl font-bold"
-                  style={{ color: getSemanticColor("success").primary }}
-                >
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
+                <TrendingUp className="mx-auto h-5 w-5 text-[color:var(--fc-status-success)]" />
+                <p className="mt-2 text-3xl font-bold text-[color:var(--fc-text-primary)]">
                   {totalStats.totalWeight.toLocaleString()}
                 </p>
-                <p
-                  className="text-sm font-semibold mt-1"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  WEIGHT (kg)
+                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                  Weight (kg)
                 </p>
               </GlassCard>
-
-              <GlassCard elevation={2} className="p-6 text-center">
-                <Clock
-                  className="w-6 h-6 mx-auto mb-2"
-                  style={{ color: getSemanticColor("trust").primary }}
-                />
-                <p
-                  className="text-3xl font-bold"
-                  style={{ color: getSemanticColor("trust").primary }}
-                >
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
+                <Clock className="mx-auto h-5 w-5 text-[color:var(--fc-accent-cyan)]" />
+                <p className="mt-2 text-3xl font-bold text-[color:var(--fc-text-primary)]">
                   {totalStats.duration}
                 </p>
-                <p
-                  className="text-sm font-semibold mt-1"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  MINUTES
+                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
+                  Minutes
                 </p>
               </GlassCard>
             </div>
 
             {/* Blocks Section - Expandable */}
             <div className="space-y-4">
-              <h2
-                className={`text-xl font-bold ${theme.text} mb-4 flex items-center gap-2`}
-              >
-                <Layers className="w-5 h-5" />
-                Blocks
-              </h2>
+              <div>
+                <h2 className="flex items-center gap-2 text-xl font-bold text-[color:var(--fc-text-primary)]">
+                  <Layers className="h-5 w-5" />
+                  Blocks
+                </h2>
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  Review every block and set from this session.
+                </p>
+              </div>
               {blockGroups.map((block, blockIndex) => {
                 const isExpanded = expandedBlocks.has(block.block_id);
                 const hasSets = block.totalSets > 0;
@@ -1281,29 +1239,25 @@ export default function WorkoutLogDetailPage() {
                   >
                     {/* Block Header - Clickable */}
                     <div
-                      className="p-6 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      className="p-6 cursor-pointer transition-colors hover:bg-[color:var(--fc-glass-soft)]"
                       onClick={() => toggleBlock(block.block_id)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3">
-                            <h3 className={`text-lg font-bold ${theme.text}`}>
+                            <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)]">
                               Block {block.block_order || blockIndex + 1} -{" "}
                               {formatBlockType(block.block_type)}
                             </h3>
                             {hasSets && (
-                              <span
-                                className={`text-sm px-2 py-1 rounded-full ${theme.textSecondary} bg-slate-100 dark:bg-slate-800`}
-                              >
+                              <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
                                 {block.totalSets}{" "}
                                 {block.totalSets === 1 ? "set" : "sets"}
                               </span>
                             )}
                           </div>
                           {block.exerciseNames.size > 0 && (
-                            <p
-                              className={`text-sm mt-1 ${theme.textSecondary}`}
-                            >
+                            <p className="mt-1 text-sm text-[color:var(--fc-text-dim)]">
                               {Array.from(block.exerciseNames.values())
                                 .slice(0, 3)
                                 .join(" + ")}
@@ -1314,23 +1268,9 @@ export default function WorkoutLogDetailPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           {isExpanded ? (
-                            <ChevronUp
-                              className="w-5 h-5"
-                              style={{
-                                color: isDark
-                                  ? "rgba(255,255,255,0.6)"
-                                  : "rgba(0,0,0,0.6)",
-                              }}
-                            />
+                            <ChevronUp className="h-5 w-5 text-[color:var(--fc-text-dim)]" />
                           ) : (
-                            <ChevronDown
-                              className="w-5 h-5"
-                              style={{
-                                color: isDark
-                                  ? "rgba(255,255,255,0.6)"
-                                  : "rgba(0,0,0,0.6)",
-                              }}
-                            />
+                            <ChevronDown className="h-5 w-5 text-[color:var(--fc-text-dim)]" />
                           )}
                         </div>
                       </div>
@@ -1338,7 +1278,7 @@ export default function WorkoutLogDetailPage() {
 
                     {/* Block Content - Expandable */}
                     {isExpanded && (
-                      <div className="px-6 pb-6 border-t border-slate-200 dark:border-slate-700">
+                      <div className="px-6 pb-6 border-t border-[color:var(--fc-glass-border)]">
                         <div className="mt-4 space-y-2">
                           {block.sets.length === 0 ? (
                             // Display template exercise data when no sets are logged
@@ -1367,7 +1307,7 @@ export default function WorkoutLogDetailPage() {
                                     .map((set) => (
                                       <div
                                         key={set.id}
-                                        className="pl-4 border-l-2 border-slate-200 dark:border-slate-700"
+                                        className="pl-4 border-l-2 border-[color:var(--fc-glass-border)]"
                                       >
                                         {renderSetDisplay(
                                           set,
@@ -1384,9 +1324,7 @@ export default function WorkoutLogDetailPage() {
                                   {Array.from(block.exercises.values()).map(
                                     (exercise) => (
                                       <div key={exercise.exercise_id}>
-                                        <h4
-                                          className={`font-semibold mb-2 ${theme.text}`}
-                                        >
+                                        <h4 className="mb-2 font-semibold text-[color:var(--fc-text-primary)]">
                                           {exercise.exercise_name}
                                         </h4>
                                         <div className="space-y-1 ml-4">
@@ -1414,7 +1352,7 @@ export default function WorkoutLogDetailPage() {
                                             .map((set) => (
                                               <div
                                                 key={set.id}
-                                                className="pl-4 border-l-2 border-slate-200 dark:border-slate-700"
+                                                className="pl-4 border-l-2 border-[color:var(--fc-glass-border)]"
                                               >
                                                 {renderSetDisplay(
                                                   set,
@@ -1456,7 +1394,7 @@ export default function WorkoutLogDetailPage() {
                                         .map((set) => (
                                           <div
                                             key={set.id}
-                                            className="pl-4 border-l-2 border-slate-200 dark:border-slate-700"
+                                            className="pl-4 border-l-2 border-[color:var(--fc-glass-border)]"
                                           >
                                             {renderSetDisplay(
                                               set,

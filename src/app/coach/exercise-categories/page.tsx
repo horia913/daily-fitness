@@ -166,93 +166,41 @@ export default function ExerciseCategories() {
         </div>
 
         <div className="relative" style={{ padding: '24px 20px', paddingBottom: '100px' }}>
-          <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Enhanced Header */}
-            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/coach/exercises')}
-                className="absolute left-0 top-0 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all duration-200"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-                <div style={{ 
-                  width: '64px', 
-                  height: '64px', 
-                  borderRadius: '18px', 
-                  background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(0, 0, 0, 0.08)'
-                }}>
-                  <Layers style={{ width: '40px', height: '40px', color: '#FFFFFF' }} />
+          <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className="fc-glass fc-card p-6 sm:p-10">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <Button
+                    variant="ghost"
+                    onClick={() => router.push('/coach/exercises')}
+                    className="fc-btn fc-btn-ghost h-10 w-10"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                  <div>
+                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
+                      Exercise Catalog
+                    </span>
+                    <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                      Exercise Categories
+                    </h1>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Organize your exercise library with custom categories.
+                    </p>
+                  </div>
                 </div>
-                <h1 style={{ 
-                  fontSize: '32px', 
-                  fontWeight: '800', 
-                  color: isDark ? '#FFFFFF' : '#1A1A1A',
-                  margin: 0,
-                  lineHeight: '1.2'
-                }}>
-                  Exercise Categories
-                </h1>
+                <button
+                  onClick={() => setShowCreateForm(true)}
+                  className="fc-btn fc-btn-primary"
+                >
+                  <Plus style={{ width: '20px', height: '20px' }} />
+                  Create Category
+                  <ArrowRight style={{ width: '20px', height: '20px' }} />
+                </button>
               </div>
-              <p style={{ 
-                fontSize: '16px', 
-                fontWeight: '400', 
-                color: isDark ? '#D1D5DB' : '#6B7280',
-                margin: 0,
-                maxWidth: '560px',
-                marginLeft: 'auto',
-                marginRight: 'auto'
-              }}>
-                Organize your exercise library with custom categories
-              </p>
             </div>
 
-            {/* Action Button */}
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button 
-                onClick={() => setShowCreateForm(true)}
-                style={{
-                  backgroundColor: '#8B5CF6',
-                  color: '#FFFFFF',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  padding: '16px 32px',
-                  borderRadius: '20px',
-                  border: 'none',
-                  boxShadow: isDark ? '0 4px 12px rgba(139, 92, 246, 0.3)' : '0 2px 4px rgba(0, 0, 0, 0.1)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.05)'
-                  e.currentTarget.style.backgroundColor = '#7C3AED'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)'
-                  e.currentTarget.style.backgroundColor = '#8B5CF6'
-                }}
-              >
-                <Plus style={{ width: '20px', height: '20px' }} />
-                Create Category
-                <ArrowRight style={{ width: '20px', height: '20px' }} />
-              </button>
-            </div>
-
-            {/* Enhanced Search */}
-            <div style={{ 
-              backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
-              borderRadius: '24px',
-              padding: '24px',
-              boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(0, 0, 0, 0.08)'
-            }}>
+            <div className="fc-glass fc-card p-4">
               <div style={{ position: 'relative' }}>
                 <Search style={{ 
                   position: 'absolute', 

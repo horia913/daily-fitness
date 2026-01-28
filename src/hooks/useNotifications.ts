@@ -2,13 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { notificationService, NotificationData } from '@/lib/notifications'
+import { isNotificationsPollDisabled } from '@/lib/featureFlags'
+import { isLiveWorkoutRoute } from '@/lib/workoutMode'
+import { usePathname } from 'next/navigation'
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<NotificationData[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [permissionGranted, setPermissionGranted] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
+    if (isLiveWorkoutRoute(pathname)) {
+      return
+    }
     // Initialize the service for browser environment
     notificationService.initialize()
     
@@ -19,10 +26,14 @@ export function useNotifications() {
     loadNotifications()
     
     // Set up interval to check for updates
+    if (isNotificationsPollDisabled) {
+      return
+    }
+
     const interval = setInterval(loadNotifications, 5000)
-    
+
     return () => clearInterval(interval)
-  }, [])
+  }, [pathname])
 
   const loadNotifications = useCallback(async () => {
     try {

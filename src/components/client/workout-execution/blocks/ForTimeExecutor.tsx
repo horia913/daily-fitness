@@ -11,11 +11,11 @@ import {
   formatTime,
 } from "../BaseBlockExecutor";
 import { LargeInput } from "../ui/LargeInput";
-import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { supabase } from "@/lib/supabase";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useLoggingReset } from "../hooks/useLoggingReset";
 
 export function ForTimeExecutor({
   block,
@@ -160,6 +160,7 @@ export function ForTimeExecutor({
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [timerStopped, setTimerStopped] = useState(false);
@@ -499,6 +500,8 @@ export function ForTimeExecutor({
               placeholder="0"
               step="0.5"
               unit="kg"
+              showStepper
+              stepAmount={2.5}
             />
             <LargeInput
               label="Completed Reps"
@@ -506,6 +509,8 @@ export function ForTimeExecutor({
               onChange={setReps}
               placeholder="0"
               step="1"
+              showStepper
+              stepAmount={1}
             />
           </div>
         </GlassCard>

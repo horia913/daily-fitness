@@ -18,6 +18,7 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { useTheme } from "@/contexts/ThemeContext";
 import { fetchPersonalRecords } from "@/lib/personalRecords";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { Badge } from "@/components/ui/badge";
 
 interface AssignmentInfo {
   id: string;
@@ -371,8 +372,8 @@ export default function WorkoutDetailsPage() {
             drop_sets: ex.drop_sets ?? [],
             cluster_sets: ex.cluster_sets ?? [],
             rest_pause_sets: ex.rest_pause_sets ?? [],
-            pyramid_sets: ex.pyramid_sets ?? [],
-            ladder_sets: ex.ladder_sets ?? [],
+            pyramid_sets: (ex as any).pyramid_sets ?? [],
+            ladder_sets: (ex as any).ladder_sets ?? [],
           })) as any[],
           })
         );
@@ -1370,129 +1371,50 @@ export default function WorkoutDetailsPage() {
       `,
         }}
       />
-      <div
-        className="relative z-10 min-h-screen"
-        style={{ paddingBottom: "120px" }}
-      >
-        {/* Navigation */}
-        <nav
-          style={{
-            marginBottom: "48px",
-          }}
-        >
-          <button
-            onClick={() => router.push("/client/workouts")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              background: "transparent",
-              border: "none",
-              color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-              cursor: "pointer",
-              transition: "color 0.3s ease",
-              padding: 0,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = isDark ? "#FFFFFF" : "#1A1A1A";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)";
-            }}
-          >
-            <ChevronLeft 
-              style={{ 
-                width: "20px", 
-                height: "20px",
-                transition: "transform 0.3s ease",
-              }}
-              className="group-hover:-translate-x-1"
-            />
-            <span
-              style={{
-                fontFamily: "monospace",
-                fontSize: "14px",
-                textTransform: "uppercase",
-                letterSpacing: "0.3em",
-              }}
+      <div className="relative fc-app-bg isolate">
+        <div className="fc-muted-overlay" />
+        <div className="fc-grain-layer" />
+        <div className="fc-vignette-layer" />
+        <div className="relative z-10 min-h-screen pb-32">
+          {/* Navigation */}
+          <nav className="mb-12 px-6">
+            <button
+              onClick={() => router.push("/client/workouts")}
+              className="group inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] font-mono fc-text-dim hover:fc-text-primary transition-colors"
             >
+              <ChevronLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
               Back to Program
-            </span>
-          </button>
-        </nav>
+            </button>
+          </nav>
 
-        <main
-          style={{
-            maxWidth: "896px",
-            margin: "0 auto",
-            padding: "0 24px",
-            paddingBottom: "180px",
-          }}
-        >
-          {/* Header Section */}
-          <header style={{ marginBottom: "64px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "16px",
-                marginBottom: "16px",
-              }}
-            >
-              {assignment.category && (
-                <span
-                  style={{
-                    padding: "2px 10px",
-                    borderRadius: "100px",
-                    fontSize: "10px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                    fontWeight: 800,
-                    border: `1px solid ${isDark ? "#A78BFA" : "#A78BFA"}`,
-                    background: isDark ? "rgba(167, 139, 250, 0.15)" : "rgba(167, 139, 250, 0.15)",
-                    color: isDark ? "#A78BFA" : "#A78BFA",
-                  }}
-                >
-                  {assignment.category.toUpperCase()}
-                </span>
-              )}
-              <span
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                  fontFamily: "monospace",
-                  fontSize: "12px",
-                }}
-              >
-                {assignment.estimatedDuration || 0} MINS
-              </span>
-            </div>
-            <h1
-              style={{
-                fontSize: "48px",
-                fontWeight: 800,
-                letterSpacing: "-0.02em",
-                lineHeight: "1.2",
-                marginBottom: "24px",
-                color: isDark ? "#FFFFFF" : "#1A1A1A",
-              }}
-            >
-              {assignment.name}
-            </h1>
-            {assignment.description && (
-              <p
-                style={{
-                  fontSize: "18px",
-                  lineHeight: "1.75",
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  fontWeight: 300,
-                  maxWidth: "672px",
-                  margin: 0,
-                }}
-              >
-                {assignment.description}
+          <main className="max-w-4xl mx-auto px-6 pb-40">
+            {/* Header Section */}
+            <header className="mb-14">
+              <p className="text-xs uppercase tracking-[0.3em] fc-text-dim mb-3">
+                Workout Detail
               </p>
-            )}
-          </header>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                {assignment.category && (
+                  <Badge
+                    variant="fc-outline"
+                    className="px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.2em]"
+                  >
+                    {assignment.category}
+                  </Badge>
+                )}
+                <span className="text-[11px] uppercase tracking-[0.22em] font-mono fc-text-dim">
+                  {assignment.estimatedDuration || 0} mins
+                </span>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight fc-text-primary mb-4">
+                {assignment.name}
+              </h1>
+              {assignment.description && (
+                <p className="text-base md:text-lg leading-relaxed fc-text-dim max-w-2xl">
+                  {assignment.description}
+                </p>
+              )}
+            </header>
 
           {/* Exercise List */}
           <section style={{ marginBottom: "128px" }}>
@@ -2233,6 +2155,7 @@ export default function WorkoutDetailsPage() {
           </button>
         </div>
       </div>
+    </div>
     </AnimatedBackground>
   );
 }

@@ -59,9 +59,10 @@ interface Program {
   name: string;
   description?: string;
   coach_id: string;
-  difficulty_level: "beginner" | "intermediate" | "advanced";
+  difficulty_level: "beginner" | "intermediate" | "advanced" | "athlete";
   duration_weeks: number;
   target_audience: string;
+  category?: string | null; // Training category for volume calculator
   is_public?: boolean; // Optional - not in database schema
   is_active: boolean;
   created_at: string;
@@ -187,7 +188,11 @@ export default function EnhancedProgramManager({
       );
       setExercises(exercisesData);
       setCategories(categoriesData);
-      setPrograms(programsData);
+      const normalizedPrograms = (programsData || []).map((program) => ({
+        ...program,
+        target_audience: program.target_audience ?? "general_fitness",
+      }));
+      setPrograms(normalizedPrograms);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -382,37 +387,21 @@ export default function EnhancedProgramManager({
           }}
         >
           <div
+            className="fc-glass fc-card"
             style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: "24px",
-              border: "1px solid #E5E7EB",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
               maxWidth: "28rem",
               width: "100%",
               maxHeight: "80vh",
               overflow: "hidden",
             }}
           >
-            <div style={{ padding: "24px", borderBottom: "1px solid #E5E7EB" }}>
+            <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2
-                    style={{
-                      fontSize: "20px",
-                      fontWeight: "700",
-                      color: "#1A1A1A",
-                    }}
-                  >
+                  <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
                     Assign Program
                   </h2>
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "400",
-                      color: "#6B7280",
-                      marginTop: "4px",
-                    }}
-                  >
+                  <p className="mt-1 text-sm text-[color:var(--fc-text-dim)]">
                     Assign &quot;
                     {selectedProgramForAssignment?.name || "Unknown"}&quot; to
                     clients
@@ -442,15 +431,9 @@ export default function EnhancedProgramManager({
               }}
             >
               {clients.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "32px 0" }}>
-                  <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "400",
-                      color: "#6B7280",
-                    }}
-                  >
+                <div className="py-8 text-center">
+                  <Users className="w-12 h-12 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
                     You don&apos;t have any active clients to assign this
                     program to.
                   </p>
@@ -472,9 +455,11 @@ export default function EnhancedProgramManager({
                             padding: "12px",
                             borderRadius: "16px",
                             border: isSelected
-                              ? "2px solid #4CAF50"
-                              : "2px solid #E5E7EB",
-                            backgroundColor: isSelected ? "#F0FDF4" : "#FFFFFF",
+                              ? "2px solid var(--fc-status-success)"
+                              : "1px solid var(--fc-glass-border)",
+                            backgroundColor: isSelected
+                              ? "var(--fc-glass-soft)"
+                              : "var(--fc-glass-base)",
                             cursor: "pointer",
                             transition: "all 0.2s",
                           }}
@@ -502,9 +487,11 @@ export default function EnhancedProgramManager({
                               height: "20px",
                               borderRadius: "4px",
                               border: "2px solid",
-                              borderColor: isSelected ? "#4CAF50" : "#D1D5DB",
+                              borderColor: isSelected
+                                ? "var(--fc-status-success)"
+                                : "var(--fc-glass-border)",
                               backgroundColor: isSelected
-                                ? "#4CAF50"
+                                ? "var(--fc-status-success)"
                                 : "transparent",
                               transition: "all 0.2s",
                             }}
@@ -717,7 +704,7 @@ export default function EnhancedProgramManager({
                     style={{
                       fontSize: "28px",
                       fontWeight: "700",
-                      color: "#1A1A1A",
+                      color: "var(--fc-text-primary)",
                       marginBottom: "8px",
                     }}
                   >
@@ -727,7 +714,7 @@ export default function EnhancedProgramManager({
                     style={{
                       fontSize: "14px",
                       fontWeight: "400",
-                      color: "#6B7280",
+                      color: "var(--fc-text-dim)",
                     }}
                   >
                     Create and manage structured training programs
@@ -739,12 +726,7 @@ export default function EnhancedProgramManager({
                 <Button
                   variant="outline"
                   onClick={loadData}
-                  style={{
-                    borderRadius: "20px",
-                    padding: "16px 32px",
-                    fontSize: "16px",
-                    fontWeight: "600",
-                  }}
+                  className="fc-btn fc-btn-ghost"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Refresh
@@ -753,14 +735,7 @@ export default function EnhancedProgramManager({
                   onClick={() =>
                     (window.location.href = "/coach/programs/create")
                   }
-                  style={{
-                    backgroundColor: "#6C5CE7",
-                    borderRadius: "20px",
-                    padding: "16px 32px",
-                    fontSize: "16px",
-                    fontWeight: "600",
-                    color: "#FFFFFF",
-                  }}
+                  className="fc-btn fc-btn-primary"
                 >
                   <Plus className="w-4 h-4" />
                   Create Program
@@ -772,10 +747,10 @@ export default function EnhancedProgramManager({
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: "var(--fc-glass-base)",
                   borderRadius: "24px",
                   padding: "24px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                  border: "1px solid var(--fc-glass-border)",
                   marginBottom: "20px",
                   minHeight: "120px",
                 }}
@@ -806,7 +781,7 @@ export default function EnhancedProgramManager({
                       style={{
                         fontSize: "40px",
                         fontWeight: "800",
-                        color: "#1A1A1A",
+                        color: "var(--fc-text-primary)",
                         lineHeight: "1.1",
                         margin: "0",
                         overflow: "hidden",
@@ -820,7 +795,7 @@ export default function EnhancedProgramManager({
                       style={{
                         fontSize: "14px",
                         fontWeight: "400",
-                        color: "#6B7280",
+                        color: "var(--fc-text-dim)",
                         margin: "0",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -835,10 +810,10 @@ export default function EnhancedProgramManager({
 
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: "var(--fc-glass-base)",
                   borderRadius: "24px",
                   padding: "24px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                  border: "1px solid var(--fc-glass-border)",
                   marginBottom: "20px",
                   minHeight: "120px",
                 }}
@@ -869,7 +844,7 @@ export default function EnhancedProgramManager({
                       style={{
                         fontSize: "40px",
                         fontWeight: "800",
-                        color: "#1A1A1A",
+                        color: "var(--fc-text-primary)",
                         lineHeight: "1.1",
                         margin: "0",
                         overflow: "hidden",
@@ -883,7 +858,7 @@ export default function EnhancedProgramManager({
                       style={{
                         fontSize: "14px",
                         fontWeight: "400",
-                        color: "#6B7280",
+                        color: "var(--fc-text-dim)",
                         margin: "0",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -898,10 +873,10 @@ export default function EnhancedProgramManager({
 
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: "var(--fc-glass-base)",
                   borderRadius: "24px",
                   padding: "24px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                  border: "1px solid var(--fc-glass-border)",
                   marginBottom: "20px",
                   minHeight: "120px",
                 }}
@@ -932,7 +907,7 @@ export default function EnhancedProgramManager({
                       style={{
                         fontSize: "40px",
                         fontWeight: "800",
-                        color: "#1A1A1A",
+                        color: "var(--fc-text-primary)",
                         lineHeight: "1.1",
                         margin: "0",
                         overflow: "hidden",
@@ -946,7 +921,7 @@ export default function EnhancedProgramManager({
                       style={{
                         fontSize: "14px",
                         fontWeight: "400",
-                        color: "#6B7280",
+                        color: "var(--fc-text-dim)",
                         margin: "0",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -961,10 +936,10 @@ export default function EnhancedProgramManager({
 
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: "var(--fc-glass-base)",
                   borderRadius: "24px",
                   padding: "24px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+                  border: "1px solid var(--fc-glass-border)",
                   marginBottom: "20px",
                   minHeight: "120px",
                 }}
@@ -995,7 +970,7 @@ export default function EnhancedProgramManager({
                       style={{
                         fontSize: "40px",
                         fontWeight: "800",
-                        color: "#1A1A1A",
+                        color: "var(--fc-text-primary)",
                         lineHeight: "1.1",
                         margin: "0",
                         overflow: "hidden",
@@ -1016,7 +991,7 @@ export default function EnhancedProgramManager({
                       style={{
                         fontSize: "14px",
                         fontWeight: "400",
-                        color: "#6B7280",
+                        color: "var(--fc-text-dim)",
                         margin: "0",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -1542,11 +1517,8 @@ function ProgramDetailsModal({
       }}
     >
       <div
+        className="fc-glass fc-card"
         style={{
-          backgroundColor: "#FFFFFF",
-          borderRadius: "24px",
-          border: "1px solid #E5E7EB",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
           maxWidth: "min(95vw, 80rem)",
           width: "100%",
           height: "min(88vh, calc(100vh - 4rem))",
@@ -1557,13 +1529,7 @@ function ProgramDetailsModal({
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: "24px",
-            borderBottom: "1px solid #E5E7EB",
-            flexShrink: 0,
-          }}
-        >
+        <div className="p-6 border-b border-[color:var(--fc-glass-border)] flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div
@@ -1583,23 +1549,10 @@ function ProgramDetailsModal({
                 />
               </div>
               <div>
-                <h2
-                  style={{
-                    fontSize: "28px",
-                    fontWeight: "700",
-                    color: "#1A1A1A",
-                    marginBottom: "4px",
-                  }}
-                >
+                <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)] mb-1">
                   {program.name}
                 </h2>
-                <p
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: "400",
-                    color: "#6B7280",
-                  }}
-                >
+                <p className="text-sm text-[color:var(--fc-text-dim)]">
                   Created {new Date(program.created_at).toLocaleDateString()}
                 </p>
               </div>
@@ -1608,15 +1561,7 @@ function ProgramDetailsModal({
               <Button
                 variant="outline"
                 onClick={onEdit}
-                style={{
-                  borderRadius: "20px",
-                  padding: "12px 24px",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  border: "2px solid #6C5CE7",
-                  color: "#6C5CE7",
-                  backgroundColor: "transparent",
-                }}
+                className="fc-btn fc-btn-secondary"
               >
                 <Edit
                   style={{ width: "16px", height: "16px", marginRight: "8px" }}
@@ -1626,7 +1571,7 @@ function ProgramDetailsModal({
               <Button
                 variant="ghost"
                 onClick={onClose}
-                style={{ padding: "8px", borderRadius: "12px" }}
+                className="fc-btn fc-btn-ghost"
               >
                 <X className="w-5 h-5" />
               </Button>
@@ -1647,11 +1592,10 @@ function ProgramDetailsModal({
           >
             <div
               style={{
-                backgroundColor: "#FFFFFF",
+                backgroundColor: "var(--fc-glass-base)",
                 borderRadius: "24px",
                 padding: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                border: "1px solid #E5E7EB",
+                border: "1px solid var(--fc-glass-border)",
                 textAlign: "center",
               }}
             >
@@ -1659,7 +1603,7 @@ function ProgramDetailsModal({
                 style={{
                   width: "48px",
                   height: "48px",
-                  backgroundColor: "#DBEAFE",
+                  backgroundColor: "var(--fc-glass-soft)",
                   borderRadius: "16px",
                   display: "flex",
                   alignItems: "center",
@@ -1668,14 +1612,14 @@ function ProgramDetailsModal({
                 }}
               >
                 <Clock
-                  style={{ width: "24px", height: "24px", color: "#2196F3" }}
+                  style={{ width: "24px", height: "24px", color: "var(--fc-domain-workouts)" }}
                 />
               </div>
               <p
                 style={{
                   fontSize: "32px",
                   fontWeight: "800",
-                  color: "#1A1A1A",
+                  color: "var(--fc-text-primary)",
                   lineHeight: "1.1",
                   margin: "0 0 8px 0",
                 }}
@@ -1686,7 +1630,7 @@ function ProgramDetailsModal({
                 style={{
                   fontSize: "14px",
                   fontWeight: "400",
-                  color: "#6B7280",
+                  color: "var(--fc-text-dim)",
                   margin: "0",
                 }}
               >
@@ -1696,11 +1640,10 @@ function ProgramDetailsModal({
 
             <div
               style={{
-                backgroundColor: "#FFFFFF",
+                backgroundColor: "var(--fc-glass-base)",
                 borderRadius: "24px",
                 padding: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                border: "1px solid #E5E7EB",
+                border: "1px solid var(--fc-glass-border)",
                 textAlign: "center",
               }}
             >
@@ -1708,7 +1651,7 @@ function ProgramDetailsModal({
                 style={{
                   width: "48px",
                   height: "48px",
-                  backgroundColor: "#D1FAE5",
+                  backgroundColor: "var(--fc-glass-soft)",
                   borderRadius: "16px",
                   display: "flex",
                   alignItems: "center",
@@ -1717,14 +1660,14 @@ function ProgramDetailsModal({
                 }}
               >
                 <Target
-                  style={{ width: "24px", height: "24px", color: "#4CAF50" }}
+                  style={{ width: "24px", height: "24px", color: "var(--fc-status-success)" }}
                 />
               </div>
               <p
                 style={{
                   fontSize: "14px",
                   fontWeight: "600",
-                  color: "#1A1A1A",
+                  color: "var(--fc-text-primary)",
                   margin: "0 0 8px 0",
                 }}
               >
@@ -1738,7 +1681,7 @@ function ProgramDetailsModal({
                 style={{
                   fontSize: "14px",
                   fontWeight: "400",
-                  color: "#6B7280",
+                  color: "var(--fc-text-dim)",
                   margin: "0",
                 }}
               >
@@ -1748,11 +1691,10 @@ function ProgramDetailsModal({
 
             <div
               style={{
-                backgroundColor: "#FFFFFF",
+                backgroundColor: "var(--fc-glass-base)",
                 borderRadius: "24px",
                 padding: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                border: "1px solid #E5E7EB",
+                border: "1px solid var(--fc-glass-border)",
                 textAlign: "center",
               }}
             >
@@ -1760,7 +1702,7 @@ function ProgramDetailsModal({
                 style={{
                   width: "48px",
                   height: "48px",
-                  backgroundColor: "#FEF3C7",
+                  backgroundColor: "var(--fc-glass-soft)",
                   borderRadius: "16px",
                   display: "flex",
                   alignItems: "center",
@@ -1769,7 +1711,7 @@ function ProgramDetailsModal({
                 }}
               >
                 <TrendingUp
-                  style={{ width: "24px", height: "24px", color: "#F59E0B" }}
+                  style={{ width: "24px", height: "24px", color: "var(--fc-status-warning)" }}
                 />
               </div>
               <Badge
@@ -1800,7 +1742,7 @@ function ProgramDetailsModal({
                 style={{
                   fontSize: "14px",
                   fontWeight: "400",
-                  color: "#6B7280",
+                  color: "var(--fc-text-dim)",
                   margin: "0",
                 }}
               >
@@ -1810,11 +1752,10 @@ function ProgramDetailsModal({
 
             <div
               style={{
-                backgroundColor: "#FFFFFF",
+                backgroundColor: "var(--fc-glass-base)",
                 borderRadius: "24px",
                 padding: "24px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                border: "1px solid #E5E7EB",
+                border: "1px solid var(--fc-glass-border)",
                 textAlign: "center",
               }}
             >
@@ -1822,7 +1763,7 @@ function ProgramDetailsModal({
                 style={{
                   width: "48px",
                   height: "48px",
-                  backgroundColor: "#EDE7F6",
+                  backgroundColor: "var(--fc-glass-soft)",
                   borderRadius: "16px",
                   display: "flex",
                   alignItems: "center",
@@ -1831,14 +1772,14 @@ function ProgramDetailsModal({
                 }}
               >
                 <Users
-                  style={{ width: "24px", height: "24px", color: "#6C5CE7" }}
+                  style={{ width: "24px", height: "24px", color: "var(--fc-accent-purple)" }}
                 />
               </div>
               <p
                 style={{
                   fontSize: "32px",
                   fontWeight: "800",
-                  color: "#1A1A1A",
+                  color: "var(--fc-text-primary)",
                   lineHeight: "1.1",
                   margin: "0 0 8px 0",
                 }}
@@ -1849,7 +1790,7 @@ function ProgramDetailsModal({
                 style={{
                   fontSize: "14px",
                   fontWeight: "400",
-                  color: "#6B7280",
+                  color: "var(--fc-text-dim)",
                   margin: "0",
                 }}
               >
@@ -1865,7 +1806,7 @@ function ProgramDetailsModal({
                 style={{
                   fontSize: "20px",
                   fontWeight: "700",
-                  color: "#1A1A1A",
+                  color: "var(--fc-text-primary)",
                   marginBottom: "12px",
                 }}
               >
@@ -1873,18 +1814,17 @@ function ProgramDetailsModal({
               </h3>
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: "var(--fc-glass-base)",
                   borderRadius: "24px",
                   padding: "24px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                  border: "1px solid #E5E7EB",
+                  border: "1px solid var(--fc-glass-border)",
                 }}
               >
                 <p
                   style={{
                     fontSize: "16px",
                     fontWeight: "400",
-                    color: "#1A1A1A",
+                    color: "var(--fc-text-primary)",
                     margin: "0",
                   }}
                 >
@@ -1931,17 +1871,18 @@ function ProgramDetailsModal({
                     >
                       <div
                         style={{
-                          backgroundColor: "#FFFFFF",
+                          backgroundColor: "var(--fc-glass-base)",
                           borderRadius: "24px",
                           height: "100%",
                           padding: "20px",
+                          border: "1px solid var(--fc-glass-border)",
                         }}
                       >
                         <h4
                           style={{
                             fontSize: "18px",
                             fontWeight: "600",
-                            color: "#1A1A1A",
+                            color: "var(--fc-text-primary)",
                             marginBottom: "16px",
                             textAlign: "center",
                           }}
@@ -1976,7 +1917,7 @@ function ProgramDetailsModal({
                               style={{
                                 fontSize: "16px",
                                 fontWeight: "600",
-                                color: "#1A1A1A",
+                                color: "var(--fc-text-primary)",
                                 marginBottom: "4px",
                               }}
                             >
@@ -1986,7 +1927,7 @@ function ProgramDetailsModal({
                               style={{
                                 fontSize: "14px",
                                 fontWeight: "600",
-                                color: "#4CAF50",
+                                color: "var(--fc-status-success)",
                               }}
                             >
                               Workout Day
@@ -1998,7 +1939,7 @@ function ProgramDetailsModal({
                               style={{
                                 width: "48px",
                                 height: "48px",
-                                backgroundColor: "#F3F4F6",
+                                backgroundColor: "var(--fc-glass-soft)",
                                 borderRadius: "16px",
                                 display: "flex",
                                 alignItems: "center",
@@ -2010,7 +1951,7 @@ function ProgramDetailsModal({
                                 style={{
                                   width: "24px",
                                   height: "24px",
-                                  color: "#9CA3AF",
+                                  color: "var(--fc-text-subtle)",
                                 }}
                               />
                             </div>
@@ -2018,7 +1959,7 @@ function ProgramDetailsModal({
                               style={{
                                 fontSize: "16px",
                                 fontWeight: "600",
-                                color: "#9CA3AF",
+                                color: "var(--fc-text-subtle)",
                               }}
                             >
                               Rest Day
@@ -2039,7 +1980,7 @@ function ProgramDetailsModal({
               style={{
                 fontSize: "20px",
                 fontWeight: "700",
-                color: "#1A1A1A",
+                color: "var(--fc-text-primary)",
                 marginBottom: "16px",
               }}
             >
@@ -2054,11 +1995,10 @@ function ProgramDetailsModal({
             >
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: "var(--fc-glass-base)",
                   borderRadius: "24px",
                   padding: "24px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                  border: "1px solid #E5E7EB",
+                  border: "1px solid var(--fc-glass-border)",
                   textAlign: "center",
                 }}
               >
@@ -2066,7 +2006,7 @@ function ProgramDetailsModal({
                   style={{
                     fontSize: "32px",
                     fontWeight: "800",
-                    color: "#1A1A1A",
+                    color: "var(--fc-text-primary)",
                     lineHeight: "1.1",
                     margin: "0 0 8px 0",
                   }}
@@ -2077,7 +2017,7 @@ function ProgramDetailsModal({
                   style={{
                     fontSize: "14px",
                     fontWeight: "400",
-                    color: "#6B7280",
+                    color: "var(--fc-text-dim)",
                     margin: "0",
                   }}
                 >
@@ -2086,11 +2026,10 @@ function ProgramDetailsModal({
               </div>
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: "var(--fc-glass-base)",
                   borderRadius: "24px",
                   padding: "24px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                  border: "1px solid #E5E7EB",
+                  border: "1px solid var(--fc-glass-border)",
                   textAlign: "center",
                 }}
               >
@@ -2098,7 +2037,7 @@ function ProgramDetailsModal({
                   style={{
                     fontSize: "32px",
                     fontWeight: "800",
-                    color: "#1A1A1A",
+                    color: "var(--fc-text-primary)",
                     lineHeight: "1.1",
                     margin: "0 0 8px 0",
                   }}
@@ -2109,7 +2048,7 @@ function ProgramDetailsModal({
                   style={{
                     fontSize: "14px",
                     fontWeight: "400",
-                    color: "#6B7280",
+                    color: "var(--fc-text-dim)",
                     margin: "0",
                   }}
                 >
@@ -2118,11 +2057,10 @@ function ProgramDetailsModal({
               </div>
               <div
                 style={{
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: "var(--fc-glass-base)",
                   borderRadius: "24px",
                   padding: "24px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                  border: "1px solid #E5E7EB",
+                  border: "1px solid var(--fc-glass-border)",
                   textAlign: "center",
                 }}
               >
@@ -2130,7 +2068,7 @@ function ProgramDetailsModal({
                   style={{
                     fontSize: "32px",
                     fontWeight: "800",
-                    color: "#1A1A1A",
+                    color: "var(--fc-text-primary)",
                     lineHeight: "1.1",
                     margin: "0 0 8px 0",
                   }}
@@ -2141,7 +2079,7 @@ function ProgramDetailsModal({
                   style={{
                     fontSize: "14px",
                     fontWeight: "400",
-                    color: "#6B7280",
+                    color: "var(--fc-text-dim)",
                     margin: "0",
                   }}
                 >
@@ -3083,17 +3021,9 @@ function ProgramCreateForm({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-[9999]">
-      <Card
-        className="max-w-2xl w-full h-[88vh] max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden"
-        style={{
-          backgroundColor: "#FFFFFF",
-          borderRadius: "24px",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-        }}
-      >
+      <Card className="fc-glass fc-card max-w-2xl w-full h-[88vh] max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
         <div
-          className="flex-shrink-0 p-6 border-b"
-          style={{ borderBottom: "1px solid #E5E7EB" }}
+          className="flex-shrink-0 p-6 border-b border-[color:var(--fc-glass-border)]"
         >
           <div className="flex items-center gap-4">
             <div
@@ -3111,9 +3041,7 @@ function ProgramCreateForm({
                 style={{ width: "32px", height: "32px", color: "#FFFFFF" }}
               />
             </div>
-            <div
-              style={{ fontSize: "28px", fontWeight: "700", color: "#1A1A1A" }}
-            >
+            <div className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
               {program ? "Edit Program" : "Create New Program"}
             </div>
           </div>
@@ -3121,83 +3049,37 @@ function ProgramCreateForm({
 
         {/* Tab Navigation */}
         <div className="px-6 pb-4">
-          <div
-            className="flex space-x-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1"
-            style={{
-              backgroundColor: "#F3F4F6",
-              borderRadius: "16px",
-              padding: "4px",
-            }}
-          >
+          <div className="flex space-x-1 rounded-2xl p-1 bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)]">
             <Button
               variant={activeTab === "basic" ? "default" : "ghost"}
               onClick={() => setActiveTab("basic")}
-              className="flex-1 rounded-lg"
-              style={
+              className={`flex-1 rounded-xl ${
                 activeTab === "basic"
-                  ? {
-                      backgroundColor: "#6C5CE7",
-                      color: "#FFFFFF",
-                      borderRadius: "12px",
-                      fontSize: "16px",
-                      fontWeight: "600",
-                    }
-                  : {
-                      backgroundColor: "transparent",
-                      color: "#6B7280",
-                      borderRadius: "12px",
-                      fontSize: "16px",
-                      fontWeight: "400",
-                    }
-              }
+                  ? "fc-btn fc-btn-primary"
+                  : "fc-btn fc-btn-ghost text-[color:var(--fc-text-dim)]"
+              }`}
             >
               Basic Info
             </Button>
             <Button
               variant={activeTab === "schedule" ? "default" : "ghost"}
               onClick={() => setActiveTab("schedule")}
-              className="flex-1 rounded-lg"
-              style={
+              className={`flex-1 rounded-xl ${
                 activeTab === "schedule"
-                  ? {
-                      backgroundColor: "#6C5CE7",
-                      color: "#FFFFFF",
-                      borderRadius: "12px",
-                      fontSize: "16px",
-                      fontWeight: "600",
-                    }
-                  : {
-                      backgroundColor: "transparent",
-                      color: "#6B7280",
-                      borderRadius: "12px",
-                      fontSize: "16px",
-                      fontWeight: "400",
-                    }
-              }
+                  ? "fc-btn fc-btn-primary"
+                  : "fc-btn fc-btn-ghost text-[color:var(--fc-text-dim)]"
+              }`}
             >
               Weekly Schedule
             </Button>
             <Button
               variant={activeTab === "progression" ? "default" : "ghost"}
               onClick={() => setActiveTab("progression")}
-              className="flex-1 rounded-lg"
-              style={
+              className={`flex-1 rounded-xl ${
                 activeTab === "progression"
-                  ? {
-                      backgroundColor: "#6C5CE7",
-                      color: "#FFFFFF",
-                      borderRadius: "12px",
-                      fontSize: "16px",
-                      fontWeight: "600",
-                    }
-                  : {
-                      backgroundColor: "transparent",
-                      color: "#6B7280",
-                      borderRadius: "12px",
-                      fontSize: "16px",
-                      fontWeight: "400",
-                    }
-              }
+                  ? "fc-btn fc-btn-primary"
+                  : "fc-btn fc-btn-ghost text-[color:var(--fc-text-dim)]"
+              }`}
             >
               Progression Rules
             </Button>
@@ -3206,18 +3088,17 @@ function ProgramCreateForm({
 
         <CardContent
           className="flex-1 overflow-y-auto space-y-6"
-          style={{ padding: "24px", backgroundColor: "#FFFFFF" }}
+          style={{ padding: "24px", backgroundColor: "var(--fc-glass-base)" }}
         >
           {/* Basic Info Tab */}
           {activeTab === "basic" && (
             <div className="space-y-6">
               <div>
                 <label
-                  className="text-sm font-medium mb-2 block"
+                  className="text-sm font-medium mb-2 block text-[color:var(--fc-text-primary)]"
                   style={{
                     fontSize: "14px",
                     fontWeight: "600",
-                    color: "#6B7280",
                     marginBottom: "8px",
                   }}
                 >
@@ -3229,26 +3110,16 @@ function ProgramCreateForm({
                     setFormData({ ...formData, name: e.target.value })
                   }
                   placeholder="Enter program name..."
-                  className="rounded-xl"
-                  style={{
-                    backgroundColor: "#FFFFFF",
-                    border: "2px solid #E5E7EB",
-                    borderRadius: "16px",
-                    padding: "16px",
-                    fontSize: "16px",
-                    fontWeight: "400",
-                    color: "#1A1A1A",
-                  }}
+                  className="fc-input"
                 />
               </div>
 
               <div>
                 <label
-                  className="text-sm font-medium mb-2 block"
+                  className="text-sm font-medium mb-2 block text-[color:var(--fc-text-primary)]"
                   style={{
                     fontSize: "14px",
                     fontWeight: "600",
-                    color: "#6B7280",
                     marginBottom: "8px",
                   }}
                 >
@@ -3260,22 +3131,13 @@ function ProgramCreateForm({
                     setFormData({ ...formData, description: e.target.value })
                   }
                   placeholder="Describe the program goals and structure..."
-                  className="rounded-xl min-h-24"
-                  style={{
-                    backgroundColor: "#FFFFFF",
-                    border: "2px solid #E5E7EB",
-                    borderRadius: "16px",
-                    padding: "16px",
-                    fontSize: "16px",
-                    fontWeight: "400",
-                    color: "#1A1A1A",
-                  }}
+                  className="fc-textarea min-h-24"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="text-sm font-medium mb-2 block text-[color:var(--fc-text-primary)]">
                     Difficulty Level
                   </label>
                   <Select
@@ -3284,19 +3146,20 @@ function ProgramCreateForm({
                       setFormData({ ...formData, difficulty_level: value })
                     }
                   >
-                    <SelectTrigger className="rounded-xl">
+                    <SelectTrigger className="fc-select">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="beginner">Beginner</SelectItem>
                       <SelectItem value="intermediate">Intermediate</SelectItem>
                       <SelectItem value="advanced">Advanced</SelectItem>
+                      <SelectItem value="athlete">Athlete</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="text-sm font-medium mb-2 block text-[color:var(--fc-text-primary)]">
                     Duration (Weeks)
                   </label>
                   <Input
@@ -3308,7 +3171,7 @@ function ProgramCreateForm({
                         duration_weeks: parseInt(e.target.value) || 8,
                       })
                     }
-                    className="rounded-xl"
+                    className="fc-input"
                     min="1"
                     max="52"
                   />
@@ -3316,7 +3179,7 @@ function ProgramCreateForm({
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">
+                <label className="text-sm font-medium mb-2 block text-[color:var(--fc-text-primary)]">
                   Target Audience
                 </label>
                 <Select
@@ -3325,7 +3188,7 @@ function ProgramCreateForm({
                     setFormData({ ...formData, target_audience: value })
                   }
                 >
-                  <SelectTrigger className="rounded-xl">
+                  <SelectTrigger className="fc-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -3350,8 +3213,8 @@ function ProgramCreateForm({
           {activeTab === "schedule" && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-2">Weekly Schedule</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                <h3 className="text-lg font-semibold mb-2 text-[color:var(--fc-text-primary)]">Weekly Schedule</h3>
+                <p className="text-sm text-[color:var(--fc-text-dim)] mb-4">
                   Assign workout templates to each day of the week. This
                   schedule will apply to all {formData.duration_weeks} weeks of
                   the program.
@@ -3359,9 +3222,12 @@ function ProgramCreateForm({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {dayNames.map((dayName, dayIndex) => (
-                    <Card key={dayIndex} className="border-2 rounded-2xl">
+                    <Card
+                      key={dayIndex}
+                      className="fc-glass-soft fc-card rounded-2xl border border-[color:var(--fc-glass-border)]"
+                    >
                       <CardContent className="p-4">
-                        <h4 className="font-medium mb-3 text-center">
+                        <h4 className="font-medium mb-3 text-center text-[color:var(--fc-text-primary)]">
                           {dayName}
                         </h4>
                         <Select
@@ -3443,7 +3309,7 @@ function ProgramCreateForm({
                             }
                           }}
                         >
-                          <SelectTrigger className="rounded-xl">
+                        <SelectTrigger className="fc-select">
                             <SelectValue placeholder="Select template" />
                           </SelectTrigger>
                           <SelectContent
@@ -3474,16 +3340,16 @@ function ProgramCreateForm({
           {activeTab === "progression" && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-2">
+                <h3 className="text-lg font-semibold mb-2 text-[color:var(--fc-text-primary)]">
                   Progression Rules
                 </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                <p className="text-sm text-[color:var(--fc-text-dim)] mb-4">
                   Edit workout parameters week by week. Changes apply only to this program.
                 </p>
 
                 {schedule.filter((s) => (s.week_number || 1) === selectedWeek)
                   .length === 0 ? (
-                  <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                  <div className="text-center py-8 text-[color:var(--fc-text-dim)]">
                     <Calendar className="w-16 h-16 mx-auto mb-4" />
                     <h4 className="text-lg font-medium mb-2">
                       No Workouts Scheduled for Week {selectedWeek}
@@ -3583,7 +3449,7 @@ function ProgramCreateForm({
         <div
           className="flex-shrink-0 flex justify-end gap-2 p-6 pt-4 border-t"
           style={{
-            borderTop: "1px solid #E5E7EB",
+            borderTop: "1px solid var(--fc-glass-border)",
             padding: "24px",
             paddingTop: "16px",
           }}
@@ -3591,16 +3457,7 @@ function ProgramCreateForm({
           <Button
             variant="outline"
             onClick={onClose}
-            className="rounded-xl"
-            style={{
-              backgroundColor: "#FFFFFF",
-              color: "#6C5CE7",
-              border: "2px solid #6C5CE7",
-              borderRadius: "20px",
-              padding: "16px 32px",
-              fontSize: "16px",
-              fontWeight: "600",
-            }}
+            className="fc-btn fc-btn-ghost"
           >
             Cancel
                         </Button>
@@ -3614,16 +3471,7 @@ function ProgramCreateForm({
                 weekValues: {},
               });
             }}
-            className="rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-            style={{
-              backgroundColor: "#6C5CE7",
-              color: "#FFFFFF",
-              borderRadius: "20px",
-              padding: "16px 32px",
-              fontSize: "16px",
-              fontWeight: "600",
-              border: "none",
-            }}
+            className="fc-btn fc-btn-primary"
           >
             <Save className="w-4 h-4 mr-2" />
             {program ? "Update Program" : "Create Program"}

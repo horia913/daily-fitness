@@ -246,13 +246,13 @@ export default function MealForm({ mealPlanId, mealType, onSave, onCancel }: Mea
       data-theme={isDark ? 'dark' : 'light'}
     >
       <div 
-        className={`relative ${theme.card} ${theme.shadow} rounded-3xl border ${theme.border} max-w-4xl max-h-[95vh] w-full overflow-hidden transform transition-all duration-300 ease-out`}
+        className={`relative ${theme.card} ${theme.shadow} fc-glass fc-card rounded-3xl border ${theme.border} max-w-4xl max-h-[95vh] w-full overflow-hidden transform transition-all duration-300 ease-out`}
         style={{
           animation: 'modalSlideIn 0.3s ease-out'
         }}
       >
         {/* Header */}
-        <div className={`sticky top-0 ${theme.card} border-b ${theme.border} px-6 py-5 rounded-t-3xl`}>
+        <div className={`sticky top-0 ${theme.card} fc-glass fc-card border-b ${theme.border} px-6 py-5 rounded-t-3xl`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-2xl ${isDark ? 'bg-slate-700' : 'bg-gradient-to-br from-green-100 to-orange-100'}`}>
@@ -283,7 +283,7 @@ export default function MealForm({ mealPlanId, mealType, onSave, onCancel }: Mea
         <div className="overflow-y-auto max-h-[calc(95vh-120px)] px-6 py-6">
           <div className="space-y-8">
             {/* Meal Details */}
-            <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
+            <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
               <CardHeader className="p-6">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-purple-100'}`}>
@@ -342,7 +342,7 @@ export default function MealForm({ mealPlanId, mealType, onSave, onCancel }: Mea
             </Card>
 
             {/* Food Search & Selection */}
-            <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
+            <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
               <CardHeader className="p-6">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-orange-100'}`}>
@@ -399,7 +399,7 @@ export default function MealForm({ mealPlanId, mealType, onSave, onCancel }: Mea
 
             {/* Selected Foods */}
             {selectedFoods.length > 0 && (
-              <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
+              <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
                 <CardHeader className="p-6">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-green-100'}`}>
@@ -451,7 +451,7 @@ export default function MealForm({ mealPlanId, mealType, onSave, onCancel }: Mea
 
             {/* Nutrition Summary */}
             {selectedFoods.length > 0 && (
-              <Card className={`${theme.card} border ${theme.border} rounded-2xl`}>
+              <Card className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}>
                 <CardHeader className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -505,7 +505,7 @@ export default function MealForm({ mealPlanId, mealType, onSave, onCancel }: Mea
         </div>
 
         {/* Action Buttons */}
-        <div className={`sticky bottom-0 ${theme.card} border-t ${theme.border} px-6 py-4 rounded-b-3xl`}>
+        <div className={`sticky bottom-0 ${theme.card} fc-glass fc-card border-t ${theme.border} px-6 py-4 rounded-b-3xl`}>
           <div className="flex justify-end gap-3">
             <Button 
               type="button" 

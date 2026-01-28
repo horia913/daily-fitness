@@ -15,6 +15,7 @@ import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useLoggingReset } from "../hooks/useLoggingReset";
 
 export function PreExhaustionExecutor({
   block,
@@ -51,6 +52,7 @@ export function PreExhaustionExecutor({
   const [compoundWeight, setCompoundWeight] = useState("");
   const [compoundReps, setCompoundReps] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
+  useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [showTimer, setShowTimer] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(restBetween);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -204,110 +206,112 @@ export function PreExhaustionExecutor({
       }
     } catch (e) {}
 
-    // Log pre-exhaustion as a single call with both exercises
-    const logData: any = {
-      block_type: 'preexhaust',
-      set_number: completedSets + 1,
-    };
-    
-    // Only add fields if they're defined
-    if (isolationExercise?.exercise_id) logData.preexhaust_isolation_exercise_id = isolationExercise.exercise_id;
-    if (isolationWeightNum !== undefined && isolationWeightNum !== null) logData.preexhaust_isolation_weight = isolationWeightNum;
-    if (isolationRepsNum !== undefined && isolationRepsNum !== null) logData.preexhaust_isolation_reps = isolationRepsNum;
-    if (compoundExercise?.exercise_id) logData.preexhaust_compound_exercise_id = compoundExercise.exercise_id;
-    if (compoundWeightNum !== undefined && compoundWeightNum !== null) logData.preexhaust_compound_weight = compoundWeightNum;
-    if (compoundRepsNum !== undefined && compoundRepsNum !== null) logData.preexhaust_compound_reps = compoundRepsNum;
-    
-    const result = await logSetToDatabase(logData);
+    try {
+      // Log pre-exhaustion as a single call with both exercises
+      const logData: any = {
+        block_type: 'preexhaust',
+        set_number: completedSets + 1,
+      };
+      
+      // Only add fields if they're defined
+      if (isolationExercise?.exercise_id) logData.preexhaust_isolation_exercise_id = isolationExercise.exercise_id;
+      if (isolationWeightNum !== undefined && isolationWeightNum !== null) logData.preexhaust_isolation_weight = isolationWeightNum;
+      if (isolationRepsNum !== undefined && isolationRepsNum !== null) logData.preexhaust_isolation_reps = isolationRepsNum;
+      if (compoundExercise?.exercise_id) logData.preexhaust_compound_exercise_id = compoundExercise.exercise_id;
+      if (compoundWeightNum !== undefined && compoundWeightNum !== null) logData.preexhaust_compound_weight = compoundWeightNum;
+      if (compoundRepsNum !== undefined && compoundRepsNum !== null) logData.preexhaust_compound_reps = compoundRepsNum;
+      
+      const result = await logSetToDatabase(logData);
 
-    if (result.success) {
-      const loggedSetsArray: LoggedSet[] = [
-        {
-          id: `temp-isolation-${Date.now()}`,
-          exercise_id: isolationExercise.exercise_id,
-          block_id: block.block.id,
-          set_number: completedSets + 1,
-          weight_kg: isolationWeightNum,
-          reps_completed: isolationRepsNum,
-          completed_at: new Date(),
-        } as LoggedSet,
-        {
-          id: `temp-compound-${Date.now()}`,
-          exercise_id: compoundExercise.exercise_id,
-          block_id: block.block.id,
-          set_number: completedSets + 1,
-          weight_kg: compoundWeightNum,
-          reps_completed: compoundRepsNum,
-          completed_at: new Date(),
-        } as LoggedSet,
-      ];
+      if (result.success) {
+        const loggedSetsArray: LoggedSet[] = [
+          {
+            id: `temp-isolation-${Date.now()}`,
+            exercise_id: isolationExercise.exercise_id,
+            block_id: block.block.id,
+            set_number: completedSets + 1,
+            weight_kg: isolationWeightNum,
+            reps_completed: isolationRepsNum,
+            completed_at: new Date(),
+          } as LoggedSet,
+          {
+            id: `temp-compound-${Date.now()}`,
+            exercise_id: compoundExercise.exercise_id,
+            block_id: block.block.id,
+            set_number: completedSets + 1,
+            weight_kg: compoundWeightNum,
+            reps_completed: compoundRepsNum,
+            completed_at: new Date(),
+          } as LoggedSet,
+        ];
 
-      // Note: Pre-exhaustion doesn't calculate e1RM (no weight+reps for e1RM calculation)
+        // Note: Pre-exhaustion doesn't calculate e1RM (no weight+reps for e1RM calculation)
 
-      addToast({
-        title: "Pre-Exhaustion Set Logged!",
-        description: `Isolation: ${isolationWeightNum}kg × ${isolationRepsNum} reps, Compound: ${compoundWeightNum}kg × ${compoundRepsNum} reps`,
-        variant: "success",
-        duration: 2000,
-      });
+        addToast({
+          title: "Pre-Exhaustion Set Logged!",
+          description: `Isolation: ${isolationWeightNum}kg × ${isolationRepsNum} reps, Compound: ${compoundWeightNum}kg × ${compoundRepsNum} reps`,
+          variant: "success",
+          duration: 2000,
+        });
 
-      // Update parent with new completed sets count
-      const newCompletedSets = completedSets + 1;
-      onSetComplete?.(newCompletedSets);
+        // Update parent with new completed sets count
+        const newCompletedSets = completedSets + 1;
+        onSetComplete?.(newCompletedSets);
 
-      // Complete block if last set
-      if (newCompletedSets >= totalSets) {
-        onBlockComplete(block.block.id, loggedSetsArray);
-      } else {
-        // Check if rest timer will show - if so, don't clear inputs yet
-        const currentExercise = block.block.exercises?.[currentExerciseIndex];
-        const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-        if (restSeconds === 0) {
-          // No rest timer, clear inputs immediately
-          const suggestedIsolation = isolationExercise?.load_percentage
-            ? calculateSuggestedWeightUtil(
-                isolationExercise.exercise_id,
-                isolationExercise.load_percentage,
-                e1rmMap
-              )
-            : null;
-          const suggestedCompound = compoundExercise?.load_percentage
-            ? calculateSuggestedWeightUtil(
-                compoundExercise.exercise_id,
-                compoundExercise.load_percentage,
-                e1rmMap
-              )
-            : null;
+        // Complete block if last set
+        if (newCompletedSets >= totalSets) {
+          onBlockComplete(block.block.id, loggedSetsArray);
+        } else {
+          // Check if rest timer will show - if so, don't clear inputs yet
+          const currentExercise = block.block.exercises?.[currentExerciseIndex];
+          const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
+          if (restSeconds === 0) {
+            // No rest timer, clear inputs immediately
+            const suggestedIsolation = isolationExercise?.load_percentage
+              ? calculateSuggestedWeightUtil(
+                  isolationExercise.exercise_id,
+                  isolationExercise.load_percentage,
+                  e1rmMap
+                )
+              : null;
+            const suggestedCompound = compoundExercise?.load_percentage
+              ? calculateSuggestedWeightUtil(
+                  compoundExercise.exercise_id,
+                  compoundExercise.load_percentage,
+                  e1rmMap
+                )
+              : null;
 
-          if (suggestedIsolation) setIsolationWeight(suggestedIsolation.toString());
-          else setIsolationWeight("");
-          if (suggestedCompound) setCompoundWeight(suggestedCompound.toString());
-          else setCompoundWeight("");
+            if (suggestedIsolation) setIsolationWeight(suggestedIsolation.toString());
+            else setIsolationWeight("");
+            if (suggestedCompound) setCompoundWeight(suggestedCompound.toString());
+            else setCompoundWeight("");
 
-          setIsolationReps("");
-          setCompoundReps("");
-          setShowTimer(false);
+            setIsolationReps("");
+            setCompoundReps("");
+            setShowTimer(false);
+          }
+          // If restSeconds > 0, rest timer will show and inputs will be cleared
+          // when the timer completes and completedSets updates
         }
-        // If restSeconds > 0, rest timer will show and inputs will be cleared
-        // when the timer completes and completedSets updates
+      } else {
+        addToast({
+          title: "Failed to Save",
+          description: "Failed to save sets. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
       }
-    } else {
-      addToast({
-        title: "Failed to Save",
-        description: "Failed to save sets. Please try again.",
-        variant: "destructive",
-        duration: 5000,
-      });
+    } finally {
+      setIsLoggingSet(false);
     }
-
-    setIsLoggingSet(false);
   };
 
   const loggingInputs = (
     <div className="space-y-4">
       {/* Isolation Exercise */}
       <GlassCard elevation={1} className="p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4">
           <h4 className="font-semibold text-blue-800 dark:text-blue-200 text-lg">
             Isolation:{" "}
             {isolationExercise?.exercise?.name || "Isolation Exercise"}
@@ -328,6 +332,8 @@ export function PreExhaustionExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <LargeInput
             label="Reps"
@@ -335,6 +341,8 @@ export function PreExhaustionExecutor({
             onChange={setIsolationReps}
             placeholder="0"
             step="1"
+            showStepper
+            stepAmount={1}
           />
         </div>
       </GlassCard>
@@ -353,7 +361,7 @@ export function PreExhaustionExecutor({
 
       {/* Compound Exercise */}
       <GlassCard elevation={1} className="p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4">
           <h4 className="font-semibold text-purple-800 dark:text-purple-200 text-lg">
             Compound: {compoundExercise?.exercise?.name || "Compound Exercise"}
           </h4>
@@ -373,6 +381,8 @@ export function PreExhaustionExecutor({
             placeholder="0"
             step="0.5"
             unit="kg"
+            showStepper
+            stepAmount={2.5}
           />
           <LargeInput
             label="Reps"
@@ -380,6 +390,8 @@ export function PreExhaustionExecutor({
             onChange={setCompoundReps}
             placeholder="0"
             step="1"
+            showStepper
+            stepAmount={1}
           />
         </div>
       </GlassCard>

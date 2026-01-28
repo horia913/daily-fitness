@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { isCoachRole } from '@/lib/roleGuard';
 
 interface RoleGuardProps {
@@ -19,31 +19,25 @@ interface RoleGuardProps {
 export function RoleGuard({ children, requiredRole, fallbackPath }: RoleGuardProps) {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const router = useRouter();
+  const { user, profile, loading, refreshProfile } = useAuth();
 
   useEffect(() => {
     const checkRole = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!session) {
+        if (loading) return;
+        if (!user) {
           router.push('/');
           return;
         }
 
-        // Fetch user role from profiles table
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
+        const resolvedProfile = profile || (await refreshProfile());
 
-        if (error || !profile) {
-          console.error('Error fetching profile:', error);
+        if (!resolvedProfile) {
           router.push('/');
           return;
         }
 
-        const userRole = profile.role;
+        const userRole = resolvedProfile.role;
 
         // Check authorization based on required role
         if (requiredRole === 'coach') {
@@ -69,7 +63,7 @@ export function RoleGuard({ children, requiredRole, fallbackPath }: RoleGuardPro
     };
 
     checkRole();
-  }, [requiredRole, fallbackPath, router]);
+  }, [requiredRole, fallbackPath, router, user, profile, loading, refreshProfile]);
 
   // Show loading state while checking authorization
   if (isAuthorized === null) {

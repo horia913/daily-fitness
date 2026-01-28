@@ -14,17 +14,14 @@ import {
   Zap,
   Layers,
   Award,
-  LayoutGrid,
   Calendar,
-  BarChart2,
-  Plus,
   Scale,
   Utensils,
   FileText,
   Activity,
 } from "lucide-react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabase, ensureAuthenticated } from "@/lib/supabase";
 import {
   getDashboardStats,
   getClientType,
@@ -72,6 +69,9 @@ export default function ClientDashboard() {
     if (user?.id) {
       (async () => {
         try {
+          // Ensure user is authenticated before querying
+          await ensureAuthenticated();
+          
           const { data } = await supabase
             .from("profiles")
             .select("avatar_url")
@@ -97,6 +97,9 @@ export default function ClientDashboard() {
     if (!user) return;
 
     try {
+      // Ensure user is authenticated before querying
+      await ensureAuthenticated();
+
       setLoadingWorkout(true);
       const today = new Date().toISOString().split("T")[0];
 
@@ -233,19 +236,6 @@ export default function ClientDashboard() {
       ? Math.min((weeklyProgress.current / weeklyProgress.goal) * 100, 100)
       : 0;
 
-  // Crystalline kinetic card style
-  const crystalCardStyle: React.CSSProperties = {
-    background: isDark
-      ? "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%)"
-      : "linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)",
-    backdropFilter: "blur(20px) saturate(180%)",
-    WebkitBackdropFilter: "blur(20px) saturate(180%)",
-    border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
-    borderRadius: "24px",
-    position: "relative" as const,
-    overflow: "hidden" as const,
-  };
-
   const getAvatarUrl = () => {
     if (avatarUrl) return avatarUrl;
     if (profile?.first_name) {
@@ -261,91 +251,32 @@ export default function ClientDashboard() {
 
   return (
     <ProtectedRoute requiredRole="client">
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        @keyframes shine {
-          0% { transform: translate(-30%, -30%); }
-          100% { transform: translate(30%, 30%); }
-        }
-        @keyframes pulse-fire {
-          0%, 100% { transform: scale(1); filter: brightness(1); }
-          50% { transform: scale(1.05); filter: brightness(1.2); }
-        }
-        .kinetic-shimmer::after {
-          content: '';
-          position: absolute;
-          top: -100%;
-          left: -100%;
-          width: 300%;
-          height: 300%;
-          background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.1) 50%, transparent 55%);
-          animation: shine 6s infinite linear;
-        }
-        .streak-badge {
-          animation: pulse-fire 2s infinite ease-in-out;
-        }
-      `,
-        }}
-      />
-      <div className="relative" style={{ isolation: "isolate" }}>
+      <div className="relative fc-app-bg isolate">
         <AnimatedBackground>
-          {/* Gray overlay for dark mode - covers AnimatedBackground's purple gradient with gray */}
-          {isDark && (
-            <div
-              className="fixed inset-0 pointer-events-none"
-              style={{
-                background: performanceSettings.animatedBackground
-                  ? "linear-gradient(180deg, #0A0A0A 0%, #1A1A1A 50%, #0F0F0F 100%)"
-                  : "linear-gradient(180deg, #0A0A0A 0%, #1A1A1A 100%)",
-                backgroundSize: performanceSettings.animatedBackground
-                  ? "100% 200%"
-                  : undefined,
-                backgroundPosition: performanceSettings.animatedBackground
-                  ? "0% 50%"
-                  : undefined,
-                animation: performanceSettings.animatedBackground
-                  ? "gradientShift 10s ease-in-out infinite"
-                  : undefined,
-                zIndex: 1,
-              }}
-            />
-          )}
+          {performanceSettings.floatingParticles && <FloatingParticles />}
 
-          <div style={{ position: "relative", zIndex: 2 }}>
-            <FloatingParticles enabled count={15} />
-
-            <div className="min-h-screen pb-32 pt-6 px-4 md:px-8">
-              <div className="max-w-7xl mx-auto space-y-6">
-                {/* Top Header */}
+          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-6 md:px-8">
+            <div className="space-y-6">
+              {/* Top Header */}
                 <header className="flex justify-between items-center mb-8">
                   <div>
-                    <h1
-                      className="text-[30px] font-bold leading-tight tracking-tight mb-1"
-                      style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                    >
-                      {greeting.text}, {userName}!
+                    <p className="text-xs uppercase tracking-[0.3em] fc-text-dim mb-2">
+                      Daily Overview
+                    </p>
+                    <h1 className="text-3xl md:text-4xl font-extrabold leading-tight tracking-tight mb-1 fc-text-primary">
+                      {greeting.text.split(" ")[0]}{" "}
+                      <span className="fc-text-subtle">
+                        {greeting.text.split(" ").slice(1).join(" ")}
+                      </span>
+                      , {userName}!
                     </h1>
-                    <p
-                      className="text-sm leading-relaxed"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.6)"
-                          : "rgba(0,0,0,0.6)",
-                      }}
-                    >
+                    <p className="text-sm leading-relaxed fc-text-dim">
                       Ready to crush your goals today?
                     </p>
                   </div>
                   <div className="relative">
                     <div
-                      className="w-12 h-12 rounded-full border-2 overflow-hidden"
-                      style={{
-                        borderColor: isDark
-                          ? "rgba(255,255,255,0.1)"
-                          : "rgba(0,0,0,0.1)",
-                        ...crystalCardStyle,
-                      }}
+                      className="w-12 h-12 rounded-full border border-[var(--fc-glass-border)] overflow-hidden fc-glass-soft"
                     >
                       <img
                         src={getAvatarUrl()}
@@ -353,69 +284,37 @@ export default function ClientDashboard() {
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <div
-                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2"
-                      style={{
-                        background: getSemanticColor("success").primary,
-                        borderColor: isDark ? "#0A0A0A" : "#FFFFFF",
-                      }}
-                    />
+                    <div className="absolute -top-1 -right-1 fc-status-dot" />
                   </div>
                 </header>
 
                 {/* Workout Recommendation Hero */}
                 <section className="mb-8">
-                  <div
-                    className="p-6 flex flex-col md:flex-row md:items-center gap-6 relative kinetic-shimmer"
-                    style={crystalCardStyle}
-                  >
+                  <div className="fc-accent-workouts rounded-2xl">
+                    <div
+                      className="fc-glass fc-card fc-kinetic-shimmer p-6 flex flex-col md:flex-row md:items-center gap-6 relative"
+                    >
                     <div className="flex-1 relative z-10">
                       {loadingWorkout ? (
                         <div className="text-center py-8">
-                          <div className="animate-spin w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
+                          <div className="animate-spin w-10 h-10 border-4 border-cyan-400 border-t-transparent rounded-full mx-auto"></div>
                         </div>
                       ) : todaysWorkout ? (
                         <>
                           <div className="flex items-center gap-2 mb-3">
                             <span
-                              className="px-3 py-1 rounded-full text-xs font-medium border tracking-wide uppercase"
-                              style={{
-                                background: isDark
-                                  ? "rgba(59, 130, 246, 0.2)"
-                                  : "rgba(59, 130, 246, 0.1)",
-                                color: "#3B82F6",
-                                borderColor: isDark
-                                  ? "rgba(59, 130, 246, 0.3)"
-                                  : "rgba(59, 130, 246, 0.2)",
-                              }}
+                              className="fc-pill fc-pill-glass fc-text-workouts"
                             >
-                              Today's Protocol
+                              Next Up
                             </span>
-                            <span
-                              className="text-xs font-mono"
-                              style={{
-                                color: isDark
-                                  ? "rgba(255,255,255,0.6)"
-                                  : "rgba(0,0,0,0.6)",
-                              }}
-                            >
+                            <span className="text-xs font-mono fc-text-dim">
                               ~{todaysWorkout.estimatedDuration} min
                             </span>
                           </div>
-                          <h2
-                            className="text-3xl font-bold mb-2"
-                            style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                          >
+                          <h2 className="text-3xl font-bold mb-2 fc-text-primary">
                             {todaysWorkout.name}
                           </h2>
-                          <div
-                            className="flex items-center gap-4 mb-6"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.7)"
-                                : "rgba(0,0,0,0.7)",
-                            }}
-                          >
+                          <div className="flex items-center gap-4 mb-6 fc-text-dim">
                             <div className="flex items-center gap-1.5">
                               <Dumbbell className="w-4 h-4" />
                               <span className="text-sm">
@@ -433,21 +332,7 @@ export default function ClientDashboard() {
                             href={`/client/workouts/${todaysWorkout.id}/start`}
                           >
                             <button
-                              className="w-full md:w-auto px-8 h-12 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all active:scale-95 hover:-translate-y-0.5"
-                              style={{
-                                background:
-                                  "linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)",
-                                boxShadow: "0 4px 16px rgba(239, 68, 68, 0.3)",
-                                color: "#FFFFFF",
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.boxShadow =
-                                  "0 6px 20px rgba(239, 68, 68, 0.4)";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.boxShadow =
-                                  "0 4px 16px rgba(239, 68, 68, 0.3)";
-                              }}
+                              className="fc-btn fc-btn-primary fc-press w-full md:w-auto h-12 px-8 flex items-center justify-center gap-2"
                             >
                               <Play className="w-5 h-5 fill-current" />
                               Start Workout
@@ -456,34 +341,15 @@ export default function ClientDashboard() {
                         </>
                       ) : (
                         <div>
-                          <h2
-                            className="text-3xl font-bold mb-2"
-                            style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                          >
+                          <h2 className="text-3xl font-bold mb-2 fc-text-primary">
                             No workout assigned
                           </h2>
-                          <p
-                            className="text-sm mb-6"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.6)"
-                                : "rgba(0,0,0,0.6)",
-                            }}
-                          >
+                          <p className="text-sm mb-6 fc-text-dim">
                             Your coach will assign today's session soon
                           </p>
                           <Link href="/client/workouts">
                             <button
-                              className="px-6 h-12 rounded-xl font-semibold border transition-all hover:-translate-y-0.5"
-                              style={{
-                                background: isDark
-                                  ? "rgba(59, 130, 246, 0.1)"
-                                  : "rgba(59, 130, 246, 0.05)",
-                                borderColor: isDark
-                                  ? "rgba(59, 130, 246, 0.4)"
-                                  : "rgba(59, 130, 246, 0.3)",
-                                color: "#3B82F6",
-                              }}
+                              className="fc-btn fc-btn-secondary fc-press h-12 px-6"
                             >
                               Browse Workouts
                             </button>
@@ -501,11 +367,7 @@ export default function ClientDashboard() {
                             cy="50"
                             r="45"
                             fill="none"
-                            stroke={
-                              isDark
-                                ? "rgba(255,255,255,0.05)"
-                                : "rgba(0,0,0,0.05)"
-                            }
+                            stroke="rgba(255,255,255,0.08)"
                             strokeWidth="8"
                           />
                           <defs>
@@ -516,8 +378,8 @@ export default function ClientDashboard() {
                               x2="100%"
                               y2="100%"
                             >
-                              <stop offset="0%" stopColor="#EF4444" />
-                              <stop offset="100%" stopColor="#3B82F6" />
+                              <stop offset="0%" stopColor="#06B6D4" />
+                              <stop offset="100%" stopColor="#A855F7" />
                             </linearGradient>
                           </defs>
                           <circle
@@ -532,57 +394,42 @@ export default function ClientDashboard() {
                               283 - (weeklyProgressPercent / 100) * 283
                             }
                             strokeLinecap="round"
-                            className="transition-all duration-800 ease-in-out"
-                            style={{
-                              transform: "rotate(-90deg)",
-                              transformOrigin: "50% 50%",
-                            }}
+                            className="transition-all duration-800 ease-in-out fc-rotate-ring"
                           />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span
-                            className="text-2xl font-bold"
-                            style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                          >
+                          <span className="text-2xl font-bold fc-text-primary">
                             {Math.round(weeklyProgressPercent)}%
                           </span>
-                          <span
-                            className="text-[10px] uppercase tracking-widest"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.6)"
-                                : "rgba(0,0,0,0.6)",
-                            }}
-                          >
+                          <span className="text-[10px] uppercase tracking-widest fc-text-dim">
                             Weekly Goal
                           </span>
                         </div>
                       </div>
                     )}
+                    </div>
                   </div>
                 </section>
 
                 {/* Stats Snapshot Grid */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                   {/* Card 1: Weekly Activity */}
-                  <div className="p-6" style={crystalCardStyle}>
+                  <div className="fc-glass fc-card p-6">
                     <div className="flex justify-between items-start mb-6">
-                      <h3
-                        className="text-xl font-semibold leading-tight"
-                        style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                      >
-                        Weekly Activity
-                      </h3>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] fc-text-dim mb-1">
+                          Snapshot
+                        </p>
+                        <h3 className="text-xl font-semibold leading-tight fc-text-primary">
+                          Weekly Activity
+                        </h3>
+                      </div>
                       {streak > 0 && (
                         <div
-                          className="flex items-center gap-1 px-3 py-1 rounded-full streak-badge"
-                          style={{
-                            background:
-                              "linear-gradient(45deg, #F59E0B, #EF4444)",
-                          }}
+                          className="fc-pill fc-pill-glass fc-text-warning fc-streak-pulse flex items-center gap-1"
                         >
-                          <Flame className="w-4 h-4 text-white" />
-                          <span className="text-xs font-bold tracking-tighter text-white">
+                          <Flame className="w-4 h-4" />
+                          <span className="text-xs font-bold tracking-tighter">
                             {streak}-DAY STREAK
                           </span>
                         </div>
@@ -590,84 +437,37 @@ export default function ClientDashboard() {
                     </div>
                     <div className="grid grid-cols-4 gap-4 mb-6">
                       <div className="text-center">
-                        <div
-                          className="text-xs mb-1"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.6)"
-                              : "rgba(0,0,0,0.6)",
-                          }}
-                        >
+                      <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
                           Workouts
                         </div>
-                        <div
-                          className="text-xl font-bold font-mono"
-                          style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                        >
+                        <div className="text-xl font-bold font-mono fc-text-primary">
                           {weeklyProgress.current}
-                          <span
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.5)"
-                                : "rgba(0,0,0,0.5)",
-                              fontSize: "14px",
-                            }}
-                          >
+                          <span className="text-sm fc-text-subtle">
                             /{weeklyProgress.goal || 0}
                           </span>
                         </div>
                       </div>
                       <div className="text-center">
-                        <div
-                          className="text-xs mb-1"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.6)"
-                              : "rgba(0,0,0,0.6)",
-                          }}
-                        >
+                      <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
                           Volume
                         </div>
-                        <div
-                          className="text-xl font-bold font-mono"
-                          style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                        >
+                        <div className="text-xl font-bold font-mono fc-text-primary">
                           {weeklyVolume > 0 ? `${weeklyVolume}k` : "0"}
                         </div>
                       </div>
                       <div className="text-center">
-                        <div
-                          className="text-xs mb-1"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.6)"
-                              : "rgba(0,0,0,0.6)",
-                          }}
-                        >
+                      <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
                           Time
                         </div>
-                        <div
-                          className="text-xl font-bold font-mono"
-                          style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                        >
+                        <div className="text-xl font-bold font-mono fc-text-primary">
                           {weeklyTime}m
                         </div>
                       </div>
                       <div className="text-center">
-                        <div
-                          className="text-xs mb-1"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.6)"
-                              : "rgba(0,0,0,0.6)",
-                          }}
-                        >
+                      <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
                           PRs
                         </div>
-                        <div
-                          className="text-xl font-bold font-mono"
-                          style={{ color: getSemanticColor("success").primary }}
-                        >
+                        <div className="text-xl font-bold font-mono fc-text-success">
                           {prsCount}
                         </div>
                       </div>
@@ -689,16 +489,9 @@ export default function ClientDashboard() {
                         return (
                           <div
                             key={i}
-                            className="flex-1 rounded-sm"
-                            style={{
-                              background:
-                                dayProgress > 0
-                                  ? getSemanticColor("success").primary
-                                  : isDark
-                                  ? "rgba(255,255,255,0.1)"
-                                  : "rgba(0,0,0,0.05)",
-                              opacity: dayProgress > 0 ? 1 : 0.2,
-                            }}
+                            className={`flex-1 rounded-sm ${
+                              dayProgress > 0 ? "fc-activity-on" : "fc-activity-off"
+                            }`}
                           />
                         );
                       })}
@@ -706,57 +499,30 @@ export default function ClientDashboard() {
                   </div>
 
                   {/* Card 2: Progress Snapshot */}
-                  <div className="p-6" style={crystalCardStyle}>
-                    <h3
-                      className="text-xl font-semibold leading-tight mb-6"
-                      style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                    >
+                  <div className="fc-glass fc-card p-6">
+                    <p className="text-xs uppercase tracking-[0.2em] fc-text-dim mb-1">
+                      Metrics
+                    </p>
+                    <h3 className="text-xl font-semibold leading-tight mb-6 fc-text-primary">
                       Progress Snapshot
                     </h3>
                     <div className="space-y-6">
                       {bodyWeight && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div
-                              className="w-10 h-10 rounded-xl flex items-center justify-center"
-                              style={{
-                                background: isDark
-                                  ? "rgba(59, 130, 246, 0.1)"
-                                  : "rgba(59, 130, 246, 0.05)",
-                              }}
-                            >
-                              <TrendingDown
-                                className="w-5 h-5"
-                                style={{ color: "#3B82F6" }}
-                              />
+                            <div className="fc-icon-tile fc-icon-neutral">
+                              <TrendingDown className="w-5 h-5" />
                             </div>
                             <div>
-                              <div
-                                className="text-xs"
-                                style={{
-                                  color: isDark
-                                    ? "rgba(255,255,255,0.6)"
-                                    : "rgba(0,0,0,0.6)",
-                                }}
-                              >
+                              <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim">
                                 Body Weight
                               </div>
-                              <div
-                                className="font-semibold"
-                                style={{
-                                  color: isDark ? "#FFFFFF" : "#1A1A1A",
-                                }}
-                              >
+                              <div className="font-semibold fc-text-primary">
                                 {bodyWeight.current.toFixed(1)} kg
                               </div>
                             </div>
                           </div>
-                          <div
-                            className="text-sm font-medium"
-                            style={{
-                              color: getSemanticColor("success").primary,
-                            }}
-                          >
+                          <div className="text-sm font-medium fc-text-success">
                             {bodyWeight.change !== 0 ? (
                               <>
                                 {bodyWeight.change > 0 ? "+" : ""}
@@ -772,46 +538,19 @@ export default function ClientDashboard() {
                       {maxDeadlift && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div
-                              className="w-10 h-10 rounded-xl flex items-center justify-center"
-                              style={{
-                                background: isDark
-                                  ? "rgba(239, 68, 68, 0.1)"
-                                  : "rgba(239, 68, 68, 0.05)",
-                              }}
-                            >
-                              <Zap
-                                className="w-5 h-5"
-                                style={{ color: "#EF4444" }}
-                              />
+                            <div className="fc-icon-tile fc-icon-workouts">
+                              <Zap className="w-5 h-5" />
                             </div>
                             <div>
-                              <div
-                                className="text-xs"
-                                style={{
-                                  color: isDark
-                                    ? "rgba(255,255,255,0.6)"
-                                    : "rgba(0,0,0,0.6)",
-                                }}
-                              >
+                              <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim">
                                 Max Deadlift
                               </div>
-                              <div
-                                className="font-semibold"
-                                style={{
-                                  color: isDark ? "#FFFFFF" : "#1A1A1A",
-                                }}
-                              >
+                              <div className="font-semibold fc-text-primary">
                                 {maxDeadlift.weight} kg
                               </div>
                             </div>
                           </div>
-                          <div
-                            className="text-sm font-medium"
-                            style={{
-                              color: getSemanticColor("success").primary,
-                            }}
-                          >
+                          <div className="text-sm font-medium fc-text-success">
                             {maxDeadlift.change !== 0 ? (
                               <>
                                 {maxDeadlift.change > 0 ? "+" : ""}
@@ -825,14 +564,7 @@ export default function ClientDashboard() {
                         </div>
                       )}
                       {!bodyWeight && !maxDeadlift && (
-                        <div
-                          className="text-sm text-center py-4"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.6)"
-                              : "rgba(0,0,0,0.6)",
-                          }}
-                        >
+                        <div className="text-sm text-center py-4 fc-text-dim">
                           No progress data available yet
                         </div>
                       )}
@@ -845,33 +577,15 @@ export default function ClientDashboard() {
                   {/* Check Ins */}
                   <Link href="/client/progress/body-metrics">
                     <div
-                      className="p-5 h-full transition-all cursor-pointer hover:scale-[1.02]"
-                      style={crystalCardStyle}
+                      className="fc-glass fc-card fc-hover-rise p-5 h-full cursor-pointer"
                     >
-                      <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
-                          boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
-                        }}
-                      >
-                        <Scale className="w-6 h-6 text-white" />
+                      <div className="fc-icon-tile fc-icon-neutral mb-3">
+                        <Scale className="w-6 h-6" />
                       </div>
-                      <h4
-                        className="text-base font-bold mb-1"
-                        style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                      >
+                      <h4 className="text-base font-bold mb-1 fc-text-primary">
                         Check Ins
                       </h4>
-                      <p
-                        className="text-xs"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.6)"
-                            : "rgba(0,0,0,0.6)",
-                        }}
-                      >
+                      <p className="text-xs fc-text-dim">
                         Log body metrics
                       </p>
                     </div>
@@ -880,33 +594,15 @@ export default function ClientDashboard() {
                   {/* Log Meal */}
                   <Link href="/client/nutrition">
                     <div
-                      className="p-5 h-full transition-all cursor-pointer hover:scale-[1.02]"
-                      style={crystalCardStyle}
+                      className="fc-glass fc-card fc-hover-rise p-5 h-full cursor-pointer"
                     >
-                      <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                          boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
-                        }}
-                      >
-                        <Utensils className="w-6 h-6 text-white" />
+                      <div className="fc-icon-tile fc-icon-meals mb-3">
+                        <Utensils className="w-6 h-6" />
                       </div>
-                      <h4
-                        className="text-base font-bold mb-1"
-                        style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                      >
+                      <h4 className="text-base font-bold mb-1 fc-text-primary">
                         Log Meal
                       </h4>
-                      <p
-                        className="text-xs"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.6)"
-                            : "rgba(0,0,0,0.6)",
-                        }}
-                      >
+                      <p className="text-xs fc-text-dim">
                         Track nutrition
                       </p>
                     </div>
@@ -915,33 +611,15 @@ export default function ClientDashboard() {
                   {/* Workout Logs */}
                   <Link href="/client/progress/workout-logs">
                     <div
-                      className="p-5 h-full transition-all cursor-pointer hover:scale-[1.02]"
-                      style={crystalCardStyle}
+                      className="fc-glass fc-card fc-hover-rise p-5 h-full cursor-pointer"
                     >
-                      <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)",
-                          boxShadow: "0 4px 12px rgba(139, 92, 246, 0.3)",
-                        }}
-                      >
-                        <FileText className="w-6 h-6 text-white" />
+                      <div className="fc-icon-tile fc-icon-workouts mb-3">
+                        <FileText className="w-6 h-6" />
                       </div>
-                      <h4
-                        className="text-base font-bold mb-1"
-                        style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                      >
+                      <h4 className="text-base font-bold mb-1 fc-text-primary">
                         Workout Logs
                       </h4>
-                      <p
-                        className="text-xs"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.6)"
-                            : "rgba(0,0,0,0.6)",
-                        }}
-                      >
+                      <p className="text-xs fc-text-dim">
                         View history
                       </p>
                     </div>
@@ -950,33 +628,15 @@ export default function ClientDashboard() {
                   {/* Analytics */}
                   <Link href="/client/progress/analytics">
                     <div
-                      className="p-5 h-full transition-all cursor-pointer hover:scale-[1.02]"
-                      style={crystalCardStyle}
+                      className="fc-glass fc-card fc-hover-rise p-5 h-full cursor-pointer"
                     >
-                      <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
-                          boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
-                        }}
-                      >
-                        <Activity className="w-6 h-6 text-white" />
+                      <div className="fc-icon-tile fc-icon-neutral mb-3">
+                        <Activity className="w-6 h-6" />
                       </div>
-                      <h4
-                        className="text-base font-bold mb-1"
-                        style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                      >
+                      <h4 className="text-base font-bold mb-1 fc-text-primary">
                         Analytics
                       </h4>
-                      <p
-                        className="text-xs"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.6)"
-                            : "rgba(0,0,0,0.6)",
-                        }}
-                      >
+                      <p className="text-xs fc-text-dim">
                         View insights
                       </p>
                     </div>
@@ -985,152 +645,21 @@ export default function ClientDashboard() {
                   {/* Session Scheduling */}
                   <Link href="/client/scheduling">
                     <div
-                      className="p-5 h-full transition-all cursor-pointer hover:scale-[1.02]"
-                      style={crystalCardStyle}
+                      className="fc-glass fc-card fc-hover-rise p-5 h-full cursor-pointer"
                     >
-                      <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, #EC4899 0%, #BE185D 100%)",
-                          boxShadow: "0 4px 12px rgba(236, 72, 153, 0.3)",
-                        }}
-                      >
-                        <Calendar className="w-6 h-6 text-white" />
+                      <div className="fc-icon-tile fc-icon-neutral mb-3">
+                        <Calendar className="w-6 h-6" />
                       </div>
-                      <h4
-                        className="text-base font-bold mb-1"
-                        style={{ color: isDark ? "#FFFFFF" : "#1A1A1A" }}
-                      >
+                      <h4 className="text-base font-bold mb-1 fc-text-primary">
                         Book Session
                       </h4>
-                      <p
-                        className="text-xs"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.6)"
-                            : "rgba(0,0,0,0.6)",
-                        }}
-                      >
+                      <p className="text-xs fc-text-dim">
                         Schedule with coach
                       </p>
                     </div>
                   </Link>
                 </section>
-              </div>
             </div>
-
-            {/* Bottom Navigation */}
-            <nav
-              className="fixed bottom-0 left-0 right-0 p-4 z-50"
-              style={{
-                background: isDark
-                  ? "rgba(10, 10, 10, 0.8)"
-                  : "rgba(255, 255, 255, 0.8)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
-                borderTop: `1px solid ${
-                  isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                }`,
-              }}
-            >
-              <div className="max-w-screen-xl mx-auto flex items-center gap-4">
-                {/* Nav Items */}
-                <div className="flex flex-1 justify-around md:justify-start md:gap-12">
-                  <Link
-                    href="/client"
-                    className="flex flex-col items-center gap-1"
-                  >
-                    <LayoutGrid
-                      className="w-6 h-6"
-                      style={{ color: "#EF4444" }}
-                    />
-                    <span
-                      className="text-[10px] font-bold uppercase tracking-widest"
-                      style={{ color: "#EF4444" }}
-                    >
-                      Dash
-                    </span>
-                  </Link>
-                  <Link
-                    href="/client/workouts"
-                    className="flex flex-col items-center gap-1"
-                  >
-                    <Calendar
-                      className="w-6 h-6"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.5)"
-                          : "rgba(0,0,0,0.5)",
-                      }}
-                    />
-                    <span
-                      className="text-[10px] font-bold uppercase tracking-widest"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.5)"
-                          : "rgba(0,0,0,0.5)",
-                      }}
-                    >
-                      Plan
-                    </span>
-                  </Link>
-                  <Link
-                    href="/client/progress"
-                    className="flex flex-col items-center gap-1"
-                  >
-                    <BarChart2
-                      className="w-6 h-6"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.5)"
-                          : "rgba(0,0,0,0.5)",
-                      }}
-                    />
-                    <span
-                      className="text-[10px] font-bold uppercase tracking-widest"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.5)"
-                          : "rgba(0,0,0,0.5)",
-                      }}
-                    >
-                      Stats
-                    </span>
-                  </Link>
-                </div>
-
-                {/* Central Floating CTA */}
-                <button
-                  onClick={() => {
-                    // Quick log action - could open a modal or navigate to a quick log page
-                    if (todaysWorkout) {
-                      window.location.href = `/client/workouts/${todaysWorkout.id}/start`;
-                    } else {
-                      window.location.href = "/client/workouts";
-                    }
-                  }}
-                  className="flex-none w-14 h-14 md:w-auto md:px-6 rounded-2xl flex items-center justify-center gap-2 shadow-2xl transition-all active:scale-95 hover:-translate-y-0.5"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)",
-                    boxShadow: "0 4px 16px rgba(239, 68, 68, 0.3)",
-                    color: "#FFFFFF",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow =
-                      "0 6px 20px rgba(239, 68, 68, 0.4)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow =
-                      "0 4px 16px rgba(239, 68, 68, 0.3)";
-                  }}
-                >
-                  <Plus className="w-6 h-6" />
-                  <span className="hidden md:block font-bold">Quick Log</span>
-                </button>
-              </div>
-            </nav>
           </div>
         </AnimatedBackground>
       </div>

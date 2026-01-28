@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   Trash2,
@@ -30,7 +28,6 @@ import {
   GripVertical,
   Timer,
 } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
 import {
   WorkoutBlock,
   WorkoutBlockExercise,
@@ -44,6 +41,7 @@ interface WorkoutBlockBuilderProps {
   blocks: WorkoutBlock[];
   onBlocksChange: (blocks: WorkoutBlock[]) => void;
   availableExercises: any[];
+  allowedBlockTypes?: WorkoutBlockType[]; // Optional: filter available block types
 }
 
 export default function WorkoutBlockBuilder({
@@ -51,9 +49,14 @@ export default function WorkoutBlockBuilder({
   blocks,
   onBlocksChange,
   availableExercises,
+  allowedBlockTypes,
 }: WorkoutBlockBuilderProps) {
-  const { getThemeStyles } = useTheme();
-  const theme = getThemeStyles();
+  // Filter block types if allowedBlockTypes is provided
+  const availableBlockConfigs = allowedBlockTypes
+    ? Object.entries(WORKOUT_BLOCK_CONFIGS).filter(([type]) =>
+        allowedBlockTypes.includes(type as WorkoutBlockType)
+      )
+    : Object.entries(WORKOUT_BLOCK_CONFIGS);
 
   const [selectedBlockType, setSelectedBlockType] =
     useState<WorkoutBlockType>("straight_set");
@@ -180,16 +183,16 @@ export default function WorkoutBlockBuilder({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-bold text-slate-800 dark:text-white">
+          <h3 className="text-xl font-bold fc-text-primary">
             Workout Blocks
           </h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+          <p className="text-sm fc-text-dim">
             Build your workout using different training protocols
           </p>
         </div>
         <Button
           onClick={() => setShowAddBlock(true)}
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+          className="fc-btn fc-btn-primary fc-press"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add Block
@@ -198,37 +201,55 @@ export default function WorkoutBlockBuilder({
 
       {/* Add Block Modal */}
       {showAddBlock && (
-        <Card className={`${theme.card} border ${theme.border}`}>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Add New Block</span>
+        <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+          <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+            <div className="flex items-center justify-between">
+              <div className="text-lg font-semibold fc-text-primary">
+                Add New Block
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowAddBlock(false)}
+                className="fc-btn fc-btn-ghost"
               >
                 <X className="w-4 h-4" />
               </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </div>
+          </div>
+          <div className="space-y-4 p-4 sm:p-6">
+            {/* Informational message when block types are filtered */}
+            {allowedBlockTypes && allowedBlockTypes.length < Object.keys(WORKOUT_BLOCK_CONFIGS).length && (
+              <div className="p-3 rounded-xl border border-[color:var(--fc-glass-border)] fc-glass-soft">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 fc-text-workouts mt-0.5 flex-shrink-0" />
+                  <div className="text-xs fc-text-dim">
+                    <p className="font-semibold mb-1">Volume Calculator Active</p>
+                    <p>
+                      Only resistance training blocks are available. Time-based blocks
+                      (AMRAP, EMOM, For Time, Tabata, Circuit) are excluded from volume calculations.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Block Type Selection */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {Object.entries(WORKOUT_BLOCK_CONFIGS).map(([type, config]) => (
+              {availableBlockConfigs.map(([type, config]) => (
                 <button
                   key={type}
                   onClick={() => setSelectedBlockType(type as WorkoutBlockType)}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
+                  className={`p-4 rounded-xl border transition-all text-left ${
                     selectedBlockType === type
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                      : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500"
+                      ? "border-[color:var(--fc-glass-border-strong)] fc-glass"
+                      : "border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] fc-glass-soft"
                   }`}
                 >
                   <div className="text-2xl mb-2">{config.icon}</div>
-                  <div className="font-semibold text-sm text-slate-800 dark:text-white">
+                  <div className="font-semibold text-sm fc-text-primary">
                     {config.name}
                   </div>
-                  <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                  <div className="text-xs fc-text-dim mt-1">
                     {config.description}
                   </div>
                 </button>
@@ -240,16 +261,16 @@ export default function WorkoutBlockBuilder({
               <Button
                 onClick={handleAddBlock}
                 disabled={loading}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                className="fc-btn fc-btn-primary fc-press"
               >
                 {loading ? "Adding..." : "Add Block"}
               </Button>
-              <Button variant="outline" onClick={() => setShowAddBlock(false)}>
+              <Button variant="outline" onClick={() => setShowAddBlock(false)} className="fc-btn fc-btn-secondary">
                 Cancel
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Blocks List */}
@@ -258,22 +279,22 @@ export default function WorkoutBlockBuilder({
           const config = WORKOUT_BLOCK_CONFIGS[block.block_type];
 
           return (
-            <Card
+            <div
               key={block.id}
-              className={`${theme.card} border ${theme.border}`}
+              className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl"
             >
-              <CardHeader>
+              <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                    <div className="fc-icon-tile fc-icon-workouts text-sm font-bold">
                       {block.block_order}
                     </div>
                     <div>
-                      <CardTitle className="text-lg flex items-center gap-2">
+                      <div className="text-lg font-semibold fc-text-primary flex items-center gap-2">
                         <span className="text-xl">{config.icon}</span>
                         {block.block_name || config.name}
-                      </CardTitle>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                      </div>
+                      <p className="text-sm fc-text-dim">
                         {config.description}
                       </p>
                     </div>
@@ -286,6 +307,7 @@ export default function WorkoutBlockBuilder({
                       size="sm"
                       onClick={() => handleReorderBlocks(block.id, "up")}
                       disabled={index === 0 || loading}
+                      className="fc-btn fc-btn-ghost"
                     >
                       <ArrowUp className="w-4 h-4" />
                     </Button>
@@ -294,6 +316,7 @@ export default function WorkoutBlockBuilder({
                       size="sm"
                       onClick={() => handleReorderBlocks(block.id, "down")}
                       disabled={index === blocks.length - 1 || loading}
+                      className="fc-btn fc-btn-ghost"
                     >
                       <ArrowDown className="w-4 h-4" />
                     </Button>
@@ -303,6 +326,7 @@ export default function WorkoutBlockBuilder({
                       variant="ghost"
                       size="sm"
                       onClick={() => setEditingBlock(block)}
+                      className="fc-btn fc-btn-ghost"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -312,45 +336,45 @@ export default function WorkoutBlockBuilder({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDeleteBlock(block.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      className="fc-btn fc-btn-ghost fc-text-error"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
-              </CardHeader>
+              </div>
 
-              <CardContent>
+              <div className="p-4 sm:p-6">
                 {/* Block Info */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   {block.rest_seconds != null && (
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-slate-500" />
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
+                      <Clock className="w-4 h-4 fc-text-subtle" />
+                      <span className="text-sm fc-text-dim">
                         Rest: {block.rest_seconds}s
                       </span>
                     </div>
                   )}
                   {block.total_sets != null && (
                     <div className="flex items-center gap-2">
-                      <Target className="w-4 h-4 text-slate-500" />
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
+                      <Target className="w-4 h-4 fc-text-subtle" />
+                      <span className="text-sm fc-text-dim">
                         Sets: {block.total_sets}
                       </span>
                     </div>
                   )}
                   {block.reps_per_set && (
                     <div className="flex items-center gap-2">
-                      <Dumbbell className="w-4 h-4 text-slate-500" />
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
+                      <Dumbbell className="w-4 h-4 fc-text-subtle" />
+                      <span className="text-sm fc-text-dim">
                         Reps: {block.reps_per_set}
                       </span>
                     </div>
                   )}
                   {block.duration_seconds != null && (
                     <div className="flex items-center gap-2">
-                      <Timer className="w-4 h-4 text-slate-500" />
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
+                      <Timer className="w-4 h-4 fc-text-subtle" />
+                      <span className="text-sm fc-text-dim">
                         Duration: {Math.floor(block.duration_seconds / 60)}m
                       </span>
                     </div>
@@ -359,8 +383,8 @@ export default function WorkoutBlockBuilder({
 
                 {/* Block Notes */}
                 {block.block_notes && (
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 mb-4">
-                    <p className="text-sm text-slate-700 dark:text-slate-300">
+                  <div className="fc-glass-soft rounded-lg p-3 mb-4 border border-[color:var(--fc-glass-border)]">
+                    <p className="text-sm fc-text-dim">
                       {block.block_notes}
                     </p>
                   </div>
@@ -368,7 +392,7 @@ export default function WorkoutBlockBuilder({
 
                 {/* Exercises */}
                 <div className="space-y-2">
-                  <h4 className="font-medium text-slate-800 dark:text-white">
+                  <h4 className="font-medium fc-text-primary">
                     Exercises ({block.exercises?.length || 0})
                   </h4>
 
@@ -379,18 +403,18 @@ export default function WorkoutBlockBuilder({
                         .map((exercise) => (
                           <div
                             key={exercise.id}
-                            className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg"
+                            className="flex items-center justify-between p-3 fc-glass-soft rounded-lg border border-[color:var(--fc-glass-border)]"
                           >
                             <div className="flex items-center gap-3">
-                              <Badge variant="outline" className="text-xs">
+                              <span className="fc-pill fc-pill-glass text-xs fc-text-subtle">
                                 {exercise.exercise_letter ||
                                   exercise.exercise_order}
-                              </Badge>
-                              <span className="font-medium text-slate-800 dark:text-white">
+                              </span>
+                              <span className="font-medium fc-text-primary">
                                 {exercise.exercise?.name || "Unknown Exercise"}
                               </span>
                             </div>
-                            <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
+                            <div className="flex items-center gap-4 text-sm fc-text-dim">
                               {exercise.sets != null && (
                                 <span>{exercise.sets} sets</span>
                               )}
@@ -414,13 +438,13 @@ export default function WorkoutBlockBuilder({
                         ))}
                     </div>
                   ) : (
-                    <div className="text-center py-6 text-slate-500 dark:text-slate-400">
+                    <div className="text-center py-6 fc-text-dim">
                       <Dumbbell className="w-8 h-8 mx-auto mb-2 opacity-50" />
                       <p>No exercises added to this block</p>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="mt-2"
+                        className="mt-2 fc-btn fc-btn-secondary"
                         onClick={() => {
                           // TODO: Open exercise selector
                         }}
@@ -431,34 +455,34 @@ export default function WorkoutBlockBuilder({
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           );
         })}
       </div>
 
       {/* Empty State */}
       {blocks.length === 0 && (
-        <Card className={`${theme.card} border ${theme.border}`}>
-          <CardContent className="text-center py-12">
-            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Dumbbell className="w-8 h-8 text-slate-500" />
+        <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
+          <div className="text-center py-12 px-6">
+            <div className="w-16 h-16 fc-glass-soft rounded-full flex items-center justify-center mx-auto mb-4 border border-[color:var(--fc-glass-border)]">
+              <Dumbbell className="w-8 h-8 fc-text-subtle" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-2">
+            <h3 className="text-lg font-semibold fc-text-primary mb-2">
               No Workout Blocks Yet
             </h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
+            <p className="fc-text-dim mb-4">
               Start building your workout by adding different training blocks
             </p>
             <Button
               onClick={() => setShowAddBlock(true)}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+              className="fc-btn fc-btn-primary fc-press"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Your First Block
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );
