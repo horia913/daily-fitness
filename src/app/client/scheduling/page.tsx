@@ -216,11 +216,11 @@ export default function ClientScheduling() {
 
       console.log('Loading coaches for user:', user.id)
 
-      // Get coaches (users with role 'coach')
+      // Get coaches (users with role 'coach' or 'admin' so admins can be selected)
       const { data: coachesData, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
-        .eq('role', 'coach')
+        .in('role', ['coach', 'admin'])
 
       console.log('Coaches data:', coachesData)
       console.log('Coaches error:', error)

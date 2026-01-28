@@ -200,11 +200,11 @@ export default function ClientSessions() {
       } else {
         console.log('No coach relationship found. Looking for any coach...')
         
-        // If no coach assigned, find any coach as a fallback
+        // If no coach assigned, find any coach or admin as a fallback
         const { data: coaches } = await supabase
           .from('profiles')
           .select('id')
-          .eq('role', 'coach')
+          .in('role', ['coach', 'admin'])
           .limit(1)
           .single()
 

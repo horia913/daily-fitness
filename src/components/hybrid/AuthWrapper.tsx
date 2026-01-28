@@ -81,11 +81,9 @@ export function AuthWrapper() {
 
   const passwordStrength = getPasswordStrength(password);
 
-  // Fetch coaches for dropdown
+  // Fetch coaches for dropdown (include admin so admins can be selected as coach)
   const fetchCoaches = async () => {
     try {
-      if (!user) return;
-
       const { data, error} = await supabase
         .from("profiles")
         .select("id, email, first_name, last_name")
@@ -119,10 +117,10 @@ export function AuthWrapper() {
     redirectWithProfile();
   }, [user, profile, authLoading, refreshProfile, router]);
 
-  // Fetch coaches when component mounts
+  // Fetch coaches when component mounts (also when not logged in, so signup dropdown can show)
   useEffect(() => {
     fetchCoaches();
-  }, [user]);
+  }, []);
 
   // Handle URL parameters for invite links
   useEffect(() => {

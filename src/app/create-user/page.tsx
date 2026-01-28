@@ -95,7 +95,7 @@ export default function CreateUserPage() {
         const { data, error } = await supabase
           .from('profiles')
           .select('id, first_name, last_name, email')
-          .eq('role', 'coach')
+          .in('role', ['coach', 'admin'])
           .order('first_name', { ascending: true })
 
         if (error) throw error

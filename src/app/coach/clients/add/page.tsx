@@ -176,9 +176,11 @@ export default function AddClient() {
         console.log('Invite code generated via fallback method:', inviteCode)
       }
 
-      // Create the invite link with pre-filled email
-      const baseUrl = window.location.origin
-      const inviteLink = `${baseUrl}/?invite=${inviteCode}&email=${encodeURIComponent(formData.email)}`
+      // Invite links always use the production app URL (Vercel) so clients never get localhost
+      const envUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
+      const isLocalhost = /^https?:\/\/localhost(\:\d+)?$/i.test(envUrl) || envUrl === ''
+      const appUrl = isLocalhost ? 'https://daily-fitness-six.vercel.app' : envUrl
+      const inviteLink = `${appUrl}/?invite=${inviteCode}&email=${encodeURIComponent(formData.email)}`
       
       setGeneratedInviteLink(inviteLink)
       setSuccess('Invite link generated successfully! Copy the link below and send it to your client via WhatsApp or any messaging app.')
