@@ -52,9 +52,9 @@ export function AuthWrapper() {
   const [coaches, setCoaches] = useState<
     Array<{
       id: string;
-      email: string;
       first_name?: string;
       last_name?: string;
+      // email removed for security - not exposed in coaches_public table
     }>
   >([]);
   const [explicitSubmit, setExplicitSubmit] = useState(false);
@@ -506,9 +506,9 @@ export function AuthWrapper() {
                           value={coach.id}
                           className="rounded-xl"
                         >
-                          {coach.first_name && coach.last_name
-                            ? `${coach.first_name} ${coach.last_name}`
-                            : coach.email}
+                          {coach.first_name || coach.last_name
+                            ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim()
+                            : 'Coach'}
                         </SelectItem>
                       ))}
                     </SelectContent>

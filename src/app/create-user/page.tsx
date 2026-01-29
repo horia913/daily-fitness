@@ -49,7 +49,7 @@ interface Coach {
   id: string
   first_name?: string
   last_name?: string
-  email: string
+  // email removed for security - not exposed in coaches_public table
 }
 
 export default function CreateUserPage() {
@@ -519,7 +519,7 @@ export default function CreateUserPage() {
                         <SelectItem key={coach.id} value={coach.id}>
                           <div className="flex items-center gap-2">
                             <Dumbbell className="w-4 h-4 text-green-600" />
-                            {coach.first_name} {coach.last_name} ({coach.email})
+                            {coach.first_name} {coach.last_name}
                           </div>
                         </SelectItem>
                       ))}
