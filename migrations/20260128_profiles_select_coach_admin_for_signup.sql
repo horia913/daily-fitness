@@ -1,10 +1,21 @@
+-- ⚠️ SUPERSEDED: This approach has been replaced by a safer solution.
+-- See: 20260128_create_coaches_public.sql (creates dedicated public table)
+-- See: 20260128_seed_coaches_public.sql (populates the table)
+-- See: docs/COACH_DROPDOWN_FIX.md (full documentation)
+--
+-- The new approach uses a dedicated coaches_public table that only exposes
+-- coach_id, first_name, last_name - no email or other PII.
+--
+-- DO NOT RUN THIS FILE. Use the new migration files instead.
+
+-- ORIGINAL CONTENT (kept for reference):
 -- RLS: Allow listing coach and admin profiles for signup/create-user coach dropdown.
 -- The dropdown runs as anon or authenticated; no existing policy allowed SELECT
 -- for "all rows where role IN ('coach','admin')".
 -- Role values are limited by profiles_role_check to: admin, coach, client.
 
-CREATE POLICY "Anyone can list coach and admin profiles for signup"
-ON public.profiles
-FOR SELECT
-TO public
-USING (role IN ('coach', 'admin'));
+-- CREATE POLICY "Anyone can list coach and admin profiles for signup"
+-- ON public.profiles
+-- FOR SELECT
+-- TO public
+-- USING (role IN ('coach', 'admin'));

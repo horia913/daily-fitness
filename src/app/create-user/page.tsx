@@ -88,18 +88,43 @@ export default function CreateUserPage() {
 
   const passwordStrength = getPasswordStrength(formData.password)
 
-  // Fetch coaches for client assignment
+  // Fetch coaches for client assignment from public-safe coaches_public table
+  // This table only exposes first_name, last_name (no PII like email)
   useEffect(() => {
     const fetchCoaches = async () => {
       try {
         const { data, error } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .in('role', ['coach', 'admin'])
-          .order('first_name', { ascending: true })
+          .from('coaches_public')
+          .select('coach_id, first_name, last_name')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true })
+          .order('last_name', { ascending: true })
 
-        if (error) throw error
-        setCoaches(data || [])
+        if (error) {
+          console.error('Error fetching coaches:', error)
+          console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          })
+          if (error.code === '42P01') {
+            console.error('Table coaches_public does not exist. Run migration 20260128_create_coaches_public.sql')
+          }
+          throw error
+        }
+
+        // Map coach_id to id so existing UI code works unchanged
+        const mappedData = (data || []).map(coach => ({
+          id: coach.coach_id,
+          first_name: coach.first_name,
+          last_name: coach.last_name,
+        }))
+
+        setCoaches(mappedData)
+        if (!mappedData || mappedData.length === 0) {
+          console.warn('No coaches found. Run 20260128_seed_coaches_public.sql to populate.')
+        }
       } catch (error) {
         console.error('Error fetching coaches:', error)
       }
