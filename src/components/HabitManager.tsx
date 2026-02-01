@@ -319,11 +319,13 @@ export default function HabitManagerComponent({
     return matchesSearch && matchesCategory && notAlreadyAdded
   })
 
-  const getCategoryName = (categoryId: string) => {
+  const getCategoryName = (categoryId: string | null) => {
+    if (!categoryId) return 'Uncategorized'
     return categories.find(c => c.id === categoryId)?.name || 'Unknown'
   }
 
-  const getCategoryIcon = (categoryId: string) => {
+  const getCategoryIcon = (categoryId: string | null) => {
+    if (!categoryId) return '📁'
     return categories.find(c => c.id === categoryId)?.icon || '📁'
   }
 

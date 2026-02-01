@@ -221,7 +221,7 @@ export default function LiveWorkoutBlockExecutor({
   // Log set to database and calculate e1RM
   // Individual sets go to workout_set_logs, not workout_logs
   // workout_logs is for session summary only
-  const logSetToDatabase = async (data: any) => {
+  const logSetToDatabase = async (data: any): Promise<{ success: boolean; error?: any; e1rm?: number; set_log_id?: string; isNewPR?: boolean }> => {
     // Validate sessionId before making API call
     if (
       !sessionId ||
@@ -481,6 +481,7 @@ export default function LiveWorkoutBlockExecutor({
 
               return {
                 success: true,
+                set_log_id: result.set_log_id, // Pass through for RPE modal
                 e1rm: result.e1rm?.stored || result.e1rm?.calculated,
                 isNewPR: !!(result.pr?.any_weight_pr || result.pr?.any_volume_pr),
               };

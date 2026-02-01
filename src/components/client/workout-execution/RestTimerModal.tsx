@@ -97,30 +97,22 @@ export function RestTimerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="fc-modal fc-card w-full max-w-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-[color:var(--fc-glass-border)] text-left">
-          <div className="flex items-start gap-4">
-            <div className="fc-icon-tile fc-icon-workouts">
-              <Timer className="w-5 h-5" />
-            </div>
-            <div className="space-y-2">
-              <span className="fc-pill fc-pill-glass fc-text-workouts">
-                Rest Timer
-              </span>
-              <div className="text-2xl font-bold fc-text-primary">
-                Recover and reset
-              </div>
-              <p className="text-sm fc-text-dim">
-                Next up: {nextLabel}
-              </p>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pb-20 bg-black/60 backdrop-blur-sm">
+      <div className="fc-modal fc-card w-full max-w-[320px] sm:max-w-sm overflow-hidden">
+        {/* Compact Header */}
+        <div className="px-4 pt-4 pb-3 border-b border-[color:var(--fc-glass-border)] text-center">
+          <span className="fc-pill fc-pill-glass fc-text-workouts text-xs">
+            Rest Timer
+          </span>
+          <p className="text-xs fc-text-dim mt-1">
+            Next: {nextLabel}
+          </p>
         </div>
 
-        <div className="px-6 py-6">
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative w-52 h-52 flex items-center justify-center">
+        {/* Timer Circle - Compact */}
+        <div className="px-4 py-4">
+          <div className="flex flex-col items-center">
+            <div className="relative w-40 h-40 flex items-center justify-center">
               <svg
                 className="absolute inset-0 w-full h-full fc-rotate-ring"
                 viewBox="0 0 200 200"
@@ -160,44 +152,45 @@ export function RestTimerModal({
               </svg>
 
               <div className="relative z-10 text-center">
-                <div className="text-5xl sm:text-6xl font-bold font-mono tracking-tight fc-text-primary">
+                <div className="text-4xl font-bold font-mono tracking-tight fc-text-primary">
                   {String(minutes).padStart(2, "0")}:
                   {String(seconds).padStart(2, "0")}
                 </div>
-                <p className="text-sm fc-text-dim mt-2">
+                <p className="text-xs fc-text-dim mt-1">
                   {timeLeft === 1 ? "Almost there!" : "Take a breather"}
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 w-full">
-              <div className="fc-glass-soft rounded-2xl px-4 py-3">
-                <div className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle">
+            {/* Compact Stats */}
+            <div className="flex gap-4 mt-3 text-center">
+              <div>
+                <div className="text-[9px] tracking-wider uppercase fc-text-subtle">
                   Remaining
                 </div>
-                <div className="text-lg font-semibold fc-text-primary font-mono">
-                  {String(minutes).padStart(2, "0")}:
-                  {String(seconds).padStart(2, "0")}
+                <div className="text-base font-semibold fc-text-primary font-mono">
+                  {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
                 </div>
               </div>
-              <div className="fc-glass-soft rounded-2xl px-4 py-3">
-                <div className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle">
+              <div className="w-px bg-[color:var(--fc-glass-border)]" />
+              <div>
+                <div className="text-[9px] tracking-wider uppercase fc-text-subtle">
                   Total
                 </div>
-                <div className="text-lg font-semibold fc-text-primary font-mono">
-                  {String(totalMinutes).padStart(2, "0")}:
-                  {String(totalSeconds).padStart(2, "0")}
+                <div className="text-base font-semibold fc-text-primary font-mono">
+                  {String(totalMinutes).padStart(2, "0")}:{String(totalSeconds).padStart(2, "0")}
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="px-6 pb-6 pt-4 border-t border-[color:var(--fc-glass-border)]">
+        {/* Skip Button */}
+        <div className="px-4 pb-4 pt-2 border-t border-[color:var(--fc-glass-border)]">
           <Button
             variant="default"
             onClick={onSkip}
-            className="w-full fc-btn fc-btn-primary fc-press py-6 text-base"
+            className="w-full fc-btn fc-btn-primary fc-press py-3 text-sm"
           >
             Skip Rest
           </Button>

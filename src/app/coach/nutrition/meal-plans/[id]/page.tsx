@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MealPlanService, MealPlan, Meal } from "@/lib/mealPlanService";
 import MealCreator from "@/components/coach/MealCreator";
-import { ArrowLeft, Plus, ChefHat, Edit } from "lucide-react";
+import MealOptionEditor from "@/components/coach/MealOptionEditor";
+import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import { ArrowLeft, Plus, ChefHat, Edit, Settings2, X } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -30,6 +32,7 @@ export default function MealPlanDetailPage() {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMealCreator, setShowMealCreator] = useState(false);
+  const [editingMealOptions, setEditingMealOptions] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (mealPlanId) {
@@ -421,6 +424,24 @@ export default function MealPlanDetailPage() {
                                   </div>
                                 )}
                               </div>
+                              
+                              {/* Edit Options Button */}
+                              {(meal as any).id && (
+                                <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-700/50">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setEditingMealOptions({ 
+                                      id: (meal as any).id, 
+                                      name: (meal as any).name || meal.meal_type 
+                                    })}
+                                    className="w-full justify-center gap-2 rounded-lg"
+                                  >
+                                    <Settings2 className="w-4 h-4" />
+                                    Manage Options
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </CardContent>
@@ -441,6 +462,48 @@ export default function MealPlanDetailPage() {
           onClose={() => setShowMealCreator(false)}
           onSave={handleMealSaved}
         />
+      )}
+
+      {/* Meal Options Editor Modal */}
+      {editingMealOptions && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={(e) => e.target === e.currentTarget && setEditingMealOptions(null)}
+        >
+          <div className={`${theme.card} fc-glass fc-card rounded-3xl border ${theme.border} max-w-3xl max-h-[90vh] w-full overflow-hidden`}>
+            {/* Modal Header */}
+            <div className={`sticky top-0 ${theme.card} fc-glass border-b ${theme.border} px-6 py-4 flex items-center justify-between`}>
+              <div>
+                <h2 className={`text-xl font-bold ${theme.text}`}>
+                  Meal Options
+                </h2>
+                <p className={`text-sm ${theme.textSecondary}`}>
+                  {editingMealOptions.name}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEditingMealOptions(null)}
+                className="h-10 w-10 rounded-xl"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              <MealOptionEditor
+                mealId={editingMealOptions.id}
+                mealPlanId={mealPlanId}
+                onOptionsChange={() => {
+                  // Reload meals when options change
+                  loadMeals();
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </ProtectedRoute>
   );

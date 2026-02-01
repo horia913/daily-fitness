@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { isDebugHarnessEnabled } from '@/lib/debugHarness'
+import { getCurrentWorkoutFromProgress } from '@/lib/programProgressService'
+import { getProgramMetrics } from '@/lib/programMetricsService'
 
 type ClientBlockExerciseRecord = {
   id: string
@@ -420,7 +422,7 @@ export async function GET(request: NextRequest) {
     })
     const [
       assignmentsResult,
-      programProgressResult,
+      _programProgressPlaceholder, // Moved to separate query after programAssignment
       programAssignmentsResult,
       logsResult,
       allTimeLogsResult,
@@ -435,16 +437,8 @@ export async function GET(request: NextRequest) {
           .eq('client_id', clientId)
           .order('scheduled_date', { ascending: false })
       ),
-      timedQuery('program_assignment_progress', () =>
-        supabaseAuth
-          .from('program_assignment_progress')
-          .select('id, assignment_id, program_id, current_week, current_day')
-          .eq('client_id', clientId)
-          .eq('is_program_completed', false)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      ),
+      // NOTE: program_progress query moved below - needs program_assignment_id first
+      Promise.resolve({ data: null, error: null }),
       timedQuery('program_assignments', () =>
         supabaseAuth
           .from('program_assignments')
@@ -482,11 +476,30 @@ export async function GET(request: NextRequest) {
     const assignments = assignmentsResult.data || []
 
     const assignmentList = assignments || []
-    const programProgress = programProgressResult.data || null
+    // programProgress is now queried separately after we have programAssignment.id
     const programAssignmentsData = programAssignmentsResult.data || []
     const allProgramAssignments = programAssignmentsData || []
     const programAssignment =
       allProgramAssignments.length > 0 ? allProgramAssignments[0] : null
+    
+    // Query program_progress for the active program assignment
+    let programProgress: any = null
+    if (programAssignment?.id) {
+      const { data: progressData, error: progressError } = await timedQuery('program_progress', () =>
+        supabaseAuth
+          .from('program_progress')
+          .select('id, program_assignment_id, current_week_index, current_day_index, is_completed')
+          .eq('program_assignment_id', programAssignment.id)
+          .maybeSingle()
+      )
+      programProgress = progressData
+      console.log('[summary] program_progress query:', { 
+        programAssignmentId: programAssignment.id,
+        progressData,
+        progressError 
+      })
+    }
+    
     const logs = logsResult.data || []
     const allTimeLogs = allTimeLogsResult.data || []
     const completedPrograms =
@@ -613,149 +626,138 @@ export async function GET(request: NextRequest) {
 
     let scheduleIdByTemplate: Record<string, string> = {}
 
-    // TASK 2: Use program_day_assignments as source of truth for next program workout
-    if (programAssignment && (!todaysWorkout || !todaysWorkout.hasWorkout)) {
-      let selectedProgramDay: any = null
+    // ========================================================================
+    // NEW: Use program_progress as SOURCE OF TRUTH for next program workout
+    // This replaces the legacy program_day_assignments logic
+    // ALWAYS use program workout path if there's an active program assignment
+    // ========================================================================
+    if (programAssignment) {
       let programExerciseCount = 0
       let programTotalSets = 0
 
-      // Get the next incomplete program_day_assignments for this program
-      // SOURCE OF TRUTH: Next program workout = earliest program_day_assignments where is_completed IS NOT true
-      addQueryPattern({
-        step: 'program_day_assignments_next',
-        table: 'program_day_assignments',
-        select: 'id, day_number, workout_template_id, name, description, day_type',
-        filters: 'eq(program_assignment_id), eq(day_type), or(is_completed.is.null,is_completed.eq.false)',
-        order: 'day_number asc',
-        limit: 'limit 1, maybeSingle',
-        joins: 'none',
-      })
-      const { data: nextProgramDay } = await timedQuery(
-        'program_day_assignments_next',
-        () =>
-          supabaseAuth
-            .from('program_day_assignments')
-            .select('id, day_number, workout_template_id, name, description, day_type')
-            .eq('program_assignment_id', programAssignment.id)
-            .eq('day_type', 'workout')
-            .or('is_completed.is.null,is_completed.eq.false')
-            .order('day_number', { ascending: true })
-            .limit(1)
-            .maybeSingle()
-      )
+      // Get current workout from program_progress + program_schedule
+      const workoutInfo = await getCurrentWorkoutFromProgress(supabaseAuth, clientId)
+      
+      console.log('[summary] getCurrentWorkoutFromProgress result:', workoutInfo)
 
-      selectedProgramDay = nextProgramDay
+      if (workoutInfo.status === 'active' && workoutInfo.template_id) {
+        const scheduleTemplateId = workoutInfo.template_id
 
-      const scheduleTemplateId = selectedProgramDay?.workout_template_id || null
-
-      let clientRules: any[] = []
-      if (scheduleTemplateId) {
-        addQueryPattern({
-          step: 'program_template_blocks',
-          table: 'workout_blocks',
-          select: 'id',
-          filters: 'eq(template_id)',
-          order: 'none',
-          limit: 'none',
-          joins: 'none',
-        })
-        const { data: templateBlocks } = await timedQuery(
-          'program_template_blocks',
-          () =>
-            supabaseAuth
-              .from('workout_blocks')
-              .select('id')
-              .eq('template_id', scheduleTemplateId)
-        )
-
-        const blockIds = (templateBlocks || [])
-          .map((block: any) => block.id)
-          .filter(Boolean)
-
-        if (blockIds.length > 0) {
-          // For program_day_assignments, we need to determine week_number from day_number
-          // This is a simplified approach - in practice, week calculation may vary
-          // For now, use day_number to estimate week (assuming ~7 workouts per week)
-          const estimatedWeek = selectedProgramDay?.day_number 
-            ? Math.ceil(selectedProgramDay.day_number / 7) 
-            : 1
-
+        // Load client progression rules for exercise counts
+        let clientRules: any[] = []
+        if (scheduleTemplateId) {
           addQueryPattern({
-            step: 'client_program_rules',
-            table: 'client_program_progression_rules',
-            select:
-              'id, week_number, block_order, exercise_id, exercise_order, exercise_letter, sets, reps, rest_seconds, notes, block_id',
-            filters: 'eq(program_assignment_id), eq(week_number), in(block_id)',
-            order: 'block_order asc, exercise_order asc',
+            step: 'program_template_blocks',
+            table: 'workout_blocks',
+            select: 'id',
+            filters: 'eq(template_id)',
+            order: 'none',
             limit: 'none',
             joins: 'none',
           })
-          const { data: clientRulesData } = await timedQuery(
-            'client_program_rules',
+          const { data: templateBlocks } = await timedQuery(
+            'program_template_blocks',
             () =>
               supabaseAuth
-                .from('client_program_progression_rules')
-                .select(
-                  'id, week_number, block_order, exercise_id, exercise_order, exercise_letter, sets, reps, rest_seconds, notes, block_id'
-                )
-                .eq('program_assignment_id', programAssignment.id)
-                .eq('week_number', estimatedWeek)
-                .in('block_id', blockIds)
-                .order('block_order', { ascending: true })
-                .order('exercise_order', { ascending: true })
+                .from('workout_blocks')
+                .select('id')
+                .eq('template_id', scheduleTemplateId)
           )
 
-          clientRules = (clientRulesData as any[]) || []
+          const blockIds = (templateBlocks || [])
+            .map((block: any) => block.id)
+            .filter(Boolean)
+
+          if (blockIds.length > 0) {
+            // Use actual week_number from program_schedule (via workoutInfo)
+            const actualWeekNumber = workoutInfo.actual_week_number || 1
+
+            addQueryPattern({
+              step: 'client_program_rules',
+              table: 'client_program_progression_rules',
+              select:
+                'id, week_number, block_order, exercise_id, exercise_order, exercise_letter, sets, reps, rest_seconds, notes, block_id',
+              filters: 'eq(program_assignment_id), eq(week_number), in(block_id)',
+              order: 'block_order asc, exercise_order asc',
+              limit: 'none',
+              joins: 'none',
+            })
+            const { data: clientRulesData } = await timedQuery(
+              'client_program_rules',
+              () =>
+                supabaseAuth
+                  .from('client_program_progression_rules')
+                  .select(
+                    'id, week_number, block_order, exercise_id, exercise_order, exercise_letter, sets, reps, rest_seconds, notes, block_id'
+                  )
+                  .eq('program_assignment_id', programAssignment.id)
+                  .eq('week_number', actualWeekNumber)
+                  .in('block_id', blockIds)
+                  .order('block_order', { ascending: true })
+                  .order('exercise_order', { ascending: true })
+            )
+
+            clientRules = (clientRulesData as any[]) || []
+          }
         }
-      }
 
-      if (clientRules.length > 0) {
-        const uniqueExercises = new Set<string>()
-        clientRules.forEach((rule) => {
-          uniqueExercises.add(
-            `${rule.block_id}:${rule.exercise_id}:${rule.exercise_order}`
+        if (clientRules.length > 0) {
+          const uniqueExercises = new Set<string>()
+          clientRules.forEach((rule) => {
+            uniqueExercises.add(
+              `${rule.block_id}:${rule.exercise_id}:${rule.exercise_order}`
+            )
+            programTotalSets += rule.sets ?? 0
+          })
+          programExerciseCount = uniqueExercises.size
+        }
+
+        // Store schedule_row_id in scheduleIdByTemplate (for routing)
+        // NOTE: Using template_id as key since that's what the UI routes with
+        if (workoutInfo.schedule_row_id && workoutInfo.template_id) {
+          scheduleIdByTemplate[workoutInfo.template_id] = workoutInfo.schedule_row_id
+        }
+
+        // Estimate duration: ~3 min per exercise (minimum 15), or fetch from template
+        let estimatedDuration = Math.max(15, programExerciseCount * 3)
+        try {
+          const { data: templateData } = await timedQuery('template_duration', () =>
+            supabaseAuth.from('workout_templates').select('estimated_duration').eq('id', workoutInfo.template_id).maybeSingle()
           )
-          programTotalSets += rule.sets ?? 0
-        })
-        programExerciseCount = uniqueExercises.size
-      }
+          if (templateData?.estimated_duration) {
+            estimatedDuration = templateData.estimated_duration
+          }
+        } catch {
+          // Ignore - use calculated estimate
+        }
 
-      const programName =
-        selectedProgramDay?.name && selectedProgramDay.name.trim().length > 0
-          ? selectedProgramDay.name
-          : programAssignment.name && programAssignment.name.trim().length > 0
-          ? programAssignment.name
-          : 'Program'
-      const programDescription =
-        selectedProgramDay?.description && selectedProgramDay.description.trim().length > 0
-          ? selectedProgramDay.description
-          : programAssignment.description && programAssignment.description.trim().length > 0
-          ? programAssignment.description
-          : ''
-
-      // Store program_day_assignments.id in scheduleIdByTemplate (for routing)
-      if (selectedProgramDay?.id && selectedProgramDay?.workout_template_id) {
-        scheduleIdByTemplate[selectedProgramDay.workout_template_id] = selectedProgramDay.id
-      }
-
-      // Calculate estimated week from day_number (assuming ~7 workouts per week)
-      const estimatedWeek = selectedProgramDay?.day_number 
-        ? Math.ceil(selectedProgramDay.day_number / 7) 
-        : 1
-
-      todaysWorkout = {
-        hasWorkout: true,
-        templateId: selectedProgramDay?.workout_template_id || undefined,
-        scheduleId: selectedProgramDay?.id || undefined, // program_day_assignments.id for routing
-        templateName: programName,
-        templateDescription: programDescription,
-        weekNumber: estimatedWeek,
-        programDay: selectedProgramDay?.day_number || 1,
-        exercises: [],
-        exerciseCount: programExerciseCount,
-        totalSets: programTotalSets,
-        generatedAt: programAssignment.start_date,
-        message: 'Program workout ready!',
+        todaysWorkout = {
+          hasWorkout: true,
+          templateId: workoutInfo.template_id,
+          scheduleId: workoutInfo.schedule_row_id, // program_schedule.id for routing
+          templateName: workoutInfo.program_name || 'Program',
+          templateDescription: '',
+          weekNumber: workoutInfo.actual_week_number || 1,
+          programDay: (workoutInfo.current_day_index || 0) + 1, // 1-based for display
+          exercises: [],
+          exerciseCount: programExerciseCount,
+          totalSets: programTotalSets,
+          estimatedDuration: estimatedDuration,
+          generatedAt: programAssignment.start_date,
+          message: workoutInfo.position_label ? `${workoutInfo.position_label} ready!` : 'Program workout ready!',
+          // Additional progress info for UI
+          weekLabel: workoutInfo.week_label,
+          dayLabel: workoutInfo.day_label,
+          positionLabel: workoutInfo.position_label,
+          currentWeekIndex: workoutInfo.current_week_index,
+          currentDayIndex: workoutInfo.current_day_index,
+        }
+      } else if (workoutInfo.status === 'completed') {
+        todaysWorkout = {
+          hasWorkout: false,
+          message: 'Congratulations! Program completed!',
+          templateName: workoutInfo.program_name || 'Program',
+        }
       }
     }
 
@@ -764,13 +766,14 @@ export async function GET(request: NextRequest) {
     let programData: any = null
     let programCoachId: string | null = null
 
-    if (programProgress?.program_id) {
+    // Use programAssignment.program_id (not programProgress which doesn't have program_id)
+    if (programAssignment?.program_id) {
       addQueryPattern({
         step: 'program_assignment_with_program',
         table: 'program_assignments -> workout_programs',
         select:
           'program:workout_programs(id, name, description, duration_weeks, difficulty_level, coach_id)',
-        filters: 'eq(program_id), eq(client_id)',
+        filters: 'eq(id), eq(client_id)',
         order: 'none',
         limit: 'maybeSingle',
         joins: 'foreign select program:workout_programs',
@@ -787,7 +790,7 @@ export async function GET(request: NextRequest) {
               )
             `
             )
-            .eq('program_id', programProgress.program_id)
+            .eq('id', programAssignment.id)
             .eq('client_id', clientId)
             .maybeSingle()
       )
@@ -933,19 +936,41 @@ export async function GET(request: NextRequest) {
       allAssignedWorkouts.push(...programsWithDetails)
     }
 
-    if (programData && programProgress) {
+    if (programData && programAssignment) {
       const coachInfo = programCoachId
         ? coachProfilesMap.get(programCoachId)
         : null
+
+      // Get accurate completion percentage from program_day_completions
+      let progressPercentage = 0
+      let currentWeek = 1
+      try {
+        // Pass authenticated client to respect RLS
+        const metrics = await getProgramMetrics(programAssignment.id, supabaseAuth)
+        console.log('[summary] getProgramMetrics result:', metrics)
+        if (metrics) {
+          progressPercentage = metrics.completion_percentage
+          // Estimate current week from current_day_number
+          currentWeek = metrics.current_day_number
+            ? Math.ceil(metrics.current_day_number / 7)
+            : (programProgress?.current_week_index ?? 0) + 1
+        }
+      } catch (err) {
+        console.error('[summary] getProgramMetrics error:', err)
+        // Fallback to index-based estimate
+        if (programProgress?.current_week_index !== undefined) {
+          currentWeek = programProgress.current_week_index + 1
+        }
+      }
+      console.log('[summary] currentProgram will be:', { progressPercentage, currentWeek, programData })
+
       currentProgram = {
         id: programData.id,
         name: programData.name,
         description: programData.description,
-        current_week: programProgress.current_week,
+        current_week: currentWeek,
         total_weeks: programData.duration_weeks,
-        progress_percentage: Math.round(
-          (programProgress.current_week / programData.duration_weeks) * 100
-        ),
+        progress_percentage: progressPercentage,
         difficulty_level: programData.difficulty_level,
         coach_name:
           `${coachInfo?.first_name || ''} ${coachInfo?.last_name || ''}`.trim() ||
@@ -962,15 +987,51 @@ export async function GET(request: NextRequest) {
       return assignment.scheduled_date >= mondayStr && assignment.scheduled_date <= sundayStr
     })
 
-    const goal = weeklyAssignments.length || 0
+    let goal = weeklyAssignments.length || 0
     const completedLogs = (logs || []).filter((log: any) => {
       if (!log.completed_at) return false
       const completedAt = new Date(log.completed_at)
       return completedAt >= monday && completedAt <= sunday
     })
+    const current = completedLogs?.length || 0
+
+    // For program users: calculate expected weekly workouts from program_schedule
+    // Use the current week in program_progress to get accurate count
+    if (programAssignment?.program_id) {
+      try {
+        // Get current week from program_progress (0-indexed)
+        const currentWeekIndex = programProgress?.current_week_index ?? 0
+        
+        // Get the actual week_number from program_schedule for this week index
+        const { data: weekNumbers } = await supabaseAuth
+          .from('program_schedule')
+          .select('week_number')
+          .eq('program_id', programAssignment.program_id)
+          .order('week_number', { ascending: true })
+        
+        if (weekNumbers && weekNumbers.length > 0) {
+          // Get unique week numbers
+          const uniqueWeeks = [...new Set(weekNumbers.map((w: any) => w.week_number))].sort((a: any, b: any) => a - b)
+          const actualWeekNumber = uniqueWeeks[currentWeekIndex] || uniqueWeeks[0] || 1
+          
+          // Count workouts scheduled for this week
+          const { data: weekDays } = await supabaseAuth
+            .from('program_schedule')
+            .select('id')
+            .eq('program_id', programAssignment.program_id)
+            .eq('week_number', actualWeekNumber)
+          
+          goal = weekDays?.length || goal
+          console.log('[summary] weeklyProgress for program:', { currentWeekIndex, actualWeekNumber, goal, current })
+        }
+      } catch (err) {
+        console.error('[summary] Error calculating weekly goal:', err)
+        // Keep existing goal from workout_assignments
+      }
+    }
 
     const weeklyProgress = {
-      current: completedLogs?.length || 0,
+      current,
       goal,
     }
 

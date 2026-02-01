@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import WorkoutTemplateDetails from '../WorkoutTemplateDetails'
-import ProgramDetailsModal from '../ProgramDetailsModal'
 import {
   Dumbbell,
   Calendar,
@@ -47,6 +46,7 @@ interface ProgramAssignment {
 }
 
 export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps) {
+  const router = useRouter()
   const [workouts, setWorkouts] = useState<WorkoutAssignment[]>([])
   const [programs, setPrograms] = useState<ProgramAssignment[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,17 +56,6 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
     inProgress: 0,
     assigned: 0
   })
-  
-  // Modal states
-  const [selectedWorkout, setSelectedWorkout] = useState<any>(null)
-  const [selectedProgram, setSelectedProgram] = useState<any>(null)
-  const [showWorkoutModal, setShowWorkoutModal] = useState(false)
-  const [showProgramModal, setShowProgramModal] = useState(false)
-  
-  // Data for program details modal
-  const [templates, setTemplates] = useState<any[]>([])
-  const [exercises, setExercises] = useState<any[]>([])
-  const [categories, setCategories] = useState<any[]>([])
 
   const getWorkoutStatusMeta = (status: string) => {
     switch (status) {
@@ -100,35 +89,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
   useEffect(() => {
     loadWorkouts()
     loadPrograms()
-    loadProgramData()
   }, [clientId])
-
-  const loadProgramData = async () => {
-    try {
-      // Load templates
-      const { data: templatesData } = await supabase
-        .from('workout_templates')
-        .select('*')
-        .order('name')
-      setTemplates(templatesData || [])
-
-      // Load exercises
-      const { data: exercisesData } = await supabase
-        .from('exercises')
-        .select('*')
-        .order('name')
-      setExercises(exercisesData || [])
-
-      // Load categories
-      const { data: categoriesData } = await supabase
-        .from('exercise_categories')
-        .select('*')
-        .order('name')
-      setCategories(categoriesData || [])
-    } catch (error) {
-      console.error('Error loading program data:', error)
-    }
-  }
 
   const loadWorkouts = async () => {
     try {
@@ -172,6 +133,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
   const loadPrograms = async () => {
     try {
+      console.log('[ClientWorkoutsView] Loading programs for client:', clientId)
       const { data, error } = await supabase
         .from('program_assignments')
         .select(`
@@ -182,15 +144,16 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
         .order('start_date', { ascending: false })
 
       if (error) {
-        // Table might not exist - show empty state
+        console.error('[ClientWorkoutsView] Error loading programs:', error)
         setPrograms([])
         setLoading(false)
         return
       }
 
+      console.log('[ClientWorkoutsView] Programs loaded:', data?.length || 0, data)
       setPrograms(data || [])
-    } catch {
-      // Silently handle error
+    } catch (err) {
+      console.error('[ClientWorkoutsView] Exception loading programs:', err)
       setPrograms([])
     } finally {
       setLoading(false)
@@ -316,12 +279,11 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
         console.error('Error deactivating programs:', deactivateProgramsError)
       }
 
-      // Then, activate this specific program
+      // Then, activate this specific program (preserve original start_date)
       const { error } = await supabase
         .from('program_assignments')
         .update({ 
-          status: 'active',
-          start_date: new Date().toISOString().split('T')[0]
+          status: 'active'
         })
         .eq('id', programId)
 
@@ -336,172 +298,23 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
     }
   }
 
-  // Modal handlers
-  const handleWorkoutClick = async (workout: any) => {
+  // Navigation handlers - navigate to client-specific detail pages
+  const handleWorkoutClick = (workout: any) => {
     if (!workout?.workout_templates?.id) {
       alert('Workout template data not available')
       return
     }
-
-    try {
-      // Fetch full template details
-      const { data: fullTemplate, error: templateError } = await supabase
-        .from('workout_templates')
-        .select('*')
-        .eq('id', workout.workout_templates.id)
-        .single()
-
-      if (templateError) throw templateError
-      
-      // Fetch blocks and block exercises (block-based system)
-      const { data: blocksData, error: blocksError } = await supabase
-        .from('workout_blocks')
-        .select('*')
-        .eq('template_id', workout.workout_templates.id)
-        .order('block_order')
-
-      if (blocksError) throw blocksError
-
-      const blockIds = (blocksData || []).map((block) => block.id).filter(Boolean)
-
-      let blockExercises: any[] = []
-      let timeProtocols: any[] = []
-      let clusterSets: any[] = []
-      let restPauseSets: any[] = []
-      let dropSets: any[] = []
-      let hrSets: any[] = []
-
-      if (blockIds.length > 0) {
-        const { data: blockExercisesData, error: blockExercisesError } = await supabase
-          .from('workout_block_exercises')
-          .select(`
-            *,
-            exercises (
-              id,
-              name,
-              description,
-              category
-            )
-          `)
-          .in('block_id', blockIds)
-          .order('exercise_order')
-
-        if (blockExercisesError) throw blockExercisesError
-        blockExercises = blockExercisesData || []
-
-        const [
-          { data: timeProtocolsData, error: timeProtocolsError },
-          { data: clusterSetsData, error: clusterSetsError },
-          { data: restPauseSetsData, error: restPauseSetsError },
-          { data: dropSetsData, error: dropSetsError },
-          { data: hrSetsData, error: hrSetsError },
-        ] = await Promise.all([
-          supabase.from('workout_time_protocols').select('*').in('block_id', blockIds),
-          supabase.from('workout_cluster_sets').select('*').in('block_id', blockIds),
-          supabase.from('workout_rest_pause_sets').select('*').in('block_id', blockIds),
-          supabase.from('workout_drop_sets').select('*').in('block_id', blockIds),
-          supabase.from('workout_hr_sets').select('*').in('block_id', blockIds),
-        ])
-
-        if (timeProtocolsError) throw timeProtocolsError
-        if (clusterSetsError) throw clusterSetsError
-        if (restPauseSetsError) throw restPauseSetsError
-        if (dropSetsError) throw dropSetsError
-        if (hrSetsError) throw hrSetsError
-
-        timeProtocols = timeProtocolsData || []
-        clusterSets = clusterSetsData || []
-        restPauseSets = restPauseSetsData || []
-        dropSets = dropSetsData || []
-        hrSets = hrSetsData || []
-      }
-
-      const blocksWithExercises = (blocksData || []).map((block) => {
-        const exercisesForBlock =
-          (blockExercises || []).filter((exercise) => exercise.block_id === block.id) || []
-        return {
-          ...block,
-          exercises: exercisesForBlock,
-          time_protocols:
-            (timeProtocols || []).filter((protocol) => protocol.block_id === block.id) || [],
-          cluster_sets:
-            (clusterSets || []).filter((cluster) => cluster.block_id === block.id) || [],
-          rest_pause_sets:
-            (restPauseSets || []).filter((restPause) => restPause.block_id === block.id) || [],
-          drop_sets:
-            (dropSets || []).filter((drop) => drop.block_id === block.id) || [],
-          hr_sets: (hrSets || []).filter((set) => set.block_id === block.id) || [],
-        }
-      })
-
-      console.log('Full template:', fullTemplate)
-      console.log('Template blocks:', blocksWithExercises)
-      console.log('Blocks count:', blocksWithExercises.length)
-
-      if (fullTemplate) {
-        setSelectedWorkout({
-          ...workout,
-          workout_templates: {
-            ...fullTemplate,
-            blocks: blocksWithExercises || []
-          }
-        })
-        setShowWorkoutModal(true)
-      }
-    } catch (error) {
-      console.error('Error loading workout details:', error)
-      alert('Failed to load workout details')
-    }
+    // Navigate to the workout template details page
+    router.push(`/coach/workouts/templates/${workout.workout_templates.id}`)
   }
 
-  const handleProgramClick = async (program: any) => {
+  const handleProgramClick = (program: any) => {
     if (!program?.workout_programs?.id) {
       alert('Program data not available')
       return
     }
-
-    try {
-      // Fetch full program with schedule
-      const { data: fullProgram, error } = await supabase
-        .from('workout_programs')
-        .select(`
-          *,
-          program_schedule(
-            *,
-            workout_templates(*)
-          )
-        `)
-        .eq('id', program.workout_programs.id)
-        .single()
-
-      if (error) {
-        console.error('Error loading program:', error)
-        alert('Could not load program details')
-        return
-      }
-
-      // Rename program_schedule to schedule for compatibility with modal component
-      const programWithSchedule = {
-        ...fullProgram,
-        schedule: fullProgram.program_schedule || []
-      }
-
-      setSelectedProgram(programWithSchedule)
-      setShowProgramModal(true)
-    } catch (error) {
-      console.error('Error loading program details:', error)
-      alert('Could not load program details')
-    }
-  }
-
-  const closeWorkoutModal = () => {
-    setShowWorkoutModal(false)
-    setSelectedWorkout(null)
-  }
-
-  const closeProgramModal = () => {
-    setShowProgramModal(false)
-    setSelectedProgram(null)
+    // Navigate to the CLIENT-SPECIFIC program details page
+    router.push(`/coach/clients/${clientId}/programs/${program.workout_programs.id}`)
   }
 
   if (loading) {
@@ -803,27 +616,6 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
         </div>
       </div>
     </div>
-
-    {/* Workout Details Modal */}
-    {showWorkoutModal && selectedWorkout?.workout_templates && (
-      <WorkoutTemplateDetails
-        isOpen={showWorkoutModal}
-        onClose={closeWorkoutModal}
-        template={selectedWorkout.workout_templates}
-      />
-    )}
-
-    {/* Program Details Modal */}
-    {showProgramModal && selectedProgram && (
-      <ProgramDetailsModal
-        program={selectedProgram}
-        templates={templates}
-        exercises={exercises}
-        categories={categories}
-        onClose={closeProgramModal}
-        onEdit={() => {}}
-      />
-    )}
     </>
   )
 }

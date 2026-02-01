@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
@@ -14,6 +14,7 @@ import {
   calculateSuggestedWeightUtil,
 } from "../BaseBlockExecutor";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { RPEModal } from "@/components/client/RPEModal";
 
 interface StraightSetExecutorProps extends BaseBlockExecutorProps {}
 
@@ -56,6 +57,10 @@ export function StraightSetExecutor({
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [loggedSetsArray, setLoggedSetsArray] = useState<LoggedSet[]>([]);
+  
+  // RPE Modal State
+  const [showRpeModal, setShowRpeModal] = useState(false);
+  const [pendingSetLogId, setPendingSetLogId] = useState<string | null>(null);
 
   // Pre-fill with suggested weight when set number or exercise changes
   useEffect(() => {
@@ -194,7 +199,7 @@ export function StraightSetExecutor({
 
       if (result.success) {
         const loggedSet: LoggedSet = {
-          id: `temp-${currentSetNumber}-${Date.now()}`,
+          id: result.set_log_id || `temp-${currentSetNumber}-${Date.now()}`,
           exercise_id: currentExercise.exercise_id,
           block_id: block.block.id,
           set_number: currentSetNumber,
@@ -210,6 +215,7 @@ export function StraightSetExecutor({
           currentSetNumber,
           totalSets,
           isLastSet: currentSetNumber >= totalSets,
+          set_log_id: result.set_log_id,
         });
         console.log("[log-set success]", {
           blockId: block.block.id,
@@ -217,6 +223,7 @@ export function StraightSetExecutor({
           isLastSet: currentSetNumber >= totalSets,
           completedSets: currentSetNumber,
           totalSets,
+          set_log_id: result.set_log_id,
         });
 
         if (result.e1rm && onE1rmUpdate) {
@@ -233,6 +240,12 @@ export function StraightSetExecutor({
         // Update parent with new completed sets count
         const newCompletedSets = currentSetNumber;
         onSetComplete?.(newCompletedSets);
+
+        // Show RPE modal if we have a set_log_id
+        if (result.set_log_id) {
+          setPendingSetLogId(result.set_log_id);
+          setShowRpeModal(true);
+        }
 
         // Check if this was the last set
         if (currentSetNumber >= totalSets) {
@@ -275,6 +288,49 @@ export function StraightSetExecutor({
       setIsLoggingSet(false);
     }
   };
+
+  // Handle RPE selection - call API to update the set log
+  const handleRpeSelect = useCallback(async (rpe: number) => {
+    if (!pendingSetLogId) {
+      setShowRpeModal(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/set-rpe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          set_log_id: pendingSetLogId,
+          rpe,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('[RPE] Successfully updated RPE:', { set_log_id: pendingSetLogId, rpe });
+      } else {
+        console.error('[RPE] Failed to update RPE:', await response.text());
+      }
+    } catch (error) {
+      console.error('[RPE] Error updating RPE:', error);
+    } finally {
+      setShowRpeModal(false);
+      setPendingSetLogId(null);
+    }
+  }, [pendingSetLogId]);
+
+  // Handle RPE skip - just close the modal
+  const handleRpeSkip = useCallback(() => {
+    console.log('[RPE] User skipped RPE input');
+    setShowRpeModal(false);
+    setPendingSetLogId(null);
+  }, []);
+
+  // Handle RPE modal close (backdrop click or X button)
+  const handleRpeClose = useCallback(() => {
+    setShowRpeModal(false);
+    setPendingSetLogId(null);
+  }, []);
 
   // Logging inputs - show only current set
   const loggingInputs = (
@@ -331,42 +387,52 @@ export function StraightSetExecutor({
   );
 
   return (
-    <BaseBlockExecutorLayout
-      {...{
-        block,
-        onBlockComplete,
-        onNextBlock,
-        e1rmMap,
-        onE1rmUpdate,
-        sessionId,
-        assignmentId,
-        allBlocks,
-        currentBlockIndex,
-        onBlockChange,
-        currentExerciseIndex,
-        onExerciseIndexChange,
-        logSetToDatabase,
-        formatTime,
-        calculateSuggestedWeight,
-        onVideoClick,
-        onAlternativesClick,
-        onRestTimerClick,
-        progressionSuggestion,
-      }}
-      exerciseName={currentExercise?.exercise?.name || "Exercise"}
-      blockDetails={blockDetails}
-      instructions={instructions}
-      currentSet={currentSetNumber}
-      totalSets={totalSets}
-      progressLabel="Set"
-      loggingInputs={loggingInputs}
-      logButton={logButton}
-      showNavigation={true}
-      currentExercise={currentExercise}
-      showRestTimer={
-        !!(block.block.rest_seconds || currentExercise?.rest_seconds)
-      }
-      progressionSuggestion={progressionSuggestion}
-    />
+    <>
+      <BaseBlockExecutorLayout
+        {...{
+          block,
+          onBlockComplete,
+          onNextBlock,
+          e1rmMap,
+          onE1rmUpdate,
+          sessionId,
+          assignmentId,
+          allBlocks,
+          currentBlockIndex,
+          onBlockChange,
+          currentExerciseIndex,
+          onExerciseIndexChange,
+          logSetToDatabase,
+          formatTime,
+          calculateSuggestedWeight,
+          onVideoClick,
+          onAlternativesClick,
+          onRestTimerClick,
+          progressionSuggestion,
+        }}
+        exerciseName={currentExercise?.exercise?.name || "Exercise"}
+        blockDetails={blockDetails}
+        instructions={instructions}
+        currentSet={currentSetNumber}
+        totalSets={totalSets}
+        progressLabel="Set"
+        loggingInputs={loggingInputs}
+        logButton={logButton}
+        showNavigation={true}
+        currentExercise={currentExercise}
+        showRestTimer={
+          !!(block.block.rest_seconds || currentExercise?.rest_seconds)
+        }
+        progressionSuggestion={progressionSuggestion}
+      />
+      
+      {/* RPE Modal - Non-blocking, appears after set is logged */}
+      <RPEModal
+        isOpen={showRpeModal}
+        onSelect={handleRpeSelect}
+        onSkip={handleRpeSkip}
+        onClose={handleRpeClose}
+      />
+    </>
   );
 }

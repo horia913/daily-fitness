@@ -4,12 +4,15 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
+type UserRole = 'coach' | 'client' | 'admin'
+
 interface ProtectedRouteProps {
   children: React.ReactNode
-  requiredRole?: 'coach' | 'client'
+  requiredRole?: UserRole
+  allowedRoles?: UserRole[]
 }
 
-export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, requiredRole, allowedRoles }: ProtectedRouteProps) {
   const { user, loading } = useAuth()
   const router = useRouter()
 
@@ -18,18 +21,28 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
       if (!user) {
         // No user, redirect to login
         router.push('/')
-      } else if (requiredRole) {
+      } else if (requiredRole || allowedRoles) {
         // Check user role (we'll implement this with user metadata later)
         // For now, we'll redirect based on the current path
         const currentPath = window.location.pathname
-        if (requiredRole === 'coach' && currentPath.startsWith('/client')) {
-          router.push('/coach')
-        } else if (requiredRole === 'client' && currentPath.startsWith('/coach')) {
-          router.push('/client')
+        
+        // If allowedRoles is provided, check if any of them match
+        // For now, treat 'admin' as having coach permissions
+        const effectiveRoles = allowedRoles || (requiredRole ? [requiredRole] : [])
+        
+        if (effectiveRoles.length > 0) {
+          const hasCoachAccess = effectiveRoles.includes('coach') || effectiveRoles.includes('admin')
+          const hasClientAccess = effectiveRoles.includes('client')
+          
+          if (hasCoachAccess && currentPath.startsWith('/client')) {
+            router.push('/coach')
+          } else if (hasClientAccess && !hasCoachAccess && currentPath.startsWith('/coach')) {
+            router.push('/client')
+          }
         }
       }
     }
-  }, [user, loading, router, requiredRole])
+  }, [user, loading, router, requiredRole, allowedRoles])
 
   if (loading) {
     return (

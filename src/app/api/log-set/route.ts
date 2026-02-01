@@ -67,9 +67,16 @@ export async function POST(req: NextRequest) {
       notes,
       block_type: incomingBlockType,
       workout_assignment_id,
-      session_id,
+      session_id, // workout_sessions.id - used to link workout_logs
       template_exercise_id,
     } = body
+
+    // Validate session_id is a valid UUID if provided
+    const isValidUuid = (value: string | null | undefined): boolean => {
+      if (!value) return false;
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    };
+    const validSessionId = isValidUuid(session_id) ? session_id : null;
 
     console.log("📥 /api/log-set received:", {
       workout_assignment_id,
@@ -276,24 +283,66 @@ export async function POST(req: NextRequest) {
       });
 
       // ✅ Check if workout_log already exists for this assignment (and is not completed)
-      const { data: existingLog, error: existingError } = await supabaseAdmin
+      // If session_id provided, prefer logs linked to that session
+      let existingLogQuery = supabaseAdmin
         .from('workout_logs')
-        .select('id, started_at, completed_at')
+        .select('id, started_at, completed_at, workout_session_id')
         .eq('client_id', userId)
         .eq('workout_assignment_id', actualWorkoutAssignmentId)
         .is('completed_at', null)  // Only active (not completed) logs
         .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+      
+      // If we have a valid session_id, prioritize logs linked to that session
+      if (validSessionId) {
+        existingLogQuery = existingLogQuery.eq('workout_session_id', validSessionId);
+      }
+      
+      const { data: existingLog, error: existingError } = await existingLogQuery.maybeSingle();
 
       console.log('🔴 DEBUG: Query result for existing log:', {
-        existingLog: existingLog ? { id: existingLog.id, started_at: existingLog.started_at } : null,
+        existingLog: existingLog ? { id: existingLog.id, started_at: existingLog.started_at, workout_session_id: existingLog.workout_session_id } : null,
         hasError: !!existingError,
         errorCode: existingError?.code,
         errorMessage: existingError?.message,
         errorDetails: existingError?.details,
         errorHint: existingError?.hint,
+        queriedWithSessionId: validSessionId,
       });
+
+      // Fallback: If no log found for this session, check for any active log without session linkage
+      let finalExistingLog = existingLog;
+      if (!existingLog && validSessionId) {
+        const { data: unlinkedLog, error: unlinkedError } = await supabaseAdmin
+          .from('workout_logs')
+          .select('id, started_at, completed_at, workout_session_id')
+          .eq('client_id', userId)
+          .eq('workout_assignment_id', actualWorkoutAssignmentId)
+          .is('completed_at', null)
+          .is('workout_session_id', null)
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (unlinkedLog && !unlinkedError) {
+          // Link this existing unlinked log to the session
+          console.log('🔗 Found unlinked workout_log, linking to session:', {
+            logId: unlinkedLog.id,
+            sessionId: validSessionId,
+          });
+          const { error: linkError } = await supabaseAdmin
+            .from('workout_logs')
+            .update({ workout_session_id: validSessionId })
+            .eq('id', unlinkedLog.id);
+          
+          if (!linkError) {
+            finalExistingLog = { ...unlinkedLog, workout_session_id: validSessionId };
+          } else {
+            console.warn('⚠️ Failed to link existing log to session:', linkError);
+            finalExistingLog = unlinkedLog;
+          }
+        }
+      }
 
       // Also check how many total logs exist for this assignment (for debugging)
       const { data: allLogsForAssignment, count } = await supabaseAdmin
@@ -325,25 +374,37 @@ export async function POST(req: NextRequest) {
         console.error('❌ Error checking for existing workout_log:', existingError);
       }
 
-      if (existingLog) {
+      if (finalExistingLog) {
         // ✅ Reuse existing log
-        console.log('✅ Found existing workout_log, reusing:', existingLog.id);
-        workoutLogId = existingLog.id;
+        console.log('✅ Found existing workout_log, reusing:', finalExistingLog.id);
+        workoutLogId = finalExistingLog.id;
       } else {
         // ✅ Create new log only if none exists
         console.log('📝 No existing log found, creating new workout_log');
         
+        // Include workout_session_id if we have a valid session
+        const insertPayload: {
+          client_id: string;
+          workout_assignment_id: string;
+          started_at: string;
+          completed_at: null;
+          workout_session_id?: string;
+        } = {
+          client_id: userId,
+          workout_assignment_id: actualWorkoutAssignmentId,
+          started_at: new Date().toISOString(),
+          completed_at: null,
+        };
+        
+        if (validSessionId) {
+          insertPayload.workout_session_id = validSessionId;
+          console.log('🔗 Linking new workout_log to session:', validSessionId);
+        }
+
         const { data: newLog, error: createError } = await supabaseAdmin
           .from('workout_logs')
-          .insert([
-            {
-              client_id: userId,
-              workout_assignment_id: actualWorkoutAssignmentId,
-              started_at: new Date().toISOString(),
-              completed_at: null,
-            },
-          ])
-          .select('id, workout_assignment_id')
+          .insert([insertPayload])
+          .select('id, workout_assignment_id, workout_session_id')
           .single();
 
         if (createError) {
@@ -379,6 +440,7 @@ export async function POST(req: NextRequest) {
         console.log('✅ Created new workout_log:', {
           id: newLog.id,
           workout_assignment_id: newLog.workout_assignment_id,
+          workout_session_id: newLog.workout_session_id,
         });
         workoutLogId = newLog.id;
       }
@@ -973,8 +1035,12 @@ export async function POST(req: NextRequest) {
       : null
 
     // Step 7: Return success (set logging succeeded, metrics update may have warnings)
+    // Include set_log_id for RPE modal to use
+    const setLogId = insertedData?.[0]?.id || null;
+    
     const response: any = {
       success: true,
+      set_log_id: setLogId, // For RPE modal to update this set
       block_type: blockType,
       set_logged: insertData || {
         workout_log_id: workoutLogId || null,

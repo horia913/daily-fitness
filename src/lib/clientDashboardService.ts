@@ -71,6 +71,7 @@ export async function calculateStreak(clientId: string): Promise<number> {
 
 /**
  * Calculate weekly workout progress (current week's completed vs assigned)
+ * Now supports both program-based workouts and legacy workout_assignments
  */
 export async function calculateWeeklyProgress(clientId: string): Promise<{ current: number; goal: number }> {
   try {
@@ -87,24 +88,7 @@ export async function calculateWeeklyProgress(clientId: string): Promise<{ curre
     sunday.setDate(monday.getDate() + 6);
     sunday.setHours(23, 59, 59, 999);
 
-    const mondayStr = monday.toISOString().split('T')[0];
-    const sundayStr = sunday.toISOString().split('T')[0];
-
-    // Count assigned workouts this week
-    const { data: assignments, error: assignError } = await supabase
-      .from('workout_assignments')
-      .select('id')
-      .eq('client_id', clientId)
-      .gte('scheduled_date', mondayStr)
-      .lte('scheduled_date', sundayStr);
-
-    if (assignError) {
-      console.error('Error fetching assignments:', assignError);
-    }
-
-    const goal = assignments?.length || 0;
-
-    // Count completed workouts this week
+    // Count completed workouts this week from workout_logs
     const { data: completedLogs, error: logError } = await supabase
       .from('workout_logs')
       .select('id, completed_at')
@@ -118,6 +102,66 @@ export async function calculateWeeklyProgress(clientId: string): Promise<{ curre
     }
 
     const current = completedLogs?.length || 0;
+
+    // FIRST: Check if client has an active program to determine weekly goal
+    const { data: activeAssignment, error: assignmentError } = await supabase
+      .from('program_assignments')
+      .select('id, program_id')
+      .eq('client_id', clientId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!assignmentError && activeAssignment?.program_id) {
+      // Program-based client: get weekly goal from program_progress + program_schedule
+      const { data: progress } = await supabase
+        .from('program_progress')
+        .select('current_week_index')
+        .eq('program_assignment_id', activeAssignment.id)
+        .maybeSingle();
+
+      const currentWeekIndex = progress?.current_week_index ?? 0;
+
+      // Get the program schedule to determine days in current week
+      const { data: scheduleRows } = await supabase
+        .from('program_schedule')
+        .select('week_number')
+        .eq('program_id', activeAssignment.program_id);
+
+      if (scheduleRows && scheduleRows.length > 0) {
+        // Get unique week numbers sorted
+        const uniqueWeeks = [...new Set(scheduleRows.map(r => r.week_number))].sort((a, b) => a - b);
+        const actualWeekNumber = uniqueWeeks[currentWeekIndex] || uniqueWeeks[0] || 1;
+        
+        // Count days in this week
+        const { data: weekDays } = await supabase
+          .from('program_schedule')
+          .select('id')
+          .eq('program_id', activeAssignment.program_id)
+          .eq('week_number', actualWeekNumber);
+
+        const goal = weekDays?.length || 0;
+        return { current, goal };
+      }
+    }
+
+    // FALLBACK: Legacy workout_assignments with scheduled_date
+    const mondayStr = monday.toISOString().split('T')[0];
+    const sundayStr = sunday.toISOString().split('T')[0];
+
+    const { data: assignments, error: assignError } = await supabase
+      .from('workout_assignments')
+      .select('id')
+      .eq('client_id', clientId)
+      .gte('scheduled_date', mondayStr)
+      .lte('scheduled_date', sundayStr);
+
+    if (assignError) {
+      console.error('Error fetching assignments:', assignError);
+    }
+
+    const goal = assignments?.length || 0;
 
     return { current, goal };
   } catch (error) {
@@ -246,6 +290,8 @@ export async function getDashboardStats(clientId: string): Promise<DashboardStat
 
 /**
  * Get today's workout assignment with template details
+ * Now supports both program-based workouts (via program_progress) and 
+ * legacy workout_assignments with scheduled_date
  */
 export interface TodaysWorkout {
   id: string;
@@ -254,13 +300,61 @@ export interface TodaysWorkout {
   exercises: number;
   totalSets: number;
   estimatedDuration: number;
+  // Program info (optional)
+  isProgram?: boolean;
+  programName?: string;
+  positionLabel?: string;
 }
 
 export async function getTodaysWorkout(clientId: string): Promise<TodaysWorkout | null> {
   try {
+    // FIRST: Check for active program workout using program_progress
+    const { getCurrentWorkoutFromProgress } = await import('./programProgressService');
+    const programWorkout = await getCurrentWorkoutFromProgress(supabase, clientId);
+    
+    if (programWorkout.status === 'active' && programWorkout.template_id) {
+      // Fetch template details for the program workout
+      const { data: template, error: templateError } = await supabase
+        .from('workout_templates')
+        .select('id, name, description, estimated_duration')
+        .eq('id', programWorkout.template_id)
+        .maybeSingle();
+
+      if (templateError || !template) {
+        console.error('Error fetching program workout template:', templateError);
+      } else {
+        // Get exercise count and total sets from blocks
+        const { WorkoutBlockService } = await import('@/lib/workoutBlockService');
+        const blocks = await WorkoutBlockService.getWorkoutBlocks(template.id);
+        const exerciseCount = blocks.reduce(
+          (sum, block) => sum + (block.exercises?.length || 0),
+          0
+        );
+        
+        const totalSets = blocks.reduce((sum, block) => {
+          return sum + (block.exercises?.reduce(
+            (blockSum, ex) => blockSum + (ex.sets || 0),
+            0
+          ) || 0);
+        }, 0);
+
+        return {
+          id: programWorkout.program_assignment_id!,
+          templateId: template.id,
+          name: template.name,
+          exercises: exerciseCount,
+          totalSets: totalSets,
+          estimatedDuration: template.estimated_duration || 45,
+          isProgram: true,
+          programName: programWorkout.program_name,
+          positionLabel: programWorkout.position_label,
+        };
+      }
+    }
+
+    // FALLBACK: Check for legacy workout_assignments with scheduled_date
     const today = new Date().toISOString().split('T')[0];
 
-    // Fetch today's workout assignment
     const { data: workoutAssignment, error: assignmentError } = await supabase
       .from('workout_assignments')
       .select(`
@@ -296,12 +390,11 @@ export async function getTodaysWorkout(clientId: string): Promise<TodaysWorkout 
     }
 
     if (!template) {
-      // Template not found (may have been deleted or RLS prevents access)
       console.warn('Template not found or not accessible:', workoutAssignment.workout_template_id);
       return null;
     }
 
-    // Get exercise count and total sets from blocks (single query)
+    // Get exercise count and total sets from blocks
     const { WorkoutBlockService } = await import('@/lib/workoutBlockService');
     const blocks = await WorkoutBlockService.getWorkoutBlocks(template.id);
     const exerciseCount = blocks.reduce(
@@ -309,7 +402,6 @@ export async function getTodaysWorkout(clientId: string): Promise<TodaysWorkout 
       0
     );
     
-    // Calculate total sets while we already have blocks loaded
     const totalSets = blocks.reduce((sum, block) => {
       return sum + (block.exercises?.reduce(
         (blockSum, ex) => blockSum + (ex.sets || 0),
@@ -324,6 +416,7 @@ export async function getTodaysWorkout(clientId: string): Promise<TodaysWorkout 
       exercises: exerciseCount,
       totalSets: totalSets,
       estimatedDuration: template.estimated_duration || 45,
+      isProgram: false,
     };
   } catch (error) {
     console.error('Error getting today\'s workout:', error);

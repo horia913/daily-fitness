@@ -44,6 +44,8 @@ export default function ClientDashboard() {
   const [loadingWorkout, setLoadingWorkout] = useState(true);
   const [streak, setStreak] = useState(0);
   const [weeklyProgress, setWeeklyProgress] = useState({ current: 0, goal: 0 });
+  // Track which days of the week (Mon=0, Tue=1, ... Sun=6) have completed workouts
+  const [workoutDays, setWorkoutDays] = useState<boolean[]>([false, false, false, false, false, false, false]);
   const [weeklyVolume, setWeeklyVolume] = useState(0); // in kg
   const [weeklyTime, setWeeklyTime] = useState(0); // in minutes
   const [prsCount, setPrsCount] = useState(0);
@@ -151,6 +153,25 @@ export default function ClientDashboard() {
           0
         ) || 0;
       setWeeklyTime(activeTime);
+
+      // Track which days of the week (Mon=0 to Sun=6) had completed workouts
+      const daysWithWorkouts = [false, false, false, false, false, false, false];
+      const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      if (weeklyLogs && weeklyLogs.length > 0) {
+        console.log('[Dashboard] Weekly logs for activity bars:', weeklyLogs.length, 'workouts');
+        weeklyLogs.forEach((log) => {
+          const logDate = new Date(log.completed_at);
+          // Use getUTCDay() to avoid timezone issues - database stores UTC timestamps
+          // JavaScript: Sunday=0, Monday=1, ..., Saturday=6
+          // We want: Monday=0, Tuesday=1, ..., Sunday=6
+          const jsDay = logDate.getUTCDay();
+          const dayIndex = jsDay === 0 ? 6 : jsDay - 1; // Convert to Mon=0, Sun=6
+          console.log(`[Dashboard] Workout completed_at: ${log.completed_at} -> UTC Day: ${jsDay} -> dayIndex=${dayIndex} (${dayNames[dayIndex]})`);
+          daysWithWorkouts[dayIndex] = true;
+        });
+        console.log('[Dashboard] Days with workouts:', daysWithWorkouts.map((v, i) => v ? dayNames[i] : null).filter(Boolean));
+      }
+      setWorkoutDays(daysWithWorkouts);
 
       // Calculate weekly volume from workout_set_logs
       if (weeklyLogs && weeklyLogs.length > 0) {
@@ -305,7 +326,7 @@ export default function ClientDashboard() {
                             <span
                               className="fc-pill fc-pill-glass fc-text-workouts"
                             >
-                              Next Up
+                              {todaysWorkout.isProgram ? todaysWorkout.positionLabel || 'Program' : 'Next Up'}
                             </span>
                             <span className="text-xs font-mono fc-text-dim">
                               ~{todaysWorkout.estimatedDuration} min
@@ -314,6 +335,11 @@ export default function ClientDashboard() {
                           <h2 className="text-3xl font-bold mb-2 fc-text-primary">
                             {todaysWorkout.name}
                           </h2>
+                          {todaysWorkout.isProgram && todaysWorkout.programName && (
+                            <p className="text-sm mb-2 fc-text-subtle">
+                              {todaysWorkout.programName}
+                            </p>
+                          )}
                           <div className="flex items-center gap-4 mb-6 fc-text-dim">
                             <div className="flex items-center gap-1.5">
                               <Dumbbell className="w-4 h-4" />
@@ -329,7 +355,7 @@ export default function ClientDashboard() {
                             </div>
                           </div>
                           <Link
-                            href={`/client/workouts/${todaysWorkout.id}/start`}
+                            href={todaysWorkout.isProgram ? "/client/workouts" : `/client/workouts/${todaysWorkout.id}/start`}
                           >
                             <button
                               className="fc-btn fc-btn-primary fc-press w-full md:w-auto h-12 px-8 flex items-center justify-center gap-2"
@@ -415,7 +441,7 @@ export default function ClientDashboard() {
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                   {/* Card 1: Weekly Activity */}
                   <div className="fc-glass fc-card p-6">
-                    <div className="flex justify-between items-start mb-6">
+                    <div className="flex justify-between items-start mb-4">
                       <div>
                         <p className="text-xs uppercase tracking-[0.2em] fc-text-dim mb-1">
                           Snapshot
@@ -424,7 +450,15 @@ export default function ClientDashboard() {
                           Weekly Activity
                         </h3>
                       </div>
-                      {streak > 0 && (
+                      {/* Show NEW WEEK badge if no workouts this week, otherwise show streak */}
+                      {weeklyProgress.current === 0 ? (
+                        <div className="fc-pill fc-pill-glass text-cyan-400 flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          <span className="text-xs font-bold tracking-tighter">
+                            NEW WEEK
+                          </span>
+                        </div>
+                      ) : streak > 0 ? (
                         <div
                           className="fc-pill fc-pill-glass fc-text-warning fc-streak-pulse flex items-center gap-1"
                         >
@@ -433,69 +467,91 @@ export default function ClientDashboard() {
                             {streak}-DAY STREAK
                           </span>
                         </div>
-                      )}
+                      ) : null}
                     </div>
-                    <div className="grid grid-cols-4 gap-4 mb-6">
-                      <div className="text-center">
-                      <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
-                          Workouts
+
+                    {/* NEW WEEK state - show motivational message */}
+                    {weeklyProgress.current === 0 ? (
+                      <div className="text-center py-6">
+                        <div className="fc-icon-tile fc-icon-workouts w-16 h-16 mx-auto mb-4">
+                          <Dumbbell className="w-8 h-8" />
                         </div>
-                        <div className="text-xl font-bold font-mono fc-text-primary">
-                          {weeklyProgress.current}
-                          <span className="text-sm fc-text-subtle">
-                            /{weeklyProgress.goal || 0}
-                          </span>
-                        </div>
+                        <h4 className="text-lg font-semibold fc-text-primary mb-2">
+                          New week to crush!
+                        </h4>
+                        <p className="text-sm fc-text-dim mb-4">
+                          Start your first workout to track this week's progress
+                        </p>
+                        {weeklyProgress.goal > 0 && (
+                          <p className="text-xs fc-text-subtle">
+                            Goal: {weeklyProgress.goal} workout{weeklyProgress.goal !== 1 ? 's' : ''} this week
+                          </p>
+                        )}
                       </div>
-                      <div className="text-center">
-                      <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
-                          Volume
+                    ) : (
+                      <>
+                        {/* Stats grid - only shown when there's activity */}
+                        <div className="grid grid-cols-4 gap-4 mb-6">
+                          <div className="text-center">
+                            <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
+                              Workouts
+                            </div>
+                            <div className="text-xl font-bold font-mono fc-text-primary">
+                              {weeklyProgress.current}
+                              <span className="text-sm fc-text-subtle">
+                                /{weeklyProgress.goal || 0}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
+                              Volume
+                            </div>
+                            <div className="text-xl font-bold font-mono fc-text-primary">
+                              {weeklyVolume > 0 ? `${weeklyVolume}k` : "0"}
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
+                              Time
+                            </div>
+                            <div className="text-xl font-bold font-mono fc-text-primary">
+                              {weeklyTime}m
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
+                              PRs
+                            </div>
+                            <div className="text-xl font-bold font-mono fc-text-success">
+                              {prsCount}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-xl font-bold font-mono fc-text-primary">
-                          {weeklyVolume > 0 ? `${weeklyVolume}k` : "0"}
+                        {/* Weekly Activity Indicator - Shows actual workout days */}
+                        <div className="space-y-1">
+                          <div className="flex gap-1">
+                            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, i) => (
+                              <div key={day} className="flex-1 text-center">
+                                <span className="text-[9px] uppercase tracking-wider fc-text-dim">
+                                  {day}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-1 h-3">
+                            {workoutDays.map((hasWorkout, i) => (
+                              <div
+                                key={i}
+                                className={`flex-1 rounded-sm ${
+                                  hasWorkout ? "fc-activity-on" : "fc-activity-off"
+                                }`}
+                              />
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-center">
-                      <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
-                          Time
-                        </div>
-                        <div className="text-xl font-bold font-mono fc-text-primary">
-                          {weeklyTime}m
-                        </div>
-                      </div>
-                      <div className="text-center">
-                      <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim mb-1">
-                          PRs
-                        </div>
-                        <div className="text-xl font-bold font-mono fc-text-success">
-                          {prsCount}
-                        </div>
-                      </div>
-                    </div>
-                    {/* Simple Activity Indicator */}
-                    <div className="flex gap-1 h-3">
-                      {Array.from({ length: 7 }).map((_, i) => {
-                        const dayProgress =
-                          i <
-                          Math.floor(
-                            (weeklyProgress.current /
-                              (weeklyProgress.goal || 1)) *
-                              7
-                          )
-                            ? weeklyProgress.goal > 0
-                              ? 1
-                              : 0
-                            : 0;
-                        return (
-                          <div
-                            key={i}
-                            className={`flex-1 rounded-sm ${
-                              dayProgress > 0 ? "fc-activity-on" : "fc-activity-off"
-                            }`}
-                          />
-                        );
-                      })}
-                    </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Card 2: Progress Snapshot */}

@@ -1,6 +1,9 @@
 /**
  * Program Service
  * Handles program-related queries: active programs, weekly goals, and streak calculations
+ * 
+ * UPDATED: Now uses the new program_progress + program_day_completions + program_schedule tables
+ * instead of the legacy program_day_assignments table.
  */
 
 import { supabase } from './supabase'
@@ -12,9 +15,10 @@ export interface ActiveProgram {
   start_date: string
   total_days: number
   duration_weeks: number
-  workouts_per_week: number | null // Calculated: total_days / duration_weeks
-  current_day_number: number
-  completed_days: number
+  workouts_per_week: number | null // Calculated from program_schedule
+  current_week_index: number
+  current_day_index: number
+  is_completed: boolean
   status: string
 }
 
@@ -27,37 +31,54 @@ export interface WeekCompletion {
 
 /**
  * Get active program assignment for a client
+ * Now includes program_progress data for current position
  */
 export async function getActiveProgram(clientId: string): Promise<ActiveProgram | null> {
   try {
-    // Use limit(1) to handle cases where multiple active programs exist
-    // Order by start_date DESC to get the most recent one
-    const { data, error } = await supabase
+    // Get active program assignment
+    const { data: assignments, error: assignError } = await supabase
       .from('program_assignments')
       .select('*')
       .eq('client_id', clientId)
       .eq('status', 'active')
-      .order('start_date', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(1)
 
-    if (error) {
-      console.error('Error fetching active program:', error)
+    if (assignError) {
+      console.error('Error fetching active program:', assignError)
       return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!assignments || assignments.length === 0) return null
 
-    const program = data[0]
+    const assignment = assignments[0]
 
-    // Calculate workouts_per_week with division by zero protection
-    const workouts_per_week = 
-      program.total_days > 0 && program.duration_weeks > 0
-        ? (program.total_days / program.duration_weeks)
-        : null
+    // Get program_progress for current position
+    const { data: progress } = await supabase
+      .from('program_progress')
+      .select('current_week_index, current_day_index, is_completed')
+      .eq('program_assignment_id', assignment.id)
+      .maybeSingle()
+
+    // Get program_schedule to calculate workouts_per_week
+    const { data: scheduleRows } = await supabase
+      .from('program_schedule')
+      .select('week_number')
+      .eq('program_id', assignment.program_id)
+
+    // Calculate average workouts per week from schedule
+    let workouts_per_week: number | null = null
+    if (scheduleRows && scheduleRows.length > 0) {
+      const uniqueWeeks = [...new Set(scheduleRows.map(r => r.week_number))]
+      workouts_per_week = scheduleRows.length / uniqueWeeks.length
+    }
 
     return {
-      ...program,
-      workouts_per_week
+      ...assignment,
+      workouts_per_week,
+      current_week_index: progress?.current_week_index ?? 0,
+      current_day_index: progress?.current_day_index ?? 0,
+      is_completed: progress?.is_completed ?? false
     }
   } catch (error) {
     console.error('Error in getActiveProgram:', error)
@@ -66,13 +87,58 @@ export async function getActiveProgram(clientId: string): Promise<ActiveProgram 
 }
 
 /**
- * Get weekly goal from active program
- * Returns the number of workouts per week, or null if no active program
+ * Get weekly workout goal for a client
+ * 
+ * LOGIC: Returns MAX(program_week_workouts, client_personal_goal)
+ * - If client has a personal weekly goal higher than program, use that
+ * - This allows clients to do extra standalone workouts beyond their program
+ * 
+ * Currently: Only program_schedule is used (no client weekly goal field yet)
+ * Future: Add profiles.weekly_workout_goal column and use MAX of both
  */
 export async function getWeeklyGoal(clientId: string): Promise<number | null> {
   try {
+    // TODO: When profiles.weekly_workout_goal is added, fetch it here:
+    // const { data: profile } = await supabase
+    //   .from('profiles')
+    //   .select('weekly_workout_goal')
+    //   .eq('id', clientId)
+    //   .maybeSingle()
+    // const clientWeeklyGoal = profile?.weekly_workout_goal || 0
+    const clientWeeklyGoal = 0 // Placeholder until field is added
+
     const activeProgram = await getActiveProgram(clientId)
-    return activeProgram?.workouts_per_week ?? null
+    
+    // If no active program, return client's personal goal (or null if none set)
+    if (!activeProgram) {
+      return clientWeeklyGoal > 0 ? clientWeeklyGoal : null
+    }
+
+    // Get current week index from program_progress
+    const currentWeekIndex = activeProgram.current_week_index
+
+    // Get program_schedule to find current week's workout count
+    const { data: scheduleRows } = await supabase
+      .from('program_schedule')
+      .select('week_number')
+      .eq('program_id', activeProgram.program_id)
+
+    if (!scheduleRows || scheduleRows.length === 0) {
+      return clientWeeklyGoal > 0 ? clientWeeklyGoal : null
+    }
+
+    // Get unique week numbers sorted
+    const uniqueWeeks = [...new Set(scheduleRows.map(r => r.week_number))].sort((a, b) => a - b)
+    
+    // Get the actual week_number for current index
+    const actualWeekNumber = uniqueWeeks[currentWeekIndex] || uniqueWeeks[0] || 1
+    
+    // Count days in this week from program_schedule
+    const programWeekDays = scheduleRows.filter(r => r.week_number === actualWeekNumber).length
+    
+    // Return MAX of program week days and client personal goal
+    // This allows clients to set a higher goal and do extra standalone workouts
+    return Math.max(programWeekDays, clientWeeklyGoal)
   } catch (error) {
     console.error('Error in getWeeklyGoal:', error)
     return null
@@ -81,62 +147,42 @@ export async function getWeeklyGoal(clientId: string): Promise<number | null> {
 
 /**
  * Get complete weeks for a client's active program
- * Returns array of weeks with completion status
+ * Now uses program_day_completions table
  */
 export async function getCompleteWeeks(clientId: string): Promise<WeekCompletion[]> {
   try {
-    // First get active program to ensure we have valid total_days and duration_weeks
     const activeProgram = await getActiveProgram(clientId)
-    
-    if (!activeProgram || !activeProgram.workouts_per_week) {
-      // No active program or invalid configuration (total_days = 0 or duration_weeks = 0)
-      return []
-    }
+    if (!activeProgram) return []
 
-    // Query program_day_assignments grouped by calculated week
-    // Use raw SQL via RPC or calculate in application
-    // Since Supabase doesn't easily support CEIL in select, we'll calculate in TypeScript
-    const { data: dayAssignments, error } = await supabase
-      .from('program_day_assignments')
-      .select('*')
+    // Get program_schedule to understand structure
+    const { data: scheduleRows } = await supabase
+      .from('program_schedule')
+      .select('week_number')
+      .eq('program_id', activeProgram.program_id)
+
+    if (!scheduleRows || scheduleRows.length === 0) return []
+
+    // Get completions from program_day_completions
+    const { data: completions } = await supabase
+      .from('program_day_completions')
+      .select('week_index, day_index')
       .eq('program_assignment_id', activeProgram.id)
 
-    if (error) {
-      console.error('Error fetching program day assignments:', error)
-      return []
-    }
+    // Get unique week numbers sorted
+    const uniqueWeeks = [...new Set(scheduleRows.map(r => r.week_number))].sort((a, b) => a - b)
 
-    if (!dayAssignments || dayAssignments.length === 0) {
-      return []
-    }
-
-    // Calculate week_number for each day assignment
-    const workoutsPerWeek = activeProgram.workouts_per_week
-    const weeksMap = new Map<number, { total: number; completed: number }>()
-
-    dayAssignments.forEach(day => {
-      const weekNumber = Math.ceil(day.day_number / workoutsPerWeek)
+    // Build week completion data
+    const weeks: WeekCompletion[] = uniqueWeeks.map((weekNum, weekIndex) => {
+      const daysInWeek = scheduleRows.filter(r => r.week_number === weekNum).length
+      const completedInWeek = completions?.filter(c => c.week_index === weekIndex).length || 0
       
-      if (!weeksMap.has(weekNumber)) {
-        weeksMap.set(weekNumber, { total: 0, completed: 0 })
-      }
-
-      const week = weeksMap.get(weekNumber)!
-      week.total++
-      if (day.is_completed) {
-        week.completed++
+      return {
+        week_number: weekNum,
+        total_workouts_in_week: daysInWeek,
+        completed_workouts_in_week: completedInWeek,
+        is_week_complete: completedInWeek >= daysInWeek
       }
     })
-
-    // Convert map to array of WeekCompletion
-    const weeks: WeekCompletion[] = Array.from(weeksMap.entries())
-      .map(([week_number, stats]) => ({
-        week_number,
-        total_workouts_in_week: stats.total,
-        completed_workouts_in_week: stats.completed,
-        is_week_complete: stats.completed === stats.total
-      }))
-      .sort((a, b) => a.week_number - b.week_number)
 
     return weeks
   } catch (error) {
@@ -146,27 +192,52 @@ export async function getCompleteWeeks(clientId: string): Promise<WeekCompletion
 }
 
 /**
- * Calculate streak (consecutive complete weeks)
- * Returns the number of consecutive complete weeks starting from the most recent week
+ * Calculate streak (consecutive days with completed workouts)
+ * Uses workout_logs table for accurate day-based streak calculation
  */
 export async function getStreak(clientId: string): Promise<number> {
   try {
-    const completeWeeks = await getCompleteWeeks(clientId)
-    
-    if (completeWeeks.length === 0) {
+    // Get all completed workout logs, ordered by completion date descending
+    const { data: logs, error } = await supabase
+      .from('workout_logs')
+      .select('completed_at')
+      .eq('client_id', clientId)
+      .not('completed_at', 'is', null)
+      .order('completed_at', { ascending: false })
+
+    if (error || !logs || logs.length === 0) {
       return 0
     }
 
-    // Sort by week_number DESC (most recent first)
-    const sortedWeeks = [...completeWeeks].sort((a, b) => b.week_number - a.week_number)
+    // Extract unique dates (YYYY-MM-DD)
+    const uniqueDates = Array.from(
+      new Set(
+        logs.map(log => new Date(log.completed_at!).toISOString().split('T')[0])
+      )
+    ).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
 
-    // Count consecutive complete weeks starting from most recent
-    let streak = 0
-    for (const week of sortedWeeks) {
-      if (week.is_week_complete) {
+    if (uniqueDates.length === 0) return 0
+
+    // Check if streak is current (most recent date should be today or yesterday)
+    const today = new Date().toISOString().split('T')[0]
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+    
+    if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) {
+      return 0 // Streak broken
+    }
+
+    // Count consecutive days
+    let streak = 1
+    let expectedDate = new Date(uniqueDates[0])
+    
+    for (let i = 1; i < uniqueDates.length; i++) {
+      expectedDate.setDate(expectedDate.getDate() - 1)
+      const expectedDateStr = expectedDate.toISOString().split('T')[0]
+      
+      if (uniqueDates[i] === expectedDateStr) {
         streak++
       } else {
-        break // Stop at first incomplete week
+        break // Streak broken
       }
     }
 
@@ -178,29 +249,39 @@ export async function getStreak(clientId: string): Promise<number> {
 }
 
 /**
- * Get completed workouts count for current week
- * Returns the number of completed workouts in the current week (based on active program)
+ * Get completed workouts count for current CALENDAR week (Mon-Sun)
+ * Uses workout_logs for consistency with dashboard
  */
 export async function getCurrentWeekCompletedWorkouts(clientId: string): Promise<number> {
   try {
-    const activeProgram = await getActiveProgram(clientId)
+    // Get start and end of current calendar week (Monday to Sunday)
+    const now = new Date()
+    const dayOfWeek = now.getDay()
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
     
-    if (!activeProgram || !activeProgram.workouts_per_week) {
+    const monday = new Date(now)
+    monday.setDate(now.getDate() + diffToMonday)
+    monday.setHours(0, 0, 0, 0)
+    
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    sunday.setHours(23, 59, 59, 999)
+
+    // Count completed workouts this calendar week from workout_logs
+    const { count, error } = await supabase
+      .from('workout_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .not('completed_at', 'is', null)
+      .gte('completed_at', monday.toISOString())
+      .lte('completed_at', sunday.toISOString())
+
+    if (error) {
+      console.error('Error fetching current week completions:', error)
       return 0
     }
 
-    const completeWeeks = await getCompleteWeeks(clientId)
-    
-    if (completeWeeks.length === 0) {
-      return 0
-    }
-
-    // Find current week (highest week_number)
-    const currentWeek = completeWeeks.reduce((max, week) => 
-      week.week_number > max.week_number ? week : max
-    )
-
-    return currentWeek.completed_workouts_in_week
+    return count ?? 0
   } catch (error) {
     console.error('Error in getCurrentWeekCompletedWorkouts:', error)
     return 0

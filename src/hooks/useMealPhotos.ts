@@ -8,33 +8,59 @@ import {
   isMealLoggedToday,
   getTodayAdherence,
   deleteMealPhoto,
+  validateMealOptionForUpload,
   type MealPhotoLog,
   type UploadPhotoResult
 } from '@/lib/mealPhotoService'
 
 /**
  * Hook for meal photo uploads with "1 photo per meal per day" enforcement
+ * 
+ * IMPORTANT: meal_option_id is INFORMATIONAL ONLY
+ * - If meal has options → mealOptionId is REQUIRED
+ * - If meal has no options → mealOptionId should be NULL/undefined
+ * - You CANNOT upload multiple photos for the same meal by using different options
  */
 export function useMealPhotoUpload(clientId: string) {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
+  /**
+   * Upload a meal photo
+   * @param mealId - The meal ID
+   * @param file - The photo file
+   * @param logDate - Optional date (defaults to today)
+   * @param notes - Optional notes
+   * @param mealOptionId - Option ID if meal has options (INFORMATIONAL ONLY)
+   * @param mealHasOptions - Whether the meal has options configured (for validation)
+   */
   const upload = useCallback(async (
     mealId: string,
     file: File,
     logDate?: string,
-    notes?: string
+    notes?: string,
+    mealOptionId?: string | null,
+    mealHasOptions?: boolean
   ): Promise<UploadPhotoResult> => {
     setUploading(true)
     setError(null)
     setUploadProgress(0)
 
     try {
+      // Validate option requirement if meal has options
+      if (mealHasOptions !== undefined) {
+        const validationError = validateMealOptionForUpload(mealHasOptions, mealOptionId)
+        if (validationError) {
+          setError(validationError)
+          return { success: false, error: validationError }
+        }
+      }
+
       // Simulate progress (real progress tracking would need additional setup)
       setUploadProgress(25)
       
-      const result = await uploadMealPhoto(clientId, mealId, file, logDate, notes)
+      const result = await uploadMealPhoto(clientId, mealId, file, logDate, notes, mealOptionId)
       
       setUploadProgress(100)
       

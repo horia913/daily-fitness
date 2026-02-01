@@ -94,40 +94,40 @@ export default function WorkoutAssignmentModal({
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
+        console.log("[WorkoutAssignmentModal] No user logged in");
         setWorkoutTemplates([]);
         setClients([]);
         return;
       }
+      
+      console.log("[WorkoutAssignmentModal] Current user ID:", user.id);
 
       // Load workout templates
+      // Note: category is a TEXT column, not a foreign key to categories table
       const { data: templates, error: templatesError } = await supabase
         .from("workout_templates")
-        .select(
-          `
-          id, name, description, estimated_duration, difficulty_level,
-          category:categories(name, color)
-        `
-        )
+        .select("id, name, description, estimated_duration, difficulty_level, category")
         .eq("coach_id", user.id)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
+
+      console.log("[WorkoutAssignmentModal] Templates query result:", {
+        count: templates?.length || 0,
+        error: templatesError,
+        userId: user.id,
+        templates: templates
+      });
 
       if (templatesError) {
         console.log("Error loading workout templates:", templatesError);
         setWorkoutTemplates([]);
       } else {
-        // Transform the data to match our interface
-        const transformedTemplates = (templates || []).map((template) => ({
+        // Transform the data - category is now a simple text field
+        const transformedTemplates = (templates || []).map((template: any) => ({
           ...template,
-          category:
-            template.category &&
-            Array.isArray(template.category) &&
-            template.category.length > 0
-              ? {
-                  name: template.category[0].name || "Uncategorized",
-                  color: template.category[0].color || "#6B7280",
-                }
-              : undefined,
+          category: template.category
+            ? { name: template.category, color: "#6B7280" }
+            : undefined,
         }));
         setWorkoutTemplates(transformedTemplates);
       }
@@ -138,6 +138,12 @@ export default function WorkoutAssignmentModal({
         .select("*")
         .eq("coach_id", user.id)
         .eq("status", "active");
+      
+      console.log("[WorkoutAssignmentModal] Clients query result:", {
+        count: clientsData?.length || 0,
+        error: clientsError,
+        data: clientsData
+      });
 
       if (clientsError) {
         console.error("Error loading clients:", clientsError);

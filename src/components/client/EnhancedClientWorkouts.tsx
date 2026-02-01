@@ -47,6 +47,7 @@ import WorkoutTemplateService, {
 } from "@/lib/workoutTemplateService";
 import { usePathname } from "next/navigation";
 import { fetchApi } from "@/lib/apiClient";
+import { getCurrentWorkoutFromProgress } from "@/lib/programProgressService";
 
 type WorkoutSummaryPayload = {
   avatarUrl: string | null;
@@ -169,6 +170,9 @@ export default function EnhancedClientWorkouts({
     activeTime: 0,
   });
   const [allTimeVolume, setAllTimeVolume] = useState(0);
+  const [dayStreak, setDayStreak] = useState(0);
+  const [thisMonthWorkouts, setThisMonthWorkouts] = useState(0);
+  const [successRate, setSuccessRate] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [thisWeekAssignments, setThisWeekAssignments] = useState<any[]>([]);
   const [assignmentIdByTemplate, setAssignmentIdByTemplate] = useState<
@@ -480,119 +484,109 @@ export default function EnhancedClientWorkouts({
         );
 
         if (programAssignment) {
-          // Get the next incomplete program_day_assignments for this program
-          // SOURCE OF TRUTH: Next program workout = earliest program_day_assignments where is_completed IS NOT true
-          const { data: nextProgramDay, error: programDayError } = await supabase
-            .from("program_day_assignments")
-            .select(
-              `
-              id,
-              day_number,
-              workout_template_id,
-              workout_assignment_id,
-              is_completed,
-              name,
-              description,
-              day_type
-            `
-            )
-            .eq("program_assignment_id", programAssignment.id)
-            .eq("day_type", "workout")
-            .or("is_completed.is.null,is_completed.eq.false")
-            .order("day_number", { ascending: true })
-            .limit(1)
-            .maybeSingle();
+          // ========================================================================
+          // NEW: Use program_progress as SOURCE OF TRUTH for next program workout
+          // This replaces the legacy program_day_assignments logic
+          // ========================================================================
+          const workoutInfo = await getCurrentWorkoutFromProgress(supabase, clientId);
+          
+          console.log(
+            "🔍 Client Workouts - getCurrentWorkoutFromProgress result:",
+            workoutInfo
+          );
 
-          if (programDayError) {
-            console.error(
-              "🔍 Client Workouts - Error loading next program day:",
-              programDayError
-            );
-          }
+          if (workoutInfo.status === "active" && workoutInfo.template_id) {
+            const programName = workoutInfo.program_name || programAssignment.name || "Program";
 
-          if (nextProgramDay && !nextProgramDay.is_completed) {
-            const programName =
-              nextProgramDay.name && nextProgramDay.name.trim().length > 0
-                ? nextProgramDay.name
-                : programAssignment.name && programAssignment.name.trim().length > 0
-                ? programAssignment.name
-                : "Program";
-            const programDescription =
-              nextProgramDay.description && nextProgramDay.description.trim().length > 0
-                ? nextProgramDay.description
-                : programAssignment.description &&
-                  programAssignment.description.trim().length > 0
-                ? programAssignment.description
-                : "";
-
-            // Load exercises from workout template if available
+            // Load exercises from workout template and get template info
             let programExercises: DailyWorkoutExercise[] = [];
-            if (nextProgramDay.workout_template_id) {
-              try {
-                const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
-                const blocks = await WorkoutBlockService.getWorkoutBlocks(
-                  nextProgramDay.workout_template_id
-                );
-                programExercises = blocks
-                  .flatMap((block) => {
-                    return (block.exercises || []).map((exercise, index) => ({
-                      id: exercise.id || `${block.id}-${index}`,
-                      exerciseId: exercise.exercise_id || "",
-                      name: exercise.exercise?.name || "Exercise",
-                      description: exercise.exercise?.description || "",
-                      orderIndex: exercise.exercise_order ?? index,
-                      notes: exercise.notes || undefined,
-                      sets: exercise.sets || 0,
-                      reps: exercise.reps || "",
-                      restSeconds: exercise.rest_seconds || 60,
-                      progressionNotes: undefined,
-                      weightGuidance: undefined,
-                    }));
-                  })
-                  .sort((a, b) => a.orderIndex - b.orderIndex);
-              } catch (blocksError) {
-                console.error(
-                  "🔍 Client Workouts - Error loading workout blocks:",
-                  blocksError
-                );
-              }
+            let estimatedDuration = 45; // Default duration
+            try {
+              const { WorkoutBlockService } = await import("@/lib/workoutBlockService");
+              const blocks = await WorkoutBlockService.getWorkoutBlocks(
+                workoutInfo.template_id
+              );
+              programExercises = blocks
+                .flatMap((block) => {
+                  return (block.exercises || []).map((exercise, index) => ({
+                    id: exercise.id || `${block.id}-${index}`,
+                    exerciseId: exercise.exercise_id || "",
+                    name: exercise.exercise?.name || "Exercise",
+                    description: exercise.exercise?.description || "",
+                    orderIndex: exercise.exercise_order ?? index,
+                    notes: exercise.notes || undefined,
+                    sets: exercise.sets || 0,
+                    reps: exercise.reps || "",
+                    restSeconds: exercise.rest_seconds || 60,
+                    progressionNotes: undefined,
+                    weightGuidance: undefined,
+                  }));
+                })
+                .sort((a, b) => a.orderIndex - b.orderIndex);
+              
+              // Estimate duration: ~3 min per exercise (including rest)
+              estimatedDuration = Math.max(15, programExercises.length * 3);
+            } catch (blocksError) {
+              console.error(
+                "🔍 Client Workouts - Error loading workout blocks:",
+                blocksError
+              );
             }
 
-            // Set nextWorkout with program_day_assignments.id (stored in scheduleId field)
+            // Also try to get estimated_duration from template
+            try {
+              const { data: templateData } = await supabase
+                .from("workout_templates")
+                .select("estimated_duration")
+                .eq("id", workoutInfo.template_id)
+                .maybeSingle();
+              if (templateData?.estimated_duration) {
+                estimatedDuration = templateData.estimated_duration;
+              }
+            } catch (err) {
+              // Ignore - use calculated estimate
+            }
+
+            // Set nextWorkout with program_schedule info (stored in scheduleId field)
             nextWorkout = {
               hasWorkout: true,
-              templateId: nextProgramDay.workout_template_id || undefined,
-              scheduleId: nextProgramDay.id, // Store program_day_assignments.id here
+              templateId: workoutInfo.template_id,
+              scheduleId: workoutInfo.schedule_row_id, // program_schedule.id for routing
               templateName: programName,
-              templateDescription: programDescription,
-              weekNumber: 1,
-              programDay: nextProgramDay.day_number || 1,
+              templateDescription: "",
+              weekNumber: workoutInfo.actual_week_number || 1,
+              programDay: (workoutInfo.current_day_index || 0) + 1, // 1-based for display
               exercises: programExercises,
+              estimatedDuration: estimatedDuration,
               generatedAt: programAssignment.start_date,
-              message: "Program workout ready!",
+              message: workoutInfo.position_label ? `${workoutInfo.position_label} ready!` : "Program workout ready!",
             };
             console.log(
-              "🔍 Client Workouts - Set program day assignment as workout:",
+              "🔍 Client Workouts - Set program workout from progress:",
               nextWorkout
             );
+          } else if (workoutInfo.status === "completed") {
+            // Program is completed
+            nextWorkout = {
+              hasWorkout: false,
+              templateId: programAssignment.program_id || undefined,
+              templateName: workoutInfo.program_name || programAssignment.name || "Program",
+              templateDescription: "",
+              message: "Congratulations! Program completed!",
+            };
           } else if (!nextWorkout || !nextWorkout.hasWorkout) {
-            // Fallback: no incomplete program days found, but show program info
+            // Fallback: no active program or other issue
             const programName =
               programAssignment.name && programAssignment.name.trim().length > 0
                 ? programAssignment.name
                 : "Program";
-            const programDescription =
-              programAssignment.description &&
-              programAssignment.description.trim().length > 0
-                ? programAssignment.description
-                : "";
 
             nextWorkout = {
               hasWorkout: false,
               templateId: programAssignment.program_id || undefined,
               templateName: programName,
-              templateDescription: programDescription,
-              message: "All program workouts completed!",
+              templateDescription: "",
+              message: workoutInfo.message || "No workout available",
             };
           }
         }
@@ -612,9 +606,9 @@ export default function EnhancedClientWorkouts({
         : null;
 
       if (activeProgramAssignment) {
-        // Get program metrics from program_day_assignments
+        // Get program metrics from program_day_completions (new system)
         const { getProgramMetrics } = await import("@/lib/programMetricsService");
-        const programMetrics = await getProgramMetrics(activeProgramAssignment.id);
+        const programMetrics = await getProgramMetrics(activeProgramAssignment.id, supabase);
 
         // Get program details
         let programData = null;
@@ -948,9 +942,10 @@ export default function EnhancedClientWorkouts({
 
         const { data: allTimeLogs } = await supabase
           .from("workout_logs")
-          .select("total_weight_lifted")
+          .select("total_weight_lifted, completed_at")
           .eq("client_id", clientId)
-          .not("completed_at", "is", null);
+          .not("completed_at", "is", null)
+          .order("completed_at", { ascending: false });
 
         const totalAllTimeVolume =
           allTimeLogs?.reduce(
@@ -958,6 +953,55 @@ export default function EnhancedClientWorkouts({
             0
           ) || 0;
         setAllTimeVolume(Math.round(totalAllTimeVolume));
+
+        // Calculate Day Streak (consecutive days with completed workouts)
+        if (allTimeLogs && allTimeLogs.length > 0) {
+          const uniqueDates = [...new Set(
+            allTimeLogs.map(log => new Date(log.completed_at!).toISOString().split('T')[0])
+          )].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+          
+          const todayStr = new Date().toISOString().split('T')[0];
+          const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+          
+          // Check if streak is current (most recent should be today or yesterday)
+          if (uniqueDates[0] === todayStr || uniqueDates[0] === yesterdayStr) {
+            let streak = 1;
+            let expectedDate = new Date(uniqueDates[0]);
+            
+            for (let i = 1; i < uniqueDates.length; i++) {
+              expectedDate.setDate(expectedDate.getDate() - 1);
+              const expectedStr = expectedDate.toISOString().split('T')[0];
+              if (uniqueDates[i] === expectedStr) {
+                streak++;
+              } else {
+                break;
+              }
+            }
+            setDayStreak(streak);
+          } else {
+            setDayStreak(0);
+          }
+        }
+
+        // Calculate This Month Workouts
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const thisMonthCount = allTimeLogs?.filter(log => 
+          new Date(log.completed_at!) >= monthStart
+        ).length || 0;
+        setThisMonthWorkouts(thisMonthCount);
+
+        // Calculate Success Rate (completed / total assigned * 100)
+        const { data: totalAssignments } = await supabase
+          .from("workout_assignments")
+          .select("id")
+          .eq("client_id", clientId);
+        
+        const totalAssigned = totalAssignments?.length || 0;
+        const totalCompleted = allTimeLogs?.length || 0;
+        const rate = totalAssigned > 0 ? Math.round((totalCompleted / totalAssigned) * 100) : 0;
+        setSuccessRate(Math.min(rate, 100)); // Cap at 100%
 
         // Load this week's workout assignments
         const mondayStr = monday.toISOString().split("T")[0];
@@ -1144,6 +1188,38 @@ export default function EnhancedClientWorkouts({
   }, [loading]);
 
   const startWorkout = async (workout: DailyWorkout) => {
+    // ========================================================================
+    // NEW: For program workouts (weekNumber exists), use the new progress-based API
+    // This creates/gets a workout_assignment from the current program_progress position
+    // ========================================================================
+    if (workout.weekNumber && workout.templateId) {
+      try {
+        console.log("🚀 Starting program workout via start-from-progress API...");
+        const response = await fetchApi("/api/program-workouts/start-from-progress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}), // Uses auth.uid() automatically
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          console.error("Error starting program workout:", errorData);
+          // Fall through to legacy handling
+        } else {
+          const result = await response.json();
+          if (result.workout_assignment_id) {
+            console.log("🚀 Got workout_assignment_id:", result.workout_assignment_id);
+            router.push(`/client/workouts/${result.workout_assignment_id}/start`);
+            return;
+          }
+        }
+      } catch (apiError) {
+        console.error("Error calling start-from-progress API:", apiError);
+        // Fall through to legacy handling
+      }
+    }
+
+    // Legacy: If scheduleId is a program_day_assignments.id or workout_assignments.id
     if (workout.scheduleId) {
       router.push(`/client/workouts/${workout.scheduleId}/start`);
       return;
@@ -1531,57 +1607,57 @@ export default function EnhancedClientWorkouts({
             <div className="grid grid-cols-4 gap-2 sm:gap-3">
               <GlassCard
                 elevation={1}
-                className="fc-glass fc-card p-3 sm:p-4 text-center flex flex-col items-center gap-2"
+                className="fc-glass fc-card p-2 sm:p-4 text-center flex flex-col items-center justify-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[100px]"
               >
-                <div className="fc-icon-tile fc-icon-habits w-9 h-9">
-                  <Flame className="w-4 h-4" />
+                <div className="fc-icon-tile fc-icon-habits w-7 h-7 sm:w-9 sm:h-9">
+                  <Flame className="w-3 h-3 sm:w-4 sm:h-4" />
                 </div>
-                <div className="text-lg sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
-                  7
+                <div className="text-base sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
+                  {dayStreak}
                 </div>
-                <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] fc-text-dim">
+                <div className="text-[9px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.18em] fc-text-dim leading-tight">
                   Day Streak
                 </div>
               </GlassCard>
               <GlassCard
                 elevation={1}
-                className="fc-glass fc-card p-3 sm:p-4 text-center flex flex-col items-center gap-2"
+                className="fc-glass fc-card p-2 sm:p-4 text-center flex flex-col items-center justify-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[100px]"
               >
-                <div className="fc-icon-tile fc-icon-challenges w-9 h-9">
-                  <Trophy className="w-4 h-4" />
+                <div className="fc-icon-tile fc-icon-challenges w-7 h-7 sm:w-9 sm:h-9">
+                  <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
                 </div>
-                <div className="text-lg sm:text-2xl font-extrabold fc-text-primary leading-tight">
-                  12
+                <div className="text-base sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
+                  {thisMonthWorkouts}
                 </div>
-                <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] fc-text-dim">
+                <div className="text-[9px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.18em] fc-text-dim leading-tight">
                   This Month
                 </div>
               </GlassCard>
               <GlassCard
                 elevation={1}
-                className="fc-glass fc-card p-3 sm:p-4 text-center flex flex-col items-center gap-2"
+                className="fc-glass fc-card p-2 sm:p-4 text-center flex flex-col items-center justify-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[100px]"
               >
-                <div className="fc-icon-tile fc-icon-workouts w-9 h-9">
-                  <TrendingUp className="w-4 h-4" />
+                <div className="fc-icon-tile fc-icon-workouts w-7 h-7 sm:w-9 sm:h-9">
+                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
                 </div>
-                <div className="text-lg sm:text-2xl font-extrabold fc-text-primary leading-tight">
-                  85%
+                <div className="text-base sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
+                  {successRate}%
                 </div>
-                <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] fc-text-dim">
+                <div className="text-[9px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.18em] fc-text-dim leading-tight">
                   Success Rate
                 </div>
               </GlassCard>
               <GlassCard
                 elevation={1}
-                className="fc-glass fc-card p-3 sm:p-4 text-center flex flex-col items-center gap-2"
+                className="fc-glass fc-card p-2 sm:p-4 text-center flex flex-col items-center justify-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[100px]"
               >
-                <div className="fc-icon-tile fc-icon-meals w-9 h-9">
-                  <Dumbbell className="w-4 h-4" />
+                <div className="fc-icon-tile fc-icon-meals w-7 h-7 sm:w-9 sm:h-9">
+                  <Dumbbell className="w-3 h-3 sm:w-4 sm:h-4" />
                 </div>
-                <div className="text-lg sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
+                <div className="text-base sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
                   {allTimeVolume.toLocaleString()}
                 </div>
-                <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] fc-text-dim">
+                <div className="text-[9px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.18em] fc-text-dim leading-tight">
                   All Time kg
                 </div>
               </GlassCard>
@@ -1629,51 +1705,41 @@ export default function EnhancedClientWorkouts({
                         <div className={isSkipped ? "opacity-70" : ""}>
                           <GlassCard
                             elevation={2}
-                            className={`fc-glass fc-card fc-list-row p-5 flex items-center justify-between cursor-pointer fc-hover-rise fc-press ${
+                            className={`fc-glass fc-card fc-list-row p-4 sm:p-5 cursor-pointer fc-hover-rise fc-press ${
                               isCompleted ? "fc-accent-workouts" : ""
                             }`}
                           >
-                        <div className="flex items-center gap-5">
-                          <div className={`fc-icon-tile fc-icon-workouts ${dateVariant}`}>
-                            <CalendarIcon className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <h4 className="text-lg font-semibold leading-tight fc-text-primary mb-1">
-                              {assignment.name || "Workout"}
-                            </h4>
-                            <div className="text-[11px] uppercase tracking-[0.22em] fc-text-dim font-mono mb-1">
-                              {scheduleLabel} • {dateLabel}
+                            {/* Mobile: Stacked, Desktop: Row */}
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                              {/* Top section */}
+                              <div className="flex items-center gap-3 sm:gap-4 flex-1">
+                                <div className={`fc-icon-tile fc-icon-workouts ${dateVariant} w-11 h-11 sm:w-12 sm:h-12 shrink-0`}>
+                                  <CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="text-base sm:text-lg font-semibold leading-tight fc-text-primary mb-1">
+                                    {assignment.name || "Workout"}
+                                  </h4>
+                                  <div className="text-xs uppercase tracking-wider fc-text-dim">
+                                    {isToday ? "Today" : scheduleLabel} • {dateLabel}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Bottom section on mobile / Right on desktop */}
+                              <div className="flex items-center justify-between sm:justify-end gap-3 pl-14 sm:pl-0">
+                                <span className={`fc-status-pill ${statusVariant}`}>
+                                  {isCompleted && <CheckCircle className="w-3.5 h-3.5" />}
+                                  {isCompleted
+                                    ? "DONE"
+                                    : isSkipped
+                                    ? "SKIPPED"
+                                    : "UPCOMING"}
+                                </span>
+                                <ChevronRight className="w-6 h-6 fc-text-subtle" />
+                              </div>
                             </div>
-                            <p className="text-sm fc-text-subtle">
-                              {isCompleted && assignment.completed_at
-                                ? `Completed at ${new Date(
-                                    assignment.completed_at
-                                  ).toLocaleTimeString("en-US", {
-                                    hour: "numeric",
-                                    minute: "2-digit",
-                                  })} • ${assignment.duration_minutes || 0} min`
-                                : isSkipped
-                                ? "Marked as skipped"
-                                : isToday
-                                ? "Scheduled for today"
-                                : "Scheduled"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <span
-                            className={`fc-status-pill ${statusVariant}`}
-                          >
-                            {isCompleted && <CheckCircle className="w-3.5 h-3.5" />}
-                            {isCompleted
-                              ? "DONE"
-                              : isSkipped
-                              ? "SKIPPED"
-                              : "UPCOMING"}
-                          </span>
-                          <ChevronRight className="w-6 h-6 fc-text-subtle" />
-                        </div>
-                      </GlassCard>
+                          </GlassCard>
                         </div>
                       </div>
                     );
@@ -1875,138 +1941,61 @@ export default function EnhancedClientWorkouts({
                       >
                         <GlassCard
                           elevation={2}
-                          className="fc-glass fc-card fc-list-row p-5 transition-all duration-300 fc-hover-rise fc-press"
+                          className="fc-glass fc-card fc-list-row p-4 sm:p-5 transition-all duration-300 fc-hover-rise fc-press"
                         >
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                          {/* Left: Date and Info */}
-                          <div className="flex items-center gap-5 flex-1 min-w-0">
-                            {/* Icon Tile */}
-                            <div className={`fc-icon-tile ${iconVariant}`}>
-                              {assignment.type === "program" ? (
-                                <Award className="w-6 h-6" />
-                              ) : (
-                                <Dumbbell className="w-6 h-6" />
-                              )}
-                            </div>
+                          {/* Mobile: Stacked layout, Desktop: Row layout */}
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                            {/* Top row on mobile / Left section on desktop */}
+                            <div className="flex items-center gap-3 sm:gap-4 flex-1">
+                              {/* Icon */}
+                              <div className={`fc-icon-tile ${iconVariant} w-11 h-11 sm:w-12 sm:h-12 shrink-0`}>
+                                {assignment.type === "program" ? (
+                                  <Award className="w-5 h-5 sm:w-6 sm:h-6" />
+                                ) : (
+                                  <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6" />
+                                )}
+                              </div>
 
-                            {/* Workout Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <h4 className="text-lg font-semibold fc-text-primary">
+                              {/* Title and meta */}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-base sm:text-lg font-semibold fc-text-primary leading-tight mb-1">
                                   {template?.name ||
                                     assignment.name ||
                                     (assignment.type === "program"
                                       ? "Program"
                                       : "Workout")}
                                 </h4>
-                                <Badge
-                                  variant="fc-outline"
-                                  className="px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.18em]"
-                                >
-                                  {assignment.type === "program"
-                                    ? "Program"
-                                    : "Workout"}
-                                </Badge>
-                              </div>
-
-                              {/* Description or Details */}
-                              <div className="space-y-1">
-                                <div className="text-[11px] uppercase tracking-[0.22em] fc-text-dim font-mono">
-                                  {monthName} {dayNumber}
-                                </div>
-                                {(template?.description ||
-                                  assignment.description) && (
-                                  <p
-                                    className="text-sm fc-text-subtle line-clamp-1"
-                                  >
-                                    {template?.description ||
-                                      assignment.description}
-                                  </p>
-                                )}
-                                <div className="flex flex-wrap items-center gap-3 text-xs">
-                                  {template?.duration_minutes && (
-                                    <div
-                                      className="flex items-center gap-1.5 fc-text-dim"
-                                    >
-                                      <Clock size={14} />
-                                      <span className="font-mono">
-                                        ~{template.duration_minutes} min
-                                      </span>
-                                    </div>
-                                  )}
-                                  {coach && (
-                                    <div
-                                      className="flex items-center gap-1.5 fc-text-dim"
-                                    >
-                                      <span>Coach: {coach.first_name}</span>
-                                    </div>
+                                <div className="text-xs sm:text-[11px] uppercase tracking-wider fc-text-dim">
+                                  {monthName.toUpperCase()} {dayNumber}
+                                  {coach?.first_name && (
+                                    <span className="hidden sm:inline"> • Coach: {coach.first_name}</span>
                                   )}
                                 </div>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Right: Status and Actions */}
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                            {/* Status Badge */}
-                            <div className={`fc-status-pill ${statusVariant}`}>
-                              {statusBadge.label}
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                            {/* Bottom row on mobile / Right section on desktop */}
+                            <div className="flex items-center justify-between sm:justify-end gap-3 pl-14 sm:pl-0">
+                              <span className={`fc-status-pill ${statusVariant}`}>
+                                {statusBadge.label}
+                              </span>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (assignment.type === "program") {
-                                    router.push(
-                                      `/client/programs/${assignment.program_id}/details`
-                                    );
-                                  } else {
-                                    router.push(
-                                      `/client/workouts/${assignment.id}/details`
-                                    );
-                                  }
-                                }}
-                                className="h-10 px-3 sm:px-4 rounded-xl font-semibold flex-1 sm:flex-initial"
-                                variant="fc-secondary"
-                              >
-                                <Eye size={16} className="sm:mr-2" />
-                                <span className="hidden sm:inline">
-                                  Details
-                                </span>
-                              </Button>
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (assignment.type === "program") {
-                                    router.push(
-                                      `/client/programs/${assignment.program_id}/details`
-                                    );
+                                    router.push(`/client/programs/${assignment.program_id}/details`);
                                   } else {
                                     router.push(`/client/workouts/${assignment.id}/start`);
                                   }
                                 }}
-                                className="h-10 px-3 sm:px-4 rounded-xl font-semibold flex-1 sm:flex-initial"
+                                className="h-9 sm:h-10 px-4 rounded-xl font-semibold"
                                 variant="fc-primary"
                               >
-                                <Play
-                                  size={16}
-                                  className="sm:mr-2 fill-current"
-                                />
-                                <span>
-                                  {assignment.type === "program"
-                                    ? "View"
-                                    : "Start"}
-                                </span>
+                                <Play size={16} className="mr-1.5 fill-current" />
+                                {assignment.type === "program" ? "View" : "Start"}
                               </Button>
                             </div>
-
-                            <ChevronRight
-                              className="w-6 h-6 fc-text-subtle hidden md:block"
-                            />
                           </div>
-                        </div>
                         </GlassCard>
                       </Link>
                     );

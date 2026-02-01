@@ -7,19 +7,23 @@ export async function POST(req: NextRequest) {
   
   try {
     // Validate authentication
-    const { user, supabaseAdmin } = await validateApiAuth(req)
+    // supabaseAuth = session-based client (runs as authenticated user with RLS)
+    // supabaseAdmin = service role client (bypasses RLS - use only when necessary)
+    const { user, supabaseAuth, supabaseAdmin } = await validateApiAuth(req)
     const body = await req.json()
     console.log("📦 Request body:", body);
     
-    const { workout_log_id, client_id, duration_minutes } = body
+    const { workout_log_id, client_id, duration_minutes, session_id } = body
 
     console.log('📥 /api/complete-workout received:', {
       workout_assignment_id: body.workout_assignment_id, // In case it's passed
       workout_log_id,
       client_id,
+      session_id, // workout_sessions.id
       duration_minutes, // Simple duration from frontend (optional)
       has_workout_log_id: !!workout_log_id,
       has_client_id: !!client_id,
+      has_session_id: !!session_id,
       has_duration_minutes: duration_minutes !== undefined,
     })
 
@@ -37,11 +41,11 @@ export async function POST(req: NextRequest) {
     // SECURITY: Validate that client_id matches authenticated user
     validateOwnership(user.id, client_id)
 
-    // Step 1: Get the workout_log to get started_at
+    // Step 1: Get the workout_log to get started_at and program day info
     console.log('🔍 Fetching workout_log:', workout_log_id)
     const { data: workoutLog, error: logError } = await supabaseAdmin
       .from('workout_logs')
-      .select('id, started_at, client_id')
+      .select('id, started_at, client_id, program_assignment_id, program_schedule_id')
       .eq('id', workout_log_id)
       .eq('client_id', client_id)
       .single()
@@ -59,6 +63,9 @@ export async function POST(req: NextRequest) {
     console.log('✅ Found workout_log:', {
       id: workoutLog.id,
       started_at: workoutLog.started_at,
+      // Program day tracking (preserved on completion - NOT modified)
+      program_assignment_id: workoutLog.program_assignment_id,
+      program_schedule_id: workoutLog.program_schedule_id,
     })
 
     // Step 2: Get workout_set_logs for THIS specific workout_log_id
@@ -177,6 +184,34 @@ export async function POST(req: NextRequest) {
       total_duration_minutes: updatedLog?.total_duration_minutes,
     })
 
+    // Step 6: Update workout_sessions status to 'completed' if session_id provided
+    // Validate session_id is a valid UUID
+    const isValidUuid = (value: string | null | undefined): boolean => {
+      if (!value) return false;
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    };
+
+    if (isValidUuid(session_id)) {
+      console.log('🔍 Updating workout_sessions status to completed:', session_id);
+      const { error: sessionUpdateError } = await supabaseAdmin
+        .from('workout_sessions')
+        .update({
+          status: 'completed',
+          completed_at: completedAt.toISOString(),
+        })
+        .eq('id', session_id)
+        .eq('client_id', client_id);
+
+      if (sessionUpdateError) {
+        console.warn('⚠️ Failed to update workout_sessions (non-blocking):', sessionUpdateError);
+        // Don't fail the request - workout_logs update succeeded
+      } else {
+        console.log('✅ Updated workout_sessions status to completed');
+      }
+    } else if (session_id) {
+      console.log('⚠️ Skipping workout_sessions update - invalid session_id format:', session_id);
+    }
+
     // Sync workout consistency goals (non-blocking)
     try {
       const { syncWorkoutConsistencyGoal } = await import('@/lib/goalSyncService')
@@ -213,6 +248,90 @@ export async function POST(req: NextRequest) {
       // Don't fail the request, just log error
     }
 
+    // ========================================================================
+    // PROGRAM PROGRESSION: Advance the program progress via RPC (REQUIRED)
+    // This is the CLIENT flow - client completes their own workout
+    // Uses supabaseAuth (session client) so RLS is enforced and auth.uid() works
+    // ========================================================================
+    console.log('📈 [Program Progression] Calling advance_program_progress RPC...');
+    const { data: rpcResult, error: rpcError } = await supabaseAuth.rpc(
+      'advance_program_progress',
+      {
+        p_client_id: client_id,
+        p_completed_by: user.id, // Client completing their own workout
+        p_notes: null
+      }
+    );
+
+    // RPC network/database error - fail the request
+    if (rpcError) {
+      console.error('❌ [Program Progression] RPC error:', rpcError);
+      return createErrorResponse(
+        'Failed to advance program progress',
+        rpcError.message,
+        'PROGRESSION_ERROR',
+        500
+      )
+    }
+
+    console.log('✅ [Program Progression] RPC result:', JSON.stringify(rpcResult, null, 2));
+
+    // Handle RPC response statuses
+    if (rpcResult?.status === 'error') {
+      console.error('❌ [Program Progression] RPC returned error:', rpcResult.message);
+      return createErrorResponse(
+        'Failed to advance program progress',
+        rpcResult.message,
+        rpcResult.error || 'PROGRESSION_ERROR',
+        500
+      )
+    }
+
+    // 'already_completed' -> HTTP 409 (day was already marked complete)
+    if (rpcResult?.status === 'already_completed') {
+      console.log('ℹ️ [Program Progression] Day was already completed');
+      return NextResponse.json({
+        success: false,
+        error: 'Day already completed',
+        message: rpcResult.message,
+        workout_log: updatedLog,
+        program_progression: {
+          status: rpcResult.status,
+          current_week_index: rpcResult.current_week_index,
+          current_day_index: rpcResult.current_day_index,
+          is_completed: rpcResult.is_completed,
+        },
+      }, { status: 409 })
+    }
+
+    // 'completed' -> HTTP 409 (program was already fully finished)
+    if (rpcResult?.status === 'completed') {
+      console.log('🎉 [Program Progression] Program was already fully completed');
+      return NextResponse.json({
+        success: false,
+        error: 'Program already completed',
+        message: rpcResult.message,
+        workout_log: updatedLog,
+        program_progression: {
+          status: rpcResult.status,
+          current_week_index: rpcResult.current_week_index,
+          current_day_index: rpcResult.current_day_index,
+          is_completed: true,
+        },
+      }, { status: 409 })
+    }
+
+    // 'advanced' -> HTTP 200 (success)
+    console.log(`📍 [Program Progression] Advanced to Week ${rpcResult?.current_week_index}, Day ${rpcResult?.current_day_index}`);
+    
+    // Log that program day columns were preserved (for audit)
+    if (workoutLog.program_assignment_id || workoutLog.program_schedule_id) {
+      console.log('📋 [Program Day Tracking] Completed workout had program day linkage:', {
+        program_assignment_id: workoutLog.program_assignment_id,
+        program_schedule_id: workoutLog.program_schedule_id,
+      });
+    }
+    
     return NextResponse.json({
       success: true,
       workout_log: updatedLog,
@@ -221,6 +340,18 @@ export async function POST(req: NextRequest) {
         reps: totalRepsCompleted,
         weight: totalWeightLifted,
         duration_minutes: totalDurationMinutes,
+      },
+      program_progression: {
+        status: rpcResult?.status,
+        message: rpcResult?.message,
+        current_week_index: rpcResult?.current_week_index,
+        current_day_index: rpcResult?.current_day_index,
+        is_completed: rpcResult?.is_completed,
+      },
+      // Include program day info for debugging
+      program_day: {
+        program_assignment_id: workoutLog.program_assignment_id,
+        program_schedule_id: workoutLog.program_schedule_id,
       },
     }, { status: 200 })
   } catch (error: any) {

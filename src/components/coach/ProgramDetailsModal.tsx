@@ -157,21 +157,23 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
               <div className="p-6">
                 <div className="grid grid-cols-7 gap-2">
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => {
-                    const dayWorkouts = (program.schedule as any)?.filter((s: any) => s.program_day === index + 1) || []
+                    // day_of_week is 0-indexed in database: 0=Monday, 1=Tuesday, ..., 6=Sunday
+                    const dayWorkouts = (program.schedule as any)?.filter((s: any) => s.day_of_week === index) || []
                     return (
                       <div key={day} className="p-3 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)] text-center">
                         <h4 className="font-semibold fc-text-primary mb-2">{day.slice(0, 3)}</h4>
                         {dayWorkouts.length > 0 ? (
                           <div className="space-y-1">
                             {dayWorkouts.map((schedule: any, idx: number) => {
-                              const template = templates.find(t => t.id === schedule.template_id)
+                              // Try to get template from embedded workout_templates or from props
+                              const template = schedule.workout_templates || templates.find(t => t.id === schedule.template_id)
                               return (
                                 <div key={idx} className="text-xs p-2 rounded fc-glass-soft border border-[color:var(--fc-glass-border)]">
                                   <div className="font-medium fc-text-primary truncate">
                                     {template?.name || 'Workout'}
                                   </div>
                                   <div className="text-xs fc-text-subtle">
-                                    {schedule.duration_minutes}m
+                                    {template?.estimated_duration || 60}m
                                   </div>
                                 </div>
                               )
@@ -203,7 +205,8 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
                 {program.schedule && program.schedule.length > 0 ? (
                   <div className="space-y-4">
                     {program.schedule.map((scheduleItem: any, index: number) => {
-                      const template = templates.find(t => t.id === scheduleItem.template_id)
+                      // Try to get template from embedded workout_templates or from props
+                      const template = scheduleItem.workout_templates || templates.find(t => t.id === scheduleItem.template_id)
                       return (
                         <div key={scheduleItem.id || index} className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-xl p-4">
                           <div className="flex items-center justify-between">
@@ -211,10 +214,10 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
                               <h4 className="font-semibold fc-text-primary mb-1">
                                 {template?.name || 'Workout'}
                               </h4>
-                              <div className="flex items-center gap-4 text-sm">
+                              <div className="flex items-center gap-4 text-sm flex-wrap">
                                 <span className="fc-text-dim">
                                   <Calendar className="w-3 h-3 inline mr-1" />
-                                  Week {scheduleItem.week_number || 1}, Day {scheduleItem.day_of_week || 1}
+                                  Week {scheduleItem.week_number || 1}, Day {(scheduleItem.day_of_week ?? 0) + 1}
                                 </span>
                                 <span className="fc-text-dim">
                                   <Clock className="w-3 h-3 inline mr-1" />
@@ -222,7 +225,7 @@ export default function ProgramDetailsModal({ program, templates, exercises, cat
                                 </span>
                                 <span className="fc-text-dim">
                                   <Dumbbell className="w-3 h-3 inline mr-1" />
-                                  {template?.exercises?.length || 0} exercises
+                                  {template?.blocks?.length || 0} exercises
                                 </span>
                                 {template?.difficulty_level && (
                                   <span className={`fc-pill fc-pill-glass text-xs ${difficultyColors[template.difficulty_level as keyof typeof difficultyColors]}`}>

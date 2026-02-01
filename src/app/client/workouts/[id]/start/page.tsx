@@ -221,6 +221,67 @@ export default function LiveWorkout() {
     currentBlockIndexRef.current = currentBlockIndex;
   }, [currentBlockIndex]);
 
+  // Helper: Validate UUID format
+  const isValidUuid = (value: string | null | undefined): boolean => {
+    if (!value) return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  };
+
+  // Helper: Persist workout progress to workout_sessions (lightweight, non-blocking)
+  const persistSessionProgress = async (
+    blockIndex: number,
+    exerciseIndex: number,
+    totalExercises?: number
+  ) => {
+    if (!sessionId || !isValidUuid(sessionId)) {
+      // Skip if sessionId is not a valid UUID (e.g., 'restored-xxx' or timestamp)
+      return;
+    }
+
+    try {
+      const updatePayload: {
+        current_block_index: number;
+        current_exercise_index: number;
+        last_activity_at: string;
+        total_exercises?: number;
+      } = {
+        current_block_index: blockIndex,
+        current_exercise_index: exerciseIndex,
+        last_activity_at: new Date().toISOString(),
+      };
+
+      if (totalExercises !== undefined) {
+        updatePayload.total_exercises = totalExercises;
+      }
+
+      const { error } = await supabase
+        .from('workout_sessions')
+        .update(updatePayload)
+        .eq('id', sessionId);
+
+      if (error) {
+        console.warn('⚠️ Failed to persist session progress (non-blocking):', error.message);
+      }
+    } catch (err) {
+      console.warn('⚠️ Error persisting session progress (non-blocking):', err);
+    }
+  };
+
+  // Persist progress when block index changes (debounced via navigation events)
+  useEffect(() => {
+    if (sessionId && isValidUuid(sessionId) && workoutBlocks.length > 0) {
+      const currentBlock = workoutBlocks[currentBlockIndex];
+      const globalExerciseIndex = currentBlock?.currentExerciseIndex ?? 0;
+      
+      // Calculate total exercises across all blocks
+      const totalExercises = workoutBlocks.reduce((total, block) => {
+        return total + (block.block.exercises?.length || 1);
+      }, 0);
+
+      persistSessionProgress(currentBlockIndex, globalExerciseIndex, totalExercises);
+    }
+  }, [currentBlockIndex, sessionId, workoutBlocks.length]);
+
   // Helper function to get suggested weight display text
   const getSuggestedWeightText = (
     exerciseId: string,
@@ -700,12 +761,12 @@ export default function LiveWorkout() {
 
   /**
    * Find active workout_log for today
-   * Returns the workout_log_id and started_at if found
+   * Returns the workout_log_id, started_at, and workout_session_id if found
    */
   const findActiveWorkoutLogForToday = async (
     workoutAssignmentId: string,
     userId: string
-  ): Promise<{ id: string; started_at: string } | null> => {
+  ): Promise<{ id: string; started_at: string; workout_session_id: string | null } | null> => {
     try {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -716,7 +777,7 @@ export default function LiveWorkout() {
 
       const { data: activeLog, error } = await supabase
         .from("workout_logs")
-        .select("id, started_at")
+        .select("id, started_at, workout_session_id")
         .eq("workout_assignment_id", workoutAssignmentId)
         .eq("client_id", userId)
         .is("completed_at", null) // Incomplete
@@ -735,6 +796,7 @@ export default function LiveWorkout() {
         console.log("✅ Found active workout_log for today:", {
           id: activeLog.id,
           started_at: activeLog.started_at,
+          workout_session_id: activeLog.workout_session_id,
         });
         return activeLog;
       }
@@ -1801,12 +1863,20 @@ export default function LiveWorkout() {
               // Store workout_log_id so we know we have an active session
               setWorkoutLogId(activeLog.id);
               
-              // Set a sessionId to prevent auto-start from triggering
-              // (the API will use workout_log_id from the restored session)
-              setSessionId(`restored-${activeLog.id}`);
+              // M2 Fix: Use the actual workout_session_id from the log if available
+              // This ensures workout_sessions.status gets updated on completion
+              if (activeLog.workout_session_id && isValidUuid(activeLog.workout_session_id)) {
+                setSessionId(activeLog.workout_session_id);
+                console.log("✅ Using existing workout_session_id:", activeLog.workout_session_id);
+              } else {
+                // Fallback for logs created before M2 (no workout_session_id)
+                setSessionId(`restored-${activeLog.id}`);
+                console.log("⚠️ No workout_session_id found, using fallback:", `restored-${activeLog.id}`);
+              }
 
               console.log("✅ Workout session restored successfully:", {
                 workoutLogId: activeLog.id,
+                workoutSessionId: activeLog.workout_session_id,
                 currentBlockIndex: restoredProgress.currentBlockIndex,
                 startedAt: new Date(restoredProgress.workoutStartTime).toISOString(),
               });
@@ -1985,25 +2055,50 @@ export default function LiveWorkout() {
   };
 
   const startWorkout = async () => {
-    // Create workout session
+    // Create or reuse workout session
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
         try {
+          // M2 Fix: First check for existing in_progress session for this assignment
+          // This prevents creating orphan sessions when resuming workouts
+          const { data: existingSession, error: existingError } = await supabase
+            .from("workout_sessions")
+            .select("id, status, current_block_index, current_exercise_index")
+            .eq("assignment_id", assignmentId)
+            .eq("client_id", user.id)
+            .eq("status", "in_progress")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (existingSession && !existingError) {
+            // Reuse existing session
+            setSessionId(existingSession.id);
+            console.log("✅ Reusing existing workout session:", existingSession.id);
+            return;
+          }
+
+          // No existing session found, create a new one
           const { data, error } = await supabase
             .from("workout_sessions")
             .insert({
               assignment_id: assignmentId,
               client_id: user.id,
               status: "in_progress",
+              // Initialize progress tracking columns (M2 Live Dashboard support)
+              current_block_index: 0,
+              current_exercise_index: 0,
+              last_activity_at: new Date().toISOString(),
             })
             .select()
             .single();
 
           if (error) throw error;
           setSessionId(data.id);
+          console.log("✅ Created new workout session:", data.id);
         } catch (dbError) {
           console.log("Database not ready, using localStorage fallback");
           setSessionId(Date.now().toString());
@@ -3530,38 +3625,40 @@ export default function LiveWorkout() {
 
           <div className="px-5 py-6">
             <div className="max-w-4xl mx-auto flex flex-col gap-5">
-              {/* Enhanced Header */}
-              <GlassCard elevation={2} className="fc-glass fc-card p-5 mb-5">
-                <div className="flex items-center gap-4">
+              {/* Enhanced Header - Mobile Optimized */}
+              <GlassCard elevation={2} className="fc-glass fc-card p-4 sm:p-5 mb-4 sm:mb-5">
+                <div className="flex items-start gap-3 sm:gap-4">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => router.push("/client/workouts")}
-                    className="p-3 rounded-xl fc-text-dim hover:fc-text-primary"
+                    className="p-2 sm:p-3 rounded-xl fc-text-dim hover:fc-text-primary flex-shrink-0"
                   >
                     <ArrowLeft className="w-5 h-5" />
                   </Button>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <div className="fc-icon-tile fc-icon-workouts w-12 h-12">
-                        <Dumbbell className="w-6 h-6" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-3">
+                      <div className="fc-icon-tile fc-icon-workouts w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
+                        <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.3em] fc-text-dim mb-1">
-                          Live Session
-                        </p>
-                        <h1 className="text-xl font-bold fc-text-primary leading-tight">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] sm:tracking-[0.3em] fc-text-dim">
+                            Live Session
+                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="text-xs fc-text-dim">Live</span>
+                          </div>
+                        </div>
+                        <h1 className="text-base sm:text-xl font-bold fc-text-primary leading-tight mt-1 break-words">
                           {assignment?.name || "Workout"}
                         </h1>
-                        <p className="text-sm fc-text-dim">
+                        <p className="text-xs sm:text-sm fc-text-dim mt-0.5">
                           Live workout execution
                         </p>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-sm fc-text-dim">Live</span>
                   </div>
                 </div>
               </GlassCard>

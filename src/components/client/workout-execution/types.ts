@@ -21,7 +21,7 @@ export interface BaseBlockExecutorProps {
   onExerciseIndexChange?: (index: number) => void;
   logSetToDatabase: (
     data: any
-  ) => Promise<{ success: boolean; error?: any; e1rm?: number }>;
+  ) => Promise<{ success: boolean; error?: any; e1rm?: number; set_log_id?: string; isNewPR?: boolean }>;
   formatTime: (seconds: number) => string;
   calculateSuggestedWeight: (
     exerciseId: string,

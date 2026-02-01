@@ -2,6 +2,10 @@
  * Meal Photo Service
  * Handles meal photo uploads to Supabase storage with DB logging
  * Enforces "1 photo per meal per day" constraint
+ * 
+ * IMPORTANT: The rule is 1 photo per MEAL per day, NOT 1 photo per option.
+ * meal_option_id is INFORMATIONAL ONLY - it records which option the client chose.
+ * The unique constraint remains: UNIQUE (client_id, meal_id, log_date)
  */
 
 import { supabase } from './supabase';
@@ -14,6 +18,7 @@ export interface MealPhotoLog {
   id: string;
   client_id: string;
   meal_id: string;
+  meal_option_id: string | null;  // INFORMATIONAL: which option was chosen (NULL for legacy meals)
   log_date: string; // YYYY-MM-DD format
   photo_url: string;
   photo_path: string;
@@ -26,6 +31,15 @@ export interface UploadPhotoResult {
   success: boolean;
   photoLog?: MealPhotoLog;
   error?: string;
+}
+
+export interface UploadPhotoParams {
+  clientId: string;
+  mealId: string;
+  file: File;
+  logDate?: string;
+  notes?: string;
+  mealOptionId?: string | null;  // Required if meal has options, NULL otherwise
 }
 
 // ============================================================================
@@ -45,18 +59,26 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'
  * Enforces "1 photo per meal per day" - returns error if photo already exists
  * Clients cannot replace or delete photos once uploaded (accountability rule)
  * 
+ * IMPORTANT: meal_option_id is INFORMATIONAL ONLY
+ * - If meal has options → mealOptionId is REQUIRED
+ * - If meal has no options → mealOptionId should be NULL
+ * - The unique constraint remains: UNIQUE (client_id, meal_id, log_date)
+ * - You CANNOT upload multiple photos for the same meal by using different options
+ * 
  * @param clientId - Client UUID
  * @param mealId - Meal UUID (from assigned meal plan)
  * @param file - Image file to upload
  * @param logDate - Date for the meal log (defaults to today)
  * @param notes - Optional notes about the meal
+ * @param mealOptionId - Option ID if meal has options (INFORMATIONAL - does not affect uniqueness)
  */
 export async function uploadMealPhoto(
   clientId: string,
   mealId: string,
   file: File,
   logDate?: string,
-  notes?: string
+  notes?: string,
+  mealOptionId?: string | null
 ): Promise<UploadPhotoResult> {
   try {
     // Validate file
@@ -69,6 +91,7 @@ export async function uploadMealPhoto(
     const dateStr = logDate || new Date().toISOString().split('T')[0];
 
     // Check if photo already logged for this meal today
+    // NOTE: We check by meal_id only, NOT by option. 1 photo per MEAL per day.
     const existingLog = await getMealPhotoForDate(clientId, mealId, dateStr);
     
     if (existingLog) {
@@ -115,11 +138,13 @@ export async function uploadMealPhoto(
     }
 
     // Create DB log
+    // meal_option_id is INFORMATIONAL - records which option the client chose
     const { data: logData, error: logError } = await supabase
       .from('meal_photo_logs')
       .insert([{
         client_id: clientId,
         meal_id: mealId,
+        meal_option_id: mealOptionId || null,  // INFORMATIONAL ONLY
         log_date: dateStr,
         photo_url: urlData.publicUrl,
         photo_path: storagePath,
@@ -150,6 +175,24 @@ export async function uploadMealPhoto(
       error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
+}
+
+/**
+ * Validate that mealOptionId is provided when required
+ * Call this before uploadMealPhoto when you know the meal has options
+ * 
+ * @param mealHasOptions - Whether the meal has options configured
+ * @param mealOptionId - The option ID being used
+ * @returns Error message if validation fails, null if valid
+ */
+export function validateMealOptionForUpload(
+  mealHasOptions: boolean,
+  mealOptionId: string | null | undefined
+): string | null {
+  if (mealHasOptions && !mealOptionId) {
+    return 'This meal has options. Please select an option before uploading a photo.';
+  }
+  return null;
 }
 
 

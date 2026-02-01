@@ -37,7 +37,7 @@ export class WorkoutBlockService {
   }
 
   /** Chunk array to avoid Supabase/Postgres statement timeouts on large .in() lists */
-  private static readonly QUERY_CHUNK_SIZE = 10
+  private static readonly QUERY_CHUNK_SIZE = 50  // Increased from 10 since we now run queries sequentially
 
   private static chunk<T>(arr: T[], size: number): T[][] {
     const out: T[][] = []
@@ -130,29 +130,33 @@ export class WorkoutBlockService {
       return { data: allData, error: null }
     }
 
-    const [exercisesRes, timeProtocolsRes, dropRes, clusterRes, restPauseRes, hrSetsRes] =
-      await Promise.all([
-        queryTableInChunks(
-          'workout_block_exercises',
-          '*',
-          blockIdsForExercises
-        ),
-        needsTimeProtocols
-          ? queryTableInChunks('workout_time_protocols', '*', blockIdsForTimeProtocols)
-          : Promise.resolve({ data: [], error: null }),
-        needsDropSets
-          ? queryTableInChunks('workout_drop_sets', '*', blockIdsForDropSets)
-          : Promise.resolve({ data: [], error: null }),
-        needsClusterSets
-          ? queryTableInChunks('workout_cluster_sets', '*', blockIdsForClusterSets)
-          : Promise.resolve({ data: [], error: null }),
-        needsRestPause
-          ? queryTableInChunks('workout_rest_pause_sets', '*', blockIdsForRestPause)
-          : Promise.resolve({ data: [], error: null }),
-        needsHRSets
-          ? queryTableInChunks('workout_hr_sets', '*', blockIdsForHRSets)
-          : Promise.resolve({ data: [], error: null }),
-      ])
+    // Optimized: Select only needed columns to reduce query time and avoid timeouts
+    // Run queries sequentially to reduce database load (parallel was causing timeouts)
+    const exercisesRes = await queryTableInChunks(
+      'workout_block_exercises',
+      'id, block_id, exercise_id, exercise_order, sets, reps, weight_kg, rest_seconds, tempo, rir, notes, exercise_letter, load_percentage',
+      blockIdsForExercises
+    )
+    
+    const timeProtocolsRes = needsTimeProtocols
+      ? await queryTableInChunks('workout_time_protocols', 'id, block_id, exercise_id, exercise_order, rounds, work_seconds, rest_seconds', blockIdsForTimeProtocols)
+      : { data: [], error: null }
+    
+    const dropRes = needsDropSets
+      ? await queryTableInChunks('workout_drop_sets', 'id, block_id, exercise_id, exercise_order, drop_order, reps, weight_kg, load_percentage', blockIdsForDropSets)
+      : { data: [], error: null }
+    
+    const clusterRes = needsClusterSets
+      ? await queryTableInChunks('workout_cluster_sets', 'id, block_id, exercise_id, exercise_order, reps_per_cluster, clusters_per_set, intra_cluster_rest, weight_kg, load_percentage', blockIdsForClusterSets)
+      : { data: [], error: null }
+    
+    const restPauseRes = needsRestPause
+      ? await queryTableInChunks('workout_rest_pause_sets', 'id, block_id, exercise_id, exercise_order, rest_pause_duration, max_rest_pauses, weight_kg, load_percentage', blockIdsForRestPause)
+      : { data: [], error: null }
+    
+    const hrSetsRes = needsHRSets
+      ? await queryTableInChunks('workout_hr_sets', 'id, block_id, exercise_id, exercise_order, target_hr_zone, work_duration_seconds, rest_duration_seconds, target_rounds', blockIdsForHRSets)
+      : { data: [], error: null }
 
     const allExerciseIds = new Set<string>()
     ;(exercisesRes.data || []).forEach((ex: any) => allExerciseIds.add(ex.exercise_id))

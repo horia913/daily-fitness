@@ -32,6 +32,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { calculateStreak, calculateWeeklyProgress } from "@/lib/clientDashboardService";
 import WorkoutAssignmentModal from "@/components/WorkoutAssignmentModal";
+import ClientWorkoutsView from "@/components/coach/client-views/ClientWorkoutsView";
 
 interface ClientData {
   id: string;
@@ -765,37 +766,7 @@ function ClientDetailContent() {
         )}
 
         {activeTab === "workouts" && (
-          <GlassCard elevation={2} className="p-12 text-center">
-            <Dumbbell
-              className="w-24 h-24 mx-auto mb-6"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-              }}
-            />
-            <h3
-              className="text-2xl font-bold mb-2"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
-              Workouts View
-            </h3>
-            <p
-              className="text-sm mb-6"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
-            >
-              View and manage assigned workouts for {client.name}
-            </p>
-            <Button
-              variant="default"
-              style={{
-                background: getSemanticColor("trust").gradient,
-                boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-              }}
-            >
-              Assign New Workout
-            </Button>
-          </GlassCard>
+          <ClientWorkoutsView clientId={clientId} />
         )}
 
         {activeTab === "nutrition" && (

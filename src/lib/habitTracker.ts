@@ -5,6 +5,7 @@ export interface HabitCategory {
   description?: string
   icon: string
   color: string
+  sort_order: number
   is_active: boolean
   created_at: string
   updated_at: string
@@ -13,12 +14,13 @@ export interface HabitCategory {
 export interface Habit {
   id: string
   coach_id?: string
-  category_id: string
+  category_id: string | null
   name: string
-  description?: string
+  description: string | null
   icon: string
   color: string
   frequency_type: 'daily' | 'weekly' | 'monthly'
+  target_days: number
   target_value: number
   unit: string
   is_public: boolean
@@ -449,6 +451,7 @@ export class HabitTracker {
         description: 'Physical activity and exercise habits',
         icon: '💪',
         color: '#10B981',
+        sort_order: 1,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -459,6 +462,7 @@ export class HabitTracker {
         description: 'Eating and drinking habits',
         icon: '🥗',
         color: '#F59E0B',
+        sort_order: 2,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -469,6 +473,7 @@ export class HabitTracker {
         description: 'Sleep and rest habits',
         icon: '😴',
         color: '#8B5CF6',
+        sort_order: 3,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -479,6 +484,7 @@ export class HabitTracker {
         description: 'Mental health and wellness habits',
         icon: '🧘',
         color: '#06B6D4',
+        sort_order: 4,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -489,6 +495,7 @@ export class HabitTracker {
         description: 'Water intake and hydration habits',
         icon: '💧',
         color: '#3B82F6',
+        sort_order: 5,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -499,6 +506,7 @@ export class HabitTracker {
         description: 'Recovery and self-care habits',
         icon: '🛁',
         color: '#EC4899',
+        sort_order: 6,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()

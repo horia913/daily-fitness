@@ -1,6 +1,8 @@
 /**
  * Progress Stats Service
  * Centralized service for fetching progress statistics
+ * 
+ * UPDATED: Now uses same data sources as client dashboard for consistency
  */
 
 import { supabase } from './supabase'
@@ -8,6 +10,7 @@ import { getWeeklyGoal, getCurrentWeekCompletedWorkouts, getStreak } from './pro
 import { getClientRank } from './leaderboardService'
 import { AchievementService } from './achievementService'
 import { BodyMetricsService } from './progressTrackingService'
+import { fetchPersonalRecords } from './personalRecords'
 
 export interface ProgressStats {
   weeklyWorkouts: {
@@ -39,7 +42,7 @@ export async function getProgressStats(clientId: string): Promise<ProgressStats>
       weeklyCompleted,
       streak,
       totalWorkouts,
-      personalRecords,
+      personalRecordsData,
       leaderboardRank,
       totalAthletes,
       achievementsUnlocked,
@@ -50,7 +53,7 @@ export async function getProgressStats(clientId: string): Promise<ProgressStats>
       getCurrentWeekCompletedWorkouts(clientId),
       getStreak(clientId),
       getTotalWorkouts(clientId),
-      getPersonalRecordsCount(clientId),
+      fetchPersonalRecords(clientId), // Use same function as dashboard for consistency
       getLeaderboardRank(clientId),
       getTotalAthletes(),
       AchievementService.getUnlockedAchievementsCount(clientId),
@@ -69,12 +72,12 @@ export async function getProgressStats(clientId: string): Promise<ProgressStats>
       },
       streak,
       totalWorkouts,
-      personalRecords,
+      personalRecords: personalRecordsData.length, // Count from dynamic calculation
       leaderboardRank: leaderboardRank?.rank ?? 0,
       totalAthletes,
       achievementsUnlocked,
       achievementsInProgress,
-      currentWeight: currentWeight ?? 0,
+      currentWeight, // Keep null as null so UI can show "—" when no data
       weightChange
     }
   } catch (error) {

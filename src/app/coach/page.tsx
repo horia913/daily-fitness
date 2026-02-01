@@ -22,6 +22,7 @@ import {
   CheckCircle,
   AlertCircle,
   MessageCircle,
+  Target,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -145,6 +146,13 @@ function CoachDashboardContent() {
                 })}
               </p>
             </div>
+            {/* Pickup Mode Quick Access */}
+            <Link href="/coach/gym-console">
+              <Button className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg">
+                <Target className="w-4 h-4 mr-2" />
+                Pickup Mode
+              </Button>
+            </Link>
           </div>
         </GlassCard>
 

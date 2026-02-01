@@ -361,6 +361,10 @@ export class AchievementService {
       const { data, error } = await supabase
         .from('user_achievements')
         .insert({
+          // Required columns that were missing:
+          user_id: clientId,  // user_id is the same as client_id
+          achievement_id: templateId,  // achievement_id is the same as achievement_template_id
+          // Standard columns:
           client_id: clientId,
           achievement_template_id: templateId,
           tier: tier,
@@ -374,11 +378,14 @@ export class AchievementService {
       if (error) {
         // If unique constraint violation, achievement already unlocked (ignore)
         if (error.code === '23505') {
+          console.log(`Achievement already unlocked: template=${templateId}, tier=${tier}`)
           return null
         }
+        console.error('Error inserting achievement:', error)
         throw error
       }
 
+      console.log(`Achievement unlocked! template=${templateId}, tier=${tier}, value=${metricValue}`)
       return data
     } catch (error) {
       console.error('Error unlocking achievement:', error)

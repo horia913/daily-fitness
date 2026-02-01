@@ -93,6 +93,7 @@ export default function CoachHabitsManagement() {
     description: '',
     category_id: '',
     frequency_type: 'daily' as 'daily' | 'weekly' | 'monthly',
+    target_days: 7,
     target_value: '',
     unit: '',
     icon: '🎯',
@@ -151,12 +152,13 @@ export default function CoachHabitsManagement() {
       if (habitsError) throw habitsError
       setHabits(habitsData || [])
 
-      // Load categories
+      // Load categories (system categories only - no coach customization)
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('habit_categories')
         .select('*')
         .eq('is_active', true)
-        .order('name')
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true })
 
       if (categoriesError) throw categoriesError
       setCategories(categoriesData || [])
@@ -184,6 +186,7 @@ export default function CoachHabitsManagement() {
           icon: '💧',
           color: '#3B82F6',
           frequency_type: 'daily',
+          target_days: 7,
           target_value: 8,
           unit: 'glasses',
           is_public: true,
@@ -200,6 +203,7 @@ export default function CoachHabitsManagement() {
           icon: '🧘',
           color: '#10B981',
           frequency_type: 'daily',
+          target_days: 7,
           target_value: 10,
           unit: 'minutes',
           is_public: true,
@@ -216,6 +220,7 @@ export default function CoachHabitsManagement() {
           icon: '💪',
           color: '#F59E0B',
           frequency_type: 'weekly',
+          target_days: 3,
           target_value: 3,
           unit: 'sessions',
           is_public: true,
@@ -225,33 +230,92 @@ export default function CoachHabitsManagement() {
         }
       ])
       
+      // Fallback categories matching the seeded data in migration
       setCategories([
         {
           id: '1',
-          name: 'Health & Wellness',
-          description: 'Habits related to physical and mental health',
-          icon: '❤️',
-          color: '#EF4444',
+          name: 'Fitness',
+          description: 'Exercise and physical activity habits',
+          icon: '🏃',
+          color: '#10B981',
+          sort_order: 1,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         },
         {
           id: '2',
-          name: 'Mindfulness',
-          description: 'Habits for mental clarity and emotional well-being',
-          icon: '🧘',
-          color: '#10B981',
+          name: 'Nutrition',
+          description: 'Diet and eating habits',
+          icon: '🥗',
+          color: '#F59E0B',
+          sort_order: 2,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         },
         {
           id: '3',
-          name: 'Fitness',
-          description: 'Physical exercise and movement habits',
-          icon: '💪',
-          color: '#F59E0B',
+          name: 'Hydration',
+          description: 'Water and fluid intake habits',
+          icon: '💧',
+          color: '#3B82F6',
+          sort_order: 3,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '4',
+          name: 'Sleep',
+          description: 'Rest and recovery habits',
+          icon: '😴',
+          color: '#6366F1',
+          sort_order: 4,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '5',
+          name: 'Wellness',
+          description: 'Mental health and mindfulness habits',
+          icon: '🧘',
+          color: '#8B5CF6',
+          sort_order: 5,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '6',
+          name: 'Recovery',
+          description: 'Stretching, mobility, and recovery habits',
+          icon: '🔄',
+          color: '#EC4899',
+          sort_order: 6,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '7',
+          name: 'Supplements',
+          description: 'Vitamin and supplement habits',
+          icon: '💊',
+          color: '#14B8A6',
+          sort_order: 7,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '8',
+          name: 'Other',
+          description: 'Miscellaneous habits',
+          icon: '📋',
+          color: '#6B7280',
+          sort_order: 99,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -280,14 +344,15 @@ export default function CoachHabitsManagement() {
         case 'created':
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         case 'category':
-          return a.category_id.localeCompare(b.category_id)
+          return (a.category_id || '').localeCompare(b.category_id || '')
         default:
           return 0
       }
     })
   }
 
-  const getCategoryById = (categoryId: string) => {
+  const getCategoryById = (categoryId: string | null) => {
+    if (!categoryId) return undefined
     return categories.find(cat => cat.id === categoryId)
   }
 
@@ -321,6 +386,7 @@ export default function CoachHabitsManagement() {
       description: '',
       category_id: '',
       frequency_type: 'daily',
+      target_days: 7,
       target_value: '',
       unit: '',
       icon: '🎯',
@@ -334,24 +400,53 @@ export default function CoachHabitsManagement() {
     if (!user || !habitForm.name.trim()) return
 
     try {
-      const newHabit: Habit = {
-        id: Date.now().toString(),
-        coach_id: user?.id || '',
-        category_id: habitForm.category_id,
-        name: habitForm.name,
-        description: habitForm.description,
-        icon: habitForm.icon,
-        color: habitForm.color,
-        frequency_type: habitForm.frequency_type,
-        target_value: parseFloat(habitForm.target_value) || 1,
-        unit: habitForm.unit,
-        is_public: habitForm.is_public,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+      // Insert into database
+      const { data, error } = await supabase
+        .from('habits')
+        .insert({
+          coach_id: user.id,
+          name: habitForm.name,
+          description: habitForm.description || null,
+          frequency_type: habitForm.frequency_type,
+          target_days: habitForm.frequency_type === 'weekly' ? (parseFloat(habitForm.target_value) || 1) : 1,
+          // New columns added by migration
+          icon: habitForm.icon || '🎯',
+          color: habitForm.color || '#8B5CF6',
+          category_id: habitForm.category_id || null,
+          unit: habitForm.unit || null,
+          target_value: parseFloat(habitForm.target_value) || null,
+          is_public: habitForm.is_public ?? true,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Database error:', error);
+        // Fallback to local state if DB fails (e.g., columns don't exist yet)
+        const newHabit: Habit = {
+          id: Date.now().toString(),
+          coach_id: user?.id || '',
+          category_id: habitForm.category_id,
+          name: habitForm.name,
+          description: habitForm.description,
+          icon: habitForm.icon,
+          color: habitForm.color,
+          frequency_type: habitForm.frequency_type,
+          target_days: habitForm.target_days,
+          target_value: parseFloat(habitForm.target_value) || 1,
+          unit: habitForm.unit,
+          is_public: habitForm.is_public,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setHabits(prev => [newHabit, ...prev]);
+      } else if (data) {
+        // Use the returned data from the database
+        setHabits(prev => [data as Habit, ...prev]);
       }
 
-      setHabits(prev => [newHabit, ...prev])
       resetForm()
       setCreateDialogOpen(false)
       alert('Habit template created successfully!')
@@ -365,17 +460,34 @@ export default function CoachHabitsManagement() {
     if (!editingHabit) return
 
     try {
+      const updatedFields = {
+        name: habitForm.name,
+        description: habitForm.description || null,
+        frequency_type: habitForm.frequency_type,
+        target_days: habitForm.target_days,
+        // New columns added by migration
+        icon: habitForm.icon || '🎯',
+        color: habitForm.color || '#8B5CF6',
+        category_id: habitForm.category_id || null,
+        unit: habitForm.unit || '',
+        target_value: parseFloat(habitForm.target_value) || 1,
+        is_public: habitForm.is_public ?? true,
+      };
+
+      // Try to update in database
+      const { error } = await supabase
+        .from('habits')
+        .update(updatedFields)
+        .eq('id', editingHabit.id);
+
+      if (error) {
+        console.error('Database error updating habit:', error);
+      }
+
+      // Update local state regardless (optimistic update)
       const updatedHabit = {
         ...editingHabit,
-        name: habitForm.name,
-        description: habitForm.description,
-        category_id: habitForm.category_id,
-        frequency_type: habitForm.frequency_type,
-        target_value: parseFloat(habitForm.target_value) || 1,
-        unit: habitForm.unit,
-        icon: habitForm.icon,
-        color: habitForm.color,
-        is_public: habitForm.is_public,
+        ...updatedFields,
         updated_at: new Date().toISOString()
       }
 
@@ -418,8 +530,9 @@ export default function CoachHabitsManagement() {
     setHabitForm({
       name: habit.name,
       description: habit.description || '',
-      category_id: habit.category_id,
+      category_id: habit.category_id || '',
       frequency_type: habit.frequency_type,
+      target_days: habit.target_days || 7,
       target_value: habit.target_value.toString(),
       unit: habit.unit,
       icon: habit.icon,
@@ -2251,7 +2364,7 @@ export default function CoachHabitsManagement() {
                   id="assign-custom-description"
                   value={assignmentForm.custom_description}
                   onChange={(e) => setAssignmentForm(prev => ({ ...prev, custom_description: e.target.value }))}
-                  placeholder={selectedHabitForAssign?.description}
+                  placeholder={selectedHabitForAssign?.description || undefined}
                   rows={3}
                   className={`${theme.border} ${theme.text} bg-transparent rounded-xl`}
                 />

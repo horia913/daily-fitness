@@ -27,20 +27,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify user is a coach or admin
+    // Verify user is authorized to create this relationship
     const { data: profile } = await supabaseAuth
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (!profile || (profile.role !== 'coach' && profile.role !== 'admin')) {
-      return createForbiddenResponse('Only coaches and admins can create client relationships')
+    if (!profile) {
+      return createForbiddenResponse('User profile not found')
     }
 
-    // Verify coach_id matches authenticated user (unless admin)
-    if (coach_id !== user.id && profile.role !== 'admin') {
-      return createForbiddenResponse('Cannot create relationship for another coach')
+    // Authorization logic:
+    // 1. Admin can create any relationship
+    // 2. Coach can create relationships where they are the coach
+    // 3. Client can create their own relationship (during signup flow)
+    const isAdmin = profile.role === 'admin'
+    const isCoachCreatingOwnRelation = (profile.role === 'coach' || profile.role === 'admin') && coach_id === user.id
+    const isClientCreatingOwnRelation = profile.role === 'client' && client_id === user.id
+
+    if (!isAdmin && !isCoachCreatingOwnRelation && !isClientCreatingOwnRelation) {
+      return createForbiddenResponse('Not authorized to create this client-coach relationship')
     }
 
     // Create client-coach relationship

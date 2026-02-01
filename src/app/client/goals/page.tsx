@@ -82,6 +82,7 @@ interface Goal {
   created_at: string;
   updated_at: string;
   progress_percentage?: number;
+  goal_template_id?: string; // FK to goal_templates table
 }
 
 interface GoalCategory {
@@ -101,6 +102,24 @@ interface PresetGoal {
   subcategory: string;
   unit: string;
   suggestedUnit: string;
+  isAutoTracked?: boolean;
+  autoTrackSource?: string;
+}
+
+// Database goal template interface (from goal_templates table)
+// Note: Goal templates are SYSTEM-ONLY (no coach customization)
+interface GoalTemplate {
+  id: string;
+  title: string;
+  description: string | null;
+  emoji: string;
+  category: string;
+  subcategory: string | null;
+  default_unit: string;
+  suggested_unit_display: string | null;
+  is_auto_tracked: boolean;
+  auto_track_source: string | null;
+  is_active: boolean;
 }
 
 // Expanded Preset Goals
@@ -437,9 +456,47 @@ export default function ClientGoals() {
     }
   }, [user]);
 
-  // Load preset goals - using constant array
+  // Load preset goals from database (with fallback to hardcoded array)
   const loadPresetGoals = useCallback(async () => {
-    setPresetGoalTemplates(PRESET_GOALS);
+    try {
+      // Fetch templates from goal_templates table
+      const { data: templates, error } = await supabase
+        .from('goal_templates')
+        .select('*')
+        .eq('is_active', true)
+        .order('category', { ascending: true })
+        .order('title', { ascending: true });
+
+      if (error) {
+        console.warn('Error fetching goal templates from DB, using fallback:', error);
+        setPresetGoalTemplates(PRESET_GOALS);
+        return;
+      }
+
+      if (templates && templates.length > 0) {
+        // Map database templates to PresetGoal format
+        const mappedTemplates: PresetGoal[] = templates.map((t: GoalTemplate) => ({
+          id: t.id,
+          title: t.title,
+          description: t.description || undefined,
+          emoji: t.emoji || '🎯',
+          category: t.category,
+          subcategory: t.subcategory || t.category,
+          unit: t.default_unit,
+          suggestedUnit: t.suggested_unit_display || t.default_unit,
+          isAutoTracked: t.is_auto_tracked,
+          autoTrackSource: t.auto_track_source || undefined,
+        }));
+        setPresetGoalTemplates(mappedTemplates);
+      } else {
+        // Fallback to hardcoded if no templates in DB yet
+        console.log('No goal templates in DB, using hardcoded fallback');
+        setPresetGoalTemplates(PRESET_GOALS);
+      }
+    } catch (error) {
+      console.error('Error loading preset goals:', error);
+      setPresetGoalTemplates(PRESET_GOALS);
+    }
   }, []);
 
   // Helper function to map preset category to valid database category
@@ -485,6 +542,9 @@ export default function ClientGoals() {
         ? getCategoryFromTitle(preset.title)
         : getCategoryFromTitle(presetTitle);
 
+      // Check if the preset has a valid UUID (from database) vs hardcoded id
+      const isFromDatabase = preset?.id && preset.id.includes('-') && preset.id.length === 36;
+
       const { data, error } = await supabase.from("goals").insert({
         client_id: user.id,
         coach_id: null,
@@ -492,12 +552,14 @@ export default function ClientGoals() {
         description: preset?.description || `Target: ${targetValue}`,
         category: category,
         target_value: targetValue,
+        target_unit: preset?.unit || null,
         target_date: targetDate || null,
         current_value: 0,
         status: "active",
         priority: "high",
         start_date: new Date().toISOString().split("T")[0],
         progress_percentage: 0,
+        goal_template_id: isFromDatabase ? preset.id : null, // Link to template if from DB
       });
 
       if (error) throw error;
@@ -559,6 +621,9 @@ export default function ClientGoals() {
       // Map preset category to valid database category
       const validCategory = mapCategoryToValid(preset.category);
 
+      // Check if the preset has a valid UUID (from database) vs hardcoded id
+      const isFromDatabase = preset.id && preset.id.includes('-') && preset.id.length === 36;
+
       // Build insert data object
       const insertData: any = {
         client_id: user.id,
@@ -573,6 +638,7 @@ export default function ClientGoals() {
         priority: customForm.priority,
         start_date: new Date().toISOString().split("T")[0],
         progress_percentage: 0,
+        goal_template_id: isFromDatabase ? preset.id : null, // Link to template if from DB
       };
 
       // Only include target_unit if it has a value

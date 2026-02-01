@@ -318,6 +318,7 @@ export default function WorkoutComplete() {
               workout_log_id: workoutLogId,
               client_id: user.id,
               duration_minutes: durationMinutes,
+              session_id: workoutSessionIdOverride, // M2: Link to workout_sessions for status update
             }),
           });
 
@@ -354,8 +355,9 @@ export default function WorkoutComplete() {
               await loadBlocksAndSets(workoutLogId, user.id);
 
               // Fetch personal records for this workout (optional)
+              // Note: personal_records uses workout_assignment_id, not workout_log_id
               try {
-                if (workoutLogId) {
+                if (effectiveAssignmentId) {
                   const { data: prs } = await supabase
                     .from('personal_records')
                     .select(`
@@ -363,7 +365,7 @@ export default function WorkoutComplete() {
                       exercise:exercises(id, name)
                     `)
                     .eq('client_id', user.id)
-                    .eq('workout_log_id', workoutLogId)
+                    .eq('workout_assignment_id', effectiveAssignmentId)
                     .order('achieved_date', { ascending: false });
                   
                   if (prs && prs.length > 0) {

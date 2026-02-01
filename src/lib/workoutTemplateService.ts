@@ -1008,6 +1008,13 @@ export class WorkoutTemplateService {
 
   static async createProgramAssignment(clientId: string, programId: string, startDate: string, coachId?: string): Promise<ProgramAssignment | null> {
     try {
+      console.log('[createProgramAssignment] Creating assignment:', {
+        clientId,
+        programId,
+        coachId,
+        startDate
+      })
+      
       // Enforce single program assignment: Set all existing programs to 'completed'
       // This ensures only one program is active per client
       await supabase
@@ -1066,6 +1073,15 @@ export class WorkoutTemplateService {
       }
 
       if (data?.id) {
+        console.log('[createProgramAssignment] Assignment created/updated:', {
+          assignmentId: data.id,
+          coach_id: data.coach_id,
+          client_id: data.client_id,
+          program_id: data.program_id,
+          status: data.status,
+          start_date: data.start_date
+        })
+        
         await ProgramProgressionService.deleteClientProgramProgressionRules(
           data.id
         )

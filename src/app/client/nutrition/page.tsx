@@ -11,6 +11,11 @@ import { Plus, Camera, CheckCircle, Droplet, Image, Info } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { uploadMealPhoto } from "@/lib/mealPhotoService";
+import MealCardWithOptions, { 
+  type MealWithOptionsDisplay, 
+  type MealOptionDisplay, 
+  type MealFoodItemDisplay 
+} from "@/components/client/MealCardWithOptions";
 
 interface NutritionData {
   calories: { consumed: number; goal: number };
@@ -43,6 +48,9 @@ interface Meal {
   logged: boolean;
   photoUrl?: string;
   logged_at?: string;
+  // Meal Options support
+  options?: MealOptionDisplay[];
+  loggedOptionId?: string;
 }
 
 function NutritionDashboardContent() {
@@ -186,10 +194,10 @@ function NutritionDashboardContent() {
       // STEP 3: OPTIMIZED - Batch fetch all data at once instead of N+1 queries
       const mealIds = planMeals.map(m => m.id);
 
-      // 3a: Batch fetch ALL meal food items for all meals at once
+      // 3a: Batch fetch ALL meal food items for all meals at once (including meal_option_id)
       const { data: allFoodItems, error: foodError } = await supabase
         .from("meal_food_items")
-        .select("id, quantity, unit, food_id, meal_id")
+        .select("id, quantity, unit, food_id, meal_id, meal_option_id")
         .in("meal_id", mealIds);
 
       if (foodError) {
@@ -210,7 +218,27 @@ function NutritionDashboardContent() {
       // Create a map for quick food lookup
       const foodMap = new Map((allFoods || []).map((food: any) => [food.id, food]));
 
-      // 3c: Batch fetch ALL photo logs for all meals at once
+      // 3c: Batch fetch ALL meal options for all meals at once
+      const { data: allMealOptions, error: optionsError } = await supabase
+        .from("meal_options")
+        .select("*")
+        .in("meal_id", mealIds)
+        .order("order_index", { ascending: true });
+
+      if (optionsError) {
+        console.error("Error fetching meal options:", optionsError);
+      }
+
+      // Create a map of meal options grouped by meal_id
+      const optionsByMealMap = new Map<string, any[]>();
+      (allMealOptions || []).forEach((opt: any) => {
+        if (!optionsByMealMap.has(opt.meal_id)) {
+          optionsByMealMap.set(opt.meal_id, []);
+        }
+        optionsByMealMap.get(opt.meal_id)!.push(opt);
+      });
+
+      // 3d: Batch fetch ALL photo logs for all meals at once (including meal_option_id)
       const { data: allPhotoLogs } = await supabase
         .from("meal_photo_logs")
         .select("*")
@@ -218,7 +246,7 @@ function NutritionDashboardContent() {
         .eq("client_id", user.id)
         .eq("log_date", today);
 
-      // 3d: Batch fetch ALL completions for all meals at once (backward compatibility)
+      // 3e: Batch fetch ALL completions for all meals at once (backward compatibility)
       const { data: allCompletions } = await supabase
         .from("meal_completions")
         .select("*")
@@ -235,16 +263,86 @@ function NutritionDashboardContent() {
       for (const meal of planMeals) {
         // Get food items for this meal from batched data
         const foodItems = (allFoodItems || []).filter((item: any) => item.meal_id === meal.id);
+        
+        // Get options for this meal
+        const mealOptions = optionsByMealMap.get(meal.id) || [];
+        const hasOptions = mealOptions.length > 0;
 
+        // Build options with their food items
+        let mealOptionsDisplay: MealOptionDisplay[] = [];
+        
+        if (hasOptions) {
+          // Meal has options - group food items by option
+          mealOptionsDisplay = mealOptions.map((option: any) => {
+            const optionFoodItems = foodItems.filter((item: any) => item.meal_option_id === option.id);
+            
+            let optionItems: MealFoodItemDisplay[] = [];
+            let optionCalories = 0;
+            let optionProtein = 0;
+            let optionCarbs = 0;
+            let optionFat = 0;
+            
+            for (const item of optionFoodItems as any[]) {
+              const foodData = foodMap.get(item.food_id);
+              if (foodData) {
+                const servingSize = foodData.serving_size || 1;
+                const multiplier = item.quantity / servingSize;
+                const calories = (foodData.calories_per_serving || 0) * multiplier;
+                const protein = (foodData.protein || 0) * multiplier;
+                const carbs = (foodData.carbs || 0) * multiplier;
+                const fat = (foodData.fat || 0) * multiplier;
+                
+                optionCalories += calories;
+                optionProtein += protein;
+                optionCarbs += carbs;
+                optionFat += fat;
+                
+                optionItems.push({
+                  food: {
+                    id: foodData.id,
+                    name: foodData.name,
+                    serving_size: foodData.serving_size,
+                    serving_unit: foodData.serving_unit,
+                  },
+                  quantity: item.quantity,
+                  calories,
+                  protein,
+                  carbs,
+                  fat,
+                });
+              }
+            }
+            
+            return {
+              id: option.id,
+              name: option.name,
+              order_index: option.order_index,
+              items: optionItems,
+              totals: {
+                calories: optionCalories,
+                protein: optionProtein,
+                carbs: optionCarbs,
+                fat: optionFat,
+                fiber: 0, // Not tracked in display
+              }
+            };
+          });
+        }
+
+        // Build legacy food items (for meals without options)
         let mappedFoodItems: MealFoodItem[] = [];
         let totalCalories = 0;
         let totalProtein = 0;
         let totalCarbs = 0;
         let totalFat = 0;
 
-        if (foodItems && foodItems.length > 0) {
-          for (const item of foodItems as any[]) {
-            // Get food details from map (no query needed!)
+        // For legacy meals (no options), use items with meal_option_id = null
+        const legacyFoodItems = hasOptions 
+          ? [] 
+          : foodItems.filter((item: any) => !item.meal_option_id);
+
+        if (legacyFoodItems.length > 0) {
+          for (const item of legacyFoodItems as any[]) {
             const foodData = foodMap.get(item.food_id);
 
             if (foodData) {
@@ -277,15 +375,22 @@ function NutritionDashboardContent() {
               });
             }
           }
+        } else if (hasOptions && mealOptionsDisplay.length > 0) {
+          // If meal has options, use the first option's totals for the summary
+          totalCalories = mealOptionsDisplay[0].totals.calories;
+          totalProtein = mealOptionsDisplay[0].totals.protein;
+          totalCarbs = mealOptionsDisplay[0].totals.carbs;
+          totalFat = mealOptionsDisplay[0].totals.fat;
+          mappedFoodItems = mealOptionsDisplay[0].items;
         }
 
         // Get photo log/completion from maps (no query needed!)
-        const photoLogs = photoLogMap.has(meal.id) ? [photoLogMap.get(meal.id)] : null;
+        const photoLog = photoLogMap.get(meal.id) || null;
         const completion = completionMap.get(meal.id) || null;
 
         // Use photo logs first, fall back to completions (from maps)
-        const hasPhotoLog = photoLogs && photoLogs.length > 0;
-        const hasCompletion = !hasPhotoLog && completionMap.has(meal.id);
+        const hasPhotoLog = photoLog !== null;
+        const hasCompletion = !hasPhotoLog && completion !== null;
 
         mealsWithData.push({
           id: meal.id,
@@ -302,15 +407,18 @@ function NutritionDashboardContent() {
           items: mappedFoodItems,
           logged: !!(hasPhotoLog || hasCompletion),
           photoUrl: hasPhotoLog
-            ? photoLogs[0].photo_url
+            ? photoLog.photo_url
             : hasCompletion
             ? completion?.photo_url
             : undefined,
           logged_at: hasPhotoLog
-            ? photoLogs[0].created_at
+            ? photoLog.created_at
             : hasCompletion
             ? completion?.completed_at
             : undefined,
+          // Meal Options support
+          options: mealOptionsDisplay.length > 0 ? mealOptionsDisplay : undefined,
+          loggedOptionId: hasPhotoLog ? photoLog.meal_option_id : undefined,
         });
       }
 
@@ -1151,6 +1259,47 @@ function NutritionDashboardContent() {
                 const mealDescription = getMealDescription(meal);
                 const mealTime = formatTime(meal.logged_at);
 
+                // Use MealCardWithOptions for meals with options
+                if (meal.options && meal.options.length > 0) {
+                  return (
+                    <MealCardWithOptions
+                      key={meal.id}
+                      meal={{
+                        id: meal.id,
+                        name: meal.name,
+                        meal_type: meal.type,
+                        emoji: meal.emoji,
+                        options: meal.options,
+                        logged: meal.logged,
+                        loggedOptionId: meal.loggedOptionId,
+                        photoUrl: meal.photoUrl,
+                        logged_at: meal.logged_at,
+                      }}
+                      clientId={user?.id || ''}
+                      onMealLogged={(mealId, optionId, photoUrl) => {
+                        // Update local state when meal is logged
+                        setMeals((prev) => {
+                          const updated = prev.map((m) =>
+                            m.id === mealId
+                              ? {
+                                  ...m,
+                                  logged: true,
+                                  photoUrl: photoUrl,
+                                  loggedOptionId: optionId || undefined,
+                                  logged_at: new Date().toISOString(),
+                                }
+                              : m
+                          );
+                          // Recalculate nutrition totals
+                          calculateNutritionTotals(updated);
+                          return updated;
+                        });
+                      }}
+                    />
+                  );
+                }
+
+                // Legacy rendering for meals without options
                 return (
                   <div
                     key={meal.id}

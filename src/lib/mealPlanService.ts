@@ -60,6 +60,56 @@ export interface Meal {
   total_fiber: number
 }
 
+// ============================================================================
+// Meal Options Types
+// ============================================================================
+
+export interface MealOption {
+  id: string
+  meal_id: string
+  name: string
+  order_index: number
+  created_at: string
+}
+
+export interface MealFoodItem {
+  id: string
+  meal_id: string
+  meal_option_id: string | null  // NULL for legacy meals without options
+  food_id: string
+  quantity: number
+  unit: string
+  created_at: string
+  food?: Food  // populated when fetching
+}
+
+export interface MacroTotals {
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  fiber: number
+}
+
+export interface MealOptionWithFoods extends MealOption {
+  food_items: MealFoodItem[]
+  totals: MacroTotals
+}
+
+export interface MealWithOptions {
+  id: string
+  meal_plan_id: string
+  name: string
+  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  order_index: number
+  notes?: string
+  created_at: string
+  updated_at: string
+  options: MealOptionWithFoods[]  // Empty array = legacy meal without options
+  // For legacy meals, food items are at meal level (no options)
+  legacy_food_items?: MealFoodItem[]
+}
+
 export class MealPlanService {
   // Food database methods
   static async getFoods(): Promise<Food[]> {
@@ -386,5 +436,497 @@ export class MealPlanService {
         timestamp: Date.now()
       }))
     })
+  }
+
+  // ============================================================================
+  // Meal Options Methods
+  // ============================================================================
+
+  /**
+   * Get all options for a meal
+   */
+  static async getMealOptions(mealId: string): Promise<MealOption[]> {
+    const { data, error } = await supabase
+      .from('meal_options')
+      .select('*')
+      .eq('meal_id', mealId)
+      .order('order_index', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching meal options:', error)
+      throw error
+    }
+
+    return data || []
+  }
+
+  /**
+   * Get a meal with all its options and food items
+   */
+  static async getMealWithOptions(mealId: string): Promise<MealWithOptions | null> {
+    try {
+      console.log('[getMealWithOptions] Starting for mealId:', mealId)
+      
+      // Fetch the meal
+      const { data: meal, error: mealError } = await supabase
+        .from('meals')
+        .select('*')
+        .eq('id', mealId)
+        .single()
+
+      console.log('[getMealWithOptions] Meal result:', { meal, mealError })
+
+      if (mealError || !meal) {
+        console.error('Error fetching meal:', mealError)
+        return null
+      }
+
+      // Fetch all options for this meal
+      console.log('[getMealWithOptions] Fetching options...')
+      const { data: options, error: optionsError } = await supabase
+        .from('meal_options')
+        .select('*')
+        .eq('meal_id', mealId)
+        .order('order_index', { ascending: true })
+
+      console.log('[getMealWithOptions] Options result:', { options, optionsError })
+
+      if (optionsError) {
+        console.error('Error fetching meal options:', optionsError)
+        throw optionsError
+      }
+
+      // Fetch all food items for this meal (both legacy and option-based)
+      console.log('[getMealWithOptions] Fetching food items...')
+      const { data: allFoodItems, error: foodError } = await supabase
+        .from('meal_food_items')
+        .select(`
+          *,
+          foods (*)
+        `)
+        .eq('meal_id', mealId)
+
+      console.log('[getMealWithOptions] Food items result:', { count: allFoodItems?.length, foodError })
+
+      if (foodError) {
+        console.error('Error fetching meal food items:', foodError)
+        throw foodError
+      }
+
+      // Transform food items
+      const transformedFoodItems: MealFoodItem[] = (allFoodItems || []).map(item => ({
+        id: item.id,
+        meal_id: item.meal_id,
+        meal_option_id: item.meal_option_id,
+        food_id: item.food_id,
+        quantity: item.quantity,
+        unit: item.unit,
+        created_at: item.created_at,
+        food: item.foods as Food
+      }))
+
+      // Separate legacy items (no option) from option-based items
+      const legacyFoodItems = transformedFoodItems.filter(item => item.meal_option_id === null)
+      const optionFoodItems = transformedFoodItems.filter(item => item.meal_option_id !== null)
+
+      // Build options with their food items and totals
+      const optionsWithFoods: MealOptionWithFoods[] = (options || []).map(option => {
+        const optionItems = optionFoodItems.filter(item => item.meal_option_id === option.id)
+        const totals = this.calculateFoodItemTotals(optionItems)
+        
+        return {
+          ...option,
+          food_items: optionItems,
+          totals
+        }
+      })
+
+      console.log('[getMealWithOptions] Returning data:', {
+        mealId: meal.id,
+        optionsCount: optionsWithFoods.length,
+        legacyItemsCount: legacyFoodItems.length
+      })
+
+      return {
+        ...meal,
+        options: optionsWithFoods,
+        legacy_food_items: legacyFoodItems.length > 0 ? legacyFoodItems : undefined
+      }
+    } catch (error) {
+      console.error('Error in getMealWithOptions:', error)
+      return null
+    }
+  }
+
+  /**
+   * Create a new meal option
+   * If this is the first option for a meal with existing food items,
+   * automatically migrate those items to a "Default" option first.
+   */
+  static async createMealOption(mealId: string, name: string): Promise<MealOption> {
+    console.log('[createMealOption] Starting for mealId:', mealId, 'name:', name)
+    
+    // Check if meal has existing options
+    const existingOptions = await this.getMealOptions(mealId)
+    console.log('[createMealOption] Existing options:', existingOptions.length)
+    
+    // If no existing options, check for legacy food items and migrate them
+    if (existingOptions.length === 0) {
+      console.log('[createMealOption] No existing options, checking for legacy items...')
+      await this.migrateLegacyFoodsToDefaultOption(mealId)
+      // Re-fetch options after migration
+      const optionsAfterMigration = await this.getMealOptions(mealId)
+      console.log('[createMealOption] Options after migration:', optionsAfterMigration.length)
+      if (optionsAfterMigration.length > 0) {
+        // Default option was created, so this new option goes after it
+        const nextIndex = optionsAfterMigration.length
+        console.log('[createMealOption] Creating new option at index:', nextIndex)
+        const { data, error } = await supabase
+          .from('meal_options')
+          .insert([{ meal_id: mealId, name, order_index: nextIndex }])
+          .select()
+          .single()
+
+        if (error) {
+          console.error('[createMealOption] Error creating meal option:', error)
+          throw error
+        }
+        console.log('[createMealOption] Created option:', data)
+        return data
+      }
+    }
+
+    // Create the new option with the next order_index
+    const nextIndex = existingOptions.length
+    console.log('[createMealOption] Creating new option at index:', nextIndex)
+    const { data, error } = await supabase
+      .from('meal_options')
+      .insert([{ meal_id: mealId, name, order_index: nextIndex }])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[createMealOption] Error creating meal option:', error)
+      throw error
+    }
+
+    console.log('[createMealOption] Created option:', data)
+    return data
+  }
+
+  /**
+   * Update a meal option
+   */
+  static async updateMealOption(optionId: string, updates: Partial<Pick<MealOption, 'name' | 'order_index'>>): Promise<MealOption> {
+    const { data, error } = await supabase
+      .from('meal_options')
+      .update(updates)
+      .eq('id', optionId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating meal option:', error)
+      throw error
+    }
+
+    return data
+  }
+
+  /**
+   * Delete a meal option and all its food items
+   * Cannot delete if it's the only option (would leave meal in invalid state)
+   */
+  static async deleteMealOption(optionId: string): Promise<boolean> {
+    try {
+      // Get the option to find its meal_id
+      const { data: option, error: fetchError } = await supabase
+        .from('meal_options')
+        .select('meal_id')
+        .eq('id', optionId)
+        .single()
+
+      if (fetchError || !option) {
+        console.error('Error fetching option for deletion:', fetchError)
+        return false
+      }
+
+      // Check how many options exist for this meal
+      const { count, error: countError } = await supabase
+        .from('meal_options')
+        .select('*', { count: 'exact', head: true })
+        .eq('meal_id', option.meal_id)
+
+      if (countError) {
+        console.error('Error counting options:', countError)
+        return false
+      }
+
+      // Cannot delete if it's the only option
+      if (count && count <= 1) {
+        console.error('Cannot delete the only option for a meal')
+        return false
+      }
+
+      // Delete the option (CASCADE will delete food items)
+      const { error: deleteError } = await supabase
+        .from('meal_options')
+        .delete()
+        .eq('id', optionId)
+
+      if (deleteError) {
+        console.error('Error deleting meal option:', deleteError)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error in deleteMealOption:', error)
+      return false
+    }
+  }
+
+  /**
+   * Add a food item to a meal option
+   */
+  static async addFoodToOption(
+    mealId: string,
+    optionId: string,
+    foodId: string,
+    quantity: number,
+    unit: string
+  ): Promise<MealFoodItem | null> {
+    try {
+      const { data, error } = await supabase
+        .from('meal_food_items')
+        .insert([{
+          meal_id: mealId,
+          meal_option_id: optionId,
+          food_id: foodId,
+          quantity,
+          unit
+        }])
+        .select(`
+          *,
+          foods (*)
+        `)
+        .single()
+
+      if (error) {
+        console.error('Error adding food to option:', error)
+        throw error
+      }
+
+      return {
+        id: data.id,
+        meal_id: data.meal_id,
+        meal_option_id: data.meal_option_id,
+        food_id: data.food_id,
+        quantity: data.quantity,
+        unit: data.unit,
+        created_at: data.created_at,
+        food: data.foods as Food
+      }
+    } catch (error) {
+      console.error('Error in addFoodToOption:', error)
+      return null
+    }
+  }
+
+  /**
+   * Remove a food item from an option
+   */
+  static async removeFoodFromOption(foodItemId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('meal_food_items')
+      .delete()
+      .eq('id', foodItemId)
+
+    if (error) {
+      console.error('Error removing food from option:', error)
+      return false
+    }
+
+    return true
+  }
+
+  /**
+   * Update a food item quantity/unit in an option
+   */
+  static async updateFoodInOption(
+    foodItemId: string,
+    updates: { quantity?: number; unit?: string }
+  ): Promise<MealFoodItem | null> {
+    try {
+      const { data, error } = await supabase
+        .from('meal_food_items')
+        .update(updates)
+        .eq('id', foodItemId)
+        .select(`
+          *,
+          foods (*)
+        `)
+        .single()
+
+      if (error) {
+        console.error('Error updating food in option:', error)
+        throw error
+      }
+
+      return {
+        id: data.id,
+        meal_id: data.meal_id,
+        meal_option_id: data.meal_option_id,
+        food_id: data.food_id,
+        quantity: data.quantity,
+        unit: data.unit,
+        created_at: data.created_at,
+        food: data.foods as Food
+      }
+    } catch (error) {
+      console.error('Error in updateFoodInOption:', error)
+      return null
+    }
+  }
+
+  /**
+   * Migrate legacy food items (meal_option_id = NULL) to a "Default" option.
+   * Called automatically when the first option is added to a meal with existing foods.
+   */
+  static async migrateLegacyFoodsToDefaultOption(mealId: string): Promise<MealOption | null> {
+    try {
+      // Check if there are any legacy food items (meal_option_id = NULL)
+      const { data: legacyItems, error: fetchError } = await supabase
+        .from('meal_food_items')
+        .select('id')
+        .eq('meal_id', mealId)
+        .is('meal_option_id', null)
+
+      if (fetchError) {
+        console.error('Error checking legacy food items:', fetchError)
+        return null
+      }
+
+      // No legacy items to migrate
+      if (!legacyItems || legacyItems.length === 0) {
+        return null
+      }
+
+      // Create a "Default" option
+      const { data: defaultOption, error: createError } = await supabase
+        .from('meal_options')
+        .insert([{ meal_id: mealId, name: 'Default', order_index: 0 }])
+        .select()
+        .single()
+
+      if (createError || !defaultOption) {
+        console.error('Error creating Default option:', createError)
+        return null
+      }
+
+      // Update all legacy food items to belong to the Default option
+      const legacyItemIds = legacyItems.map(item => item.id)
+      const { error: updateError } = await supabase
+        .from('meal_food_items')
+        .update({ meal_option_id: defaultOption.id })
+        .in('id', legacyItemIds)
+
+      if (updateError) {
+        console.error('Error migrating legacy food items:', updateError)
+        // Rollback: delete the default option
+        await supabase.from('meal_options').delete().eq('id', defaultOption.id)
+        return null
+      }
+
+      console.log(`Migrated ${legacyItems.length} legacy food items to Default option for meal ${mealId}`)
+      return defaultOption
+    } catch (error) {
+      console.error('Error in migrateLegacyFoodsToDefaultOption:', error)
+      return null
+    }
+  }
+
+  /**
+   * Check if a meal has options
+   */
+  static async mealHasOptions(mealId: string): Promise<boolean> {
+    const { count, error } = await supabase
+      .from('meal_options')
+      .select('*', { count: 'exact', head: true })
+      .eq('meal_id', mealId)
+
+    if (error) {
+      console.error('Error checking meal options:', error)
+      return false
+    }
+
+    return (count || 0) > 0
+  }
+
+  /**
+   * Get option count for a meal (max 5 allowed)
+   */
+  static async getMealOptionCount(mealId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('meal_options')
+      .select('*', { count: 'exact', head: true })
+      .eq('meal_id', mealId)
+
+    if (error) {
+      console.error('Error counting meal options:', error)
+      return 0
+    }
+
+    return count || 0
+  }
+
+  /**
+   * Calculate macro totals from food items
+   */
+  static calculateFoodItemTotals(items: MealFoodItem[]): MacroTotals {
+    return items.reduce((totals, item) => {
+      if (!item.food) return totals
+      
+      const multiplier = item.quantity / (item.food.serving_size || 1)
+      return {
+        calories: totals.calories + (item.food.calories_per_serving * multiplier),
+        protein: totals.protein + (item.food.protein * multiplier),
+        carbs: totals.carbs + (item.food.carbs * multiplier),
+        fat: totals.fat + (item.food.fat * multiplier),
+        fiber: totals.fiber + (item.food.fiber * multiplier)
+      }
+    }, {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0
+    })
+  }
+
+  /**
+   * Reorder options for a meal
+   */
+  static async reorderMealOptions(mealId: string, optionIds: string[]): Promise<boolean> {
+    try {
+      // Update each option's order_index
+      for (let i = 0; i < optionIds.length; i++) {
+        const { error } = await supabase
+          .from('meal_options')
+          .update({ order_index: i })
+          .eq('id', optionIds[i])
+          .eq('meal_id', mealId) // Safety check
+
+        if (error) {
+          console.error('Error reordering option:', error)
+          return false
+        }
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error in reorderMealOptions:', error)
+      return false
+    }
   }
 }

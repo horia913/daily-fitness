@@ -69,6 +69,13 @@ export default function CoachProfilePage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [notifications, setNotifications] = useState({
     clientMessages: true,
     workoutCompletions: true,
@@ -263,6 +270,46 @@ export default function CoachProfilePage() {
       injuries: profile?.injuries || "",
     });
     setEditing(false);
+  };
+
+  const handlePasswordChange = async () => {
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    if (passwordData.newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      });
+
+      if (error) {
+        setPasswordError(error.message);
+        return;
+      }
+
+      setPasswordSuccess(true);
+      setPasswordData({ newPassword: '', confirmPassword: '' });
+      
+      // Close modal after 2 seconds on success
+      setTimeout(() => {
+        setShowPasswordModal(false);
+        setPasswordSuccess(false);
+      }, 2000);
+    } catch (error: any) {
+      setPasswordError(error.message || 'Failed to change password');
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const addSpecialization = (specialization: string) => {
@@ -1115,7 +1162,11 @@ export default function CoachProfilePage() {
                           </p>
                         </div>
                       </div>
-                      <Button variant="outline" className="fc-btn fc-btn-ghost rounded-2xl">
+                      <Button 
+                        variant="outline" 
+                        className="fc-btn fc-btn-ghost rounded-2xl"
+                        onClick={() => setShowPasswordModal(true)}
+                      >
                         <Lock className="w-4 h-4 mr-2" />
                         Change
                       </Button>
@@ -1183,6 +1234,88 @@ export default function CoachProfilePage() {
             </Card>
           </div>
         </div>
+
+        {/* Password Change Modal */}
+        {showPasswordModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="fc-glass fc-card rounded-3xl p-6 w-full max-w-md">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)]">Change Password</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordData({ newPassword: '', confirmPassword: '' });
+                    setPasswordError('');
+                    setPasswordSuccess(false);
+                  }}
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+
+              {passwordSuccess ? (
+                <div className="text-center py-6">
+                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                  <p className="text-lg font-semibold text-green-600">Password changed successfully!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="newPassword">New Password</Label>
+                    <Input
+                      id="newPassword"
+                      type="password"
+                      placeholder="Enter new password"
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="Confirm new password"
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {passwordError && (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">
+                      {passwordError}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setShowPasswordModal(false);
+                        setPasswordData({ newPassword: '', confirmPassword: '' });
+                        setPasswordError('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={handlePasswordChange}
+                      disabled={changingPassword}
+                    >
+                      {changingPassword ? 'Changing...' : 'Change Password'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </AnimatedBackground>
     </ProtectedRoute>
   );

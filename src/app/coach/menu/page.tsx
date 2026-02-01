@@ -6,6 +6,7 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Users,
   Dumbbell,
@@ -21,6 +22,10 @@ import {
   FolderTree,
   User,
   Trophy,
+  Settings,
+  Database,
+  Award,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -118,8 +123,44 @@ const menuItems = [
   },
 ];
 
+// Admin-only menu items
+const adminMenuItems = [
+  {
+    title: "Goal Templates",
+    description: "Manage goal types that clients can select",
+    icon: Target,
+    href: "/admin/goal-templates",
+    color: "bg-blue-100 text-blue-600",
+  },
+  {
+    title: "Habit Categories",
+    description: "Manage categories for organizing client habits",
+    icon: Sparkles,
+    href: "/admin/habit-categories",
+    color: "bg-violet-100 text-violet-600",
+  },
+  {
+    title: "Achievement Templates",
+    description: "Manage achievements and badges clients can earn",
+    icon: Award,
+    href: "/admin/achievement-templates",
+    color: "bg-amber-100 text-amber-600",
+  },
+  {
+    title: "Tracking Sources",
+    description: "View available data sources for auto-tracking",
+    icon: Database,
+    href: "/admin/tracking-sources",
+    color: "bg-cyan-100 text-cyan-600",
+  },
+];
+
 export default function CoachMenu() {
   const { performanceSettings } = useTheme();
+  const { profile } = useAuth();
+  
+  // Check if user is admin
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <ProtectedRoute requiredRole="coach">
@@ -170,6 +211,53 @@ export default function CoachMenu() {
             })}
           </div>
 
+          {/* Admin Section - Only visible to admin users */}
+          {isAdmin && (
+            <>
+              <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10 border-2 border-amber-500/30">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
+                    <Settings className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <span className="px-2 py-1 text-xs font-medium bg-amber-500/20 text-amber-600 rounded-full border border-amber-500/30">
+                      ADMIN ONLY
+                    </span>
+                    <h2 className="mt-2 text-xl font-bold text-[color:var(--fc-text-primary)]">
+                      System Administration
+                    </h2>
+                    <p className="text-sm text-[color:var(--fc-text-dim)]">
+                      Manage templates, categories, and system configuration
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {adminMenuItems.map((item, index) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link href={item.href} key={`admin-${index}`}>
+                        <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-100/50 dark:bg-slate-800/50 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-all">
+                          <div className={`w-10 h-10 rounded-xl ${item.color} flex items-center justify-center`}>
+                            <Icon className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-[color:var(--fc-text-primary)]">
+                              {item.title}
+                            </h3>
+                            <p className="text-xs text-[color:var(--fc-text-dim)]">
+                              {item.description}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </GlassCard>
+            </>
+          )}
+
           <GlassCard elevation={2} className="fc-glass fc-card p-6">
             <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)] mb-4">
               Quick Actions
@@ -205,6 +293,14 @@ export default function CoachMenu() {
                   Edit Profile
                 </Button>
               </Link>
+              {isAdmin && (
+                <Link href="/admin">
+                  <Button className="fc-btn bg-amber-500 hover:bg-amber-600 text-white">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Admin Panel
+                  </Button>
+                </Link>
+              )}
             </div>
           </GlassCard>
         </div>
