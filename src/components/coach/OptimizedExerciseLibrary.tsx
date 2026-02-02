@@ -250,10 +250,10 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
     .filter(exercise => {
       const matchesSearch = exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            exercise.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           exercise.muscle_groups.some(group => group.toLowerCase().includes(searchTerm.toLowerCase()))
+                           (exercise.muscle_groups || []).some(group => group.toLowerCase().includes(searchTerm.toLowerCase()))
       const matchesCategory = selectedCategory === 'all' || exercise.category === selectedCategory
       const matchesDifficulty = selectedDifficulty === 'all' || exercise.difficulty === selectedDifficulty
-      const matchesEquipment = selectedEquipment === 'all' || exercise.equipment.includes(selectedEquipment)
+      const matchesEquipment = selectedEquipment === 'all' || (exercise.equipment || []).includes(selectedEquipment)
       return matchesSearch && matchesCategory && matchesDifficulty && matchesEquipment
     })
     .sort((a, b) => {
@@ -812,8 +812,8 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                           )}
 
                           <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-[color:var(--fc-text-subtle)]">
-                            <span className="truncate">Muscles: {exercise.muscle_groups.slice(0, 2).join(', ')}{exercise.muscle_groups.length > 2 ? '...' : ''}</span>
-                            <span className="truncate">Equipment: {exercise.equipment.slice(0, 2).join(', ')}{exercise.equipment.length > 2 ? '...' : ''}</span>
+                            <span className="truncate">Muscles: {(exercise.muscle_groups || []).slice(0, 2).join(', ')}{(exercise.muscle_groups || []).length > 2 ? '...' : ''}</span>
+                            <span className="truncate">Equipment: {(exercise.equipment || []).slice(0, 2).join(', ')}{(exercise.equipment || []).length > 2 ? '...' : ''}</span>
                             <div className="flex items-center gap-1">
                               <Users className="w-3 h-3" />
                               <span>{exercise.usage_count || 0}</span>

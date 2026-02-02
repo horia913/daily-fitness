@@ -77,17 +77,15 @@ BEGIN
   WHERE id = v_client_id;
   
   -- ========================================
-  -- 2. Get client type from clients table
+  -- 2. Set client type (defaulting to 'online')
+  -- Note: client_type column may not exist in clients table
+  -- If you have this column, uncomment the query below
   -- ========================================
-  SELECT c.client_type
-  INTO v_client_type
-  FROM clients c
-  WHERE c.client_id = v_client_id
-    AND c.status = 'active'
-  LIMIT 1;
+  -- SELECT c.client_type INTO v_client_type
+  -- FROM clients c WHERE c.client_id = v_client_id AND c.status = 'active' LIMIT 1;
   
-  -- Default to online if not found
-  v_client_type := COALESCE(v_client_type, 'online');
+  -- Default to online
+  v_client_type := 'online';
   
   -- ========================================
   -- 3. Get next session (if in_gym client)

@@ -927,7 +927,7 @@ function NutritionDashboardContent() {
               )}
             </div>
           </div>
-          <Link href="/client/nutrition/log">
+          <Link href="/client/nutrition/foods/create">
             <Button
               variant="success"
               className="h-12 px-8 rounded-xl flex items-center justify-center gap-2 font-semibold w-full md:w-auto"

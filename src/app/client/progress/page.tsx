@@ -22,6 +22,8 @@ import {
   FileText,
   Activity,
   Timer,
+  Crosshair,
+  CheckSquare,
 } from "lucide-react";
 import Link from "next/link";
 import { getProgressStats, ProgressStats } from "@/lib/progressStatsService";
@@ -531,6 +533,64 @@ function ProgressHubContent() {
 
                   <p className="text-xs font-medium text-[color:var(--fc-domain-workouts)]">
                     View detailed analytics →
+                  </p>
+                </div>
+              </GlassCard>
+            </Link>
+
+            {/* Goals Card */}
+            <Link href="/client/goals">
+              <GlassCard
+                elevation={2}
+                className="fc-glass fc-card p-6 transition-all hover:-translate-y-1 hover:shadow-2xl cursor-pointer h-full"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br from-cyan-500 to-teal-600 shadow-[0_8px_20px_rgba(6,182,212,0.3)]">
+                    <Crosshair className="w-7 h-7 text-white" />
+                  </div>
+                  <ChevronRight className="w-6 h-6 text-[color:var(--fc-text-subtle)]" />
+                </div>
+
+                <h3 className="text-xl font-bold mb-2 text-[color:var(--fc-text-primary)]">
+                  Goals
+                </h3>
+
+                <div className="space-y-2">
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Set and track your fitness goals
+                  </p>
+
+                  <p className="text-xs font-medium text-[color:var(--fc-accent-cyan)]">
+                    Manage your goals →
+                  </p>
+                </div>
+              </GlassCard>
+            </Link>
+
+            {/* Habits Card */}
+            <Link href="/client/habits">
+              <GlassCard
+                elevation={2}
+                className="fc-glass fc-card p-6 transition-all hover:-translate-y-1 hover:shadow-2xl cursor-pointer h-full"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br from-lime-500 to-green-600 shadow-[0_8px_20px_rgba(132,204,22,0.3)]">
+                    <CheckSquare className="w-7 h-7 text-white" />
+                  </div>
+                  <ChevronRight className="w-6 h-6 text-[color:var(--fc-text-subtle)]" />
+                </div>
+
+                <h3 className="text-xl font-bold mb-2 text-[color:var(--fc-text-primary)]">
+                  Habits
+                </h3>
+
+                <div className="space-y-2">
+                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                    Build and track daily habits
+                  </p>
+
+                  <p className="text-xs font-medium text-[color:var(--fc-status-success)]">
+                    Track your habits →
                   </p>
                 </div>
               </GlassCard>
