@@ -103,6 +103,13 @@ type ClientBlockExerciseRecord = {
   tempo: string | null;
   rest_seconds: number | null;
   notes: string | null;
+  time_protocols?: any[]; // For tabata/amrap/emom/for_time/circuit blocks
+  // Special set data from workout_*_sets tables
+  drop_sets?: any[];
+  cluster_sets?: any[];
+  rest_pause_sets?: any[];
+  pyramid_sets?: any[];
+  ladder_sets?: any[];
 };
 
 type ClientBlockRecord = {
@@ -117,6 +124,7 @@ type ClientBlockRecord = {
   duration_seconds?: number | null;
   block_parameters?: unknown;
   exercises?: ClientBlockExerciseRecord[] | null;
+  time_protocols?: any[]; // Block-level time protocols for tabata/amrap/emom/for_time/circuit
 };
 
 export default function LiveWorkout() {
@@ -1548,6 +1556,7 @@ export default function LiveWorkout() {
         reps_per_set: block.reps_per_set ?? null,
         rest_seconds: block.rest_seconds ?? null,
         duration_seconds: block.duration_seconds ?? null,
+        time_protocols: (block as any).time_protocols ?? [], // Block-level time protocols
         exercises: (block.exercises ?? []).map((ex: any) => ({
           id: ex.id,
           exercise_id: ex.exercise_id,
@@ -1561,6 +1570,13 @@ export default function LiveWorkout() {
           rest_seconds: ex.rest_seconds ?? null,
           load_percentage: (ex as any).load_percentage ?? null,
           notes: ex.notes ?? null,
+          time_protocols: ex.time_protocols ?? [], // Exercise-level time protocols for tabata/amrap/emom/etc
+          // Preserve special set data
+          drop_sets: ex.drop_sets ?? [],
+          cluster_sets: ex.cluster_sets ?? [],
+          rest_pause_sets: ex.rest_pause_sets ?? [],
+          pyramid_sets: ex.pyramid_sets ?? [],
+          ladder_sets: ex.ladder_sets ?? [],
         })) as any[],
       }));
       const allClientExercises = clientBlocks.flatMap(
@@ -1670,6 +1686,7 @@ export default function LiveWorkout() {
                   exercise.rest_seconds ?? block.rest_seconds ?? undefined,
                 load_percentage: (exercise as any).load_percentage ?? undefined,
                 notes: exercise.notes ?? undefined,
+                time_protocols: exercise.time_protocols ?? [], // For tabata/amrap/emom/for_time/circuit blocks
                 exercise: exercise.exercise_id
                   ? {
                       id: exercise.exercise_id,
@@ -1682,11 +1699,12 @@ export default function LiveWorkout() {
                       updated_at: now,
                     }
                   : undefined,
-                drop_sets: [],
-                cluster_sets: [],
-                pyramid_sets: [],
-                rest_pause_sets: [],
-                ladder_sets: [],
+                // Preserve special set data from exercise
+                drop_sets: exercise.drop_sets ?? [],
+                cluster_sets: exercise.cluster_sets ?? [],
+                pyramid_sets: exercise.pyramid_sets ?? [],
+                rest_pause_sets: exercise.rest_pause_sets ?? [],
+                ladder_sets: exercise.ladder_sets ?? [],
                 created_at: now,
                 updated_at: now,
               };
@@ -1711,12 +1729,14 @@ export default function LiveWorkout() {
             reps_per_set: block.reps_per_set ?? undefined,
             block_parameters: blockParameters,
             exercises: blockExercises as any,
-            drop_sets: [],
-            cluster_sets: [],
-            pyramid_sets: [],
-            rest_pause_sets: [],
-            time_protocol: undefined,
-            ladder_sets: [],
+            // Block-level special sets (aggregated from all exercises)
+            drop_sets: blockExercises.flatMap((ex: any) => ex.drop_sets || []),
+            cluster_sets: blockExercises.flatMap((ex: any) => ex.cluster_sets || []),
+            pyramid_sets: blockExercises.flatMap((ex: any) => ex.pyramid_sets || []),
+            rest_pause_sets: blockExercises.flatMap((ex: any) => ex.rest_pause_sets || []),
+            time_protocol: block.time_protocols?.[0] ?? undefined, // First time protocol for backwards compatibility
+            time_protocols: block.time_protocols ?? [], // Full array for tabata/amrap/emom/for_time/circuit
+            ladder_sets: blockExercises.flatMap((ex: any) => ex.ladder_sets || []),
             created_at: now,
             updated_at: now,
           } as WorkoutBlock;

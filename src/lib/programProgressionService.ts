@@ -516,6 +516,137 @@ export class ProgramProgressionService {
       blocksMap.get(blockOrder)!.push(rule)
     }
 
+    // Collect block IDs by block type for fetching special tables
+    const timeBasedBlockTypes = ['amrap', 'emom', 'for_time', 'tabata', 'circuit']
+    const timeBasedBlockIds: string[] = []
+    const dropSetBlockIds: string[] = []
+    const clusterSetBlockIds: string[] = []
+    const restPauseBlockIds: string[] = []
+    const pyramidBlockIds: string[] = []
+    const ladderBlockIds: string[] = []
+    
+    for (const [_, blockRules] of blocksMap.entries()) {
+      if (blockRules.length > 0) {
+        const firstRule = blockRules[0]
+        if (firstRule.block_id) {
+          if (timeBasedBlockTypes.includes(firstRule.block_type)) {
+            timeBasedBlockIds.push(firstRule.block_id)
+          }
+          if (firstRule.block_type === 'drop_set') {
+            dropSetBlockIds.push(firstRule.block_id)
+          }
+          if (firstRule.block_type === 'cluster_set') {
+            clusterSetBlockIds.push(firstRule.block_id)
+          }
+          if (firstRule.block_type === 'rest_pause') {
+            restPauseBlockIds.push(firstRule.block_id)
+          }
+          if (firstRule.block_type === 'pyramid_set') {
+            pyramidBlockIds.push(firstRule.block_id)
+          }
+          if (firstRule.block_type === 'ladder') {
+            ladderBlockIds.push(firstRule.block_id)
+          }
+        }
+      }
+    }
+
+    // Fetch time_protocols for time-based blocks
+    const timeProtocolsByBlock = new Map<string, any[]>()
+    if (timeBasedBlockIds.length > 0) {
+      const { data: timeProtocols } = await supabase
+        .from('workout_time_protocols')
+        .select('id, block_id, exercise_id, exercise_order, protocol_type, set, rounds, work_seconds, rest_seconds, rest_after_set, total_duration_minutes, reps_per_round, target_reps, time_cap_minutes, emom_mode, weight_kg, load_percentage')
+        .in('block_id', timeBasedBlockIds)
+      
+      ;(timeProtocols || []).forEach((tp: any) => {
+        if (!timeProtocolsByBlock.has(tp.block_id)) {
+          timeProtocolsByBlock.set(tp.block_id, [])
+        }
+        timeProtocolsByBlock.get(tp.block_id)!.push(tp)
+      })
+    }
+    
+    // Fetch drop_sets
+    const dropSetsByBlock = new Map<string, any[]>()
+    if (dropSetBlockIds.length > 0) {
+      const { data: dropSets } = await supabase
+        .from('workout_drop_sets')
+        .select('id, block_id, exercise_id, exercise_order, drop_order, reps, weight_kg, load_percentage')
+        .in('block_id', dropSetBlockIds)
+      
+      ;(dropSets || []).forEach((ds: any) => {
+        if (!dropSetsByBlock.has(ds.block_id)) {
+          dropSetsByBlock.set(ds.block_id, [])
+        }
+        dropSetsByBlock.get(ds.block_id)!.push(ds)
+      })
+    }
+    
+    // Fetch cluster_sets
+    const clusterSetsByBlock = new Map<string, any[]>()
+    if (clusterSetBlockIds.length > 0) {
+      const { data: clusterSets } = await supabase
+        .from('workout_cluster_sets')
+        .select('id, block_id, exercise_id, exercise_order, reps_per_cluster, clusters_per_set, intra_cluster_rest, weight_kg, load_percentage')
+        .in('block_id', clusterSetBlockIds)
+      
+      ;(clusterSets || []).forEach((cs: any) => {
+        if (!clusterSetsByBlock.has(cs.block_id)) {
+          clusterSetsByBlock.set(cs.block_id, [])
+        }
+        clusterSetsByBlock.get(cs.block_id)!.push(cs)
+      })
+    }
+    
+    // Fetch rest_pause_sets
+    const restPauseSetsByBlock = new Map<string, any[]>()
+    if (restPauseBlockIds.length > 0) {
+      const { data: restPauseSets } = await supabase
+        .from('workout_rest_pause_sets')
+        .select('id, block_id, exercise_id, exercise_order, rest_pause_duration, max_rest_pauses, weight_kg, load_percentage')
+        .in('block_id', restPauseBlockIds)
+      
+      ;(restPauseSets || []).forEach((rp: any) => {
+        if (!restPauseSetsByBlock.has(rp.block_id)) {
+          restPauseSetsByBlock.set(rp.block_id, [])
+        }
+        restPauseSetsByBlock.get(rp.block_id)!.push(rp)
+      })
+    }
+    
+    // Fetch pyramid_sets
+    const pyramidSetsByBlock = new Map<string, any[]>()
+    if (pyramidBlockIds.length > 0) {
+      const { data: pyramidSets } = await supabase
+        .from('workout_pyramid_sets')
+        .select('id, block_id, exercise_id, exercise_order, set_number, reps, weight_kg, load_percentage')
+        .in('block_id', pyramidBlockIds)
+      
+      ;(pyramidSets || []).forEach((ps: any) => {
+        if (!pyramidSetsByBlock.has(ps.block_id)) {
+          pyramidSetsByBlock.set(ps.block_id, [])
+        }
+        pyramidSetsByBlock.get(ps.block_id)!.push(ps)
+      })
+    }
+    
+    // Fetch ladder_sets
+    const ladderSetsByBlock = new Map<string, any[]>()
+    if (ladderBlockIds.length > 0) {
+      const { data: ladderSets } = await supabase
+        .from('workout_ladder_sets')
+        .select('id, block_id, exercise_id, exercise_order, rung_number, reps, weight_kg, load_percentage')
+        .in('block_id', ladderBlockIds)
+      
+      ;(ladderSets || []).forEach((ls: any) => {
+        if (!ladderSetsByBlock.has(ls.block_id)) {
+          ladderSetsByBlock.set(ls.block_id, [])
+        }
+        ladderSetsByBlock.get(ls.block_id)!.push(ls)
+      })
+    }
+
     // Convert grouped rules to WorkoutBlock[]
     const blocks: WorkoutBlock[] = []
 
@@ -534,12 +665,53 @@ export class ProgramProgressionService {
         .in('id', exerciseIds)
 
       const exerciseMap = new Map(exercises?.map(e => [e.id, e]) || [])
+      
+      // Get special table data for this block
+      const blockTimeProtocols = firstRule.block_id 
+        ? timeProtocolsByBlock.get(firstRule.block_id) || []
+        : []
+      const blockDropSets = firstRule.block_id
+        ? dropSetsByBlock.get(firstRule.block_id) || []
+        : []
+      const blockClusterSets = firstRule.block_id
+        ? clusterSetsByBlock.get(firstRule.block_id) || []
+        : []
+      const blockRestPauseSets = firstRule.block_id
+        ? restPauseSetsByBlock.get(firstRule.block_id) || []
+        : []
+      const blockPyramidSets = firstRule.block_id
+        ? pyramidSetsByBlock.get(firstRule.block_id) || []
+        : []
+      const blockLadderSets = firstRule.block_id
+        ? ladderSetsByBlock.get(firstRule.block_id) || []
+        : []
 
       // Convert rules to WorkoutBlockExercise[]
       const blockExercises: WorkoutBlockExercise[] = blockRules
         .sort((a, b) => a.exercise_order - b.exercise_order)
         .map((rule) => {
           const exercise = exerciseMap.get(rule.exercise_id)
+          
+          // Get special table data for this specific exercise
+          const exerciseTimeProtocols = blockTimeProtocols.filter(
+            (tp: any) => tp.exercise_id === rule.exercise_id && tp.exercise_order === rule.exercise_order
+          )
+          const exerciseDropSets = blockDropSets.filter(
+            (ds: any) => ds.exercise_id === rule.exercise_id && ds.exercise_order === rule.exercise_order
+          )
+          const exerciseClusterSets = blockClusterSets.filter(
+            (cs: any) => cs.exercise_id === rule.exercise_id && cs.exercise_order === rule.exercise_order
+          )
+          const exerciseRestPauseSets = blockRestPauseSets.filter(
+            (rp: any) => rp.exercise_id === rule.exercise_id && rp.exercise_order === rule.exercise_order
+          )
+          const exercisePyramidSets = blockPyramidSets.filter(
+            (ps: any) => ps.exercise_id === rule.exercise_id && ps.exercise_order === rule.exercise_order
+          )
+          const exerciseLadderSets = blockLadderSets.filter(
+            (ls: any) => ls.exercise_id === rule.exercise_id && ls.exercise_order === rule.exercise_order
+          )
+          
           const exerciseData = {
             id: rule.id || '',
             exercise_id: rule.exercise_id,
@@ -553,6 +725,13 @@ export class ProgramProgressionService {
             weight_kg: rule.weight_kg || null,
             load_percentage: rule.load_percentage || null,
             notes: rule.notes || null,
+            // Special table data for exercise
+            time_protocols: exerciseTimeProtocols, // For tabata/amrap/emom/for_time blocks
+            drop_sets: exerciseDropSets,
+            cluster_sets: exerciseClusterSets,
+            rest_pause_sets: exerciseRestPauseSets,
+            pyramid_sets: exercisePyramidSets,
+            ladder_sets: exerciseLadderSets,
             exercise: exercise ? {
               id: exercise.id,
               name: exercise.name,
@@ -590,6 +769,13 @@ export class ProgramProgressionService {
         duration_seconds:
           blockMeta?.duration_seconds ??
           (firstRule.duration_minutes ? firstRule.duration_minutes * 60 : undefined),
+        // Block-level special table data
+        time_protocols: blockTimeProtocols,
+        drop_sets: blockDropSets,
+        cluster_sets: blockClusterSets,
+        rest_pause_sets: blockRestPauseSets,
+        pyramid_sets: blockPyramidSets,
+        ladder_sets: blockLadderSets,
         exercises: blockExercises.map(ex => ({
           ...ex,
           block_id: firstRule.block_id || `block-${blockOrder}`,

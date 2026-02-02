@@ -374,6 +374,7 @@ export default function WorkoutDetailsPage() {
             rest_pause_sets: ex.rest_pause_sets ?? [],
             pyramid_sets: (ex as any).pyramid_sets ?? [],
             ladder_sets: (ex as any).ladder_sets ?? [],
+            time_protocols: (ex as any).time_protocols ?? [], // For tabata/amrap/emom/for_time blocks
           })) as any[],
           })
         );
