@@ -1,32 +1,23 @@
 /**
- * GET /api/client/workouts/summary
+ * GET /api/coach/dashboard
  * 
- * Returns comprehensive workout summary for the authenticated client.
+ * Returns comprehensive dashboard data for the authenticated coach.
  * 
- * OPTIMIZED: Uses single PostgreSQL RPC call (get_client_workout_summary)
- * instead of 20-25 individual queries.
+ * OPTIMIZED: Uses single PostgreSQL RPC call (get_coach_dashboard)
+ * instead of 6+ individual queries.
  * 
  * Response includes:
- * - todaysWorkout
- * - currentProgram
- * - weeklyProgress
- * - weeklyStats
- * - workoutHistory
- * - allAssignedWorkouts
- * - completedPrograms
- * - assignmentIdByTemplate
- * - scheduleIdByTemplate
+ * - stats { totalClients, activeClients, totalWorkouts, totalMealPlans }
+ * - todaySessions
+ * - recentClients
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { PerfCollector } from '@/lib/perfUtils'
 
-// Feature flag to fall back to legacy implementation if RPC not available
-const USE_RPC = process.env.DISABLE_SUMMARY_RPC !== 'true'
-
 export async function GET(request: NextRequest) {
-  const perf = new PerfCollector('/api/client/workouts/summary')
+  const perf = new PerfCollector('/api/coach/dashboard')
   
   try {
     // 1. Create authenticated Supabase client
@@ -44,29 +35,28 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    // 3. Call the optimized RPC (auth.uid() is validated inside the function)
-    const rpcResult = await perf.time('rpc_get_client_workout_summary', async () =>
-      supabase.rpc('get_client_workout_summary')
+    // 3. Call the optimized RPC
+    const rpcResult = await perf.time('rpc_get_coach_dashboard', async () =>
+      supabase.rpc('get_coach_dashboard')
     )
     const { data, error } = rpcResult
     
     if (error) {
-      console.error('[summary] RPC error:', error)
+      console.error('[coach/dashboard] RPC error:', error)
       
       // Check if function doesn't exist (migration not run)
       if (error.code === '42883' || (error.message?.includes('function') && error.message?.includes('does not exist'))) {
-        console.error('[summary] RPC function not found. Run migration 20260202_client_summary_rpc.sql')
+        console.error('[coach/dashboard] RPC function not found. Run migration 20260202_coach_dashboard_rpc.sql')
         return NextResponse.json(
           { 
             error: 'Database function not available',
-            details: 'Please run the client summary RPC migration.',
+            details: 'Please run the coach dashboard RPC migration.',
             code: 'RPC_NOT_FOUND'
           },
           { status: 503 }
         )
       }
       
-      // Handle authentication errors from RPC
       if (error.message?.includes('Not authenticated')) {
         return NextResponse.json(
           { error: 'Unauthorized' },
@@ -74,8 +64,15 @@ export async function GET(request: NextRequest) {
         )
       }
       
+      if (error.message?.includes('must be coach or admin')) {
+        return NextResponse.json(
+          { error: 'Forbidden - Only coaches can access this endpoint' },
+          { status: 403 }
+        )
+      }
+      
       return NextResponse.json(
-        { error: error.message || 'Failed to fetch workout summary' },
+        { error: error.message || 'Failed to fetch dashboard data' },
         { status: 500 }
       )
     }
@@ -93,7 +90,7 @@ export async function GET(request: NextRequest) {
     return response
     
   } catch (error: any) {
-    console.error('[summary] Unexpected error:', error)
+    console.error('[coach/dashboard] Unexpected error:', error)
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

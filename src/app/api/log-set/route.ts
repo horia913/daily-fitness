@@ -4,15 +4,21 @@ import { getTrackedFetch } from '@/lib/supabaseQueryLogger'
 import { createErrorResponse, handleApiError, validateRequiredFields } from '@/lib/apiErrorHandler'
 import { createForbiddenResponse } from '@/lib/apiAuth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { PerfCollector } from '@/lib/perfUtils'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
 export async function POST(req: NextRequest) {
+  // Initialize performance collector for Server-Timing header
+  const perf = new PerfCollector('/api/log-set')
+  
   console.log("📥 /api/log-set called");
   
   try {
     const supabaseAuth = await createSupabaseServerClient()
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser()
+    const { data: { user }, error: authError } = await perf.time('auth', () => 
+      supabaseAuth.auth.getUser()
+    )
     if (authError || !user) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('[AuthMissing]', {
@@ -1067,7 +1073,17 @@ export async function POST(req: NextRequest) {
 
     response.message = prMessage || 'Set logged!'
 
-    return NextResponse.json(response, { status: 200 })
+    // Log performance summary
+    perf.logSummary()
+    
+    // Create response with Server-Timing header
+    const jsonResponse = NextResponse.json(response, { status: 200 })
+    const perfHeaders = perf.getHeaders()
+    Object.entries(perfHeaders).forEach(([key, value]) => {
+      jsonResponse.headers.set(key, value)
+    })
+    
+    return jsonResponse
   } catch (error) {
     return handleApiError(error, 'Failed to log workout set')
   }

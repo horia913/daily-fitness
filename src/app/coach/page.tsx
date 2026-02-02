@@ -24,8 +24,34 @@ import {
   MessageCircle,
   Target,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 
+// API response types
+interface DashboardData {
+  stats: {
+    totalClients: number;
+    activeClients: number;
+    totalWorkouts: number;
+    totalMealPlans: number;
+  };
+  todaySessions: Array<{
+    id: string;
+    scheduledAt: string;
+    durationMinutes: number;
+    status: string;
+    clientId: string;
+    clientName: string;
+    clientAvatar: string | null;
+  }>;
+  recentClients: Array<{
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+    status: string;
+  }>;
+}
+
+// UI types (mapped from API response)
 interface Client {
   id: string;
   first_name?: string;
@@ -50,13 +76,6 @@ interface Session {
   status?: string;
 }
 
-interface ComplianceClient {
-  id: string;
-  name: string;
-  compliance: number;
-  avatar_url?: string;
-}
-
 function CoachDashboardContent() {
   const { user } = useAuth();
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
@@ -69,44 +88,72 @@ function CoachDashboardContent() {
   });
   const [recentClients, setRecentClients] = useState<Client[]>([]);
   const [todaySessions, setTodaySessions] = useState<Session[]>([]);
-  const [topCompliant, setTopCompliant] = useState<ComplianceClient[]>([]);
-  const [atRisk, setAtRisk] = useState<ComplianceClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadDashboardData = useCallback(async () => {
     if (!user) return;
 
     try {
-      // Load dashboard data using service functions
-      const { getCoachStats, getTodaysSessions, getRecentClients } = await import(
-        "@/lib/coachDashboardService"
-      );
+      setLoading(true);
+      setError(null);
 
-      const [coachStats, sessions, recentClientsData] = await Promise.all([
-        getCoachStats(user.id),
-        getTodaysSessions(user.id),
-        getRecentClients(user.id, 5),
-      ]);
+      // Single API call to get all dashboard data
+      const response = await fetch('/api/coach/dashboard', {
+        credentials: 'include'
+      });
 
-      setStats(coachStats);
-      setRecentClients(recentClientsData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        // Handle RPC not found - fall back gracefully
+        if (errorData.code === 'RPC_NOT_FOUND') {
+          console.warn('[CoachDashboard] RPC not found, migration needed');
+          setError('Dashboard optimization pending. Please run database migrations.');
+          return;
+        }
+        
+        throw new Error(errorData.error || 'Failed to fetch dashboard data');
+      }
 
-      // Map sessions to match existing interface
-      const mappedSessions: Session[] = sessions.map((s) => ({
-        id: s.id,
-        clientName: s.client_name, // Map from service's client_name to interface's clientName
-        time: s.start_time,
-        type: "session",
-        status: s.status || "",
+      const data: DashboardData = await response.json();
+
+      // Map stats
+      setStats(data.stats);
+
+      // Map recent clients to UI format
+      const mappedClients: Client[] = data.recentClients.map((c) => ({
+        id: c.id,
+        first_name: c.firstName || undefined,
+        last_name: c.lastName || undefined,
+        avatar_url: c.avatarUrl || undefined,
+        status: c.status,
       }));
+      setRecentClients(mappedClients);
 
+      // Map sessions to UI format
+      const mappedSessions: Session[] = data.todaySessions.map((s) => {
+        // Parse scheduled time for display
+        const scheduledDate = new Date(s.scheduledAt);
+        const timeStr = scheduledDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        
+        return {
+          id: s.id,
+          clientName: s.clientName || 'Unknown Client',
+          time: timeStr,
+          type: 'Training Session',
+          status: s.status || '',
+        };
+      });
       setTodaySessions(mappedSessions);
 
-      // Mock data for compliance (can be enhanced later)
-      setTopCompliant([]);
-      setAtRisk([]);
-    } catch (error) {
-      console.error("Error loading dashboard data:", error);
+    } catch (err: any) {
+      console.error("Error loading dashboard data:", err);
+      setError(err.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -155,6 +202,13 @@ function CoachDashboardContent() {
             </Link>
           </div>
         </GlassCard>
+
+        {/* Error State */}
+        {error && (
+          <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
+            <p>{error}</p>
+          </div>
+        )}
 
         {/* Hero Stats Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -419,7 +473,11 @@ function CoachDashboardContent() {
               </Link>
             </div>
 
-            {recentClients.length > 0 ? (
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-cyan-400 border-t-transparent rounded-full"></div>
+              </div>
+            ) : recentClients.length > 0 ? (
               <div className="space-y-4">
                 {recentClients.map((client) => (
                   <Link key={client.id} href={`/coach/clients/${client.id}`}>
@@ -458,10 +516,12 @@ function CoachDashboardContent() {
                           <div
                             className="w-2 h-2 rounded-full"
                             style={{
-                              background: getSemanticColor("success").primary,
+                              background: client.status === 'active' 
+                                ? getSemanticColor("success").primary 
+                                : 'rgba(128,128,128,0.5)',
                             }}
                           />
-                          Active
+                          {client.status === 'active' ? 'Active' : client.status || 'Pending'}
                         </div>
                       </div>
                       <Button variant="ghost" size="sm">
@@ -530,7 +590,11 @@ function CoachDashboardContent() {
               </Link>
             </div>
 
-            {todaySessions.length > 0 ? (
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-cyan-400 border-t-transparent rounded-full"></div>
+              </div>
+            ) : todaySessions.length > 0 ? (
               <div className="space-y-3">
                 {todaySessions.map((session) => (
                   <div

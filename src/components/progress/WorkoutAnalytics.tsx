@@ -677,6 +677,23 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
       return
     }
     
+    // OPTIMIZED: Batch query all set logs for all workout logs at once
+    const logIds = workoutLogs.map(log => log.id)
+    const { data: allSetLogs } = await supabase
+      .from('workout_set_logs')
+      .select('workout_log_id, weight, reps')
+      .in('workout_log_id', logIds)
+      .not('weight', 'is', null)
+      .not('reps', 'is', null)
+    
+    // Group set logs by workout_log_id for quick lookup
+    const setLogsByWorkoutId = new Map<string, Array<{ weight: number | null; reps: number | null }>>()
+    allSetLogs?.forEach(setLog => {
+      const existing = setLogsByWorkoutId.get(setLog.workout_log_id) || []
+      existing.push({ weight: setLog.weight, reps: setLog.reps })
+      setLogsByWorkoutId.set(setLog.workout_log_id, existing)
+    })
+    
     // Group by week and calculate volume
     const weeklyVolumes: Record<number, number> = {}
     
@@ -684,15 +701,9 @@ export function WorkoutAnalytics({ loading = false }: WorkoutAnalyticsProps) {
       const date = new Date(log.completed_at!)
       const weekNumber = Math.floor((date.getTime() - fourWeeksAgo.getTime()) / (7 * 24 * 60 * 60 * 1000))
       
-      // Get set logs for this workout
-      const { data: setLogs } = await supabase
-        .from('workout_set_logs')
-        .select('weight, reps')
-        .eq('workout_log_id', log.id)
-        .not('weight', 'is', null)
-        .not('reps', 'is', null)
-      
-      const volume = setLogs?.reduce((sum, s) => sum + ((s.weight || 0) * (s.reps || 0)), 0) || 0
+      // Get set logs from the pre-fetched map
+      const setLogs = setLogsByWorkoutId.get(log.id) || []
+      const volume = setLogs.reduce((sum, s) => sum + ((s.weight || 0) * (s.reps || 0)), 0)
       
       if (!weeklyVolumes[weekNumber]) {
         weeklyVolumes[weekNumber] = 0

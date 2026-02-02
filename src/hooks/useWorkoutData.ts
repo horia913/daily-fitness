@@ -57,10 +57,15 @@ export function useWorkoutAssignments(userId: string) {
         }
 
         // Fetch fresh data
-        // First, get the assignments
+        // OPTIMIZED: Single query with join for templates
         const { data: assignmentsData, error: assignmentsError } = await supabase
           .from('workout_assignments')
-          .select('*')
+          .select(`
+            *,
+            template:workout_templates (
+              id, name, description, estimated_duration, difficulty_level, category
+            )
+          `)
           .eq('client_id', userId)
           .order('scheduled_date', { ascending: true })
 
@@ -69,71 +74,81 @@ export function useWorkoutAssignments(userId: string) {
           throw assignmentsError
         }
 
-        // Then, fetch template data for each assignment
-        const assignmentsWithTemplates = await Promise.all(
-          (assignmentsData || []).map(async (assignment) => {
-            const { data: templateData, error: templateError } = await supabase
-              .from('workout_templates')
-              .select(`
-                id, name, description, estimated_duration, difficulty_level,
-                category:workout_categories(name, color)
-              `)
-              .eq('id', assignment.workout_template_id)
-              .single()
-
-            if (templateError) {
-              // Use fallback data when template fetch fails (RLS issues)
-              return {
-                ...assignment,
-                template: {
-                id: assignment.workout_template_id,
-                  name: 'Workout',
-                  description: 'Your assigned workout',
-                  estimated_duration: 30,
-                  difficulty_level: 'Beginner',
-                  category: null
-                }
-              }
-            }
-
-            return {
-              ...assignment,
-              template: templateData
-            }
-          })
-        )
-
-        const data = assignmentsWithTemplates
-
         // If no data returned, set empty array
-        if (!data || data.length === 0) {
+        if (!assignmentsData || assignmentsData.length === 0) {
           setAssignments([])
           setLoading(false)
           return
         }
 
-        // Get exercise count for each template
-        const assignmentsWithCounts = await Promise.all(
-          (data || []).map(async (assignment) => {
-            const templateId = assignment.workout_template_id
-            console.log(`Getting exercise count for template ${templateId}`)
-            const { count, error } = await supabase
-              .from('workout_template_exercises')
-              .select('*', { count: 'exact', head: true })
-              .eq('template_id', templateId)
+        // OPTIMIZED: Get all unique template IDs and batch query exercise counts
+        const templateIds = [...new Set(
+          assignmentsData
+            .map(a => a.workout_template_id)
+            .filter(Boolean)
+        )]
+
+        // Batch query for exercise counts using workout_blocks (exercises are nested under blocks)
+        const exerciseCountMap = new Map<string, number>()
+        
+        if (templateIds.length > 0) {
+          // Get blocks for all templates in one query
+          const { data: blocksData, error: blocksError } = await supabase
+            .from('workout_blocks')
+            .select('template_id, id')
+            .in('template_id', templateIds)
+
+          if (!blocksError && blocksData) {
+            const blockIds = blocksData.map(b => b.id)
             
-            if (error) {
-              console.error(`Error getting exercise count for template ${templateId}:`, error)
+            if (blockIds.length > 0) {
+              // Get exercise counts from workout_block_exercises in one query
+              const { data: exercisesData } = await supabase
+                .from('workout_block_exercises')
+                .select('block_id')
+                .in('block_id', blockIds)
+
+              // Build block to template mapping
+              const blockToTemplate = new Map<string, string>()
+              blocksData.forEach(b => blockToTemplate.set(b.id, b.template_id))
+
+              // Count exercises per template
+              exercisesData?.forEach(ex => {
+                const templateId = blockToTemplate.get(ex.block_id)
+                if (templateId) {
+                  exerciseCountMap.set(templateId, (exerciseCountMap.get(templateId) || 0) + 1)
+                }
+              })
             }
-            
-            console.log(`Exercise count for template ${templateId}:`, count)
-            
-            return {
-              ...assignment,
-              exercise_count: count || 0
-            }
-          })
-        )
+          }
+        }
+
+        // Map assignments with template data and exercise counts
+        const assignmentsWithCounts = assignmentsData.map(assignment => {
+          // Handle template - use embedded data or fallback
+          const templateData = assignment.template
+          const template = templateData ? {
+            id: templateData.id,
+            name: templateData.name || 'Workout',
+            description: templateData.description || 'Your assigned workout',
+            estimated_duration: templateData.estimated_duration || 30,
+            difficulty_level: templateData.difficulty_level || 'Beginner',
+            category: templateData.category ? { name: templateData.category, color: '#6B7280' } : null
+          } : {
+            id: assignment.workout_template_id,
+            name: 'Workout',
+            description: 'Your assigned workout',
+            estimated_duration: 30,
+            difficulty_level: 'Beginner',
+            category: null
+          }
+
+          return {
+            ...assignment,
+            template,
+            exercise_count: exerciseCountMap.get(assignment.workout_template_id) || 0
+          }
+        })
 
         // Cache the data
         cache.set(cacheKey, assignmentsWithCounts, 5 * 60 * 1000) // 5 minutes TTL

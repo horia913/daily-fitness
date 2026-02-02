@@ -21,13 +21,6 @@ import {
   Activity,
 } from "lucide-react";
 import Link from "next/link";
-import { supabase, ensureAuthenticated } from "@/lib/supabase";
-import {
-  getDashboardStats,
-  getClientType,
-  getNextSession,
-} from "@/lib/clientDashboardService";
-import { fetchPersonalRecords } from "@/lib/personalRecords";
 
 function getTimeBasedGreeting() {
   const hour = new Date().getHours();
@@ -36,59 +29,59 @@ function getTimeBasedGreeting() {
   return { text: "Good evening", emoji: "🌙" };
 }
 
+// Type for the dashboard API response
+interface DashboardData {
+  avatarUrl: string | null;
+  firstName: string | null;
+  clientType: "online" | "in_gym";
+  nextSession: {
+    id: string;
+    scheduled_at: string;
+    duration_minutes: number;
+    title: string;
+    coach_name: string;
+  } | null;
+  streak: number;
+  weeklyProgress: {
+    current: number;
+    goal: number;
+  };
+  weeklyStats: {
+    volume: number;
+    time: number;
+    prsCount: number;
+  };
+  workoutDays: number[]; // Array of day indices (0-6) that have workouts
+  bodyWeight: {
+    current: number;
+    change: number;
+  } | null;
+  todaysWorkout: {
+    hasWorkout: boolean;
+    type?: "program" | "assignment";
+    templateId?: string;
+    scheduleId?: string;
+    assignmentId?: string;
+    name?: string;
+    weekNumber?: number;
+    dayNumber?: number;
+    totalSets?: number;
+    estimatedDuration?: number;
+    message?: string;
+  };
+}
+
 export default function ClientDashboard() {
   const { user, profile } = useAuth();
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
 
-  const [todaysWorkout, setTodaysWorkout] = useState<any>(null);
-  const [loadingWorkout, setLoadingWorkout] = useState(true);
-  const [streak, setStreak] = useState(0);
-  const [weeklyProgress, setWeeklyProgress] = useState({ current: 0, goal: 0 });
-  // Track which days of the week (Mon=0, Tue=1, ... Sun=6) have completed workouts
-  const [workoutDays, setWorkoutDays] = useState<boolean[]>([false, false, false, false, false, false, false]);
-  const [weeklyVolume, setWeeklyVolume] = useState(0); // in kg
-  const [weeklyTime, setWeeklyTime] = useState(0); // in minutes
-  const [prsCount, setPrsCount] = useState(0);
-  const [bodyWeight, setBodyWeight] = useState<{
-    current: number;
-    change: number;
-  } | null>(null);
-  const [maxDeadlift, setMaxDeadlift] = useState<{
-    weight: number;
-    change: number;
-  } | null>(null);
-  const [totalSets, setTotalSets] = useState(0);
-  const [clientType, setClientType] = useState<"online" | "in_gym" | null>(
-    null
-  );
-  const [nextSession, setNextSession] = useState<any>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const greeting = getTimeBasedGreeting();
 
-  // Fetch avatar URL
-  useEffect(() => {
-    if (user?.id) {
-      (async () => {
-        try {
-          // Ensure user is authenticated before querying
-          await ensureAuthenticated();
-          
-          const { data } = await supabase
-            .from("profiles")
-            .select("avatar_url")
-            .eq("id", user.id)
-            .single();
-          if (data?.avatar_url) {
-            setAvatarUrl(data.avatar_url);
-          }
-        } catch {
-          // Silently fail - avatar is optional
-        }
-      })();
-    }
-  }, [user]);
-
+  // Single API call to fetch all dashboard data
   useEffect(() => {
     if (user) {
       fetchDashboardData();
@@ -96,161 +89,59 @@ export default function ClientDashboard() {
   }, [user]);
 
   const fetchDashboardData = async () => {
-    if (!user) return;
-
     try {
-      // Ensure user is authenticated before querying
-      await ensureAuthenticated();
+      setLoading(true);
+      setError(null);
 
-      setLoadingWorkout(true);
-      const today = new Date().toISOString().split("T")[0];
+      const response = await fetch('/api/client/dashboard', {
+        credentials: 'include'
+      });
 
-      // Fetch dashboard stats (streak, weekly progress)
-      const stats = await getDashboardStats(user.id);
-      setStreak(stats.streak);
-      setWeeklyProgress(stats.weeklyProgress);
-
-      // Fetch client type
-      const type = await getClientType(user.id);
-      setClientType(type);
-
-      // Fetch next session if in_gym client
-      if (type === "in_gym") {
-        const session = await getNextSession(user.id);
-        setNextSession(session);
-      }
-
-      // Fetch today's workout assignment using service (includes total sets)
-      const { getTodaysWorkout } = await import("@/lib/clientDashboardService");
-      const workout = await getTodaysWorkout(user.id);
-      if (workout) {
-        setTodaysWorkout(workout);
-        setTotalSets(workout.totalSets || 0);
-      }
-
-      // Fetch weekly volume and time
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const monday = new Date(now);
-      monday.setDate(now.getDate() + diffToMonday);
-      monday.setHours(0, 0, 0, 0);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
-
-      const { data: weeklyLogs } = await supabase
-        .from("workout_logs")
-        .select("id, completed_at, total_duration_minutes")
-        .eq("client_id", user.id)
-        .not("completed_at", "is", null)
-        .gte("completed_at", monday.toISOString())
-        .lte("completed_at", sunday.toISOString());
-
-      const activeTime =
-        weeklyLogs?.reduce(
-          (sum, log) => sum + (log.total_duration_minutes || 0),
-          0
-        ) || 0;
-      setWeeklyTime(activeTime);
-
-      // Track which days of the week (Mon=0 to Sun=6) had completed workouts
-      const daysWithWorkouts = [false, false, false, false, false, false, false];
-      const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-      if (weeklyLogs && weeklyLogs.length > 0) {
-        console.log('[Dashboard] Weekly logs for activity bars:', weeklyLogs.length, 'workouts');
-        weeklyLogs.forEach((log) => {
-          const logDate = new Date(log.completed_at);
-          // Use getUTCDay() to avoid timezone issues - database stores UTC timestamps
-          // JavaScript: Sunday=0, Monday=1, ..., Saturday=6
-          // We want: Monday=0, Tuesday=1, ..., Sunday=6
-          const jsDay = logDate.getUTCDay();
-          const dayIndex = jsDay === 0 ? 6 : jsDay - 1; // Convert to Mon=0, Sun=6
-          console.log(`[Dashboard] Workout completed_at: ${log.completed_at} -> UTC Day: ${jsDay} -> dayIndex=${dayIndex} (${dayNames[dayIndex]})`);
-          daysWithWorkouts[dayIndex] = true;
-        });
-        console.log('[Dashboard] Days with workouts:', daysWithWorkouts.map((v, i) => v ? dayNames[i] : null).filter(Boolean));
-      }
-      setWorkoutDays(daysWithWorkouts);
-
-      // Calculate weekly volume from workout_set_logs
-      if (weeklyLogs && weeklyLogs.length > 0) {
-        const logIds = weeklyLogs.map((log) => log.id);
-        const { data: setLogs } = await supabase
-          .from("workout_set_logs")
-          .select("weight, reps")
-          .in("workout_log_id", logIds)
-          .eq("client_id", user.id);
-
-        const totalVolume =
-          setLogs?.reduce(
-            (sum, set) => sum + (set.weight || 0) * (set.reps || 0),
-            0
-          ) || 0;
-        setWeeklyVolume(Math.round((totalVolume / 1000) * 10) / 10); // Convert to tons (kg*1000) and round to 1 decimal for display as "k"
-      }
-
-      // Fetch PRs count
-      try {
-        const prs = await fetchPersonalRecords(user.id);
-        setPrsCount(prs.length);
-      } catch (error) {
-        console.error("Error fetching PRs:", error);
-      }
-
-      // Fetch body weight
-      try {
-        const { data: metrics } = await supabase
-          .from("body_metrics")
-          .select("weight_kg, measured_date")
-          .eq("client_id", user.id)
-          .not("weight_kg", "is", null)
-          .order("measured_date", { ascending: false })
-          .limit(2);
-
-        if (metrics && metrics.length > 0) {
-          const current = metrics[0].weight_kg;
-          const previous = metrics.length > 1 ? metrics[1].weight_kg : current;
-          const change = current - previous;
-          setBodyWeight({ current, change });
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        // Handle RPC not found - fall back gracefully
+        if (errorData.code === 'RPC_NOT_FOUND') {
+          console.warn('[Dashboard] RPC not found, migration needed');
+          setError('Dashboard optimization pending. Please run database migrations.');
+          return;
         }
-      } catch (error) {
-        console.error("Error fetching body weight:", error);
+        
+        throw new Error(errorData.error || 'Failed to fetch dashboard data');
       }
 
-      // Fetch max deadlift from PRs
-      try {
-        const prs = await fetchPersonalRecords(user.id);
-        const deadliftPRs = prs.filter((pr) =>
-          pr.exerciseName.toLowerCase().includes("deadlift")
-        );
-
-        if (deadliftPRs.length > 0) {
-          // Get the max weight deadlift PR
-          const maxDeadliftPR = deadliftPRs.reduce((max, pr) =>
-            pr.weight > max.weight ? pr : max
-          );
-
-          // Try to find previous max for comparison (simplified - just use first PR as baseline)
-          const previousMax =
-            deadliftPRs.length > 1
-              ? deadliftPRs[1].weight
-              : maxDeadliftPR.weight;
-
-          setMaxDeadlift({
-            weight: maxDeadliftPR.weight,
-            change: maxDeadliftPR.weight - previousMax,
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching max deadlift:", error);
-      }
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
+      const data = await response.json();
+      setDashboardData(data);
+    } catch (err: any) {
+      console.error("Error fetching dashboard data:", err);
+      setError(err.message || 'An error occurred');
     } finally {
-      setLoadingWorkout(false);
+      setLoading(false);
     }
   };
+
+  // Derived values from dashboardData
+  const streak = dashboardData?.streak ?? 0;
+  const weeklyProgress = dashboardData?.weeklyProgress ?? { current: 0, goal: 0 };
+  const weeklyVolume = dashboardData?.weeklyStats?.volume ?? 0;
+  const weeklyTime = dashboardData?.weeklyStats?.time ?? 0;
+  const prsCount = dashboardData?.weeklyStats?.prsCount ?? 0;
+  const bodyWeight = dashboardData?.bodyWeight ?? null;
+  const todaysWorkout = dashboardData?.todaysWorkout;
+  const totalSets = todaysWorkout?.totalSets ?? 0;
+  const clientType = dashboardData?.clientType ?? null;
+  const nextSession = dashboardData?.nextSession ?? null;
+  const avatarUrl = dashboardData?.avatarUrl ?? null;
+
+  // Convert workoutDays array of indices to boolean array
+  const workoutDays = [false, false, false, false, false, false, false];
+  if (dashboardData?.workoutDays) {
+    dashboardData.workoutDays.forEach((dayIndex) => {
+      if (dayIndex >= 0 && dayIndex <= 6) {
+        workoutDays[dayIndex] = true;
+      }
+    });
+  }
 
   const weeklyProgressPercent =
     weeklyProgress.goal > 0
@@ -268,7 +159,18 @@ export default function ClientDashboard() {
     }`;
   };
 
-  const userName = profile?.first_name || "there";
+  const userName = dashboardData?.firstName || profile?.first_name || "there";
+
+  // Build workout display data from todaysWorkout
+  const workoutDisplay = todaysWorkout?.hasWorkout ? {
+    name: todaysWorkout.name || "Workout",
+    isProgram: todaysWorkout.type === "program",
+    programName: todaysWorkout.type === "program" ? `Week ${todaysWorkout.weekNumber} Day ${todaysWorkout.dayNumber}` : undefined,
+    positionLabel: todaysWorkout.type === "program" ? `Week ${todaysWorkout.weekNumber} Day ${todaysWorkout.dayNumber}` : undefined,
+    estimatedDuration: todaysWorkout.estimatedDuration || 45,
+    exercises: Math.max(1, Math.ceil((todaysWorkout.totalSets || 0) / 3)), // Estimate exercises
+    id: todaysWorkout.assignmentId || todaysWorkout.templateId
+  } : null;
 
   return (
     <ProtectedRoute requiredRole="client">
@@ -316,35 +218,39 @@ export default function ClientDashboard() {
                       className="fc-glass fc-card fc-kinetic-shimmer p-6 flex flex-col md:flex-row md:items-center gap-6 relative"
                     >
                     <div className="flex-1 relative z-10">
-                      {loadingWorkout ? (
+                      {loading ? (
                         <div className="text-center py-8">
                           <div className="animate-spin w-10 h-10 border-4 border-cyan-400 border-t-transparent rounded-full mx-auto"></div>
                         </div>
-                      ) : todaysWorkout ? (
+                      ) : error ? (
+                        <div className="text-center py-8">
+                          <p className="text-sm fc-text-dim">{error}</p>
+                        </div>
+                      ) : workoutDisplay ? (
                         <>
                           <div className="flex items-center gap-2 mb-3">
                             <span
                               className="fc-pill fc-pill-glass fc-text-workouts"
                             >
-                              {todaysWorkout.isProgram ? todaysWorkout.positionLabel || 'Program' : 'Next Up'}
+                              {workoutDisplay.isProgram ? workoutDisplay.positionLabel || 'Program' : 'Next Up'}
                             </span>
                             <span className="text-xs font-mono fc-text-dim">
-                              ~{todaysWorkout.estimatedDuration} min
+                              ~{workoutDisplay.estimatedDuration} min
                             </span>
                           </div>
                           <h2 className="text-3xl font-bold mb-2 fc-text-primary">
-                            {todaysWorkout.name}
+                            {workoutDisplay.name}
                           </h2>
-                          {todaysWorkout.isProgram && todaysWorkout.programName && (
+                          {workoutDisplay.isProgram && workoutDisplay.programName && (
                             <p className="text-sm mb-2 fc-text-subtle">
-                              {todaysWorkout.programName}
+                              {workoutDisplay.programName}
                             </p>
                           )}
                           <div className="flex items-center gap-4 mb-6 fc-text-dim">
                             <div className="flex items-center gap-1.5">
                               <Dumbbell className="w-4 h-4" />
                               <span className="text-sm">
-                                {todaysWorkout.exercises} Exercises
+                                {workoutDisplay.exercises} Exercises
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -355,7 +261,7 @@ export default function ClientDashboard() {
                             </div>
                           </div>
                           <Link
-                            href={todaysWorkout.isProgram ? "/client/workouts" : `/client/workouts/${todaysWorkout.id}/start`}
+                            href={workoutDisplay.isProgram ? "/client/workouts" : `/client/workouts/${workoutDisplay.id}/start`}
                           >
                             <button
                               className="fc-btn fc-btn-primary fc-press w-full md:w-auto h-12 px-8 flex items-center justify-center gap-2"
@@ -385,7 +291,7 @@ export default function ClientDashboard() {
                     </div>
 
                     {/* Weekly Progress Ring - Hidden on mobile, shown on desktop */}
-                    {!loadingWorkout && weeklyProgress.goal > 0 && (
+                    {!loading && weeklyProgress.goal > 0 && (
                       <div className="hidden md:block w-48 h-48 relative flex-shrink-0">
                         <svg viewBox="0 0 100 100" className="w-full h-full">
                           <circle
@@ -591,35 +497,7 @@ export default function ClientDashboard() {
                           </div>
                         </div>
                       )}
-                      {maxDeadlift && (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="fc-icon-tile fc-icon-workouts">
-                              <Zap className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <div className="text-[11px] uppercase tracking-[0.18em] fc-text-dim">
-                                Max Deadlift
-                              </div>
-                              <div className="font-semibold fc-text-primary">
-                                {maxDeadlift.weight} kg
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-sm font-medium fc-text-success">
-                            {maxDeadlift.change !== 0 ? (
-                              <>
-                                {maxDeadlift.change > 0 ? "+" : ""}
-                                {maxDeadlift.change}kg{" "}
-                                {maxDeadlift.change > 0 ? "↑" : "↓"}
-                              </>
-                            ) : (
-                              "No change"
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {!bodyWeight && !maxDeadlift && (
+                      {!bodyWeight && (
                         <div className="text-sm text-center py-4 fc-text-dim">
                           No progress data available yet
                         </div>
