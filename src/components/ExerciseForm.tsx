@@ -195,7 +195,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
           .select('id, name')
           .eq('name', formData.name.trim())
           .eq('coach_id', user.id)
-          .single()
+          .maybeSingle()
 
         if (existingExercise) {
           showErrorToast(

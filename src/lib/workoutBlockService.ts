@@ -139,7 +139,7 @@ export class WorkoutBlockService {
     )
     
     const timeProtocolsRes = needsTimeProtocols
-      ? await queryTableInChunks('workout_time_protocols', 'id, block_id, exercise_id, exercise_order, rounds, work_seconds, rest_seconds', blockIdsForTimeProtocols)
+      ? await queryTableInChunks('workout_time_protocols', 'id, block_id, exercise_id, exercise_order, protocol_type, set, rounds, work_seconds, rest_seconds, rest_after_set, total_duration_minutes, reps_per_round, target_reps, time_cap_minutes, emom_mode, weight_kg, load_percentage', blockIdsForTimeProtocols)
       : { data: [], error: null }
     
     const dropRes = needsDropSets

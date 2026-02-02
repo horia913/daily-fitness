@@ -2190,8 +2190,8 @@ export default function LiveWorkout() {
         });
       }
 
-      // Log the drop set
-      if (dropWeightNum > 0 && dropReps > 0) {
+      // Log the drop set (weight >= 0 allows bodyweight exercises)
+      if (dropWeightNum >= 0 && dropReps > 0) {
         const response2 = await fetchApi("/api/log-set", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2335,8 +2335,8 @@ export default function LiveWorkout() {
         throw new Error("User not authenticated");
       }
 
-      // Log first exercise (Exercise A)
-      if (currentExercise.exercise_id && weightA > 0 && repsA > 0) {
+      // Log first exercise (Exercise A) - weight >= 0 allows bodyweight exercises
+      if (currentExercise.exercise_id && weightA >= 0 && repsA > 0) {
         const responseA = await fetchApi("/api/log-set", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2377,7 +2377,7 @@ export default function LiveWorkout() {
       const exerciseBId =
         currentExercise.meta?.superset_exercise_id ||
         currentExercise.superset_exercise_id;
-      if (exerciseBId && weightB > 0 && repsB > 0) {
+      if (exerciseBId && weightB >= 0 && repsB > 0) {
         const responseB = await fetchApi("/api/log-set", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2517,7 +2517,8 @@ export default function LiveWorkout() {
       }
 
       // Call /api/log-set endpoint (handles both logging and e1RM calculation)
-      if (currentExercise.exercise_id && weightNum > 0 && repsNum > 0) {
+      // weight >= 0 allows bodyweight exercises
+      if (currentExercise.exercise_id && weightNum >= 0 && repsNum > 0) {
         const response = await fetchApi("/api/log-set", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2719,7 +2720,8 @@ export default function LiveWorkout() {
       }
 
       // Call /api/log-set endpoint (handles both logging and e1RM calculation)
-      if (currentExercise.exercise_id && loggedWeight > 0 && loggedReps > 0) {
+      // weight >= 0 allows bodyweight exercises
+      if (currentExercise.exercise_id && loggedWeight >= 0 && loggedReps > 0) {
         // Build notes for for_time completion
         let notes = "";
         if (currentType === "for_time" && forTimeCompletionSecs != null) {
@@ -2878,8 +2880,8 @@ export default function LiveWorkout() {
         const exerciseItem = giantSetExercises[i];
         const exerciseId = exerciseItem?.exercise_id;
 
-        // Only log if we have valid data
-        if (exerciseId && weight > 0 && reps > 0) {
+        // Only log if we have valid data (weight >= 0 allows bodyweight exercises)
+        if (exerciseId && weight >= 0 && reps > 0) {
           const response = await fetchApi("/api/log-set", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
