@@ -1979,21 +1979,64 @@ export default function EnhancedClientWorkouts({
                               <span className={`fc-status-pill ${statusVariant}`}>
                                 {statusBadge.label}
                               </span>
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (assignment.type === "program") {
-                                    router.push(`/client/programs/${assignment.program_id}/details`);
-                                  } else {
+                              {assignment.type === "program" ? (
+                                <div className="flex gap-2">
+                                  <Button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      // Start program workout via progress API
+                                      try {
+                                        const response = await fetchApi("/api/program-workouts/start-from-progress", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({}),
+                                        });
+                                        if (response.ok) {
+                                          const result = await response.json();
+                                          if (result.workout_assignment_id) {
+                                            router.push(`/client/workouts/${result.workout_assignment_id}/start`);
+                                            return;
+                                          }
+                                        }
+                                        // Fallback to program details if API fails
+                                        router.push(`/client/programs/${assignment.program_id}/details`);
+                                      } catch (err) {
+                                        console.error("Error starting program workout:", err);
+                                        router.push(`/client/programs/${assignment.program_id}/details`);
+                                      }
+                                    }}
+                                    className="h-9 sm:h-10 px-4 rounded-xl font-semibold"
+                                    variant="fc-primary"
+                                  >
+                                    <Play size={16} className="mr-1.5 fill-current" />
+                                    Start
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      router.push(`/client/programs/${assignment.program_id}/details`);
+                                    }}
+                                    className="h-9 sm:h-10 px-3 rounded-xl font-semibold"
+                                    variant="fc-secondary"
+                                  >
+                                    <Eye size={16} />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     router.push(`/client/workouts/${assignment.id}/start`);
-                                  }
-                                }}
-                                className="h-9 sm:h-10 px-4 rounded-xl font-semibold"
-                                variant="fc-primary"
-                              >
-                                <Play size={16} className="mr-1.5 fill-current" />
-                                {assignment.type === "program" ? "View" : "Start"}
-                              </Button>
+                                  }}
+                                  className="h-9 sm:h-10 px-4 rounded-xl font-semibold"
+                                  variant="fc-primary"
+                                >
+                                  <Play size={16} className="mr-1.5 fill-current" />
+                                  Start
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </GlassCard>
