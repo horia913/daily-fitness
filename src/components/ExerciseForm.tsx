@@ -210,6 +210,9 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
 
       // Prepare data - only send fields that exist in database
       // Use category (string) field, not category_id
+      // NOTE: muscle_groups column doesn't exist in exercises table - the table uses
+      // primary_muscle_group_id, secondary_muscle_group_1_id, secondary_muscle_group_2_id (uuid FKs)
+      // For now, we don't send muscle_groups to the database
       const exerciseData: any = {
         name: formData.name.trim(),
         description: formData.description?.trim() || null,
@@ -218,7 +221,7 @@ export default function ExerciseForm({ isOpen, onClose, onSuccess, exercise }: E
         // Filter out empty strings and ensure arrays are not empty
         instructions: formData.instructions.filter(instruction => instruction.trim() !== ''),
         tips: formData.tips.filter(tip => tip.trim() !== ''),
-        muscle_groups: formData.muscle_groups.length > 0 ? formData.muscle_groups : [],
+        // muscle_groups is NOT a column in the exercises table - removed to prevent error
         equipment_types: formData.equipment_types.length > 0 ? formData.equipment_types : [],
         video_url: formData.video_url?.trim() || null,
         image_url: formData.image_url?.trim() || null
