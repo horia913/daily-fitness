@@ -48,7 +48,7 @@ export function TabataExecutor({
   const tabataSets: any[] = [];
   const setsMap = new Map<number, any[]>();
   
-  // Group exercises by set number from their time_protocols
+  // Group by set number; allow same exercise multiple times (e.g. Side Plank left + right as one exercise, added twice)
   if (block.block.exercises) {
     block.block.exercises.forEach((ex) => {
       if (ex.time_protocols && Array.isArray(ex.time_protocols)) {
@@ -58,18 +58,12 @@ export function TabataExecutor({
             if (!setsMap.has(setNum)) {
               setsMap.set(setNum, []);
             }
-            // Check if this exercise is already in this set
-            const existing = setsMap.get(setNum)!.find(
-              (item: any) => item.exercise_id === ex.exercise_id
-            );
-            if (!existing) {
             setsMap.get(setNum)!.push({
               exercise_id: ex.exercise_id,
               work_seconds: tp.work_seconds || 20,
               rest_after: tp.rest_seconds || 10,
               target_reps: tp.target_reps,
             });
-            }
           }
         });
       }
