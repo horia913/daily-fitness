@@ -129,29 +129,49 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
 
         if (error) throw error
 
-        // Get exercise count and usage stats for each template
-        const templatesWithStats = await Promise.all(
-          (data || []).map(async (template) => {
-            const { count: exerciseCount } = await supabase
-              .from('workout_template_exercises')
-              .select('*', { count: 'exact', head: true })
-              .eq('template_id', template.id)
-            
-            // Mock usage data for now
-            const usageCount = Math.floor(Math.random() * 50) + 1
-            const rating = Math.round((Math.random() * 2 + 3) * 10) / 10 // 3.0-5.0
-            const lastUsed = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
-            
-            return {
-              ...template,
-              exercise_count: exerciseCount || 0,
-              usage_count: usageCount,
-              rating: rating,
-              last_used: lastUsed,
-              updated_at: template.updated_at || template.created_at
-            } as WorkoutTemplate
-          })
-        )
+        const templateIds = (data || []).map((t: { id: string }) => t.id)
+        if (templateIds.length === 0) {
+          setTemplates(data || [])
+          return
+        }
+        const { data: blocks } = await supabase.from('workout_blocks').select('id, template_id').in('template_id', templateIds)
+        const blockIds = (blocks || []).map((b: { id: string }) => b.id)
+        const [assignmentsRes, exercisesRes] = await Promise.all([
+          supabase.from('workout_assignments').select('workout_template_id, assigned_date, scheduled_date').in('workout_template_id', templateIds),
+          blockIds.length > 0 ? supabase.from('workout_block_exercises').select('block_id').in('block_id', blockIds) : { data: [] }
+        ])
+        const blocksByTemplate: Record<string, string[]> = {}
+        ;(blocks || []).forEach((b: { id: string; template_id: string }) => {
+          if (!blocksByTemplate[b.template_id]) blocksByTemplate[b.template_id] = []
+          blocksByTemplate[b.template_id].push(b.id)
+        })
+        const blockToTemplate: Record<string, string> = {}
+        ;(blocks || []).forEach((b: { id: string; template_id: string }) => { blockToTemplate[b.id] = b.template_id })
+        const exerciseCountByTemplate: Record<string, number> = {}
+        templateIds.forEach(id => (exerciseCountByTemplate[id] = 0))
+        ;((exercisesRes as { data?: { block_id: string }[] }).data || []).forEach((r: { block_id: string }) => {
+          const tid = blockToTemplate[r.block_id]
+          if (tid) exerciseCountByTemplate[tid] = (exerciseCountByTemplate[tid] || 0) + 1
+        })
+        const usageByTemplate: Record<string, { count: number; lastDate: string }> = {}
+        templateIds.forEach(id => (usageByTemplate[id] = { count: 0, lastDate: '' }))
+        ;((assignmentsRes as { data?: { workout_template_id: string; assigned_date?: string; scheduled_date?: string }[] }).data || []).forEach((r: { workout_template_id: string; assigned_date?: string; scheduled_date?: string }) => {
+          const d = (r.assigned_date || r.scheduled_date || '').toString().slice(0, 10)
+          if (!usageByTemplate[r.workout_template_id]) usageByTemplate[r.workout_template_id] = { count: 0, lastDate: '' }
+          usageByTemplate[r.workout_template_id].count++
+          if (d > (usageByTemplate[r.workout_template_id].lastDate || '')) usageByTemplate[r.workout_template_id].lastDate = d
+        })
+        const templatesWithStats = (data || []).map((template: { id: string; updated_at?: string; created_at?: string } & Record<string, unknown>) => {
+          const usage = usageByTemplate[template.id] || { count: 0, lastDate: '' }
+          return {
+            ...template,
+            exercise_count: exerciseCountByTemplate[template.id] ?? 0,
+            usage_count: usage.count,
+            rating: 0,
+            last_used: usage.lastDate ? new Date(usage.lastDate + 'T12:00:00Z').toISOString() : (template.updated_at || template.created_at || ''),
+            updated_at: template.updated_at || template.created_at
+          } as WorkoutTemplate
+        })
 
         setTemplates(templatesWithStats)
       } catch {

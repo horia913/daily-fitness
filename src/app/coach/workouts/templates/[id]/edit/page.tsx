@@ -43,10 +43,7 @@ export default function EditWorkoutTemplatePage() {
   const loadTemplate = async () => {
     try {
       setLoading(true);
-      const templates = await WorkoutTemplateService.getWorkoutTemplates(
-        user!.id
-      );
-      const found = templates.find((t) => t.id === templateId);
+      const found = await WorkoutTemplateService.getWorkoutTemplateById(templateId);
       if (found) {
         setTemplate(found);
         setIsOpen(true);

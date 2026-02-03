@@ -332,12 +332,12 @@ export async function syncWorkoutConsistencyGoal(
     sunday.setDate(monday.getDate() + 6)
     sunday.setHours(23, 59, 59, 999)
 
-    // Step 2: Count completed workouts this week
-    const { data: workoutSessions, error } = await supabaseAdmin
-      .from('workout_sessions')
+    // Step 2: Count completed workouts this week (workout_logs, not workout_sessions)
+    const { data: workoutLogs, error } = await supabaseAdmin
+      .from('workout_logs')
       .select('id')
       .eq('client_id', clientId)
-      .eq('status', 'completed')
+      .not('completed_at', 'is', null)
       .gte('completed_at', monday.toISOString())
       .lte('completed_at', sunday.toISOString())
 
@@ -352,7 +352,7 @@ export async function syncWorkoutConsistencyGoal(
       }
     }
 
-    const newValue = workoutSessions?.length || 0
+    const newValue = workoutLogs?.length || 0
 
     // Step 3: Get goal info
     const { data: goal, error: goalError } = await supabaseAdmin
@@ -453,16 +453,16 @@ export async function syncNutritionTrackingGoal(
     sunday.setDate(monday.getDate() + 6)
     sunday.setHours(23, 59, 59, 999)
 
-    // Step 2: Count distinct days with meal logs
-    const { data: mealLogs, error } = await supabaseAdmin
-      .from('meal_logs')
-      .select('logged_at')
+    // Step 2: Count distinct days with meal completions (meal_logs does not exist)
+    const { data: mealCompletionsData, error } = await supabaseAdmin
+      .from('meal_completions')
+      .select('completed_at')
       .eq('client_id', clientId)
-      .gte('logged_at', monday.toISOString().split('T')[0])
-      .lte('logged_at', sunday.toISOString().split('T')[0])
+      .gte('completed_at', monday.toISOString())
+      .lte('completed_at', sunday.toISOString())
 
     if (error) {
-      console.error('Error counting meal logs:', error)
+      console.error('Error counting meal completions:', error)
       return {
         goalId,
         oldValue: 0,
@@ -472,11 +472,11 @@ export async function syncNutritionTrackingGoal(
       }
     }
 
-    // Count unique dates
+    // Count unique dates (completed_at is timestamp)
     const uniqueDays = new Set(
-      mealLogs?.map(m => {
-        const date = m.logged_at
-        return typeof date === 'string' ? date.split('T')[0] : date
+      mealCompletionsData?.map(m => {
+        const date = m.completed_at
+        return date ? new Date(date).toISOString().split('T')[0] : ''
       }).filter(Boolean) || []
     )
     const newValue = uniqueDays.size

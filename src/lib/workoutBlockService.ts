@@ -549,14 +549,27 @@ export class WorkoutBlockService {
         insertData.load_percentage = exerciseData.load_percentage;
       }
 
-      const { data, error } = await supabase
+      // Add timeout protection to prevent UI freezes
+      const queryPromise = supabase
         .from('workout_block_exercises')
         .insert(insertData)
         .select(`
           *,
           exercise:exercises(*)
         `)
-        .single()
+        .single();
+
+      const result = await Promise.race([
+        queryPromise,
+        new Promise<{ data: null; error: { code: string; message: string } }>((resolve) =>
+          setTimeout(() => resolve({ 
+            data: null, 
+            error: { code: '57014', message: 'Query timeout - database may be under heavy load' } 
+          }), 10000) // 10 second timeout
+        )
+      ]);
+
+      const { data, error } = result;
 
       if (error) {
         console.error('Error adding exercise to block - Full error:', error);
@@ -565,6 +578,9 @@ export class WorkoutBlockService {
           console.error('Column not found. Please check that the workout_block_exercises table has all required columns.');
           console.error('Required columns: block_id, exercise_id, exercise_order');
           console.error('Optional columns: exercise_letter, sets, reps, weight_kg, rir, tempo, rest_seconds, notes');
+        }
+        if (error.code === '57014' || error.message?.includes('timeout')) {
+          console.warn('Database timeout - the special set tables may need indexes. Run the migration: 20260202_special_set_indexes.sql');
         }
         throw error;
       }
@@ -812,15 +828,49 @@ export class WorkoutBlockService {
   }
 
   // Delete all special table data for a block (helper for updates)
-  static async deleteBlockSpecialData(blockId: string): Promise<void> {
-    // Delete all special table data that references this block
-    await supabase.from('workout_block_exercises').delete().eq('block_id', blockId);
-    await supabase.from('workout_drop_sets').delete().eq('block_id', blockId);
-    await supabase.from('workout_cluster_sets').delete().eq('block_id', blockId);
-    await supabase.from('workout_rest_pause_sets').delete().eq('block_id', blockId);
-    await supabase.from('workout_time_protocols').delete().eq('block_id', blockId);
-    await supabase.from('workout_hr_sets').delete().eq('block_id', blockId);
-    // REMOVED: workout_pyramid_sets and workout_ladder_sets (deprecated block types)
+  // Optimized: runs deletes in parallel with timeout protection
+  static async deleteBlockSpecialData(blockId: string, blockType?: string): Promise<void> {
+    const safeDelete = async (table: string) => {
+      try {
+        await Promise.race([
+          supabase.from(table).delete().eq('block_id', blockId),
+          new Promise((_, reject) => setTimeout(() => reject(new Error(`Delete timeout: ${table}`)), 8000))
+        ]);
+      } catch (error: any) {
+        // Log but don't fail - the data might not exist
+        if (error?.message?.includes('timeout') || error?.code === '57014') {
+          console.warn(`Delete timeout for ${table} (block_id=${blockId}) - continuing...`);
+        }
+      }
+    };
+
+    // If block type is known, only delete from relevant tables
+    if (blockType) {
+      if (['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(blockType)) {
+        await safeDelete('workout_block_exercises');
+      } else if (blockType === 'drop_set') {
+        await safeDelete('workout_drop_sets');
+      } else if (blockType === 'cluster_set') {
+        await safeDelete('workout_cluster_sets');
+      } else if (blockType === 'rest_pause') {
+        await safeDelete('workout_rest_pause_sets');
+      } else if (['amrap', 'emom', 'for_time', 'tabata', 'circuit'].includes(blockType)) {
+        await safeDelete('workout_time_protocols');
+      } else if (blockType === 'hr_sets') {
+        await safeDelete('workout_hr_sets');
+      }
+      return;
+    }
+
+    // If block type is unknown, delete from all tables in parallel
+    await Promise.all([
+      safeDelete('workout_block_exercises'),
+      safeDelete('workout_drop_sets'),
+      safeDelete('workout_cluster_sets'),
+      safeDelete('workout_rest_pause_sets'),
+      safeDelete('workout_time_protocols'),
+      safeDelete('workout_hr_sets'),
+    ]);
   }
 
   // Delete workout block (and all related special table data)

@@ -669,66 +669,6 @@ export default function CoachHabitsManagement() {
     return selectedClients.map(id => clients.find(c => c.id === id)).filter(Boolean)
   }
 
-  // Progress tracking helper functions
-  const generateMockUserHabits = () => {
-    if (selectedClientForProgress === 'all') return []
-    
-    const client = clients.find(c => c.id === selectedClientForProgress)
-    if (!client) return []
-
-    // Generate mock user habits for the selected client
-    return habits.slice(0, 3).map(habit => ({
-      id: `user-habit-${habit.id}-${client.id}`,
-      user_id: client.id,
-      habit_id: habit.id,
-      coach_id: user?.id || '',
-      custom_name: habit.name,
-      custom_description: habit.description,
-      target_value: habit.target_value,
-      frequency_type: habit.frequency_type,
-      is_active: true,
-      start_date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-      end_date: null,
-      reminder_time: '09:00',
-      reminder_enabled: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      habit: habit,
-      streak: {
-        current: Math.floor(Math.random() * 10),
-        longest: Math.floor(Math.random() * 20) + 10
-      }
-    }))
-  }
-
-  const generateMockHabitEntries = (userHabit: any) => {
-    const entries = []
-    const startDate = new Date(userHabit.start_date)
-    const days = parseInt(progressDateRange)
-    
-    for (let i = 0; i < days; i++) {
-      const date = new Date(startDate)
-      date.setDate(date.getDate() + i)
-      
-      // Generate realistic completion data
-      const isCompleted = Math.random() > 0.3 // 70% completion rate
-      const value = isCompleted ? userHabit.target_value : Math.floor(Math.random() * userHabit.target_value)
-      
-      entries.push({
-        id: `entry-${userHabit.id}-${i}`,
-        user_habit_id: userHabit.id,
-        date: date.toISOString().split('T')[0],
-        value: value,
-        is_completed: isCompleted,
-        notes: isCompleted ? 'Great job!' : '',
-        created_at: date.toISOString(),
-        updated_at: date.toISOString()
-      })
-    }
-    
-    return entries
-  }
-
   const calculateProgressStats = (userHabits: any[], habitEntries: Record<string, any[]>) => {
     if (userHabits.length === 0) {
       return {
@@ -846,26 +786,135 @@ export default function CoachHabitsManagement() {
     return data
   }
 
-  // Load progress data when client changes
-  useEffect(() => {
-    if (selectedClientForProgress !== 'all') {
-      const mockUserHabits = generateMockUserHabits()
-      setUserHabits(mockUserHabits)
-      
-      const entries: Record<string, any[]> = {}
-      mockUserHabits.forEach(userHabit => {
-        entries[userHabit.id] = generateMockHabitEntries(userHabit)
+  const loadProgressData = useCallback(async () => {
+    if (selectedClientForProgress === 'all') {
+      setUserHabits([])
+      setHabitEntries({})
+      setProgressStats({})
+      return
+    }
+    const client = clients.find((c: any) => c.id === selectedClientForProgress)
+    if (!client) {
+      setUserHabits([])
+      setHabitEntries({})
+      setProgressStats({})
+      return
+    }
+    try {
+      const days = Math.min(365, Math.max(1, parseInt(progressDateRange) || 30))
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - days)
+      const startStr = startDate.toISOString().split('T')[0]
+      const endStr = endDate.toISOString().split('T')[0]
+
+      const { data: assignments, error: assignErr } = await supabase
+        .from('habit_assignments')
+        .select(`
+          id,
+          habit_id,
+          start_date,
+          created_at,
+          updated_at,
+          habits(id, name, description, frequency_type, target_days, target_value, icon, color)
+        `)
+        .eq('client_id', selectedClientForProgress)
+        .eq('is_active', true)
+
+      if (assignErr || !assignments?.length) {
+        setUserHabits([])
+        setHabitEntries({})
+        setProgressStats(calculateProgressStats([], {}))
+        return
+      }
+
+      const assignmentIds = assignments.map((a: any) => a.id)
+      const { data: logs, error: logsErr } = await supabase
+        .from('habit_logs')
+        .select('id, assignment_id, log_date, completed_at, notes, created_at')
+        .in('assignment_id', assignmentIds)
+        .gte('log_date', startStr)
+        .lte('log_date', endStr)
+        .order('log_date', { ascending: true })
+
+      if (logsErr) {
+        setUserHabits([])
+        setHabitEntries({})
+        setProgressStats(calculateProgressStats([], {}))
+        return
+      }
+
+      const userHabitsList = assignments.map((a: any) => ({
+        id: a.id,
+        user_id: selectedClientForProgress,
+        habit_id: a.habit_id,
+        coach_id: user?.id || '',
+        custom_name: a.habits?.name ?? '',
+        custom_description: a.habits?.description ?? '',
+        target_value: a.habits?.target_value ?? 1,
+        frequency_type: a.habits?.frequency_type ?? 'daily',
+        is_active: true,
+        start_date: a.start_date,
+        end_date: null,
+        reminder_time: '09:00',
+        reminder_enabled: true,
+        created_at: a.created_at,
+        updated_at: a.updated_at,
+        habit: a.habits,
+        streak: { current: 0, longest: 0 }
+      }))
+
+      const entriesByAssignment: Record<string, any[]> = {}
+      ;(logs || []).forEach((log: any) => {
+        const dateStr = typeof log.log_date === 'string' ? log.log_date.slice(0, 10) : log.log_date
+        const entry = {
+          id: log.id,
+          user_habit_id: log.assignment_id,
+          date: dateStr,
+          value: 1,
+          is_completed: true,
+          notes: log.notes ?? '',
+          created_at: log.created_at,
+          updated_at: log.created_at
+        }
+        if (!entriesByAssignment[log.assignment_id]) entriesByAssignment[log.assignment_id] = []
+        entriesByAssignment[log.assignment_id].push(entry)
       })
-      setHabitEntries(entries)
-      
-      const stats = calculateProgressStats(mockUserHabits, entries)
-      setProgressStats(stats)
-    } else {
+
+      for (const uh of userHabitsList) {
+        const entries = entriesByAssignment[uh.id] || []
+        const dates = [...new Set(entries.map((e: any) => e.date))].sort()
+        let current = 0
+        let longest = 0
+        const todayStr = endStr
+        for (let i = dates.length - 1; i >= 0; i--) {
+          const expected = new Date(todayStr)
+          expected.setDate(expected.getDate() - (dates.length - 1 - i))
+          const expectedStr = expected.toISOString().split('T')[0]
+          if (dates[i] === expectedStr) {
+            current++
+            longest = Math.max(longest, current)
+          } else {
+            current = 0
+          }
+        }
+        uh.streak = { current, longest: longest || current }
+      }
+
+      setUserHabits(userHabitsList)
+      setHabitEntries(entriesByAssignment)
+      setProgressStats(calculateProgressStats(userHabitsList, entriesByAssignment))
+    } catch (e) {
+      console.error('Error loading habit progress:', e)
       setUserHabits([])
       setHabitEntries({})
       setProgressStats({})
     }
-  }, [selectedClientForProgress, progressDateRange, habits, clients, user])
+  }, [selectedClientForProgress, progressDateRange, clients, user])
+
+  useEffect(() => {
+    loadProgressData()
+  }, [loadProgressData])
 
   if (loading) {
     return (

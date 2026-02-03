@@ -551,101 +551,130 @@ export class ProgramProgressionService {
       }
     }
 
-    // Fetch time_protocols for time-based blocks
+    // Fetch special table data in parallel to reduce total wait time
+    // Initialize maps
     const timeProtocolsByBlock = new Map<string, any[]>()
-    if (timeBasedBlockIds.length > 0) {
-      const { data: timeProtocols } = await supabase
-        .from('workout_time_protocols')
-        .select('id, block_id, exercise_id, exercise_order, protocol_type, set, rounds, work_seconds, rest_seconds, rest_after_set, total_duration_minutes, reps_per_round, target_reps, time_cap_minutes, emom_mode, weight_kg, load_percentage')
-        .in('block_id', timeBasedBlockIds)
-      
-      ;(timeProtocols || []).forEach((tp: any) => {
-        if (!timeProtocolsByBlock.has(tp.block_id)) {
-          timeProtocolsByBlock.set(tp.block_id, [])
-        }
-        timeProtocolsByBlock.get(tp.block_id)!.push(tp)
-      })
-    }
-    
-    // Fetch drop_sets
     const dropSetsByBlock = new Map<string, any[]>()
-    if (dropSetBlockIds.length > 0) {
-      const { data: dropSets } = await supabase
-        .from('workout_drop_sets')
-        .select('id, block_id, exercise_id, exercise_order, drop_order, reps, weight_kg, load_percentage')
-        .in('block_id', dropSetBlockIds)
-      
-      ;(dropSets || []).forEach((ds: any) => {
-        if (!dropSetsByBlock.has(ds.block_id)) {
-          dropSetsByBlock.set(ds.block_id, [])
-        }
-        dropSetsByBlock.get(ds.block_id)!.push(ds)
-      })
-    }
-    
-    // Fetch cluster_sets
     const clusterSetsByBlock = new Map<string, any[]>()
-    if (clusterSetBlockIds.length > 0) {
-      const { data: clusterSets } = await supabase
-        .from('workout_cluster_sets')
-        .select('id, block_id, exercise_id, exercise_order, reps_per_cluster, clusters_per_set, intra_cluster_rest, weight_kg, load_percentage')
-        .in('block_id', clusterSetBlockIds)
-      
-      ;(clusterSets || []).forEach((cs: any) => {
-        if (!clusterSetsByBlock.has(cs.block_id)) {
-          clusterSetsByBlock.set(cs.block_id, [])
-        }
-        clusterSetsByBlock.get(cs.block_id)!.push(cs)
-      })
-    }
-    
-    // Fetch rest_pause_sets
     const restPauseSetsByBlock = new Map<string, any[]>()
-    if (restPauseBlockIds.length > 0) {
-      const { data: restPauseSets } = await supabase
-        .from('workout_rest_pause_sets')
-        .select('id, block_id, exercise_id, exercise_order, rest_pause_duration, max_rest_pauses, weight_kg, load_percentage')
-        .in('block_id', restPauseBlockIds)
-      
-      ;(restPauseSets || []).forEach((rp: any) => {
-        if (!restPauseSetsByBlock.has(rp.block_id)) {
-          restPauseSetsByBlock.set(rp.block_id, [])
-        }
-        restPauseSetsByBlock.get(rp.block_id)!.push(rp)
-      })
-    }
-    
-    // Fetch pyramid_sets
     const pyramidSetsByBlock = new Map<string, any[]>()
-    if (pyramidBlockIds.length > 0) {
-      const { data: pyramidSets } = await supabase
-        .from('workout_pyramid_sets')
-        .select('id, block_id, exercise_id, exercise_order, set_number, reps, weight_kg, load_percentage')
-        .in('block_id', pyramidBlockIds)
-      
-      ;(pyramidSets || []).forEach((ps: any) => {
-        if (!pyramidSetsByBlock.has(ps.block_id)) {
-          pyramidSetsByBlock.set(ps.block_id, [])
-        }
-        pyramidSetsByBlock.get(ps.block_id)!.push(ps)
-      })
-    }
-    
-    // Fetch ladder_sets
     const ladderSetsByBlock = new Map<string, any[]>()
-    if (ladderBlockIds.length > 0) {
-      const { data: ladderSets } = await supabase
-        .from('workout_ladder_sets')
-        .select('id, block_id, exercise_id, exercise_order, rung_number, reps, weight_kg, load_percentage')
-        .in('block_id', ladderBlockIds)
-      
-      ;(ladderSets || []).forEach((ls: any) => {
-        if (!ladderSetsByBlock.has(ls.block_id)) {
-          ladderSetsByBlock.set(ls.block_id, [])
+
+    // Helper to safely execute query with timeout protection
+    const safeQuery = async (queryBuilder: any, fallback: any[] = []) => {
+      try {
+        const result = await Promise.race([
+          queryBuilder.then((r: any) => r),
+          new Promise<{ data: null; error: { message: string } }>((resolve) =>
+            setTimeout(() => resolve({ data: null, error: { message: 'Query timeout' } }), 8000)
+          )
+        ])
+        if (result.error) {
+          console.warn('[ProgramProgressionService] Query error:', result.error.message)
+          return fallback
         }
-        ladderSetsByBlock.get(ls.block_id)!.push(ls)
-      })
+        return result.data || fallback
+      } catch (error) {
+        console.warn('[ProgramProgressionService] Query failed:', error)
+        return fallback
+      }
     }
+
+    // Build all query promises (only for non-empty block ID lists)
+    const queryPromises: Promise<void>[] = []
+
+    if (timeBasedBlockIds.length > 0) {
+      queryPromises.push(
+        safeQuery(
+          supabase.from('workout_time_protocols')
+            .select('id, block_id, exercise_id, exercise_order, protocol_type, set, rounds, work_seconds, rest_seconds, rest_after_set, total_duration_minutes, reps_per_round, target_reps, time_cap_minutes, emom_mode, weight_kg, load_percentage')
+            .in('block_id', timeBasedBlockIds)
+        ).then(data => {
+          data.forEach((tp: any) => {
+            if (!timeProtocolsByBlock.has(tp.block_id)) timeProtocolsByBlock.set(tp.block_id, [])
+            timeProtocolsByBlock.get(tp.block_id)!.push(tp)
+          })
+        })
+      )
+    }
+
+    if (dropSetBlockIds.length > 0) {
+      queryPromises.push(
+        safeQuery(
+          supabase.from('workout_drop_sets')
+            .select('id, block_id, exercise_id, exercise_order, drop_order, reps, weight_kg, load_percentage')
+            .in('block_id', dropSetBlockIds)
+        ).then(data => {
+          data.forEach((ds: any) => {
+            if (!dropSetsByBlock.has(ds.block_id)) dropSetsByBlock.set(ds.block_id, [])
+            dropSetsByBlock.get(ds.block_id)!.push(ds)
+          })
+        })
+      )
+    }
+
+    if (clusterSetBlockIds.length > 0) {
+      queryPromises.push(
+        safeQuery(
+          supabase.from('workout_cluster_sets')
+            .select('id, block_id, exercise_id, exercise_order, reps_per_cluster, clusters_per_set, intra_cluster_rest, weight_kg, load_percentage')
+            .in('block_id', clusterSetBlockIds)
+        ).then(data => {
+          data.forEach((cs: any) => {
+            if (!clusterSetsByBlock.has(cs.block_id)) clusterSetsByBlock.set(cs.block_id, [])
+            clusterSetsByBlock.get(cs.block_id)!.push(cs)
+          })
+        })
+      )
+    }
+
+    if (restPauseBlockIds.length > 0) {
+      queryPromises.push(
+        safeQuery(
+          supabase.from('workout_rest_pause_sets')
+            .select('id, block_id, exercise_id, exercise_order, rest_pause_duration, max_rest_pauses, weight_kg, load_percentage')
+            .in('block_id', restPauseBlockIds)
+        ).then(data => {
+          data.forEach((rp: any) => {
+            if (!restPauseSetsByBlock.has(rp.block_id)) restPauseSetsByBlock.set(rp.block_id, [])
+            restPauseSetsByBlock.get(rp.block_id)!.push(rp)
+          })
+        })
+      )
+    }
+
+    if (pyramidBlockIds.length > 0) {
+      queryPromises.push(
+        safeQuery(
+          supabase.from('workout_pyramid_sets')
+            .select('id, block_id, exercise_id, exercise_order, set_number, reps, weight_kg, load_percentage')
+            .in('block_id', pyramidBlockIds)
+        ).then(data => {
+          data.forEach((ps: any) => {
+            if (!pyramidSetsByBlock.has(ps.block_id)) pyramidSetsByBlock.set(ps.block_id, [])
+            pyramidSetsByBlock.get(ps.block_id)!.push(ps)
+          })
+        })
+      )
+    }
+
+    if (ladderBlockIds.length > 0) {
+      queryPromises.push(
+        safeQuery(
+          supabase.from('workout_ladder_sets')
+            .select('id, block_id, exercise_id, exercise_order, rung_number, reps, weight_kg, load_percentage')
+            .in('block_id', ladderBlockIds)
+        ).then(data => {
+          data.forEach((ls: any) => {
+            if (!ladderSetsByBlock.has(ls.block_id)) ladderSetsByBlock.set(ls.block_id, [])
+            ladderSetsByBlock.get(ls.block_id)!.push(ls)
+          })
+        })
+      )
+    }
+
+    // Execute all queries in parallel
+    await Promise.all(queryPromises)
 
     // Convert grouped rules to WorkoutBlock[]
     const blocks: WorkoutBlock[] = []

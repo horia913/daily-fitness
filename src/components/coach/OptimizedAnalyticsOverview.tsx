@@ -187,62 +187,108 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
   }, [coachId, selectedPeriod])
 
   const loadAnalyticsData = async () => {
+    if (!coachId) return
     try {
       setLoading(true)
+      const {
+        getCoachClientIds,
+        getTotalWorkouts,
+        getTotalMeals,
+        getHabitCompletionsCount,
+        getPersonalRecordsCount,
+        getSuccessRate,
+        getAvgSessionTime,
+        getSessionsPerWeek,
+        getNewClientsInPeriod,
+        getPeriodBounds
+      } = await import('@/lib/metrics')
 
-      // Load clients for this coach
+      let period: { start: string; end: string; weeksInPeriod: number }
+      if (selectedPeriod === '7d') {
+        period = getPeriodBounds('last_7_days')
+      } else if (selectedPeriod === '30d') {
+        period = getPeriodBounds('this_month')
+      } else if (selectedPeriod === '90d') {
+        const end = new Date()
+        const start = new Date(end)
+        start.setUTCDate(start.getUTCDate() - 90)
+        period = { start: start.toISOString(), end: end.toISOString(), weeksInPeriod: 90 / 7 }
+      } else {
+        const end = new Date()
+        const start = new Date(end)
+        start.setUTCFullYear(start.getUTCFullYear() - 1)
+        period = { start: start.toISOString(), end: end.toISOString(), weeksInPeriod: 52 }
+      }
+
+      const clientIds = await getCoachClientIds(coachId, false)
+      if (clientIds.length === 0) {
+        setAnalyticsData(prev => ({ ...prev, totalClients: 0, activeClients: 0 }))
+        setLoading(false)
+        return
+      }
+
       const { data: clients, error: clientsError } = await supabase
         .from('clients')
-        .select('*')
+        .select('id, client_id, status, created_at')
         .eq('coach_id', coachId)
-
+        .in('client_id', clientIds)
       if (clientsError) throw clientsError
 
-      
-      // Fetch profiles for these clients
-      const clientIds = clients?.map(c => c.client_id) || []
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, first_name, last_name, avatar_url')
         .in('id', clientIds)
 
-      
-      // Merge clients with their profiles
-      const clientsWithProfiles = clients?.map(client => ({
+      const clientsWithProfiles = (clients || []).map(client => ({
         ...client,
         profile: profiles?.find(p => p.id === client.client_id)
-      })) || []
-
+      }))
       const totalClients = clientsWithProfiles.length
       const activeClients = clientsWithProfiles.filter(c => c.status === 'active').length
 
-      // Load workout assignments
-      const { data: workoutAssignments } = await supabase
-        .from('workout_assignments')
-        .select('id, client_id, status, created_at')
+      const [
+        totalWorkouts,
+        totalMeals,
+        totalHabits,
+        personalBests,
+        successRate,
+        avgSessionTime,
+        sessionsPerWeek,
+        newClientsThisPeriod,
+        workoutLogsData,
+        assignedData
+      ] = await Promise.all([
+        getTotalWorkouts(clientIds, period),
+        getTotalMeals(clientIds, period),
+        getHabitCompletionsCount(clientIds, period),
+        getPersonalRecordsCount(clientIds, period),
+        getSuccessRate(clientIds, period),
+        getAvgSessionTime(clientIds, period),
+        getSessionsPerWeek(clientIds, period),
+        getNewClientsInPeriod(coachId, period),
+        supabase.from('workout_logs').select('client_id').in('client_id', clientIds).not('completed_at', 'is', null).gte('completed_at', period.start).lt('completed_at', period.end),
+        supabase.from('workout_assignments').select('client_id, scheduled_date, assigned_date').in('client_id', clientIds)
+      ])
 
-      const totalWorkouts = workoutAssignments?.length || 0
+      const periodStart = period.start.slice(0, 10)
+      const periodEnd = period.end.slice(0, 10)
+      const completedByClient: Record<string, number> = {}
+      clientIds.forEach(id => (completedByClient[id] = 0))
+      ;(workoutLogsData.data || []).forEach((r: { client_id: string }) => { completedByClient[r.client_id] = (completedByClient[r.client_id] || 0) + 1 })
+      const assignedByClient: Record<string, number> = {}
+      clientIds.forEach(id => (assignedByClient[id] = 0))
+      ;(assignedData.data || []).forEach((r: { client_id: string; scheduled_date?: string; assigned_date?: string }) => {
+        const d = (r.scheduled_date || r.assigned_date) ?? ''
+        if (d >= periodStart && d < periodEnd) assignedByClient[r.client_id] = (assignedByClient[r.client_id] || 0) + 1
+      })
 
-      // Load meal plan assignments
-      const { data: mealAssignments } = await supabase
-        .from('meal_plan_assignments')
-        .select('id, client_id, created_at')
-
-      const totalMeals = mealAssignments?.length || 0
-
-      // Calculate compliance for each client (simplified - you can enhance this)
       const clientComplianceData: ClientCompliance[] = clientsWithProfiles.map(client => {
-        const clientWorkouts = workoutAssignments?.filter(w => w.client_id === client.id) || []
-        const completedWorkouts = clientWorkouts.filter(w => w.status === 'completed').length
-        const compliance = clientWorkouts.length > 0 
-          ? Math.round((completedWorkouts / clientWorkouts.length) * 100)
-          : 0
-
-        // Try multiple possible name fields from profile
-        const firstName = client.profile?.first_name || client.profile?.name || client.profile?.full_name || client.profile?.display_name || 'Unknown'
+        const completed = completedByClient[client.client_id] || 0
+        const assigned = assignedByClient[client.client_id] || 0
+        const compliance = assigned > 0 ? Math.round((completed / assigned) * 100) : 0
+        const firstName = client.profile?.first_name || 'Unknown'
         const lastName = client.profile?.last_name || ''
         const fullName = `${firstName} ${lastName}`.trim() || 'Unknown'
-
         return {
           id: client.id,
           name: fullName,
@@ -251,45 +297,38 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
         }
       })
 
-      // Sort by compliance and get top 5 and bottom 5
       const sortedByCompliance = [...clientComplianceData].sort((a, b) => b.compliance - a.compliance)
       setTopClients(sortedByCompliance.slice(0, 5))
       setBottomClients(sortedByCompliance.slice(-5).reverse())
 
-      // Calculate overall compliance
       const avgCompliance = clientComplianceData.length > 0
         ? Math.round(clientComplianceData.reduce((sum, c) => sum + c.compliance, 0) / clientComplianceData.length)
         : 0
 
-      // Update analytics data with real values
       setAnalyticsData({
         totalClients,
         activeClients,
-        newClientsThisPeriod: 0, // TODO: Calculate based on selectedPeriod
+        newClientsThisPeriod,
         clientRetentionRate: totalClients > 0 ? Math.round((activeClients / totalClients) * 100) : 0,
         overallComplianceRate: avgCompliance,
-        
-        avgSessionTime: 0, // TODO: Calculate from actual session data
-        sessionsPerWeek: 0, // TODO: Calculate from actual session data
-        goalsAchieved: 0, // TODO: Query goals table
-        totalGoals: 0, // TODO: Query goals table
-        successRate: 0, // TODO: Calculate
-        
+        avgSessionTime,
+        sessionsPerWeek,
+        goalsAchieved: successRate.achieved,
+        totalGoals: successRate.total,
+        successRate: successRate.ratePercent,
         totalWorkouts,
         totalMeals,
-        totalHabits: 0, // TODO: Query habits table
-        personalBests: 0, // TODO: Query from workout logs
-        
-        clientGrowthTrend: 'stable', // TODO: Calculate trend
-        complianceTrend: 'stable', // TODO: Calculate trend
-        engagementTrend: 'stable', // TODO: Calculate trend
-        
-        clientGrowthData: [], // TODO: Calculate growth data
+        totalHabits,
+        personalBests,
+        clientGrowthTrend: newClientsThisPeriod > 0 ? 'up' : 'stable',
+        complianceTrend: 'stable',
+        engagementTrend: sessionsPerWeek > 0 ? 'up' : 'stable',
+        clientGrowthData: [],
         complianceBreakdown: [
-          { category: 'Workouts', percentage: avgCompliance, color: 'bg-blue-500', icon: Dumbbell },
-          { category: 'Nutrition', percentage: 0, color: 'bg-green-500', icon: Apple },
-          { category: 'Habits', percentage: 0, color: 'bg-purple-500', icon: Heart },
-          { category: 'Goals', percentage: 0, color: 'bg-orange-500', icon: Target }
+          { category: 'Workouts', percentage: avgCompliance, color: 'bg-[color:var(--fc-domain-workouts)]', icon: Dumbbell },
+          { category: 'Nutrition', percentage: 0, color: 'bg-[color:var(--fc-domain-meals)]', icon: Apple },
+          { category: 'Habits', percentage: 0, color: 'bg-[color:var(--fc-domain-habits)]', icon: Heart },
+          { category: 'Goals', percentage: successRate.ratePercent, color: 'bg-[color:var(--fc-status-warning)]', icon: Target }
         ],
         programEffectiveness: [],
         insights: []
@@ -400,7 +439,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
                 <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
                   <Button
                     variant="outline"
-                    onClick={() => setLoading(true)}
+                    onClick={() => loadAnalyticsData()}
                     className="fc-btn fc-btn-ghost flex items-center gap-2"
                     size="sm"
                   >

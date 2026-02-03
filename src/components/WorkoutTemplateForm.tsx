@@ -1369,7 +1369,8 @@ export default function WorkoutTemplateForm({
                 console.log(`🔄 Updating existing block: ${exercise.id}`);
 
                 // Delete special table data first (will be recreated below)
-                await WorkoutBlockService.deleteBlockSpecialData(exercise.id);
+                // Pass block type for optimized deletion (only deletes from relevant table)
+                await WorkoutBlockService.deleteBlockSpecialData(exercise.id, exerciseType);
 
                 // Collect exercise IDs for block name generation
                 const exerciseIds: string[] = [];

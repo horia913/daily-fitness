@@ -155,34 +155,59 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
 
         if (clientsError) throw clientsError
 
-        // Fetch workout compliance data
-        const { data: workoutData, error: workoutError } = await supabase
-          .from('workout_sessions')
-          .select('*')
-          .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        const clientIds = (clients || []).map((c: any) => c.client_id)
+        const periodStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-        if (workoutError) throw workoutError
+        // Completed workouts from workout_logs (not workout_sessions)
+        const { data: workoutLogs } = await supabase
+          .from('workout_logs')
+          .select('client_id, completed_at')
+          .in('client_id', clientIds.length ? clientIds : ['00000000-0000-0000-0000-000000000000'])
+          .not('completed_at', 'is', null)
+          .gte('completed_at', periodStart)
 
-        // Use empty data for non-existent tables
-        const nutritionData: any[] = []
+        // Meal completions (meal_logs does not exist)
+        const { data: nutritionRows } = await supabase
+          .from('meal_completions')
+          .select('client_id, completed_at')
+          .in('client_id', clientIds.length ? clientIds : ['00000000-0000-0000-0000-000000000000'])
+          .gte('completed_at', periodStart)
 
-        // Calculate real compliance metrics
+        // Habit logs
+        const periodStartDate = periodStart.slice(0, 10)
+        const { data: habitRows } = await supabase
+          .from('habit_logs')
+          .select('client_id, log_date')
+          .in('client_id', clientIds.length ? clientIds : ['00000000-0000-0000-0000-000000000000'])
+          .gte('log_date', periodStartDate)
+
         const totalClients = clients?.length || 0
-        const workoutCompliance = calculateWorkoutCompliance(workoutData || [])
-        const nutritionCompliance = calculateNutritionCompliance(nutritionData || [])
-        
+        const workoutCompliance = totalClients > 0 && workoutLogs?.length
+          ? Math.round((workoutLogs.length / (totalClients * 4)) * 100) // rough: 4 workouts per client per month
+          : totalClients > 0
+            ? 0
+            : 0
+        const nutritionUniqueDays = nutritionRows ? new Set(nutritionRows.map((n: any) => new Date(n.completed_at).toISOString().slice(0, 10))).size : 0
+        const nutritionCompliance = totalClients > 0 ? Math.min(100, Math.round((nutritionUniqueDays / 30) * 100)) : 0
+        const habitUniqueDays = habitRows ? new Set(habitRows.map((h: any) => h.log_date)).size : 0
+        const habitCompliance = totalClients > 0 ? Math.min(100, Math.round((habitUniqueDays / 30) * 100)) : 0
+        const overall = totalClients > 0 ? Math.round((workoutCompliance + nutritionCompliance + habitCompliance) / 3) : 0
+
+        const weeklyTrend = buildWeeklyTrendFromData(workoutLogs || [], nutritionRows || [], habitRows || [], clientIds)
+        const clientCompliance = await buildClientComplianceData(clients || [], workoutLogs || [], nutritionRows || [], habitRows || [])
+
         const realComplianceData: ComplianceData = {
-          overallCompliance: Math.round((workoutCompliance + nutritionCompliance) / 2),
+          overallCompliance: overall,
           workoutCompliance,
           nutritionCompliance,
-          habitCompliance: Math.round((workoutCompliance + nutritionCompliance) / 2),
+          habitCompliance,
           complianceTrend: 'up',
           totalClients,
-          clientsOnTrack: Math.round(totalClients * 0.75),
-          clientsAtRisk: Math.round(totalClients * 0.15),
-          clientsNeedingAttention: Math.round(totalClients * 0.10),
-          weeklyTrend: generateWeeklyTrend(),
-          clientCompliance: generateClientComplianceData(clients || [])
+          clientsOnTrack: clientCompliance.filter((c: any) => c.overallCompliance >= 70).length,
+          clientsAtRisk: clientCompliance.filter((c: any) => c.overallCompliance < 50).length,
+          clientsNeedingAttention: clientCompliance.filter((c: any) => c.overallCompliance >= 50 && c.overallCompliance < 70).length,
+          weeklyTrend,
+          clientCompliance
         }
 
         setComplianceData(realComplianceData)
@@ -210,138 +235,104 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
     return Math.round((uniqueDays / totalDays) * 100)
   }
 
-  const generateWeeklyTrend = () => {
-    return [
-      { week: 'Week 1', overall: 78, workouts: 82, nutrition: 75, habits: 77 },
-      { week: 'Week 2', overall: 81, workouts: 85, nutrition: 78, habits: 80 },
-      { week: 'Week 3', overall: 84, workouts: 87, nutrition: 82, habits: 83 },
-      { week: 'Week 4', overall: 84, workouts: 87, nutrition: 82, habits: 79 }
-    ]
+  function buildWeeklyTrendFromData(
+    workoutLogs: any[],
+    nutritionRows: any[],
+    habitRows: any[],
+    clientIds: string[]
+  ) {
+    const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4']
+    const now = new Date()
+    return weeks.map((week, i) => {
+      const weekStart = new Date(now)
+      weekStart.setDate(now.getDate() - (4 - i) * 7)
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 7)
+      const wCount = workoutLogs.filter((w: any) => {
+        const d = new Date(w.completed_at)
+        return d >= weekStart && d < weekEnd
+      }).length
+      const nCount = nutritionRows.filter((n: any) => {
+        const d = new Date(n.completed_at)
+        return d >= weekStart && d < weekEnd
+      }).length
+      const hCount = habitRows.filter((h: any) => {
+        const d = new Date(h.log_date)
+        return d >= weekStart && d < weekEnd
+      }).length
+      const expected = clientIds.length * 4
+      const workout = expected > 0 ? Math.min(100, Math.round((wCount / expected) * 100)) : 0
+      const nutrition = clientIds.length > 0 ? Math.min(100, Math.round((nCount / (clientIds.length * 7)) * 100)) : 0
+      const habits = clientIds.length > 0 ? Math.min(100, Math.round((hCount / (clientIds.length * 7)) * 100)) : 0
+      const overall = Math.round((workout + nutrition + habits) / 3)
+      return { week, overall, workouts: workout, nutrition, habits }
+    })
   }
 
-  const generateClientComplianceData = (clients: any[]) => {
-    return clients.map(client => ({
-      client: {
-        id: client.id,
-        first_name: client.name || client.full_name || 'Unknown',
-        last_name: '',
-        email: client.email || 'no-email@example.com',
-        join_date: client.created_at?.split('T')[0] || '2024-01-01',
-        program: 'General Fitness',
-        goals: ['Stay healthy'],
-        compliance_status: 'on_track' as const
-      },
-      overallCompliance: Math.floor(Math.random() * 30) + 70,
-      workoutCompliance: Math.floor(Math.random() * 30) + 70,
-      nutritionCompliance: Math.floor(Math.random() * 30) + 70,
-      habitCompliance: Math.floor(Math.random() * 30) + 70,
-      lastActivity: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-      streakDays: Math.floor(Math.random() * 14),
-      missedDays: Math.floor(Math.random() * 5)
-    }))
-  }
-
-  // Fetch real compliance data from Supabase
-  const [complianceData, setComplianceData] = useState<ComplianceData>({
-    overallCompliance: 84,
-    workoutCompliance: 87,
-    nutritionCompliance: 82,
-    habitCompliance: 79,
-    complianceTrend: 'up',
-    totalClients: 24,
-    clientsOnTrack: 18,
-    clientsAtRisk: 4,
-    clientsNeedingAttention: 2,
-    weeklyTrend: [
-      { week: 'Week 1', overall: 78, workouts: 82, nutrition: 75, habits: 77 },
-      { week: 'Week 2', overall: 81, workouts: 85, nutrition: 78, habits: 80 },
-      { week: 'Week 3', overall: 84, workouts: 87, nutrition: 82, habits: 83 },
-      { week: 'Week 4', overall: 84, workouts: 87, nutrition: 82, habits: 79 }
-    ],
-    clientCompliance: [
-      {
+  async function buildClientComplianceData(
+    clients: any[],
+    workoutLogs: any[],
+    nutritionRows: any[],
+    habitRows: any[]
+  ) {
+    const clientIds = clients.map((c: any) => c.client_id)
+    const { data: profilesList } = clientIds.length > 0
+      ? await supabase.from('profiles').select('id, first_name, last_name, email').in('id', clientIds)
+      : { data: [] }
+    const profileMap = new Map((profilesList || []).map((p: any) => [p.id, p]))
+    return clients.map((client: any) => {
+      const cid = client.client_id
+      const wCount = workoutLogs.filter((w: any) => w.client_id === cid).length
+      const nDays = new Set(nutritionRows.filter((n: any) => n.client_id === cid).map((n: any) => new Date(n.completed_at).toISOString().slice(0, 10))).size
+      const hDays = new Set(habitRows.filter((h: any) => h.client_id === cid).map((h: any) => h.log_date)).size
+      const workoutCompliance = Math.min(100, Math.round((wCount / 4) * 100))
+      const nutritionCompliance = Math.min(100, Math.round((nDays / 30) * 100))
+      const habitCompliance = Math.min(100, Math.round((hDays / 30) * 100))
+      const overallCompliance = Math.round((workoutCompliance + nutritionCompliance + habitCompliance) / 3)
+      const lastWorkout = workoutLogs.filter((w: any) => w.client_id === cid).sort((a: any, b: any) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())[0]
+      const profile = profileMap.get(cid)
+      return {
         client: {
-          id: '1',
-          first_name: 'John',
-          last_name: 'Smith',
-          email: 'john@example.com',
-          join_date: '2024-01-15',
-          program: 'Weight Loss Program',
-          goals: ['Lose 20 lbs', 'Build muscle'],
-          compliance_status: 'on_track'
+          id: client.id,
+          first_name: profile?.first_name ?? 'Unknown',
+          last_name: profile?.last_name ?? '',
+          email: profile?.email ?? 'no-email@example.com',
+          join_date: client.created_at?.split('T')[0] || '2024-01-01',
+          program: 'General Fitness',
+          goals: ['Stay healthy'],
+          compliance_status: (overallCompliance >= 70 ? 'on_track' : overallCompliance >= 50 ? 'needs_attention' : 'at_risk') as 'on_track' | 'needs_attention' | 'at_risk'
         },
-        overallCompliance: 92,
-        workoutCompliance: 95,
-        nutritionCompliance: 90,
-        habitCompliance: 88,
-        lastActivity: '2024-02-12',
-        streakDays: 12,
-        missedDays: 1
-      },
-      {
-        client: {
-          id: '2',
-          first_name: 'Maria',
-          last_name: 'Johnson',
-          email: 'maria@example.com',
-          join_date: '2024-02-01',
-          program: 'Strength Building',
-          goals: ['Increase bench press'],
-          compliance_status: 'at_risk'
-        },
-        overallCompliance: 68,
-        workoutCompliance: 75,
-        nutritionCompliance: 65,
-        habitCompliance: 60,
-        lastActivity: '2024-02-10',
-        streakDays: 3,
-        missedDays: 4
-      },
-      {
-        client: {
-          id: '3',
-          first_name: 'David',
-          last_name: 'Kim',
-          email: 'david@example.com',
-          join_date: '2024-01-20',
-          program: 'Endurance Training',
-          goals: ['Improve 5K time'],
-          compliance_status: 'needs_attention'
-        },
-        overallCompliance: 45,
-        workoutCompliance: 50,
-        nutritionCompliance: 40,
-        habitCompliance: 45,
-        lastActivity: '2024-02-08',
+        overallCompliance,
+        workoutCompliance,
+        nutritionCompliance,
+        habitCompliance,
+        lastActivity: lastWorkout?.completed_at || new Date(0).toISOString(),
         streakDays: 0,
-        missedDays: 7
-      },
-      {
-        client: {
-          id: '4',
-          first_name: 'Sarah',
-          last_name: 'Wilson',
-          email: 'sarah@example.com',
-          join_date: '2024-01-10',
-          program: 'Muscle Building',
-          goals: ['Gain 8 lbs muscle'],
-          compliance_status: 'on_track'
-        },
-        overallCompliance: 88,
-        workoutCompliance: 92,
-        nutritionCompliance: 85,
-        habitCompliance: 87,
-        lastActivity: '2024-02-12',
-        streakDays: 8,
-        missedDays: 2
+        missedDays: 0
       }
-    ]
+    })
+  }
+
+  const [complianceData, setComplianceData] = useState<ComplianceData>({
+    overallCompliance: 0,
+    workoutCompliance: 0,
+    nutritionCompliance: 0,
+    habitCompliance: 0,
+    complianceTrend: 'up',
+    totalClients: 0,
+    clientsOnTrack: 0,
+    clientsAtRisk: 0,
+    clientsNeedingAttention: 0,
+    weeklyTrend: [
+      { week: 'Week 1', overall: 0, workouts: 0, nutrition: 0, habits: 0 },
+      { week: 'Week 2', overall: 0, workouts: 0, nutrition: 0, habits: 0 },
+      { week: 'Week 3', overall: 0, workouts: 0, nutrition: 0, habits: 0 },
+      { week: 'Week 4', overall: 0, workouts: 0, nutrition: 0, habits: 0 }
+    ],
+    clientCompliance: []
   })
 
-  useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setLoading(false), 1000)
-  }, [])
+  // Loading is controlled by fetchComplianceData only
 
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
@@ -436,17 +427,9 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
   }
 
   return (
-    <div className="min-h-screen fc-app-bg">
-      {/* Enhanced Header */}
-      <div className="p-4 sm:p-6 fc-app-bg relative overflow-hidden">
-        {/* Floating background elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-glass-highlight)] opacity-50 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-glass-highlight)] opacity-40 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-glass-highlight)] opacity-30 rounded-full blur-2xl"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
+    <div className="min-h-screen fc-app-bg w-full">
+      <div className="p-4 sm:p-6 fc-app-bg relative overflow-hidden w-full">
+        <div className="w-full relative z-10">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
             <div className="flex items-center gap-3 sm:gap-4">
               <Button
@@ -720,8 +703,8 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
           </div>
 
           {/* Client Compliance Breakdown */}
-          <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
+          <div className="w-full space-y-4">
+            <div className="p-4 sm:p-6">
               <div className="flex items-center gap-3 fc-text-primary font-semibold">
                 <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
                   <Users className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
@@ -733,7 +716,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
               {viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredClients.map(client => (
-                    <div key={client.client.id} className="fc-list-row rounded-xl p-4 border border-[color:var(--fc-glass-border)] hover:shadow-md transition-all duration-300">
+                    <div key={client.client.id} className="rounded-lg p-4 transition-all duration-300">
                       <div className="flex items-center gap-3 mb-3">
                         <div className="fc-icon-tile fc-icon-workouts w-10 h-10 text-sm font-semibold">
                           {client.client.first_name[0]}{client.client.last_name[0]}
@@ -817,7 +800,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
               ) : (
                 <div className="space-y-3">
                   {filteredClients.map(client => (
-                    <div key={client.client.id} className="fc-list-row rounded-xl p-4 border border-[color:var(--fc-glass-border)] hover:shadow-md transition-all duration-300">
+                    <div key={client.client.id} className="rounded-lg p-4 transition-all duration-300">
                       <div className="flex items-center gap-4">
                         <div className="fc-icon-tile fc-icon-workouts w-12 h-12 text-sm font-semibold flex-shrink-0">
                           {client.client.first_name[0]}{client.client.last_name[0]}

@@ -4,6 +4,38 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Play, Pause, X } from "lucide-react";
 
+// Simple beep via Web Audio — no external files. work = higher, rest = lower.
+function playWorkBeep() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 660;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch (_) {}
+}
+function playRestBeep() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 440;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.2);
+  } catch (_) {}
+}
+
 interface ExerciseInSet {
   exercise_id: string;
   work_seconds?: number;
@@ -42,10 +74,36 @@ export function TabataCircuitTimerModal({
   const [timerExerciseIndex, setTimerExerciseIndex] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevPhaseRef = useRef<"work" | "rest" | "rest_after_set" | null>(null);
+
+  // Lock background scroll while modal is open (same as other app modals)
+  useEffect(() => {
+    if (!isOpen) return;
+    document.body.classList.add("fc-modal-open");
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.classList.remove("fc-modal-open");
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
+
+  // Sound alerts when phase changes: work = higher beep, rest / rest_after_set = lower beep
+  useEffect(() => {
+    if (prevPhaseRef.current === null) {
+      prevPhaseRef.current = intervalPhase;
+      return;
+    }
+    if (prevPhaseRef.current === intervalPhase) return;
+    prevPhaseRef.current = intervalPhase;
+    if (intervalPhase === "work") playWorkBeep();
+    else if (intervalPhase === "rest" || intervalPhase === "rest_after_set") playRestBeep();
+  }, [intervalPhase]);
 
   // Initialize timer when modal opens
   useEffect(() => {
     if (isOpen && sets.length > 0 && sets[0]?.exercises?.length > 0) {
+      prevPhaseRef.current = null;
       const firstExercise = sets[0].exercises[0];
       const workTime = firstExercise.work_seconds || 20;
       setIntervalPhase("work");
@@ -333,229 +391,137 @@ export function TabataCircuitTimerModal({
       : intervalPhase === "rest_after_set"
       ? "Rest After Set"
       : "Rest";
-  const phaseAccent =
+
+  // Full-screen phase colors (your request): work = blue, rest = red, rest_after_set = green
+  const overlayBgClass =
     intervalPhase === "work"
-      ? "fc-text-workouts"
-      : intervalPhase === "rest_after_set"
-      ? "fc-text-warning"
-      : "fc-text-neutral";
+      ? "bg-[#2563eb]"
+      : intervalPhase === "rest"
+      ? "bg-[#dc2626]"
+      : "bg-[#16a34a]";
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm">
-      <div className="h-full flex items-center justify-center p-4">
-        <div className="fc-modal fc-card w-full max-w-4xl overflow-hidden">
-          <div className="px-6 pt-6 pb-4 border-b border-[color:var(--fc-glass-border)] flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div className="fc-icon-tile fc-icon-workouts">
-                <Play className="w-5 h-5" />
-              </div>
-              <div className="space-y-2">
-                <span className={`fc-pill fc-pill-glass ${phaseAccent}`}>
-                  {phaseLabel}
-                </span>
-                <div className="text-2xl font-bold fc-text-primary">
-                  Interval Circuit
-                </div>
-                <div className="text-sm fc-text-dim">
-                  Round {intervalRound + 1} of {Math.max(1, Number(totalRounds) || 1)}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="fc-pill fc-pill-glass fc-text-subtle">
-                Segment {currentSegment} / {totalSegments}
-              </div>
-              <Button
-                onClick={onClose}
-                variant="ghost"
-                size="sm"
-                className="rounded-full p-2 fc-btn fc-btn-ghost"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
+    <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 min-h-full ${overlayBgClass}`}>
+      <div
+        className={`fc-modal fc-card rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col shadow-2xl border-2 border-white/30 ${overlayBgClass}`}
+      >
+          {/* Minimal top bar: round + close */}
+          <div className="flex items-center justify-between px-4 pt-4 py-3 text-white/90">
+            <span className="text-sm font-medium">
+              Round {intervalRound + 1} of {Math.max(1, Number(totalRounds) || 1)}
+            </span>
+            <Button
+              onClick={onClose}
+              variant="ghost"
+              size="sm"
+              className="rounded-full p-2 text-white/90 hover:bg-white/20 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </Button>
           </div>
 
-          <div className="px-6 py-6">
-            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="space-y-6">
-                {(() => {
-                  // Calculate total duration in seconds for one round
-                  let durationPerRound = 0;
-                  
-                  if (sets && Array.isArray(sets) && sets.length > 0) {
-                    sets.forEach((set) => {
-                      if (set && Array.isArray(set.exercises) && set.exercises.length > 0) {
-                        const exercisesInSet = set.exercises.length;
-                        
-                        set.exercises.forEach((exercise, exIndex) => {
-                          if (exercise) {
-                            const isLastExercise = exIndex === exercisesInSet - 1;
-                            // Add work time (always)
-                            const workTime = Number(exercise.work_seconds) || 20;
-                            durationPerRound += workTime;
-                            
-                            // Add rest time only if not last exercise
-                            if (!isLastExercise) {
-                              const restTime = Number(exercise.rest_after) || 10;
-                              durationPerRound += restTime;
-                            }
-                          }
-                        });
-                        
-                        // Add rest_after_set for all sets in a round
-                        const restAfterSet = Number(set.rest_between_sets) || 30;
-                        durationPerRound += restAfterSet;
-                      }
-                    });
-                  }
-                  
-                  // Multiply by rounds
-                  const rounds = Number(totalRounds) || 1;
-                  let totalDurationSeconds = durationPerRound * rounds;
-                  
-                  // Subtract last rest_after_set (last set of last round doesn't have it)
-                  if (sets && sets.length > 0) {
-                    const lastSet = sets[sets.length - 1];
-                    if (lastSet) {
-                      const lastRestAfterSet = Number(lastSet.rest_between_sets) || 30;
-                      totalDurationSeconds -= lastRestAfterSet;
-                    }
-                  }
-                  
-                  // Ensure we have a valid number
-                  if (isNaN(totalDurationSeconds) || totalDurationSeconds < 0 || !isFinite(totalDurationSeconds)) {
-                    totalDurationSeconds = 0;
-                  }
-                  
-                  // Format duration
-                  const totalMinutes = Math.floor(totalDurationSeconds / 60);
-                  const totalSeconds = totalDurationSeconds % 60;
-                  const durationText = totalMinutes > 0 
-                    ? `${totalMinutes}m ${totalSeconds}s`
-                    : `${totalSeconds}s`;
-                  
-                  return (
-                    <div className="fc-glass-soft rounded-2xl px-5 py-4">
-                      <div className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle">
-                        Total duration
-                      </div>
-                      <div className="text-lg font-semibold fc-text-primary">
-                        {durationText}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {currentExercise && (
-                  <div className="fc-glass-soft rounded-2xl px-6 py-5">
-                    <div className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle mb-2">
-                      Current exercise
-                    </div>
-                    <div className="text-2xl font-semibold fc-text-primary">
-                      {exerciseName}
-                    </div>
-                    {intervalPhase === "work" && (
-                      <div className="text-sm fc-text-dim mt-2">
-                        {currentExercise.work_seconds
-                          ? `${currentExercise.work_seconds}s work`
-                          : currentExercise.target_reps
-                          ? `${currentExercise.target_reps} reps`
-                          : "Work phase"}
-                      </div>
-                    )}
+          {/* Hero: timer + phase + current exercise + controls — main focus */}
+          <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 text-center">
+            <span className="text-sm font-semibold uppercase tracking-wider text-white/90 mb-2">
+              {phaseLabel}
+            </span>
+            <div className="text-7xl sm:text-8xl font-black font-mono tracking-tight text-white tabular-nums">
+              {Math.floor(intervalPhaseLeft / 60)
+                .toString()
+                .padStart(2, "0")}
+              :{(intervalPhaseLeft % 60).toString().padStart(2, "0")}
+            </div>
+            {currentExercise && (
+              <div className="mt-6 max-w-md">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/80 mb-1">
+                  Current exercise
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold text-white">
+                  {exerciseName}
+                </div>
+                {intervalPhase === "work" && (
+                  <div className="text-sm text-white/80 mt-1">
+                    {currentExercise.work_seconds
+                      ? `${currentExercise.work_seconds}s work`
+                      : currentExercise.target_reps
+                      ? `${currentExercise.target_reps} reps`
+                      : "Work phase"}
                   </div>
                 )}
-
-                <div className="fc-glass-soft rounded-2xl px-6 py-5">
-                  <div className="text-[10px] tracking-[0.2em] uppercase fc-text-subtle mb-2">
-                    Up next
-                  </div>
-                  <div className="text-lg font-semibold fc-text-primary">
-                    {nextExerciseName}
-                  </div>
-                </div>
               </div>
-
-              <div className="flex flex-col items-center justify-center text-center gap-6">
-                <div className={`text-base font-semibold ${phaseAccent}`}>
-                  {phaseLabel}
-                </div>
-                <div className="text-6xl sm:text-7xl font-black font-mono tracking-tight fc-text-primary">
-                  {Math.floor(intervalPhaseLeft / 60)
-                    .toString()
-                    .padStart(2, "0")}
-                  :{(intervalPhaseLeft % 60).toString().padStart(2, "0")}
-                </div>
-                <div className="flex items-center gap-3">
-                  <Button
-                    onClick={handlePrevious}
-                    variant="outline"
-                    size="sm"
-                    className="fc-btn fc-btn-secondary fc-press min-w-[48px] min-h-[48px]"
-                    disabled={
-                      timerExerciseIndex === 0 &&
-                      timerSetIndex === 0 &&
-                      intervalRound === 0 &&
-                      intervalPhase === "work"
-                    }
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                  {intervalActive ? (
-                    <Button
-                      onClick={() => setIsTimerPaused(!isTimerPaused)}
-                      variant="outline"
-                      size="lg"
-                      className="fc-btn fc-btn-primary fc-press min-w-[64px] min-h-[64px]"
-                    >
-                      {isTimerPaused ? (
-                        <Play className="w-6 h-6" />
-                      ) : (
-                        <Pause className="w-6 h-6" />
-                      )}
-                    </Button>
+            )}
+            <div className="flex items-center gap-3 mt-8">
+              <Button
+                onClick={handlePrevious}
+                variant="outline"
+                size="sm"
+                className="min-w-[48px] min-h-[48px] rounded-full border-2 border-white/50 bg-white/10 text-white hover:bg-white/25"
+                disabled={
+                  timerExerciseIndex === 0 &&
+                  timerSetIndex === 0 &&
+                  intervalRound === 0 &&
+                  intervalPhase === "work"
+                }
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              {intervalActive ? (
+                <Button
+                  onClick={() => setIsTimerPaused(!isTimerPaused)}
+                  variant="outline"
+                  size="lg"
+                  className="min-w-[64px] min-h-[64px] rounded-full border-2 border-white bg-white/20 text-white hover:bg-white/35"
+                >
+                  {isTimerPaused ? (
+                    <Play className="w-6 h-6" />
                   ) : (
-                    <Button
-                      onClick={handleStart}
-                      variant="outline"
-                      size="lg"
-                      className="fc-btn fc-btn-primary fc-press min-w-[64px] min-h-[64px]"
-                    >
-                      <Play className="w-6 h-6" />
-                    </Button>
+                    <Pause className="w-6 h-6" />
                   )}
-                  <Button
-                    onClick={handleNext}
-                    variant="outline"
-                    size="sm"
-                    className="fc-btn fc-btn-secondary fc-press min-w-[48px] min-h-[48px]"
-                  >
-                    <ArrowLeft className="w-5 h-5 rotate-180" />
-                  </Button>
-                </div>
-              </div>
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleStart}
+                  variant="outline"
+                  size="lg"
+                  className="min-w-[64px] min-h-[64px] rounded-full border-2 border-white bg-white/20 text-white hover:bg-white/35"
+                >
+                  <Play className="w-6 h-6" />
+                </Button>
+              )}
+              <Button
+                onClick={handleNext}
+                variant="outline"
+                size="sm"
+                className="min-w-[48px] min-h-[48px] rounded-full border-2 border-white/50 bg-white/10 text-white hover:bg-white/25"
+              >
+                <ArrowLeft className="w-5 h-5 rotate-180" />
+              </Button>
             </div>
           </div>
 
-          <div className="px-6 pb-6 pt-4 border-t border-[color:var(--fc-glass-border)] flex items-center justify-between">
-            <div className="text-xs tracking-[0.2em] uppercase fc-text-subtle">
-              Sets {timerSetIndex + 1}/{sets.length} · Exercise {timerExerciseIndex + 1}/
-              {currentSet?.exercises?.length || 1}
+          {/* Bottom: up next + stop — secondary */}
+          <div className="px-4 pb-6 pt-4 flex flex-col gap-3">
+            <div className="rounded-xl bg-black/20 px-4 py-3 text-center">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/80">Up next</span>
+              <div className="text-lg font-semibold text-white">{nextExerciseName}</div>
             </div>
-            {intervalActive && (
-              <Button
-                onClick={handleStop}
-                variant="outline"
-                className="fc-btn fc-btn-destructive fc-press px-6 py-3 text-sm"
-              >
-                Stop
-              </Button>
-            )}
+            <div className="flex items-center justify-between text-white/70 text-xs">
+              <span>
+                Set {timerSetIndex + 1}/{sets.length} · Ex {timerExerciseIndex + 1}/{currentSet?.exercises?.length || 1}
+              </span>
+              {intervalActive && (
+                <Button
+                  onClick={handleStop}
+                  variant="ghost"
+                  className="text-white/90 hover:bg-white/20 hover:text-white px-4 py-2 text-sm"
+                >
+                  Stop
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
   );
 }
 

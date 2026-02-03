@@ -47,6 +47,7 @@ import {
   CheckCircle
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 interface ReportTemplate {
   id: string
@@ -103,54 +104,68 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
 
-  // Mock data - replace with actual data fetching
-  const [clients, setClients] = useState<ClientData[]>([
-    {
-      id: '1',
-      name: 'John Smith',
-      avatar: 'JS',
-      program: 'Weight Loss Program',
-      startDate: '2024-01-01',
-      lastActive: '2024-01-15',
-      metrics: {
-        weight: 180,
-        bodyFat: 18,
-        strength: 85,
-        endurance: 75,
-        adherence: 92
-      }
-    },
-    {
-      id: '2',
-      name: 'Maria Johnson',
-      avatar: 'MJ',
-      program: 'Strength Building',
-      startDate: '2024-01-05',
-      lastActive: '2024-01-14',
-      metrics: {
-        weight: 165,
-        bodyFat: 22,
-        strength: 95,
-        endurance: 80,
-        adherence: 88
-      }
-    },
-    {
-      id: '3',
-      name: 'David Kim',
-      avatar: 'DK',
-      program: 'Endurance Training',
-      startDate: '2024-01-10',
-      lastActive: '2024-01-13',
-      metrics: {
-        weight: 175,
-        bodyFat: 15,
-        strength: 70,
-        endurance: 90,
-        adherence: 85
-      }
+  const [clients, setClients] = useState<ClientData[]>([])
+
+  useEffect(() => {
+    if (!coachId) {
+      setClients([])
+      setLoading(false)
+      return
     }
-  ])
+    let cancelled = false
+    setLoading(true)
+    ;(async () => {
+      try {
+        const { getCoachClientIds, getPeriodBounds, getSuccessRate } = await import('@/lib/metrics')
+        const { getTotalWorkouts } = await import('@/lib/metrics/workout')
+        const period = getPeriodBounds('this_month')
+        const clientIds = await getCoachClientIds(coachId, false)
+        if (clientIds.length === 0 || cancelled) {
+          setClients([])
+          return
+        }
+        const { data: clientsRows, error: clientsError } = await supabase
+          .from('clients')
+          .select('id, client_id, created_at')
+          .eq('coach_id', coachId)
+          .in('client_id', clientIds)
+        if (clientsError || !clientsRows?.length) {
+          setClients([])
+          return
+        }
+        const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name').in('id', clientIds)
+        const { data: bodyRows } = await supabase.from('body_metrics').select('client_id, weight_kg, body_fat_percentage').in('client_id', clientIds).order('measured_date', { ascending: false })
+        const [totalWorkouts, successRate] = await Promise.all([getTotalWorkouts(clientIds, period), getSuccessRate(clientIds, period)])
+        const profileMap = new Map((profiles || []).map((p: { id: string; first_name?: string; last_name?: string }) => [p.id, p]))
+        const latestBody: Record<string, { weight_kg: number | null; body_fat_percentage: number | null }> = {}
+        ;(bodyRows || []).forEach((r: { client_id: string; weight_kg: number | null; body_fat_percentage: number | null }) => {
+          if (!latestBody[r.client_id]) latestBody[r.client_id] = { weight_kg: r.weight_kg, body_fat_percentage: r.body_fat_percentage }
+        })
+        const workoutsPerClient = clientIds.length > 0 ? Math.round(totalWorkouts / clientIds.length) : 0
+        const list: ClientData[] = clientsRows.map((row: { id: string; client_id: string; created_at?: string }) => {
+          const profile = profileMap.get(row.client_id)
+          const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Client'
+          const body = latestBody[row.client_id]
+          return {
+            id: row.id,
+            name,
+            avatar: name.slice(0, 2).toUpperCase() || '?',
+            program: 'General Fitness',
+            startDate: row.created_at?.split('T')[0] ?? '',
+            lastActive: new Date().toISOString().split('T')[0],
+            metrics: { weight: body?.weight_kg ?? 0, bodyFat: body?.body_fat_percentage ?? 0, strength: successRate.ratePercent, endurance: workoutsPerClient, adherence: successRate.ratePercent }
+          }
+        })
+        if (!cancelled) setClients(list)
+      } catch (e) {
+        console.error('Error loading report clients:', e)
+        if (!cancelled) setClients([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [coachId])
 
   const reportTemplates: ReportTemplate[] = [
     {
@@ -271,10 +286,6 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
     }
   ]
 
-  useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setLoading(false), 1000)
-  }, [])
 
   const handleTemplateSelect = (templateId: string) => {
     const template = reportTemplates.find(t => t.id === templateId)
@@ -306,12 +317,75 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
     }
   }
 
-  const exportReport = (format: 'pdf' | 'excel' | 'csv') => {
-    console.log(`Exporting report as ${format}`)
+  const exportReport = async (format: 'pdf' | 'excel' | 'csv') => {
+    const list = selectedClient ? clients.filter((c) => c.id === selectedClient) : clients
+    if (list.length === 0) return
+    const headers = ['Client', 'Program', 'Start Date', 'Last Active', 'Weight (kg)', 'Body Fat (%)', 'Strength', 'Endurance', 'Adherence (%)']
+    const rows = list.map((c) => [
+      c.name,
+      c.program,
+      c.startDate,
+      c.lastActive,
+      String(c.metrics.weight),
+      String(c.metrics.bodyFat),
+      String(c.metrics.strength),
+      String(c.metrics.endurance),
+      String(c.metrics.adherence)
+    ])
+    if (format === 'pdf') {
+      try {
+        const { jsPDF } = await import('jspdf')
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+        const pageW = doc.internal.pageSize.getWidth()
+        const margin = 14
+        let y = 20
+        doc.setFontSize(18)
+        doc.text('Client Progress Report', margin, y)
+        y += 10
+        doc.setFontSize(10)
+        doc.text(`Generated: ${new Date().toISOString().slice(0, 10)}`, margin, y)
+        y += 12
+        doc.setFontSize(11)
+        const colW = (pageW - 2 * margin) / 9
+        headers.forEach((h, i) => doc.text(h, margin + i * colW, y))
+        y += 7
+        doc.setFontSize(9)
+        rows.forEach((row) => {
+          if (y > 270) { doc.addPage(); y = 20 }
+          row.forEach((cell, i) => doc.text(String(cell).slice(0, 18), margin + i * colW, y))
+          y += 6
+        })
+        doc.save(`report-${new Date().toISOString().slice(0, 10)}.pdf`)
+      } catch (e) {
+        console.error('PDF export failed:', e)
+        const csvContent = [headers.join(','), ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = `report-${new Date().toISOString().slice(0, 10)}.csv`
+        a.click()
+        URL.revokeObjectURL(a.href)
+      }
+      return
+    }
+    const csvContent = [headers.join(','), ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: format === 'excel' ? 'application/vnd.ms-excel' : 'text/csv' })
+    const ext = format === 'excel' ? 'xls' : 'csv'
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `report-${new Date().toISOString().slice(0, 10)}.${ext}`
+    a.click()
+    URL.revokeObjectURL(a.href)
   }
 
   const shareReport = () => {
-    console.log('Sharing report')
+    const list = selectedClient ? clients.filter((c) => c.id === selectedClient) : clients
+    if (list.length === 0) return
+    const lines = list.map((c) => `${c.name}: Weight ${c.metrics.weight}kg, Body Fat ${c.metrics.bodyFat}%, Adherence ${c.metrics.adherence}%`)
+    const text = `Client Report (${new Date().toISOString().slice(0, 10)})\n${lines.join('\n')}`
+    navigator.clipboard.writeText(text).then(() => {
+      if (typeof window !== 'undefined' && (window as any).toast) (window as any).toast.success('Report summary copied to clipboard')
+    }).catch(() => {})
   }
 
   const selectedClientData = clients.find(c => c.id === selectedClient)

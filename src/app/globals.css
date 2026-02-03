@@ -322,3 +322,8 @@
     }
   }
 }
+
+/* Lock main content scroll when a full-screen modal is open */
+body.fc-modal-open main {
+  overflow: hidden !important;
+}

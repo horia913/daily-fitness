@@ -356,18 +356,43 @@ export default function ClientGoals() {
 
       if (error) throw error;
 
+      const goalsList = data || [];
+      // Fetch habit_logs once for all habit-type goals (client_id = user.id)
+      const habitGoalStarts = goalsList.filter((g: Goal) => g.type === "habit" && g.start_date).map((g: Goal) => g.start_date!);
+      let habitLogsByDate: Set<string> = new Set();
+      if (habitGoalStarts.length > 0) {
+        const minStart = habitGoalStarts.reduce((a, b) => (a < b ? a : b)).slice(0, 10);
+        const { data: logs } = await supabase
+          .from("habit_logs")
+          .select("log_date")
+          .eq("client_id", user.id)
+          .gte("log_date", minStart);
+        if (logs?.length) {
+          logs.forEach((r: { log_date: string }) => {
+            const d = typeof r.log_date === "string" ? r.log_date.slice(0, 10) : r.log_date;
+            if (d) habitLogsByDate.add(d);
+          });
+        }
+      }
+
       // Calculate progress for each goal
-      const goalsWithProgress = (data || []).map((goal) => {
+      const goalsWithProgress = goalsList.map((goal: Goal) => {
         let progressPercentage = 0;
 
-        if (goal.target_value && goal.current_value) {
+        if (goal.target_value != null && goal.current_value != null) {
           progressPercentage = Math.min(
             (goal.current_value / goal.target_value) * 100,
             100
           );
         } else if (goal.type === "habit") {
-          // For habit goals, calculate based on completion rate
-          progressPercentage = Math.random() * 100; // Placeholder - would need actual habit tracking
+          // Habit progress: days with at least one completion in [start_date, today] / total days in period
+          const start = goal.start_date ? new Date(goal.start_date) : new Date();
+          const end = new Date();
+          const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+          const startStr = start.toISOString().slice(0, 10);
+          const endStr = end.toISOString().slice(0, 10);
+          const daysWithHabit = [...habitLogsByDate].filter((d) => d >= startStr && d <= endStr).length;
+          progressPercentage = Math.min(100, Math.round((daysWithHabit / totalDays) * 100));
         } else if (goal.type === "milestone") {
           // For milestone goals, calculate based on time progress
           if (goal.target_date) {
@@ -394,63 +419,7 @@ export default function ClientGoals() {
       setGoals(goalsWithProgress);
     } catch (error) {
       console.error("Error loading goals:", error);
-      // Set fallback data
-      setGoals([
-        {
-          id: "1",
-          client_id: user.id,
-          title: "Complete 30 workouts this month",
-          description: "Maintain consistent workout schedule",
-          category: "performance",
-          type: "target",
-          target_value: 30,
-          target_unit: "workouts",
-          current_value: 12,
-          start_date: new Date().toISOString(),
-          target_date: new Date(
-            Date.now() + 30 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          status: "active",
-          priority: "high",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          progress_percentage: 40,
-        },
-        {
-          id: "2",
-          client_id: user.id,
-          title: "Lose 5kg",
-          description: "Reach target weight for summer",
-          category: "weight_loss",
-          type: "target",
-          target_value: 5,
-          target_unit: "kg",
-          current_value: 2,
-          start_date: new Date().toISOString(),
-          target_date: new Date(
-            Date.now() + 60 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          status: "active",
-          priority: "medium",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          progress_percentage: 40,
-        },
-        {
-          id: "3",
-          client_id: user.id,
-          title: "Drink 2L water daily",
-          description: "Stay hydrated throughout the day",
-          category: "performance",
-          type: "habit",
-          start_date: new Date().toISOString(),
-          status: "active",
-          priority: "low",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          progress_percentage: 75,
-        },
-      ]);
+      setGoals([]);
     } finally {
       setLoading(false);
     }

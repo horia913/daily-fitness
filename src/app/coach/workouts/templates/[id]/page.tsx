@@ -110,10 +110,8 @@ export default function WorkoutTemplateDetailsPage() {
       setLoading(true);
       setError(null);
 
-      const templates = await WorkoutTemplateService.getWorkoutTemplates(
-        user.id
-      );
-      const found = templates.find((t) => t.id === templateId);
+      // Use efficient single-template fetch instead of loading all templates
+      const found = await WorkoutTemplateService.getWorkoutTemplateById(templateId);
       if (found) {
         setTemplate(found);
         // Use exercise_count from template (calculated using same logic)

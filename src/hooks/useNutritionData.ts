@@ -165,35 +165,28 @@ export function useDailyNutrition(userId: string, date: string) {
           return
         }
 
-        // Fetch fresh data
-        const { data: mealLogsData, error: mealLogsError } = await supabase
-          .from('meal_logs')
-          .select(`
-            *,
-            foods:meal_food_items(
-              food:foods(*),
-              quantity,
-              calories,
-              protein,
-              carbs,
-              fat,
-              fiber
-            )
-          `)
+        // Fetch meal completions for date (meal_logs table does not exist)
+        const dayStart = new Date(date + 'T00:00:00.000Z').toISOString()
+        const dayEnd = new Date(date + 'T23:59:59.999Z').toISOString()
+        const { data: mealCompletionsData, error: mealError } = await supabase
+          .from('meal_completions')
+          .select('id, completed_at')
           .eq('client_id', userId)
-          .eq('logged_at', date)
+          .gte('completed_at', dayStart)
+          .lte('completed_at', dayEnd)
 
-        if (mealLogsError) throw mealLogsError
+        if (mealError) throw mealError
 
-        // Calculate daily totals
-        const meals = mealLogsData || []
-        const totals = meals.reduce((acc, meal) => ({
-          calories: acc.calories + (meal.totals?.calories || 0),
-          protein: acc.protein + (meal.totals?.protein || 0),
-          carbs: acc.carbs + (meal.totals?.carbs || 0),
-          fat: acc.fat + (meal.totals?.fat || 0),
-          fiber: acc.fiber + (meal.totals?.fiber || 0)
-        }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 })
+        // meal_completions has id, completed_at only; map to MealLog shape for type compatibility
+        const meals: MealLog[] = (mealCompletionsData || []).map((m: { id: string; completed_at: string }) => ({
+          id: m.id,
+          client_id: userId,
+          meal_type: 'breakfast' as const,
+          logged_at: m.completed_at,
+          foods: [],
+          totals: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
+        }))
+        const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
 
         const goals = {
           calories: 2000,
@@ -203,7 +196,7 @@ export function useDailyNutrition(userId: string, date: string) {
           fiber: 25
         }
 
-        const nutritionData = {
+        const nutritionData: DailyNutrition = {
           date,
           meals,
           totals,

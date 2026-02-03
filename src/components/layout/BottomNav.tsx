@@ -84,7 +84,7 @@ export default function BottomNav() {
     <nav
       data-fc-bottom-nav
       style={fixedNavStyle}
-      className="fc-glass fc-card border-t border-[color:var(--fc-glass-border)] h-20 shadow-lg"
+      className="fc-glass fc-card border-t border-[color:var(--fc-glass-border)] h-20 shadow-lg !rounded-none"
     >
       <div className="h-full px-2">
         <div className="flex items-center justify-between h-full max-w-md mx-auto">

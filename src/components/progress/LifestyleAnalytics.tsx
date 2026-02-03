@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,17 +22,67 @@ import {
   Award
 } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 import { ACHIEVEMENTS, getTierColor, getTierIcon, getAchievementTier, type AchievementTier } from '@/lib/achievements'
+import { supabase } from '@/lib/supabase'
 
 interface LifestyleAnalyticsProps {
   loading?: boolean
 }
 
+/** Current week Mon–Sun: { dateStr, dayLabel, hasMeals } */
+function getThisWeekDays(): { dateStr: string; dayLabel: string }[] {
+  const now = new Date()
+  const dayOfWeek = now.getDay()
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + mondayOffset)
+  monday.setHours(0, 0, 0, 0)
+  const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    return { dateStr: d.toISOString().slice(0, 10), dayLabel: labels[i] }
+  })
+}
+
 export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps) {
   const { isDark, getThemeStyles } = useTheme()
+  const { user } = useAuth()
   const theme = getThemeStyles()
   const [selectedAchievement, setSelectedAchievement] = useState<{ achievement: any; tier: AchievementTier; value: number } | null>(null)
+  const [nutritionWeek, setNutritionWeek] = useState<{ dateStr: string; dayLabel: string; hasMeals: boolean }[]>([])
+
+  const loadNutritionWeek = useCallback(async () => {
+    const weekDays = getThisWeekDays()
+    if (!user?.id) {
+      setNutritionWeek(weekDays.map((d) => ({ ...d, hasMeals: false })))
+      return
+    }
+    const monday = new Date(weekDays[0].dateStr)
+    monday.setHours(0, 0, 0, 0)
+    const sunday = new Date(weekDays[6].dateStr)
+    sunday.setHours(23, 59, 59, 999)
+    const { data, error } = await supabase
+      .from('meal_completions')
+      .select('completed_at')
+      .eq('client_id', user.id)
+      .gte('completed_at', monday.toISOString())
+      .lte('completed_at', sunday.toISOString())
+    if (error) {
+      setNutritionWeek(weekDays.map((d) => ({ ...d, hasMeals: false })))
+      return
+    }
+    const datesWithMeals = new Set(
+      (data || []).map((r) => (r.completed_at ? new Date(r.completed_at).toISOString().slice(0, 10) : '')).filter(Boolean)
+    )
+    setNutritionWeek(weekDays.map((d) => ({ ...d, hasMeals: datesWithMeals.has(d.dateStr) })))
+  }, [user?.id])
+
+  useEffect(() => {
+    loadNutritionWeek()
+  }, [loadNutritionWeek])
 
   // Sample user progress data - In production, fetch from database
   const userProgress = {
@@ -309,28 +359,24 @@ export function LifestyleAnalytics({ loading = false }: LifestyleAnalyticsProps)
               </div>
             </div>
 
-            {/* Nutrition Adherence */}
+            {/* Nutrition Adherence - from meal_completions this week (Mon–Sun) */}
             <div>
               <h3 className={`text-sm font-semibold ${theme.text} mb-3 flex items-center gap-2`}>
                 <Apple className="w-4 h-4" />
                 Nutrition This Week
               </h3>
-              
               <div className="grid grid-cols-7 gap-2">
-                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => {
-                  const rating = Math.floor(Math.random() * 5) + 1
-                  return (
-                    <div key={index} className="text-center">
-                      <div className={`rounded-xl p-3 mb-1 ${isDark ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                        {rating >= 4 ? '😊' : rating >= 3 ? '😐' : '😞'}
-                      </div>
-                      <p className={`text-xs ${theme.textSecondary}`}>{day}</p>
+                {(nutritionWeek.length === 7 ? nutritionWeek : getThisWeekDays().map((d) => ({ ...d, hasMeals: false }))).map((day, index) => (
+                  <div key={day.dateStr} className="text-center">
+                    <div className={`rounded-xl p-3 mb-1 ${isDark ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                      {day.hasMeals ? '😊' : '—'}
                     </div>
-                  )
-                })}
+                    <p className={`text-xs ${theme.textSecondary}`}>{day.dayLabel}</p>
+                  </div>
+                ))}
               </div>
               <p className={`text-xs ${theme.textSecondary} text-center mt-3`}>
-                Rate how well you followed your nutrition plan each day
+                Days with at least one meal logged (from your meal completions)
               </p>
             </div>
           </CardContent>

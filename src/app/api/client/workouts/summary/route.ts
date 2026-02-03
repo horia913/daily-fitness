@@ -36,14 +36,14 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authError } = await perf.time('auth', () =>
       supabase.auth.getUser()
     )
-    
+
     if (authError || !user) {
       return NextResponse.json(
         { error: authError?.message || 'Unauthorized' },
         { status: 401 }
       )
     }
-    
+
     // 3. Call the optimized RPC (auth.uid() is validated inside the function)
     const rpcResult = await perf.time('rpc_get_client_workout_summary', async () =>
       supabase.rpc('get_client_workout_summary')
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     Object.entries(perfHeaders).forEach(([key, value]) => {
       response.headers.set(key, value)
     })
-    
+
     return response
     
   } catch (error: any) {

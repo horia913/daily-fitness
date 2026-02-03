@@ -313,19 +313,51 @@ export class WorkoutTemplateService {
         }
       })
 
-      // Count exercises from each table
+      // Count exercises from each table with timeout protection
       const counts: Record<string, number> = {}
       
+      // Build a map of block_id -> template_id to avoid JOINs
+      const blockToTemplate = new Map<string, string>()
+      ;(blocks || []).forEach((block: any) => {
+        blockToTemplate.set(block.id, block.template_id)
+      })
+      
+      // Helper for timeout-protected queries (NO JOINs - much faster)
+      const safeQueryForCount = async <T>(
+        queryBuilder: PromiseLike<{ data: T | null; error: any }>,
+        timeoutMs: number = 8000
+      ): Promise<T | null> => {
+        try {
+          const result = await Promise.race([
+            queryBuilder,
+            new Promise<{ data: null; error: { message: string } }>((resolve) =>
+              setTimeout(() => resolve({ data: null, error: { message: 'Query timeout' } }), timeoutMs)
+            )
+          ]);
+          if (result.error) {
+            console.warn('[WorkoutTemplateService] Query error:', result.error.message);
+            return null;
+          }
+          return result.data;
+        } catch (error) {
+          console.warn('[WorkoutTemplateService] Query failed:', error);
+          return null;
+        }
+      };
+      
       // Count from workout_block_exercises (for straight_set, superset, giant_set, pre_exhaustion)
+      // OPTIMIZED: No JOIN - use block_id map instead
       if (blockIdsByType.usesBlockExercises.length > 0) {
-        const { data: exerciseRows } = await supabase
-          .from('workout_block_exercises')
-          .select('id, block_id, workout_blocks!inner(template_id)')
-          .in('block_id', blockIdsByType.usesBlockExercises)
+        const exerciseRows = await safeQueryForCount<any[]>(
+          supabase
+            .from('workout_block_exercises')
+            .select('id, block_id')
+            .in('block_id', blockIdsByType.usesBlockExercises)
+        );
 
         if (exerciseRows) {
           exerciseRows.forEach((row: any) => {
-            const templateId = row.workout_blocks?.template_id
+            const templateId = blockToTemplate.get(row.block_id)
             if (templateId) {
               counts[templateId] = (counts[templateId] || 0) + 1
             }
@@ -334,16 +366,19 @@ export class WorkoutTemplateService {
       }
 
       // Count from workout_drop_sets (for drop_set) - count unique exercises per block
+      // OPTIMIZED: No JOIN - use block_id map instead
       if (blockIdsByType.usesDropSets.length > 0) {
-        const { data: dropSets } = await supabase
-          .from('workout_drop_sets')
-          .select('exercise_id, exercise_order, workout_blocks!inner(template_id)')
-          .in('block_id', blockIdsByType.usesDropSets)
+        const dropSets = await safeQueryForCount<any[]>(
+          supabase
+            .from('workout_drop_sets')
+            .select('block_id, exercise_id, exercise_order')
+            .in('block_id', blockIdsByType.usesDropSets)
+        );
 
         if (dropSets) {
           const uniqueExercises = new Set<string>()
           dropSets.forEach((row: any) => {
-            const templateId = row.workout_blocks?.template_id
+            const templateId = blockToTemplate.get(row.block_id)
             const key = `${templateId}:${row.exercise_id}:${row.exercise_order}`
             if (templateId && !uniqueExercises.has(key)) {
               uniqueExercises.add(key)
@@ -354,15 +389,18 @@ export class WorkoutTemplateService {
       }
 
       // Count from workout_cluster_sets (for cluster_set)
+      // OPTIMIZED: No JOIN - use block_id map instead
       if (blockIdsByType.usesClusterSets.length > 0) {
-        const { data: clusterSets } = await supabase
-          .from('workout_cluster_sets')
-          .select('exercise_id, exercise_order, workout_blocks!inner(template_id)')
-          .in('block_id', blockIdsByType.usesClusterSets)
+        const clusterSets = await safeQueryForCount<any[]>(
+          supabase
+            .from('workout_cluster_sets')
+            .select('block_id, exercise_id, exercise_order')
+            .in('block_id', blockIdsByType.usesClusterSets)
+        );
 
         if (clusterSets) {
           clusterSets.forEach((row: any) => {
-            const templateId = row.workout_blocks?.template_id
+            const templateId = blockToTemplate.get(row.block_id)
             if (templateId) {
               counts[templateId] = (counts[templateId] || 0) + 1
             }
@@ -371,15 +409,18 @@ export class WorkoutTemplateService {
       }
 
       // Count from workout_rest_pause_sets (for rest_pause)
+      // OPTIMIZED: No JOIN - use block_id map instead
       if (blockIdsByType.usesRestPause.length > 0) {
-        const { data: restPauseSets } = await supabase
-          .from('workout_rest_pause_sets')
-          .select('exercise_id, exercise_order, workout_blocks!inner(template_id)')
-          .in('block_id', blockIdsByType.usesRestPause)
+        const restPauseSets = await safeQueryForCount<any[]>(
+          supabase
+            .from('workout_rest_pause_sets')
+            .select('block_id, exercise_id, exercise_order')
+            .in('block_id', blockIdsByType.usesRestPause)
+        );
 
         if (restPauseSets) {
           restPauseSets.forEach((row: any) => {
-            const templateId = row.workout_blocks?.template_id
+            const templateId = blockToTemplate.get(row.block_id)
             if (templateId) {
               counts[templateId] = (counts[templateId] || 0) + 1
             }
@@ -388,16 +429,19 @@ export class WorkoutTemplateService {
       }
 
       // Count from workout_time_protocols (for amrap, emom, for_time, tabata) - count unique exercises per block
+      // OPTIMIZED: No JOIN - use block_id map instead
       if (blockIdsByType.usesTimeProtocols.length > 0) {
-        const { data: timeProtocols } = await supabase
-          .from('workout_time_protocols')
-          .select('exercise_id, exercise_order, workout_blocks!inner(template_id)')
-          .in('block_id', blockIdsByType.usesTimeProtocols)
+        const timeProtocols = await safeQueryForCount<any[]>(
+          supabase
+            .from('workout_time_protocols')
+            .select('block_id, exercise_id, exercise_order')
+            .in('block_id', blockIdsByType.usesTimeProtocols)
+        );
 
         if (timeProtocols) {
           const uniqueExercises = new Set<string>()
           timeProtocols.forEach((row: any) => {
-            const templateId = row.workout_blocks?.template_id
+            const templateId = blockToTemplate.get(row.block_id)
             const key = `${templateId}:${row.exercise_id}:${row.exercise_order}`
             if (templateId && !uniqueExercises.has(key)) {
               uniqueExercises.add(key)
@@ -417,21 +461,73 @@ export class WorkoutTemplateService {
     }
   }
 
+  // Get a single template by ID (efficient - doesn't load all templates)
+  static async getWorkoutTemplateById(templateId: string): Promise<WorkoutTemplate | null> {
+    try {
+      const { ensureAuthenticated } = await import('./supabase');
+      await ensureAuthenticated();
+      
+      const { data, error } = await supabase
+        .from('workout_templates')
+        .select('*')
+        .eq('id', templateId)
+        .single()
+
+      if (error) {
+        console.error('Error fetching template by ID:', error)
+        return null
+      }
+
+      if (!data) return null
+
+      // Get exercise count for this single template
+      const exerciseCount = await this.countExercisesForTemplate(templateId)
+
+      return {
+        ...data,
+        exercise_count: exerciseCount,
+      } as WorkoutTemplate
+    } catch (error) {
+      console.error('Error fetching workout template by ID:', error)
+      return null
+    }
+  }
+
+  // Helper for timeout-protected queries (handles Supabase thenable objects)
+  private static async safeQueryWithTimeout<T>(
+    queryBuilder: any,
+    timeoutMs: number = 5000
+  ): Promise<T | null> {
+    try {
+      const result = await Promise.race([
+        queryBuilder.then((r: any) => r),
+        new Promise<{ data: null; error: { message: string } }>((resolve) =>
+          setTimeout(() => resolve({ data: null, error: { message: 'Query timeout' } }), timeoutMs)
+        )
+      ])
+      if (result.error) {
+        console.warn('[WorkoutTemplateService] Query error:', result.error.message)
+        return null
+      }
+      return result.data
+    } catch (error) {
+      console.warn('[WorkoutTemplateService] Query failed:', error)
+      return null
+    }
+  }
+
   // Count exercises for a single template (uses same logic as getWorkoutTemplates)
   static async countExercisesForTemplate(templateId: string): Promise<number> {
     try {
       // Get all blocks for this template
-      const { data: blocks, error: blocksError } = await supabase
-        .from('workout_blocks')
-        .select('id, template_id, block_type')
-        .eq('template_id', templateId)
+      const blocks = await this.safeQueryWithTimeout<any[]>(
+        supabase
+          .from('workout_blocks')
+          .select('id, template_id, block_type')
+          .eq('template_id', templateId)
+      )
 
-      if (blocksError) {
-        console.warn('Unable to load blocks for exercise counting:', blocksError.message)
-        return 0
-      }
-
-      if (!blocks || blocks.length === 0) return 0
+      if (!blocks || !Array.isArray(blocks) || blocks.length === 0) return 0
 
       // Categorize blocks by which table they use for exercises
       const blockIdsByType = {
@@ -457,102 +553,89 @@ export class WorkoutTemplateService {
         }
       })
 
-      let count = 0
+      // Run all count queries in parallel with timeout protection
+      const countPromises: Promise<number>[] = []
 
       // Count from workout_block_exercises
       if (blockIdsByType.usesBlockExercises.length > 0) {
-        const { data: exerciseRows } = await supabase
-          .from('workout_block_exercises')
-          .select('id')
-          .in('block_id', blockIdsByType.usesBlockExercises)
-
-        if (exerciseRows) {
-          count += exerciseRows.length
-        }
+        countPromises.push(
+          this.safeQueryWithTimeout<any[]>(
+            supabase
+              .from('workout_block_exercises')
+              .select('id')
+              .in('block_id', blockIdsByType.usesBlockExercises)
+          ).then(data => (Array.isArray(data) ? data.length : 0))
+        )
       }
 
       // Count from workout_drop_sets - count unique exercises per block
       if (blockIdsByType.usesDropSets.length > 0) {
-        const { data: dropSets } = await supabase
-          .from('workout_drop_sets')
-          .select('exercise_id, exercise_order')
-          .in('block_id', blockIdsByType.usesDropSets)
-
-        if (dropSets) {
-          const uniqueExercises = new Set<string>()
-          dropSets.forEach((row: any) => {
-            const key = `${row.exercise_id}:${row.exercise_order}`
-            if (!uniqueExercises.has(key)) {
-              uniqueExercises.add(key)
-              count += 1
-            }
+        countPromises.push(
+          this.safeQueryWithTimeout<any[]>(
+            supabase
+              .from('workout_drop_sets')
+              .select('exercise_id, exercise_order')
+              .in('block_id', blockIdsByType.usesDropSets)
+          ).then(data => {
+            if (!data || !Array.isArray(data)) return 0
+            const uniqueExercises = new Set<string>()
+            data.forEach((row: any) => {
+              uniqueExercises.add(`${row.exercise_id}:${row.exercise_order}`)
+            })
+            return uniqueExercises.size
           })
-        }
+        )
       }
 
       // Count from workout_cluster_sets
       if (blockIdsByType.usesClusterSets.length > 0) {
-        const { data: clusterSets } = await supabase
-          .from('workout_cluster_sets')
-          .select('id')
-          .in('block_id', blockIdsByType.usesClusterSets)
-
-        if (clusterSets) {
-          count += clusterSets.length
-        }
+        countPromises.push(
+          this.safeQueryWithTimeout<any[]>(
+            supabase
+              .from('workout_cluster_sets')
+              .select('id')
+              .in('block_id', blockIdsByType.usesClusterSets)
+          ).then(data => (Array.isArray(data) ? data.length : 0))
+        )
       }
 
       // Count from workout_rest_pause_sets
       if (blockIdsByType.usesRestPause.length > 0) {
-        const { data: restPauseSets } = await supabase
-          .from('workout_rest_pause_sets')
-          .select('id')
-          .in('block_id', blockIdsByType.usesRestPause)
-
-        if (restPauseSets) {
-          count += restPauseSets.length
-        }
+        countPromises.push(
+          this.safeQueryWithTimeout<any[]>(
+            supabase
+              .from('workout_rest_pause_sets')
+              .select('id')
+              .in('block_id', blockIdsByType.usesRestPause)
+          ).then(data => (Array.isArray(data) ? data.length : 0))
+        )
       }
 
       // Count from workout_time_protocols - count unique exercises per block
       if (blockIdsByType.usesTimeProtocols.length > 0) {
-        const { data: timeProtocols } = await supabase
-          .from('workout_time_protocols')
-          .select('exercise_id, exercise_order')
-          .in('block_id', blockIdsByType.usesTimeProtocols)
-
-        if (timeProtocols) {
-          const uniqueExercises = new Set<string>()
-          timeProtocols.forEach((row: any) => {
-            const key = `${row.exercise_id}:${row.exercise_order}`
-            if (!uniqueExercises.has(key)) {
-              uniqueExercises.add(key)
-              count += 1
-            }
+        countPromises.push(
+          this.safeQueryWithTimeout<any[]>(
+            supabase
+              .from('workout_time_protocols')
+              .select('exercise_id, exercise_order')
+              .in('block_id', blockIdsByType.usesTimeProtocols)
+          ).then(data => {
+            if (!data || !Array.isArray(data)) return 0
+            const uniqueExercises = new Set<string>()
+            data.forEach((row: any) => {
+              uniqueExercises.add(`${row.exercise_id}:${row.exercise_order}`)
+            })
+            return uniqueExercises.size
           })
-        }
+        )
       }
 
-      return count
+      // Wait for all counts and sum them
+      const counts = await Promise.all(countPromises)
+      return counts.reduce((sum, count) => sum + count, 0)
     } catch (error) {
       console.error('Error counting exercises for template:', error)
       return 0
-    }
-  }
-
-  static async getWorkoutTemplateById(templateId: string): Promise<WorkoutTemplate | null> {
-    try {
-      const { data, error } = await supabase
-        .from('workout_templates')
-        .select('*')
-        .eq('id', templateId)
-        .maybeSingle()
-
-      if (error) throw error
-      return data || null
-    } catch (error) {
-      console.error('Error fetching workout template:', error)
-      return null
     }
   }
 

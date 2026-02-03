@@ -244,36 +244,38 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
 
       if (clientError) throw clientError
 
-      // Fetch workout data for this client
-      const { data: workoutData, error: workoutError } = await supabase
-        .from('workout_sessions')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false })
+      const selectedClientData = clientData
+      const clientUserId = selectedClientData.client_id
 
-      if (workoutError) throw workoutError
-
-      // Use empty data for non-existent tables
-      const weightData: any[] = []
-      const nutritionData: any[] = []
-
-      // Calculate real progress metrics
-      const totalWorkouts = workoutData?.length || 0
-      const completedWorkouts = workoutData?.filter(w => w.completed_at).length || 0
+      // Completed workouts from workout_logs; compliance = completed / assigned
+      const { data: workoutLogs } = await supabase
+        .from('workout_logs')
+        .select('id, completed_at')
+        .eq('client_id', clientUserId)
+        .not('completed_at', 'is', null)
+      const completedWorkouts = workoutLogs?.length || 0
+      const { count: assignedCount } = await supabase
+        .from('workout_assignments')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', clientUserId)
+      const totalWorkouts = assignedCount ?? 0
       const workoutCompletionRate = totalWorkouts > 0 ? Math.round((completedWorkouts / totalWorkouts) * 100) : 0
 
-      const recentWeight = weightData?.[0]?.weight || 0
-      const oldestWeight = weightData?.[weightData.length - 1]?.weight || recentWeight
-      const weightChange = recentWeight - oldestWeight
-
-      // Get client data directly from the database to avoid race conditions
-      const { data: selectedClientData, error: selectedClientError } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', clientId)
-        .single()
-
-      if (selectedClientError) throw selectedClientError
+      // Body metrics from body_metrics table
+      const { data: bodyMetricsList } = await supabase
+        .from('body_metrics')
+        .select('weight_kg, body_fat_percentage, measured_date')
+        .eq('client_id', clientUserId)
+        .order('measured_date', { ascending: false })
+        .limit(30)
+      const weightData = (bodyMetricsList || []).map((r) => ({ weight: r.weight_kg, date: r.measured_date, bodyFat: r.body_fat_percentage }))
+      const recentWeight = weightData?.[0]?.weight ?? 0
+      const oldestWeight = weightData?.length ? (weightData[weightData.length - 1]?.weight ?? recentWeight) : recentWeight
+      const weightChange = Number(recentWeight) - Number(oldestWeight)
+      const bodyFatPercentage = weightData?.[0]?.bodyFat ?? null
+      const bodyFatChange = weightData?.length >= 2 && weightData[0]?.bodyFat != null && weightData[weightData.length - 1]?.bodyFat != null
+        ? Number(weightData[0].bodyFat) - Number(weightData[weightData.length - 1].bodyFat)
+        : 0
 
       // Get the profile for this client
       const { data: profile } = await supabase
@@ -296,139 +298,106 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
       // Fetch real recent activity from database
       const activities: ClientProgressData['recentActivity'] = []
       
-      // Fetch recent workout logs
+      // Fetch recent workout logs (total_duration_minutes per schema; workout_assignments for name)
       const { data: recentWorkouts } = await supabase
         .from('workout_logs')
         .select(`
           id,
           completed_at,
-          duration_minutes,
-          workout_templates(name)
+          total_duration_minutes,
+          workout_assignments(name)
         `)
-        .eq('client_id', selectedClientData.client_id)
+        .eq('client_id', clientUserId)
         .order('completed_at', { ascending: false })
         .limit(5)
       
       if (recentWorkouts) {
         recentWorkouts.forEach((workout: any) => {
           if (workout.completed_at) {
+            const mins = workout.total_duration_minutes ?? 0
             activities.push({
               id: workout.id,
               type: 'workout',
-              title: workout.workout_templates?.name || 'Workout',
-              description: workout.duration_minutes 
-                ? `Completed in ${workout.duration_minutes} minutes`
-                : 'Workout completed',
+              title: workout.workout_assignments?.name || 'Workout',
+              description: mins ? `Completed in ${mins} minutes` : 'Workout completed',
               date: workout.completed_at.split('T')[0],
-              value: workout.duration_minutes ? `${workout.duration_minutes} min` : undefined
+              value: mins ? `${mins} min` : undefined
             })
           }
         })
       }
       
-      // Fetch recent meal logs (if table exists)
-      try {
-        const { data: recentMeals } = await supabase
-          .from('meal_logs')
-          .select('id, logged_at, total_calories')
-          .eq('client_id', selectedClientData.client_id)
-          .order('logged_at', { ascending: false })
-          .limit(3)
-        
-        if (recentMeals) {
-          recentMeals.forEach((meal: any) => {
-            activities.push({
-              id: meal.id,
-              type: 'meal',
-              title: 'Meal Logged',
-              description: 'Meal entry',
-              date: meal.logged_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-              value: meal.total_calories ? `${meal.total_calories} cal` : undefined
-            })
+      // Meal completions (meal_logs table does not exist)
+      const { data: recentMeals } = await supabase
+        .from('meal_completions')
+        .select('id, completed_at')
+        .eq('client_id', clientUserId)
+        .order('completed_at', { ascending: false })
+        .limit(3)
+      
+      if (recentMeals) {
+        recentMeals.forEach((meal: any) => {
+          activities.push({
+            id: meal.id,
+            type: 'meal',
+            title: 'Meal Logged',
+            description: 'Meal entry',
+            date: meal.completed_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+            value: undefined
           })
-        }
-      } catch (error) {
-        // Meal logs table might not exist, skip silently
-        console.log('Meal logs table not available')
+        })
       }
       
       // Sort by date (most recent first) and limit to 10
       const sortedActivities = activities
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 10)
+
+      // Nutrition and habit compliance from metrics
+      const period = (await import('@/lib/metrics/period')).getPeriodBounds('this_month')
+      const [nutritionCompliance, habitCompliance, achievementsList, prList] = await Promise.all([
+        import('@/lib/metrics/nutrition').then((m) => m.getNutritionCompliance(clientUserId, period, 'this_month')),
+        import('@/lib/metrics/habit').then((m) => m.getHabitCompliance(clientUserId, period, 'this_month')),
+        import('@/lib/metrics/achievements').then((m) => m.getAchievementsList(clientUserId, 10)),
+        supabase.from('personal_records').select('exercise_id, record_value, achieved_date, record_type').eq('client_id', clientUserId).order('achieved_date', { ascending: false }).limit(10)
+      ])
+      const { data: prData } = prList
+      const strengthGains = (prData || []).slice(0, 3).map((pr: any) => ({
+        exercise: pr.record_type || 'PR',
+        currentWeight: Number(pr.record_value) || 0,
+        change: 0,
+        unit: 'kg'
+      }))
+      if (strengthGains.length === 0) {
+        strengthGains.push({ exercise: '—', currentWeight: 0, change: 0, unit: 'kg' })
+      }
       
       const realProgressData: ClientProgressData = {
         client: mappedClient,
-        currentWeight: recentWeight,
-        weightChange: weightChange,
-        bodyFatPercentage: 15.2, // This would need a separate body fat tracking table
-        bodyFatChange: -2.1, // This would need a separate body fat tracking table
+        currentWeight: Number(recentWeight) || 0,
+        weightChange: Number(weightChange) || 0,
+        bodyFatPercentage: bodyFatPercentage != null ? Number(bodyFatPercentage) : 0,
+        bodyFatChange: Number(bodyFatChange) || 0,
         overallCompliance: workoutCompletionRate,
-        complianceChange: 5,
-        strengthGains: [
-          { exercise: 'Squat', currentWeight: 225, change: 25, unit: 'lbs' },
-          { exercise: 'Bench Press', currentWeight: 185, change: 15, unit: 'lbs' },
-          { exercise: 'Deadlift', currentWeight: 275, change: 35, unit: 'lbs' }
-        ],
-        weightHistory: [
-          { date: '2024-01-15', weight: 188 },
-          { date: '2024-01-22', weight: 186 },
-          { date: '2024-01-29', weight: 184 },
-          { date: '2024-02-05', weight: 182 },
-          { date: '2024-02-12', weight: 180 }
-        ],
-        bodyFatHistory: [
-          { date: '2024-01-15', bodyFat: 17.3 },
-          { date: '2024-01-22', bodyFat: 16.8 },
-          { date: '2024-01-29', bodyFat: 16.2 },
-          { date: '2024-02-05', bodyFat: 15.7 },
-          { date: '2024-02-12', bodyFat: 15.2 }
-        ],
-        strengthHistory: [
-          { date: '2024-01-15', exercise: 'Squat', weight: 200 },
-          { date: '2024-01-22', exercise: 'Squat', weight: 205 },
-          { date: '2024-01-29', exercise: 'Squat', weight: 210 },
-          { date: '2024-02-05', exercise: 'Squat', weight: 215 },
-          { date: '2024-02-12', exercise: 'Squat', weight: 225 }
-        ],
+        complianceChange: 0,
+        strengthGains,
+        weightHistory: weightData.map((r) => ({ date: r.date, weight: Number(r.weight) || 0 })),
+        bodyFatHistory: weightData.filter((r) => r.bodyFat != null).map((r) => ({ date: r.date, bodyFat: Number(r.bodyFat) })),
+        strengthHistory: (prData || []).map((pr: any) => ({ date: pr.achieved_date, exercise: pr.record_type || 'PR', weight: Number(pr.record_value) || 0 })),
         complianceBreakdown: {
           workouts: workoutCompletionRate,
-          nutrition: 0, // TODO: Calculate from meal logs when available
-          habits: 0 // TODO: Calculate from habit logs when available
+          nutrition: nutritionCompliance.ratePercent,
+          habits: habitCompliance.ratePercent
         },
         recentActivity: sortedActivities,
-        achievements: [
-          {
-            id: '1',
-            title: 'Weight Loss Milestone',
-            description: 'Lost 8 lbs in 4 weeks',
-            date: '2024-02-12',
-            type: 'weight_loss'
-          },
-          {
-            id: '2',
-            title: 'Strength Improvement',
-            description: 'Added 25 lbs to squat',
-            date: '2024-02-10',
-            type: 'strength'
-          }
-        ],
-        photos: [
-          {
-            id: '1',
-            type: 'before',
-            url: '/placeholder-before.jpg',
-            date: '2024-01-15',
-            notes: 'Starting point'
-          },
-          {
-            id: '2',
-            type: 'after',
-            url: '/placeholder-after.jpg',
-            date: '2024-02-12',
-            notes: '4 weeks progress'
-          }
-        ]
+        achievements: achievementsList.map((a) => ({
+          id: a.id,
+          title: a.title,
+          description: a.achievement_type,
+          date: a.achieved_date,
+          type: a.achievement_type as any
+        })),
+        photos: []
       }
       setClientProgressData(realProgressData)
     } catch (error) {

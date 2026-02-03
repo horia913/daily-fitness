@@ -78,137 +78,135 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
   }, [coachId, selectedPeriod])
 
   const loadClientData = async () => {
+    if (!coachId) return
     try {
       setLoading(true)
-      
-      // Load clients with their profiles
-      const { data: clientsData, error: clientsError } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          client_relationships:clients!client_id(*)
-        `)
-        .eq('role', 'client')
-        .eq('client_relationships.coach_id', coachId)
-        .eq('client_relationships.status', 'active')
+      const { getCoachClientIds, getPeriodBounds } = await import('@/lib/metrics')
+      const period = getPeriodBounds(selectedPeriod === 'week' ? 'this_week' : selectedPeriod === 'month' ? 'this_month' : 'last_4_weeks')
+      const periodStart = period.start
+      const periodEnd = period.end
+      const periodStartDate = periodStart.slice(0, 10)
+      const periodEndDate = periodEnd.slice(0, 10)
 
+      const clientIds = await getCoachClientIds(coachId, true)
+      if (clientIds.length === 0) {
+        setClients([])
+        setLoading(false)
+        return
+      }
+
+      const { data: clientsRows, error: clientsError } = await supabase
+        .from('clients')
+        .select('id, client_id, status, created_at, updated_at')
+        .eq('coach_id', coachId)
+        .in('client_id', clientIds)
       if (clientsError) throw clientsError
 
-      // Load compliance data for each client
-      const clientsWithData = await Promise.all(
-        (clientsData || []).map(async (client) => {
-          const clientId = client.id
-          
-          // Load compliance metrics
-          const { data: complianceData, error: complianceError } = await supabase
-            .from('client_compliance_metrics')
-            .select('*')
-            .eq('client_id', clientId)
-            .eq('coach_id', coachId)
-            .order('metric_date', { ascending: false })
-            .limit(1)
-            .single()
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', clientIds)
 
-          // Load engagement data
-          const { data: engagementData, error: engagementError } = await supabase
-            .from('client_engagement')
-            .select('*')
-            .eq('client_id', clientId)
-            .eq('coach_id', coachId)
-            .order('engagement_date', { ascending: false })
-            .limit(1)
-            .single()
+      const [workoutLogsRes, mealCompletionsRes, habitLogsRes, assignmentsRes, workoutDurationsRes] = await Promise.all([
+        supabase.from('workout_logs').select('client_id, completed_at').in('client_id', clientIds).not('completed_at', 'is', null).gte('completed_at', periodStart).lt('completed_at', periodEnd),
+        supabase.from('meal_completions').select('client_id, completed_at').in('client_id', clientIds).gte('completed_at', periodStart).lt('completed_at', periodEnd),
+        supabase.from('habit_logs').select('client_id, log_date').in('client_id', clientIds).gte('log_date', periodStartDate).lt('log_date', periodEndDate),
+        supabase.from('workout_assignments').select('client_id, scheduled_date, assigned_date').in('client_id', clientIds),
+        supabase.from('workout_logs').select('client_id, total_duration_minutes').in('client_id', clientIds).not('completed_at', 'is', null).not('total_duration_minutes', 'is', null).gte('completed_at', periodStart).lt('completed_at', periodEnd)
+      ])
 
-          // Load milestones
-          const { data: milestonesData, error: milestonesError } = await supabase
-            .from('client_milestones')
-            .select('*')
-            .eq('client_id', clientId)
-            .eq('coach_id', coachId)
-            .order('created_at', { ascending: false })
+      const workoutLogs = workoutLogsRes.data || []
+      const nutritionRows = mealCompletionsRes.data || []
+      const habitRows = habitLogsRes.data || []
+      const assignments = assignmentsRes.data || []
+      const durations = workoutDurationsRes.data || []
 
-          // Load alerts
-          const { data: alertsData, error: alertsError } = await supabase
-            .from('client_compliance_alerts')
-            .select('*')
-            .eq('client_id', clientId)
-            .eq('coach_id', coachId)
-            .eq('is_resolved', false)
-            .order('created_at', { ascending: false })
+      const daysInPeriod = Math.ceil((new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / (24 * 60 * 60 * 1000)) || 30
+      const assignedByClient: Record<string, number> = {}
+      clientIds.forEach(id => (assignedByClient[id] = 0))
+      assignments.forEach((r: { client_id: string; scheduled_date?: string; assigned_date?: string }) => {
+        const d = (r.scheduled_date || r.assigned_date) ?? ''
+        if (d >= periodStartDate && d < periodEndDate) assignedByClient[r.client_id] = (assignedByClient[r.client_id] || 0) + 1
+      })
 
-          // Create default data if not found
-          const compliance: ClientComplianceMetrics = complianceData || {
-            id: '',
-            client_id: clientId,
-            coach_id: coachId,
-            metric_date: new Date().toISOString().split('T')[0],
-            workout_compliance: Math.floor(Math.random() * 40) + 60, // 60-100 for demo
-            nutrition_compliance: Math.floor(Math.random() * 40) + 60,
-            habit_compliance: Math.floor(Math.random() * 40) + 60,
-            session_attendance: Math.floor(Math.random() * 40) + 60,
-            overall_compliance: Math.floor(Math.random() * 40) + 60,
-            engagement_score: Math.floor(Math.random() * 40) + 60,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
+      const profileMap = new Map((profiles || []).map((p: { id: string }) => [p.id, p]))
+      const today = new Date().toISOString().split('T')[0]
 
-          const engagement: ClientEngagement = engagementData || {
-            id: '',
-            client_id: clientId,
-            coach_id: coachId,
-            engagement_date: new Date().toISOString().split('T')[0],
-            app_logins: Math.floor(Math.random() * 20) + 5,
-            workout_sessions: Math.floor(Math.random() * 10) + 3,
-            nutrition_logs: Math.floor(Math.random() * 15) + 5,
-            habit_completions: Math.floor(Math.random() * 20) + 10,
-            messages_sent: Math.floor(Math.random() * 10) + 2,
-            progress_updates: Math.floor(Math.random() * 5) + 1,
-            feature_usage: {},
-            session_duration: Math.floor(Math.random() * 120) + 30,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
+      const clientsWithData: ComplianceDashboardData[] = (clientsRows || []).map((row: { id: string; client_id: string; created_at?: string; updated_at?: string }) => {
+        const clientId = row.client_id
+        const profile = profileMap.get(clientId) as { first_name?: string; last_name?: string; email?: string } | undefined
+        const wCount = workoutLogs.filter((w: { client_id: string }) => w.client_id === clientId).length
+        const nDays = new Set(nutritionRows.filter((n: { client_id: string }) => n.client_id === clientId).map((n: { completed_at: string }) => new Date(n.completed_at).toISOString().slice(0, 10))).size
+        const hDays = new Set(habitRows.filter((h: { client_id: string }) => h.client_id === clientId).map((h: { log_date: string }) => h.log_date)).size
+        const assigned = assignedByClient[clientId] || 0
+        const workoutCompliance = assigned > 0 ? Math.min(100, Math.round((wCount / assigned) * 100)) : 0
+        const nutritionCompliance = daysInPeriod > 0 ? Math.min(100, Math.round((nDays / daysInPeriod) * 100)) : 0
+        const habitCompliance = daysInPeriod > 0 ? Math.min(100, Math.round((hDays / daysInPeriod) * 100)) : 0
+        const overallCompliance = Math.round((workoutCompliance + nutritionCompliance + habitCompliance) / 3)
+        const sessionDurations = durations.filter((d: { client_id: string }) => d.client_id === clientId).map((d: { total_duration_minutes: number | null }) => d.total_duration_minutes ?? 0)
+        const avgDuration = sessionDurations.length > 0 ? Math.round(sessionDurations.reduce((a: number, b: number) => a + b, 0) / sessionDurations.length) : 0
 
-          const milestones: ClientMilestone[] = milestonesData || []
-          const alerts: ClientComplianceAlert[] = alertsData || []
+        const compliance: ClientComplianceMetrics = {
+          id: '',
+          client_id: clientId,
+          coach_id: coachId,
+          metric_date: today,
+          workout_compliance: workoutCompliance,
+          nutrition_compliance: nutritionCompliance,
+          habit_compliance: habitCompliance,
+          session_attendance: workoutCompliance,
+          overall_compliance: overallCompliance,
+          engagement_score: Math.min(100, Math.round((wCount * 10 + nDays * 5 + hDays * 3) / 2)),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        const engagement: ClientEngagement = {
+          id: '',
+          client_id: clientId,
+          coach_id: coachId,
+          engagement_date: today,
+          app_logins: 0,
+          workout_sessions: wCount,
+          nutrition_logs: nutritionRows.filter((n: { client_id: string }) => n.client_id === clientId).length,
+          habit_completions: habitRows.filter((h: { client_id: string }) => h.client_id === clientId).length,
+          messages_sent: 0,
+          progress_updates: 0,
+          feature_usage: {},
+          session_duration: avgDuration,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        const milestones: ClientMilestone[] = []
+        const alerts: ClientComplianceAlert[] = []
+        const insights = ClientComplianceTracker.generateInsights(compliance, engagement, milestones)
+        const recommendations = ClientComplianceTracker.generateRecommendations(compliance, engagement, alerts)
+        const trends = { compliance_trend: 'stable' as const, engagement_trend: 'stable' as const, workout_trend: 'stable' as const, nutrition_trend: 'stable' as const }
 
-          // Generate insights and recommendations
-          const insights = ClientComplianceTracker.generateInsights(compliance, engagement, milestones)
-          const recommendations = ClientComplianceTracker.generateRecommendations(compliance, engagement, alerts)
-
-          // Calculate trends (simplified for demo)
-          const trends = {
-            compliance_trend: 'stable' as const,
-            engagement_trend: 'stable' as const,
-            workout_trend: 'stable' as const,
-            nutrition_trend: 'stable' as const
-          }
-
-          return {
-            client: {
-              id: clientId,
-              first_name: client.first_name,
-              last_name: client.last_name,
-              email: client.email,
-              fitness_level: client.fitness_level,
-              goals: client.goals,
-              join_date: client.created_at,
-              last_active: client.updated_at
-            },
-            compliance,
-            engagement,
-            milestones,
-            alerts,
-            trends,
-            insights,
-            recommendations
-          }
-        })
-      )
+        return {
+          client: {
+            id: clientId,
+            first_name: profile?.first_name,
+            last_name: profile?.last_name,
+            email: profile?.email ?? '',
+            fitness_level: undefined,
+            goals: [],
+            join_date: row.created_at?.split('T')[0] ?? '',
+            last_active: row.updated_at?.split('T')[0] ?? ''
+          },
+          compliance,
+          engagement,
+          milestones,
+          alerts,
+          trends,
+          insights,
+          recommendations
+        }
+      })
 
       setClients(clientsWithData)
     } catch (error) {
       console.error('Error loading client compliance data:', error)
+      setClients([])
     } finally {
       setLoading(false)
     }

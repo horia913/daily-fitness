@@ -165,20 +165,33 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
           }
         })
 
-        // Add mock compliance data for demo
-        const assignmentsWithCompliance = assignmentsWithJoins.map(assignment => ({
-          ...assignment,
-          compliance: {
-            completed_days: Math.floor(Math.random() * 30),
-            total_days: 30,
-            last_logged: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-            streak_days: Math.floor(Math.random() * 7),
-            average_calories: Math.floor(Math.random() * 500) + 1500,
-            average_protein: Math.floor(Math.random() * 50) + 100
+        const periodStart = new Date()
+        periodStart.setDate(periodStart.getDate() - 30)
+        const { data: mealRows } = clientIds.length > 0 ? await supabase.from('meal_completions').select('client_id, completed_at').in('client_id', clientIds).gte('completed_at', periodStart.toISOString()) : { data: [] }
+        const daysByClient: Record<string, Set<string>> = {}
+        clientIds.forEach(id => (daysByClient[id] = new Set()))
+        ;(mealRows || []).forEach((r: { client_id: string; completed_at: string }) => {
+          if (daysByClient[r.client_id]) daysByClient[r.client_id].add(new Date(r.completed_at).toISOString().slice(0, 10))
+        })
+        const assignmentsWithCompliance = assignmentsWithJoins.map((assignment) => {
+          const days = assignment.client_id ? daysByClient[assignment.client_id] : new Set<string>()
+          const completed_days = days?.size ?? 0
+          const total_days = 30
+          const lastLogged = days?.size ? Array.from(days).sort().pop()! : null
+          return {
+            ...assignment,
+            compliance: {
+              completed_days,
+              total_days,
+              last_logged: lastLogged ? new Date(lastLogged + 'T12:00:00Z').toISOString() : new Date(0).toISOString(),
+              streak_days: 0,
+              average_calories: 0,
+              average_protein: 0
+            }
           }
-        }))
+        })
 
-        setAssignments(assignmentsWithCompliance)
+        setAssignments(assignmentsWithCompliance as MealPlanAssignment[])
       } catch (dbError) {
         console.log('Database not ready, using localStorage fallback')
         const savedAssignments = localStorage.getItem(`nutrition_assignments_${user.id}`)

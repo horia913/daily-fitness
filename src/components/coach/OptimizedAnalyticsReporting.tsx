@@ -107,95 +107,24 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
   const [selectedMetric, setSelectedMetric] = useState<'overall' | 'workouts' | 'nutrition' | 'progress'>('overall')
   const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set())
 
-  // Mock analytics data - replace with actual data fetching
+  // Empty/zero initial state; filled by fetchAnalyticsData from metrics layer
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
-    totalClients: 24,
-    activeClients: 18,
-    avgAdherence: 87,
-    totalWorkouts: 342,
-    totalMeals: 1089,
-    personalBests: 12,
-    clientProgress: [
-      {
-        clientId: '1',
-        clientName: 'John Smith',
-        avatar: 'JS',
-        program: 'Weight Loss Program',
-        progress: 75,
-        goal: 'Lose 10 lbs',
-        achievement: '-8 lbs',
-        trend: 'up'
-      },
-      {
-        clientId: '2',
-        clientName: 'Maria Johnson',
-        avatar: 'MJ',
-        program: 'Strength Building',
-        progress: 90,
-        goal: 'Add 20 lbs to bench',
-        achievement: '+15 lbs',
-        trend: 'up'
-      },
-      {
-        clientId: '3',
-        clientName: 'David Kim',
-        avatar: 'DK',
-        program: 'Endurance Training',
-        progress: 60,
-        goal: 'Improve 5K time by 5 min',
-        achievement: '+2.5 min',
-        trend: 'stable'
-      },
-      {
-        clientId: '4',
-        clientName: 'Sarah Wilson',
-        avatar: 'SW',
-        program: 'Muscle Building',
-        progress: 85,
-        goal: 'Gain 8 lbs muscle',
-        achievement: '+6 lbs',
-        trend: 'up'
-      }
-    ],
-    workoutTypes: [
-      { type: 'Strength Training', percentage: 45, color: 'bg-[color:var(--fc-domain-workouts)]' },
-      { type: 'Cardio', percentage: 30, color: 'bg-[color:var(--fc-domain-meals)]' },
-      { type: 'Flexibility', percentage: 15, color: 'bg-[color:var(--fc-accent-purple)]' },
-      { type: 'HIIT', percentage: 10, color: 'bg-[color:var(--fc-status-warning)]' }
-    ],
+    totalClients: 0,
+    activeClients: 0,
+    avgAdherence: 0,
+    totalWorkouts: 0,
+    totalMeals: 0,
+    personalBests: 0,
+    clientProgress: [],
+    workoutTypes: [],
     engagementMetrics: {
-      avgSessionTime: 45,
-      sessionsPerWeek: 3.2,
-      goalsAchieved: 8,
-      totalGoals: 12,
-      successRate: 67
+      avgSessionTime: 0,
+      sessionsPerWeek: 0,
+      goalsAchieved: 0,
+      totalGoals: 0,
+      successRate: 0
     },
-    achievements: [
-      {
-        id: '1',
-        clientName: 'John Smith',
-        achievement: 'Weight Loss Goal Reached!',
-        description: 'Lost 10 lbs in 8 weeks',
-        type: 'weight_loss',
-        date: '2024-01-15'
-      },
-      {
-        id: '2',
-        clientName: 'Maria Johnson',
-        achievement: 'Bench Press Improvement',
-        description: 'Added 20 lbs to her max',
-        type: 'strength',
-        date: '2024-01-14'
-      },
-      {
-        id: '3',
-        clientName: 'David Kim',
-        achievement: 'First 5K Completed',
-        description: 'Finished in 28:45',
-        type: 'endurance',
-        date: '2024-01-13'
-      }
-    ]
+    achievements: []
   })
 
   useEffect(() => {
@@ -205,58 +134,116 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
   }, [coachId])
 
   const fetchAnalyticsData = async () => {
+    if (!coachId) return
     try {
       setLoading(true)
-      
-      // Fetch clients
+      const { getCoachClientIds, getTotalWorkouts, getTotalMeals, getPersonalRecordsCount, getSuccessRate, getAvgSessionTime, getSessionsPerWeek, getPeriodBounds } = await import('@/lib/metrics')
+      const period = getPeriodBounds('this_month')
+
+      const clientIds = await getCoachClientIds(coachId, false)
+      if (clientIds.length === 0) {
+        setAnalyticsData(prev => ({ ...prev, totalClients: 0, activeClients: 0 }))
+        setLoading(false)
+        return
+      }
+
       const { data: clients, error: clientsError } = await supabase
         .from('clients')
-        .select('*')
+        .select('id, client_id, status')
         .eq('coach_id', coachId)
-
+        .in('client_id', clientIds)
       if (clientsError) throw clientsError
 
-      // Fetch profiles for these clients
-      const clientIds = clients?.map(c => c.client_id) || []
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, first_name, last_name')
         .in('id', clientIds)
 
-      // Create real client progress data
-      const realClientProgress = clients?.map((client, index) => {
+      const [
+        totalWorkouts,
+        totalMeals,
+        personalBests,
+        successRate,
+        avgSessionTime,
+        sessionsPerWeek,
+        workoutLogsData,
+        goalsData,
+        achievementsData
+      ] = await Promise.all([
+        getTotalWorkouts(clientIds, period),
+        getTotalMeals(clientIds, period),
+        getPersonalRecordsCount(clientIds, period),
+        getSuccessRate(clientIds, period),
+        getAvgSessionTime(clientIds, period),
+        getSessionsPerWeek(clientIds, period),
+        supabase.from('workout_logs').select('client_id').in('client_id', clientIds).not('completed_at', 'is', null).gte('completed_at', period.start).lt('completed_at', period.end),
+        supabase.from('goals').select('client_id, progress_percentage').in('client_id', clientIds).in('status', ['active', 'completed']),
+        supabase.from('achievements').select('id, client_id, title, achievement_type, achieved_date').in('client_id', clientIds).order('achieved_date', { ascending: false }).limit(30)
+      ])
+
+      const completedByClient: Record<string, number> = {}
+      clientIds.forEach(id => (completedByClient[id] = 0))
+      ;(workoutLogsData.data || []).forEach((r: { client_id: string }) => { completedByClient[r.client_id] = (completedByClient[r.client_id] || 0) + 1 })
+      const goalsByClient: Record<string, number[]> = {}
+      clientIds.forEach(id => (goalsByClient[id] = []))
+      ;(goalsData.data || []).forEach((r: { client_id: string; progress_percentage: number | null }) => {
+        if (r.progress_percentage != null) goalsByClient[r.client_id].push(r.progress_percentage)
+      })
+
+      const clientProgressList = (clients || []).map((client) => {
         const profile = profiles?.find(p => p.id === client.client_id)
         const firstName = profile?.first_name || 'Unknown'
         const lastName = profile?.last_name || 'Client'
-        
+        const name = `${firstName} ${lastName}`.trim()
+        const progressPcts = goalsByClient[client.client_id] || []
+        const progress = progressPcts.length > 0 ? Math.round(progressPcts.reduce((a, b) => a + b, 0) / progressPcts.length) : (completedByClient[client.client_id] || 0)
         return {
           clientId: client.id,
-          clientName: `${firstName} ${lastName}`.trim(),
-          avatar: `${firstName[0]}${lastName[0]}`.toUpperCase(),
+          clientName: name,
+          avatar: `${(firstName || '')[0]}${(lastName || '')[0]}`.toUpperCase().slice(0, 2) || '?',
           program: 'General Fitness',
-          progress: Math.floor(Math.random() * 40) + 60, // Random progress between 60-100
-          goal: 'Stay healthy',
+          progress: Math.min(100, Math.max(0, progress)),
+          goal: progressPcts.length ? 'On track' : 'Stay healthy',
           achievement: 'Active',
           trend: 'up' as const
         }
-      }) || []
+      })
 
-      // Update analytics data with real data
+      const achievementList = (achievementsData.data || []).map((a: { id: string; client_id: string; title: string; achievement_type: string; achieved_date: string }) => {
+        const profile = profiles?.find(p => p.id === a.client_id)
+        const name = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Client'
+        return {
+          id: a.id,
+          clientName: name || 'Client',
+          achievement: a.title,
+          description: a.achievement_type,
+          type: (a.achievement_type === 'personal_record' ? 'strength' : a.achievement_type === 'goal_completion' ? 'weight_loss' : 'general') as 'weight_loss' | 'strength' | 'endurance' | 'general',
+          date: a.achieved_date
+        }
+      })
+
+      const activeCount = (clients || []).filter(c => c.status === 'active').length
+      const adherenceList = clientProgressList.map(c => c.progress)
+      const avgAdherence = adherenceList.length > 0 ? Math.round(adherenceList.reduce((a, b) => a + b, 0) / adherenceList.length) : 0
+
       setAnalyticsData(prev => ({
         ...prev,
         totalClients: clients?.length || 0,
-        activeClients: clients?.filter(c => c.status === 'active').length || 0,
-        clientProgress: realClientProgress,
-        achievements: realClientProgress.slice(0, 3).map((client, index) => ({
-          id: client.clientId,
-          clientName: client.clientName,
-          achievement: 'Great Progress!',
-          description: 'Maintaining consistent workouts',
-          type: 'general' as const,
-          date: new Date().toISOString().split('T')[0]
-        }))
+        activeClients: activeCount,
+        avgAdherence,
+        totalWorkouts,
+        totalMeals,
+        personalBests,
+        engagementMetrics: {
+          avgSessionTime,
+          sessionsPerWeek,
+          goalsAchieved: successRate.achieved,
+          totalGoals: successRate.total,
+          successRate: successRate.ratePercent
+        },
+        clientProgress: clientProgressList,
+        achievements: achievementList
       }))
-
     } catch (error) {
       console.error('Error fetching analytics data:', error)
     } finally {
@@ -322,18 +309,10 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen pb-24">
-        {/* Enhanced Header */}
-        <div className="p-4 sm:p-6 relative overflow-hidden">
-          {/* Floating background elements */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent-cyan)]/10 rounded-full blur-3xl"></div>
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-3xl"></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-domain-meals)]/10 rounded-full blur-2xl"></div>
-          </div>
-
-          <div className="max-w-7xl mx-auto relative z-10">
-            <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
-              <CardContent className="p-5 sm:p-6 space-y-6">
+        {/* Header - no frame */}
+        <div className="p-4 sm:p-6 relative overflow-hidden w-full">
+          <div className="w-full relative z-10">
+            <div className="p-4 sm:p-6 space-y-6">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div className="flex items-start gap-3 sm:gap-4">
                     <Button
@@ -383,16 +362,15 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </div>
           </div>
         </div>
 
-        {/* Main Content with Tabs */}
-        <div className="p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+        {/* Main Content with Tabs - full width */}
+        <div className="p-4 sm:p-6 w-full">
+          <div className="w-full space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="flex w-full fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-1 min-h-[56px] overflow-hidden">
+              <TabsList className="flex w-full rounded-lg border-0 bg-transparent p-1 min-h-[56px] overflow-hidden">
                 <TabsTrigger 
                   value="overview" 
                   className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)] flex-1 flex items-center justify-center min-h-[48px]"
@@ -437,8 +415,7 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
             {/* Detailed Reports Tab */}
             <TabsContent value="detailed" className="space-y-6 mt-6">
               {/* Global Filters */}
-              <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)] mb-6">
-                <CardContent className="p-6">
+              <div className="p-6 mb-6">
                   <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex items-center gap-2 flex-1">
                       <Calendar className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
@@ -485,8 +462,7 @@ export default function OptimizedAnalyticsReporting({ coachId }: OptimizedAnalyt
                       </Select>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
 
               {/* Detailed Reports Content */}
               <div className="space-y-6">

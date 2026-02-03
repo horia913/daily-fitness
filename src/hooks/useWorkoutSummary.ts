@@ -145,46 +145,44 @@ export function useWorkoutSummary(userId: string, sessionId?: string, workoutLog
 
   const loadUserStats = async (userId: string) => {
     try {
-      // Load workout statistics
-      const { data: sessions, error: sessionsError } = await supabase
-        .from('workout_sessions')
-        .select('*')
-        .eq('client_id', userId)
-        .eq('status', 'completed')
-        .order('completed_at', { ascending: false })
-
-      if (sessionsError) throw sessionsError
-
-      const totalWorkouts = sessions?.length || 0
-      const averageWorkoutDuration = sessions?.length 
-        ? sessions.reduce((sum, session) => sum + (session.total_duration || 0), 0) / sessions.length
-        : 45
-
-      // Calculate consistency (workouts per week over last 4 weeks)
+      // Use workout_logs (completed workouts) per metric contract; total_duration_minutes per schema
       const fourWeeksAgo = new Date()
       fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28)
-      
-      const recentSessions = sessions?.filter(session => 
-        new Date(session.completed_at || session.started_at) >= fourWeeksAgo
-      ) || []
+      const fourWeeksAgoIso = fourWeeksAgo.toISOString()
 
-      const consistency = Math.min(100, (recentSessions.length / 4) * 25) // 4 workouts per week = 100%
+      const { data: logs, error } = await supabase
+        .from('workout_logs')
+        .select('id, completed_at, total_duration_minutes')
+        .eq('client_id', userId)
+        .not('completed_at', 'is', null)
+        .order('completed_at', { ascending: false })
+
+      if (error) throw error
+
+      const totalWorkouts = logs?.length || 0
+      const withDuration = logs?.filter(l => l.total_duration_minutes != null) || []
+      const averageWorkoutDuration = withDuration.length
+        ? withDuration.reduce((sum, l) => sum + (l.total_duration_minutes ?? 0), 0) / withDuration.length
+        : 0
+
+      const recentInFourWeeks = logs?.filter(l => (l.completed_at && l.completed_at >= fourWeeksAgoIso)) || []
+      const consistency = Math.min(100, (recentInFourWeeks.length / 4) * 25) // 4 workouts per week = 100%
 
       return {
         totalWorkouts,
         averageWorkoutDuration: Math.round(averageWorkoutDuration),
-        favoriteExercises: [], // Would need to analyze exercise data
-        strengthProgress: 0, // Would need to analyze weight progression
+        favoriteExercises: [],
+        strengthProgress: 0,
         consistency: Math.round(consistency)
       }
     } catch (error) {
       console.error('Error loading user stats:', error)
       return {
         totalWorkouts: 0,
-        averageWorkoutDuration: 45,
+        averageWorkoutDuration: 0,
         favoriteExercises: [],
         strengthProgress: 0,
-        consistency: 70
+        consistency: 0
       }
     }
   }

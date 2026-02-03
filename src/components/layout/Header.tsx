@@ -11,7 +11,7 @@ export default function Header() {
   const { toggleTheme, isDark } = useTheme()
 
   return (
-    <header className="fc-glass fc-card border-b border-[color:var(--fc-glass-border)] px-4 py-3 relative z-30">
+    <header className="fc-glass fc-card border-b border-[color:var(--fc-glass-border)] px-4 py-3 relative z-30 !rounded-none">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 fc-icon-tile fc-icon-workouts rounded-lg flex items-center justify-center">
