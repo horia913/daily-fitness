@@ -602,6 +602,7 @@ export default function WorkoutTemplateForm({
 
   // Save draft to localStorage (debounced)
   const saveDraftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const workoutFlowSectionRef = useRef<HTMLDivElement | null>(null);
   const saveDraft = useCallback(() => {
     if (saveDraftTimeoutRef.current) {
       clearTimeout(saveDraftTimeoutRef.current);
@@ -1340,16 +1341,16 @@ export default function WorkoutTemplateForm({
             exercises.map((e) => e.id).filter((id): id is string => Boolean(id))
           );
 
-          // Delete blocks that were removed (exist in DB but not in new exercises)
+          // Delete blocks that were removed (exist in DB but not in new exercises) in parallel
           const blocksToDelete = existingBlocks.filter(
             (block) => !newExerciseIds.has(block.id)
           );
-          for (const block of blocksToDelete) {
-            console.log(`🗑️ Deleting removed block: ${block.id}`);
-            await WorkoutBlockService.deleteWorkoutBlock(block.id);
-          }
           if (blocksToDelete.length > 0) {
-            console.log(`🔍 Deleted ${blocksToDelete.length} removed block(s)`);
+            await Promise.all(
+              blocksToDelete.map((block) =>
+                WorkoutBlockService.deleteWorkoutBlock(block.id)
+              )
+            );
           }
 
           // Process each exercise: UPDATE if block exists, CREATE if new
@@ -2407,12 +2408,13 @@ export default function WorkoutTemplateForm({
         });
         setEditingExerciseId(null);
       } else {
-        // Add new exercise
+        // Add new exercise at end (keeps order: first added = #1, second = #2)
         setExercises((prev) => {
           const updated = [...prev, newWorkoutExercise];
           console.log("🔍 Added new exercise to array:", updated);
           return updated;
         });
+        // Don't scroll — coach stays at top where the Add Exercise form was
       }
       setNewExercise({
         exercise_id: "",
@@ -3363,8 +3365,10 @@ export default function WorkoutTemplateForm({
               </Card>
             )}
 
-            {/* Unified Workout Structure */}
-            <div className="space-y-4">
+            {/* Wrapper: when Add Exercise is open, form shows first (order 0) then list (order 1) */}
+            <div className="flex flex-col">
+            {/* Unified Workout Structure - ref so we can scroll here when adding new exercise */}
+            <div ref={workoutFlowSectionRef} className="space-y-4" style={{ order: 1 }}>
               <div className="flex flex-col sm:flex-row w-full items-start sm:items-center gap-3 sm:gap-2 sm:justify-between">
                 <h3 className={`text-xl font-bold ${theme.text}`}>
                   Workout Flow ({workoutItems.length} items)
@@ -3379,7 +3383,9 @@ export default function WorkoutTemplateForm({
                 </Button>
               </div>
 
-              {exercises.length > 0 ? (
+              {/* When Add Exercise is open, show form first (order 0) then list (order 1) so coach doesn't scroll */}
+              <div className="flex flex-col gap-4">
+                {exercises.length > 0 ? (
                 <DragDropContext onDragEnd={handleDragEnd}>
                   <Droppable droppableId="exercises-list">
                     {(provided) => (
@@ -3481,9 +3487,11 @@ export default function WorkoutTemplateForm({
                 </div>
               )}
             </div>
+            </div>
 
-            {/* Add Exercise Modal */}
+            {/* Add Exercise form - order 0 so it appears above the list when open */}
             {showAddExercise && (
+              <div style={{ order: 0 }} className="w-full">
               <Card
                 className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}
               >
@@ -5701,7 +5709,9 @@ export default function WorkoutTemplateForm({
                   </div>
                 </CardContent>
               </Card>
+              </div>
             )}
+            </div>
           </form>
         </div>
 

@@ -53,38 +53,10 @@ export default function VolumeCalculatorWidget({
   // Check if this is a guideline category
   const isGuidelineCat = isGuidelineCategory(category);
   
-  // Debug logging
-  useEffect(() => {
-    console.log("🔍 VolumeCalculatorWidget props:", {
-      category,
-      difficulty,
-      isGuidelineCat,
-      excludeFromRecommendations,
-      blocksCount: blocks.length,
-    });
-  }, [category, difficulty, isGuidelineCat, excludeFromRecommendations, blocks.length]);
-
-  // Calculate volume per muscle group
+  // Calculate volume per muscle group (memoized)
   const volumePerMuscleGroup = useMemo(() => {
-    if (!isGuidelineCat) {
-      console.log("🔍 Volume calculator: Not a guideline category:", category);
-      return new Map<string, number>();
-    }
-    console.log("🔍 Volume calculator: Calculating volume for", blocks.length, "blocks");
-    console.log("🔍 Blocks data:", blocks.map(b => ({
-      block_type: b.block_type,
-      exercises_count: b.exercises?.length || 0,
-      exercises: b.exercises?.map(e => ({
-        exercise_id: e.exercise_id,
-        exercise_name: e.exercise?.name,
-        primary_muscle_group: e.exercise?.primary_muscle_group,
-        primary_muscle_group_id: e.exercise?.primary_muscle_group_id,
-        sets: e.sets
-      }))
-    })));
-    const volume = calculateVolumePerMuscleGroup(blocks);
-    console.log("🔍 Volume calculator: Result:", Object.fromEntries(volume));
-    return volume;
+    if (!isGuidelineCat) return new Map<string, number>();
+    return calculateVolumePerMuscleGroup(blocks);
   }, [blocks, isGuidelineCat, category]);
 
   // Detect priority muscle group
@@ -102,38 +74,21 @@ export default function VolumeCalculatorWidget({
     }
 
     const loadRecommendations = async () => {
-      const recs = new Map<string, MuscleGroupVolumeRecommendation>();
       const normalizedDifficulty = difficulty.toLowerCase();
-
-      console.log("🔍 Loading recommendations:", {
-        category,
-        difficulty: normalizedDifficulty,
-        muscleGroups: Array.from(volumePerMuscleGroup.keys()),
-        priorityMuscleGroup,
-      });
-
-      for (const [muscleGroup, currentSets] of volumePerMuscleGroup.entries()) {
-        const isPriority = muscleGroup === priorityMuscleGroup;
-        const recommendation = await getVolumeRecommendationForMuscleGroup(
-          muscleGroup,
-          currentSets,
-          category,
-          normalizedDifficulty,
-          isPriority,
-          daysPerWeek
-        );
-        
-        console.log("🔍 Recommendation for", muscleGroup, ":", {
-          recommendedMin: recommendation.recommendedMin,
-          recommendedOptimal: recommendation.recommendedOptimal,
-          recommendedMax: recommendation.recommendedMax,
-          status: recommendation.status,
-        });
-        
-        recs.set(muscleGroup, recommendation);
-      }
-
-      setRecommendations(recs);
+      const entries = Array.from(volumePerMuscleGroup.entries());
+      const results = await Promise.all(
+        entries.map(([muscleGroup, currentSets]) =>
+          getVolumeRecommendationForMuscleGroup(
+            muscleGroup,
+            currentSets,
+            category,
+            normalizedDifficulty,
+            muscleGroup === priorityMuscleGroup,
+            daysPerWeek
+          ).then((recommendation) => [muscleGroup, recommendation] as const)
+        )
+      );
+      setRecommendations(new Map(results));
     };
 
     loadRecommendations();
