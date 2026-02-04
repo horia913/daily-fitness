@@ -15,6 +15,7 @@ import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
+import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 
 export function GiantSetExecutor({
   block,
@@ -22,6 +23,8 @@ export function GiantSetExecutor({
   onNextBlock,
   e1rmMap = {},
   onE1rmUpdate,
+  lastPerformedWeightByExerciseId = {},
+  lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
   allBlocks = [],
@@ -47,35 +50,43 @@ export function GiantSetExecutor({
   const [reps, setReps] = useState<string[]>([]);
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
+  const [weightsPristine, setWeightsPristine] = useState<boolean[]>([]);
 
-  // Initialize arrays and recalculate suggested weights when exercises or e1rmMap changes
+  const results = exercises.map((ex) =>
+    getWeightDefaultAndSuggestion({
+      sessionStickyWeight: ex.exercise_id ? (lastPerformedWeightByExerciseId[ex.exercise_id] ?? null) : null,
+      lastSessionWeight: ex.exercise_id ? (lastSessionWeightByExerciseId[ex.exercise_id] ?? null) : null,
+      loadPercentage: ex.load_percentage ?? null,
+      e1rm: ex.exercise_id ? (e1rmMap[ex.exercise_id] ?? null) : null,
+    })
+  );
+
   useEffect(() => {
     if (exercises.length > 0) {
-      // Only update if weights array is empty or length doesn't match
-      const shouldInitialize = weights.length === 0 || weights.length !== exercises.length;
-      
-      if (shouldInitialize) {
-        const initialWeights = exercises.map((ex) => {
-          // Only set suggested weight if e1rmMap has data
-          const hasE1rm = ex.exercise_id && e1rmMap[ex.exercise_id] && e1rmMap[ex.exercise_id] > 0;
-          
-          if (hasE1rm && ex.load_percentage) {
-            const suggested = calculateSuggestedWeightUtil(
-              ex.exercise_id,
-              ex.load_percentage,
-              e1rmMap
-            );
-            if (suggested && suggested > 0) {
-              return suggested.toString();
-            }
-          }
-          return "";
-        });
-        setWeights(initialWeights);
-        setReps(new Array(exercises.length).fill(""));
+      setWeightsPristine(new Array(exercises.length).fill(true));
+    }
+  }, [completedSets, exercises.length]);
+
+  useEffect(() => {
+    if (exercises.length === 0) return;
+    const nextWeights: string[] = weights.length !== exercises.length ? [] : [...weights];
+    for (let idx = 0; idx < exercises.length; idx++) {
+      if (weightsPristine[idx] !== false) {
+        const r = results[idx];
+        const val = r?.default_weight != null && r.default_weight > 0 ? String(r.default_weight) : "";
+        if (nextWeights.length <= idx) nextWeights.push(val);
+        else if (nextWeights[idx] !== val) nextWeights[idx] = val;
+      } else if (nextWeights.length <= idx) {
+        nextWeights.push("");
       }
     }
-  }, [exercises, e1rmMap]); // Removed 'weights' from dependencies to prevent infinite loop
+    if (nextWeights.length !== weights.length || nextWeights.some((w, i) => weights[i] !== w)) {
+      setWeights(nextWeights.length ? nextWeights : new Array(exercises.length).fill(""));
+    }
+    if (reps.length !== exercises.length) {
+      setReps(new Array(exercises.length).fill(""));
+    }
+  }, [exercises.length, completedSets, lastPerformedWeightByExerciseId, lastSessionWeightByExerciseId, e1rmMap, weightsPristine]);
 
   // Block details
   const blockDetails: BlockDetail[] = [
@@ -229,27 +240,7 @@ export function GiantSetExecutor({
         if (newCompletedSets >= totalSets) {
           onBlockComplete(block.block.id, loggedSetsArray);
         } else {
-          // Check if rest timer will show - if so, don't clear inputs yet
-          const currentExercise = exercises[currentExerciseIndex || 0];
-          const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-          if (restSeconds === 0) {
-            // No rest timer, clear inputs immediately
-            const newWeights = exercises.map((ex) => {
-              if (ex.load_percentage) {
-                const suggested = calculateSuggestedWeightUtil(
-                  ex.exercise_id,
-                  ex.load_percentage,
-                  e1rmMap
-                );
-                return suggested ? suggested.toString() : "";
-              }
-              return "";
-            });
-            setWeights(newWeights);
-            setReps(new Array(exercises.length).fill(""));
-          }
-          // If restSeconds > 0, rest timer will show and inputs will be cleared
-          // when the timer completes and completedSets updates
+          // Advancing to next set: parent updates lastPerformedWeightByExerciseId and completedSets; useEffect will apply defaults
         }
       } else {
         addToast({
@@ -284,20 +275,45 @@ export function GiantSetExecutor({
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <LargeInput
-              label="Weight"
-              value={weights[idx] || ""}
-              onChange={(value) => {
-                const newWeights = [...weights];
-                newWeights[idx] = value;
-                setWeights(newWeights);
-              }}
-              placeholder="0"
-              step="0.5"
-              unit="kg"
-              showStepper
-              stepAmount={2.5}
-            />
+            <div className="space-y-2">
+              <LargeInput
+                label="Weight"
+                value={weights[idx] || ""}
+                onChange={(value) => {
+                  setWeightsPristine((prev) => {
+                    const next = [...(prev.length ? prev : new Array(exercises.length).fill(true))];
+                    if (next[idx] !== false) next[idx] = false;
+                    return next;
+                  });
+                  const newWeights = [...weights];
+                  newWeights[idx] = value;
+                  setWeights(newWeights);
+                }}
+                placeholder="0"
+                step="0.5"
+                unit="kg"
+                showStepper
+                stepAmount={2.5}
+              />
+              {results[idx]?.suggested_weight != null && results[idx].suggested_weight! > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWeightsPristine((prev) => {
+                      const next = [...(prev.length ? prev : new Array(exercises.length).fill(true))];
+                      next[idx] = false;
+                      return next;
+                    });
+                    const newWeights = [...weights];
+                    newWeights[idx] = String(results[idx].suggested_weight);
+                    setWeights(newWeights);
+                  }}
+                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  {exercise.load_percentage != null ? `${exercise.load_percentage}% → ${results[idx].suggested_weight} kg` : `Suggested: ${results[idx].suggested_weight} kg`} (tap to apply)
+                </button>
+              )}
+            </div>
             <LargeInput
               label="Reps"
               value={reps[idx] || ""}

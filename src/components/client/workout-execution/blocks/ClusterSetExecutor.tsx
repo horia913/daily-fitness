@@ -14,6 +14,7 @@ import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
+import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 
 export function ClusterSetExecutor({
   block,
@@ -21,6 +22,8 @@ export function ClusterSetExecutor({
   onNextBlock,
   e1rmMap = {},
   onE1rmUpdate,
+  lastPerformedWeightByExerciseId = {},
+  lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
   allBlocks = [],
@@ -42,36 +45,37 @@ export function ClusterSetExecutor({
   const completedSets = block.completedSets || 0;
   const currentSet = completedSets;
 
-  // Cluster set parameters (block_parameters removed - TODO: Get from workout_cluster_sets table)
-  const clustersPerSet: number = 3; // TODO: Get from workout_cluster_sets table
-  const repsPerCluster: number = 2; // TODO: Get from workout_cluster_sets table
-  const intraClusterRest: number = 20; // TODO: Get from workout_cluster_sets table
+  const clustersPerSet: number = 3;
+  const repsPerCluster: number = 2;
+  const intraClusterRest: number = 20;
   const restBetweenSets = block.block.rest_seconds || 90;
 
   const [weight, setWeight] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
+  const [isWeightPristine, setIsWeightPristine] = useState(true);
 
-  // Pre-fill with suggested weight - recalculate when e1rmMap is populated
+  const exerciseId = currentExercise?.exercise_id ?? "";
+  const sessionStickyWeight = exerciseId ? lastPerformedWeightByExerciseId[exerciseId] ?? null : null;
+  const lastSessionWeight = exerciseId ? lastSessionWeightByExerciseId[exerciseId] ?? null : null;
+  const loadPercentage = currentExercise?.load_percentage ?? null;
+  const e1rm = exerciseId ? e1rmMap[exerciseId] ?? null : null;
+  const { default_weight, suggested_weight, source } = getWeightDefaultAndSuggestion({
+    sessionStickyWeight: sessionStickyWeight ?? null,
+    lastSessionWeight: lastSessionWeight ?? null,
+    loadPercentage,
+    e1rm: e1rm ?? null,
+  });
+
   useEffect(() => {
-    if (currentExercise?.load_percentage && currentExercise?.exercise_id) {
-      // Check if e1rmMap has data for this exercise
-      const hasE1rm = e1rmMap[currentExercise.exercise_id] && e1rmMap[currentExercise.exercise_id] > 0;
-      // Only set if weight is empty or if e1rmMap was just populated
-      const weightIsEmpty = !weight || weight.trim() === "" || parseFloat(weight) === 0;
-      
-      if (hasE1rm && weightIsEmpty) {
-        const suggested = calculateSuggestedWeightUtil(
-          currentExercise.exercise_id,
-          currentExercise.load_percentage,
-          e1rmMap
-        );
-        if (suggested && suggested > 0) {
-          setWeight(suggested.toString());
-        }
-      }
-    }
-  }, [currentExercise?.exercise_id, currentExercise?.load_percentage, e1rmMap, weight]);
+    setIsWeightPristine(true);
+  }, [completedSets, currentExerciseIndex, exerciseId]);
+
+  useEffect(() => {
+    if (!isWeightPristine) return;
+    if (default_weight != null && default_weight > 0) setWeight(String(default_weight));
+    else setWeight("");
+  }, [isWeightPristine, default_weight, completedSets, exerciseId]);
 
   // Block details
   const blockDetails: BlockDetail[] = [
@@ -99,22 +103,10 @@ export function ClusterSetExecutor({
     },
   ];
 
-  if (currentExercise?.load_percentage) {
-    const suggestedWeight = calculateSuggestedWeightUtil(
-      currentExercise.exercise_id,
-      currentExercise.load_percentage,
-      e1rmMap
-    );
-    const loadDisplay = formatLoadPercentage(
-      currentExercise.load_percentage,
-      suggestedWeight
-    );
-    if (loadDisplay) {
-      blockDetails.push({
-        label: "LOAD",
-        value: loadDisplay,
-      });
-    }
+  if (currentExercise?.load_percentage != null) {
+    const suggestedForDisplay = source === "percent_e1rm" ? suggested_weight : null;
+    const loadDisplay = formatLoadPercentage(currentExercise.load_percentage, suggestedForDisplay);
+    if (loadDisplay) blockDetails.push({ label: "LOAD", value: loadDisplay });
   }
 
   const instructions =
@@ -192,19 +184,9 @@ export function ClusterSetExecutor({
 
         // Complete block if last set
         if (newCompletedSets >= totalSets) {
-          setWeight("");
           onBlockComplete(block.block.id, loggedSetsArray);
         } else {
-          // Check if rest timer will show - if so, don't clear weight yet
-          // For cluster sets, use intra-cluster rest (rest between exercises within cluster)
-          // restBetweenSets is only for rest AFTER completing a full set
-          const restSeconds: number = intraClusterRest || currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-          if (restSeconds === 0) {
-            // No rest timer, clear weight immediately
-            setWeight("");
-          }
-          // If restSeconds > 0, rest timer will show and weight will be cleared
-          // when the timer completes and completedSets updates
+          // Advancing to next set: parent updates lastPerformedWeightByExerciseId and completedSets; useEffect will apply defaults
         }
       } else {
         addToast({
@@ -234,16 +216,23 @@ export function ClusterSetExecutor({
           Cluster 1 of {clustersPerSet} (Set {currentSet + 1} of {totalSets})
         </div>
         <div className="space-y-4">
-          <LargeInput
-            label="Weight"
-            value={weight}
-            onChange={setWeight}
-            placeholder="0"
-            step="0.5"
-            unit="kg"
-            showStepper
-            stepAmount={2.5}
-          />
+          <div className="space-y-2">
+            <LargeInput
+              label="Weight"
+              value={weight}
+              onChange={(val) => { setIsWeightPristine(false); setWeight(val); }}
+              placeholder="0"
+              step="0.5"
+              unit="kg"
+              showStepper
+              stepAmount={2.5}
+            />
+            {suggested_weight != null && suggested_weight > 0 && (
+              <button type="button" onClick={() => { setWeight(String(suggested_weight)); setIsWeightPristine(false); }} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                {loadPercentage != null ? `${loadPercentage}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
+              </button>
+            )}
+          </div>
           <div className="text-sm text-slate-600 dark:text-slate-400">
             Reps per cluster: {repsPerCluster} | Total reps:{" "}
             {repsPerCluster * clustersPerSet}

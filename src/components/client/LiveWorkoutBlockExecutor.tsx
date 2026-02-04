@@ -46,6 +46,12 @@ interface LiveWorkoutBlockExecutorProps {
   onNextBlock: () => void;
   e1rmMap?: Record<string, number>;
   onE1rmUpdate?: (exerciseId: string, e1rm: number) => void;
+  /** Session-level last performed weight per exercise (sticky default); updated after each log-set */
+  lastPerformedWeightByExerciseId?: Record<string, number>;
+  /** Last-session weight per exercise (earliest set in most recent completed workout) */
+  lastSessionWeightByExerciseId?: Record<string, number>;
+  /** Called after each successful log-set to update session sticky map */
+  onWeightLogged?: (exerciseId: string, weight: number) => void;
   sessionId?: string | null;
   assignmentId?: string;
   allBlocks?: LiveWorkoutBlock[];
@@ -65,6 +71,9 @@ export default function LiveWorkoutBlockExecutor({
   onNextBlock,
   e1rmMap = {},
   onE1rmUpdate,
+  lastPerformedWeightByExerciseId = {},
+  lastSessionWeightByExerciseId = {},
+  onWeightLogged,
   sessionId,
   assignmentId,
   allBlocks = [],
@@ -461,6 +470,38 @@ export default function LiveWorkoutBlockExecutor({
               ) {
                 onE1rmUpdate(data.exercise_id, result.e1rm.stored);
               }
+              // Update session-level sticky weight for default on next set
+              if (onWeightLogged) {
+                if (data.exercise_id != null && data.weight != null && typeof data.weight === "number") {
+                  onWeightLogged(data.exercise_id, data.weight);
+                }
+                if (data.superset_exercise_a_id != null && data.superset_weight_a != null && typeof data.superset_weight_a === "number") {
+                  onWeightLogged(data.superset_exercise_a_id, data.superset_weight_a);
+                }
+                if (data.superset_exercise_b_id != null && data.superset_weight_b != null && typeof data.superset_weight_b === "number") {
+                  onWeightLogged(data.superset_exercise_b_id, data.superset_weight_b);
+                }
+                if (Array.isArray(data.giant_set_exercises)) {
+                  for (const ex of data.giant_set_exercises) {
+                    if (ex?.exercise_id != null && ex?.weight != null && typeof ex.weight === "number") {
+                      onWeightLogged(ex.exercise_id, ex.weight);
+                    }
+                  }
+                }
+                if (data.exercise_id != null && data.dropset_initial_weight != null && typeof data.dropset_initial_weight === "number") {
+                  onWeightLogged(data.exercise_id, data.dropset_initial_weight);
+                }
+                const rpWeight = data.rest_pause_initial_weight;
+                if (data.exercise_id != null && rpWeight != null && typeof rpWeight === "number") {
+                  onWeightLogged(data.exercise_id, rpWeight);
+                }
+                if (data.preexhaust_isolation_exercise_id != null && data.preexhaust_isolation_weight != null && typeof data.preexhaust_isolation_weight === "number") {
+                  onWeightLogged(data.preexhaust_isolation_exercise_id, data.preexhaust_isolation_weight);
+                }
+                if (data.preexhaust_compound_exercise_id != null && data.preexhaust_compound_weight != null && typeof data.preexhaust_compound_weight === "number") {
+                  onWeightLogged(data.preexhaust_compound_exercise_id, data.preexhaust_compound_weight);
+                }
+              }
 
               // Show PR notification if new personal record
             if (result.pr?.any_weight_pr || result.pr?.any_volume_pr) {
@@ -718,6 +759,9 @@ export default function LiveWorkoutBlockExecutor({
     onNextBlock,
     e1rmMap,
     onE1rmUpdate,
+    lastPerformedWeightByExerciseId,
+    lastSessionWeightByExerciseId,
+    onWeightLogged,
     sessionId,
     assignmentId,
     allBlocks,

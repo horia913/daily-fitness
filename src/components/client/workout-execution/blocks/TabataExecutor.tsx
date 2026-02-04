@@ -47,8 +47,8 @@ export function TabataExecutor({
   // For tabata, exercises are grouped by 'set' number in time_protocols
   const tabataSets: any[] = [];
   const setsMap = new Map<number, any[]>();
-  
-  // Group by set number; allow same exercise multiple times (e.g. Side Plank left + right as one exercise, added twice)
+
+  // 1) Prefer exercise-level time_protocols
   if (block.block.exercises) {
     block.block.exercises.forEach((ex) => {
       if (ex.time_protocols && Array.isArray(ex.time_protocols)) {
@@ -70,14 +70,31 @@ export function TabataExecutor({
     });
   }
 
+  // 2) Fallback: use block-level time_protocols (API often returns only block-level)
+  if (setsMap.size === 0 && block.block.time_protocols && Array.isArray(block.block.time_protocols)) {
+    block.block.time_protocols.forEach((tp: any) => {
+      if (tp.protocol_type === 'tabata' && (tp.set !== undefined && tp.set !== null) && tp.exercise_id) {
+        const setNum = tp.set;
+        if (!setsMap.has(setNum)) {
+          setsMap.set(setNum, []);
+        }
+        setsMap.get(setNum)!.push({
+          exercise_id: tp.exercise_id,
+          work_seconds: tp.work_seconds || 20,
+          rest_after: tp.rest_seconds || 10,
+          target_reps: tp.target_reps,
+        });
+      }
+    });
+  }
+
   // Convert setsMap to tabataSets array, sorted by set number
   const sortedSetNumbers = Array.from(setsMap.keys()).sort((a, b) => a - b);
+  const firstTpFromBlock = block.block.time_protocols?.[0];
+  const firstTpFromExercise = block.block.exercises?.[0]?.time_protocols?.[0];
   sortedSetNumbers.forEach((setNum) => {
     const exercises = setsMap.get(setNum) || [];
-    // Get rest_after_set from first time_protocol (it's block-level, same for all)
-    const firstTp = block.block.exercises?.[0]?.time_protocols?.[0];
-    const restAfterSet = firstTp?.rest_after_set || null;
-    
+    const restAfterSet = firstTpFromExercise?.rest_after_set ?? firstTpFromBlock?.rest_after_set ?? null;
     tabataSets.push({
       exercises: exercises,
       rest_between_sets: restAfterSet,

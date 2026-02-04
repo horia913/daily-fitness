@@ -42,6 +42,7 @@ import {
   Square,
   TrendingUp,
   Calendar,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { fetchApi } from "@/lib/apiClient";
@@ -186,6 +187,8 @@ export default function LiveWorkout() {
   // Workout Completion State
   const [showWorkoutCompletion, setShowWorkoutCompletion] = useState(false);
   const [isLastBlockComplete, setIsLastBlockComplete] = useState(false);
+  const [isCompletingWorkout, setIsCompletingWorkout] = useState(false);
+  const isCompletingWorkoutRef = useRef(false);
   const [workoutStats, setWorkoutStats] = useState({
     totalTime: 0,
     exercisesCompleted: 0,
@@ -215,6 +218,11 @@ export default function LiveWorkout() {
 
   // e1RM state for suggested weight calculations
   const [e1rmMap, setE1rmMap] = useState<Record<string, number>>({});
+
+  // Session-level last performed weight per exercise (for sticky default; updated after each successful log-set)
+  const [lastPerformedWeightByExerciseId, setLastPerformedWeightByExerciseId] = useState<Record<string, number>>({});
+  // Last-session weight per exercise (earliest set in most recent completed workout)
+  const [lastSessionWeightByExerciseId, setLastSessionWeightByExerciseId] = useState<Record<string, number>>({});
 
   // Progression suggestions state
   const [progressionSuggestions, setProgressionSuggestions] = useState<
@@ -420,6 +428,9 @@ export default function LiveWorkout() {
 
   // Workout Block Handlers
   const handleBlockComplete = (blockId: string, loggedSets: LoggedSet[]) => {
+    const hadLogId = !!workoutLogId;
+    const assignmentIdForApi = assignment?.id || assignmentId;
+
     console.log("🎯 handleBlockComplete called:", {
       blockId,
       currentBlockIndex,
@@ -432,6 +443,22 @@ export default function LiveWorkout() {
       totalBlocks: workoutBlocks.length,
       source: "handleBlockComplete",
     });
+
+    // Persist block completion (non-blocking). When workout_log_id was missing, persist the one returned by the API.
+    fetchApi("/api/block-complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workout_log_id: workoutLogId || undefined,
+        workout_assignment_id: assignmentIdForApi,
+        workout_block_id: blockId,
+      }),
+    })
+      .then((r) => r.json())
+      .then((res: { workout_log_id?: string }) => {
+        if (!hadLogId && res.workout_log_id) setWorkoutLogId(res.workout_log_id);
+      })
+      .catch((err) => console.error("block-complete failed", err));
 
     // Update block completion status
     setWorkoutBlocks((prev) => {
@@ -817,8 +844,9 @@ export default function LiveWorkout() {
   };
 
   /**
-   * Restore workout progress from workout_set_logs
-   * Counts sets per block/exercise to determine where client left off
+   * Restore workout progress from workout_set_logs and workout_block_completions
+   * Counts sets per block/exercise to determine where client left off; blocks with
+   * no set logs but a block-completion record (e.g. timer-only Tabata/EMOM) are marked completed.
    */
   const restoreWorkoutProgress = async (
     workoutLogId: string,
@@ -830,32 +858,50 @@ export default function LiveWorkout() {
     workoutStartTime: number;
   } | null> => {
     try {
-      // Get all set logs for this workout_log
-      const { data: setLogs, error } = await supabase
-        .from("workout_set_logs")
-        .select("block_id, exercise_id, set_number, block_type")
-        .eq("workout_log_id", workoutLogId)
-        .eq("client_id", userId)
-        .order("completed_at", { ascending: true });
+      // Fetch set logs and block completions in parallel
+      const [setLogsResult, blockCompletionsResult, workoutLogResult] = await Promise.all([
+        supabase
+          .from("workout_set_logs")
+          .select("block_id, exercise_id, set_number, block_type")
+          .eq("workout_log_id", workoutLogId)
+          .eq("client_id", userId)
+          .order("completed_at", { ascending: true }),
+        supabase
+          .from("workout_block_completions")
+          .select("workout_block_id")
+          .eq("workout_log_id", workoutLogId),
+        supabase
+          .from("workout_logs")
+          .select("started_at")
+          .eq("id", workoutLogId)
+          .single(),
+      ]);
+
+      const { data: setLogs, error } = setLogsResult;
+      const { data: blockCompletions, error: blockCompletionsError } = blockCompletionsResult;
+      const { data: workoutLog } = workoutLogResult;
 
       if (error) {
         console.error("Error fetching set logs for progress restoration:", error);
         return null;
       }
-
-      if (!setLogs || setLogs.length === 0) {
-        console.log("No set logs found - starting fresh");
-        return null;
+      if (blockCompletionsError) {
+        console.error("Error fetching block completions for progress restoration:", blockCompletionsError);
       }
 
-      console.log(`📊 Found ${setLogs.length} set logs to restore progress from`);
+      const completedBlockIds = new Set(
+        (blockCompletions || []).map((r: { workout_block_id: string }) => r.workout_block_id)
+      );
 
-      // Get workout_log to restore started_at time
-      const { data: workoutLog } = await supabase
-        .from("workout_logs")
-        .select("started_at")
-        .eq("id", workoutLogId)
-        .single();
+      if (!setLogs || setLogs.length === 0) {
+        if (completedBlockIds.size === 0) {
+          console.log("No set logs and no block completions - starting fresh");
+          return null;
+        }
+        console.log(`📊 No set logs; restoring from ${completedBlockIds.size} block completion(s)`);
+      } else {
+        console.log(`📊 Found ${setLogs.length} set logs to restore progress from`);
+      }
 
       const workoutStartTime = workoutLog?.started_at
         ? new Date(workoutLog.started_at).getTime()
@@ -906,9 +952,24 @@ export default function LiveWorkout() {
         const blockId = block.block?.id || block.id;
         const blockData = block.block || block;
         const blockSetsCounts = setsByBlock.get(blockId);
+        const completedByBlockCompletionRecord = completedBlockIds.has(blockId);
 
         if (!blockSetsCounts || blockSetsCounts.size === 0) {
-          // No sets logged for this block - if we haven't found incomplete block yet, this is it
+          // No set logs for this block: either completed via block-completion record (e.g. timer-only) or incomplete
+          if (completedByBlockCompletionRecord) {
+            if (!foundIncompleteBlock) {
+              currentBlockIndex = Math.min(index + 1, workoutBlocks.length - 1);
+            }
+            return {
+              block: blockData,
+              currentExerciseIndex: 0,
+              currentSetIndex: 0,
+              isCompleted: true,
+              completedSets: blockData.total_sets || (blockData.exercises && blockData.exercises[0]?.sets) || 1,
+              totalSets: blockData.total_sets || (blockData.exercises && blockData.exercises[0]?.sets) || 1,
+            };
+          }
+          // No sets and no completion record - incomplete
           if (!foundIncompleteBlock) {
             currentBlockIndex = index;
             foundIncompleteBlock = true;
@@ -1016,6 +1077,9 @@ export default function LiveWorkout() {
             }
           }
         }
+
+        // Block is also completed if we have a block-completion record (e.g. timer-only Tabata/EMOM)
+        blockIsCompleted = blockIsCompleted || completedByBlockCompletionRecord;
 
         // If this block is completed and we haven't found an incomplete block yet,
         // advance the restore cursor to the next block.
@@ -1944,6 +2008,19 @@ export default function LiveWorkout() {
           fetchE1RMs(allExerciseIds, supabase).then((e1rmData) => {
             setE1rmMap(e1rmData);
           });
+          // Fetch last-session weight (earliest set in most recent session) per exercise for default
+          const { fetchLastSessionWeightForExercise } = await import("@/lib/weightDefaultService");
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const lastWeights: Record<string, number> = {};
+            await Promise.all(
+              allExerciseIds.map(async (exerciseId) => {
+                const w = await fetchLastSessionWeightForExercise(supabase, user.id, exerciseId);
+                if (w != null && w > 0) lastWeights[exerciseId] = w;
+              })
+            );
+            setLastSessionWeightByExerciseId((prev) => ({ ...prev, ...lastWeights }));
+          }
         }
 
         // Load progression suggestions if workout is part of a program
@@ -3008,6 +3085,11 @@ export default function LiveWorkout() {
     );
 
   const completeWorkout = async () => {
+    // Double-submit guard: prevent concurrent runs (inside function, not only button)
+    if (isCompletingWorkoutRef.current) return;
+    isCompletingWorkoutRef.current = true;
+    setIsCompletingWorkout(true);
+
     try {
       console.log("🚀 completeWorkout called - navigating to complete page");
       const completeTargetId = assignment?.id || assignmentId;
@@ -3096,6 +3178,14 @@ export default function LiveWorkout() {
       router.push(`/client/workouts/${completeTargetId}/complete`);
     } catch (error) {
       console.error("❌ Error in completeWorkout:", error);
+      addToast({
+        title: "Could not complete workout",
+        description: "Check connection and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      isCompletingWorkoutRef.current = false;
+      setIsCompletingWorkout(false);
     }
   };
 
@@ -3742,6 +3832,14 @@ export default function LiveWorkout() {
                         [exerciseId]: e1rm,
                       }));
                     }}
+                    lastPerformedWeightByExerciseId={lastPerformedWeightByExerciseId}
+                    lastSessionWeightByExerciseId={lastSessionWeightByExerciseId}
+                    onWeightLogged={(exerciseId: string, weight: number) => {
+                      setLastPerformedWeightByExerciseId((prev) => ({
+                        ...prev,
+                        [exerciseId]: weight,
+                      }));
+                    }}
                     sessionId={sessionId}
                     assignmentId={assignment?.id || assignmentId}
                     allBlocks={workoutBlocks}
@@ -3756,16 +3854,26 @@ export default function LiveWorkout() {
                     currentBlockIndex === workoutBlocks.length - 1 && (
                       <div className="mt-6">
                         <Button
+                          disabled={isCompletingWorkout}
                           onClick={async () => {
                             console.log("🔘 Complete Workout button clicked");
                             setShowWorkoutCompletion(false);
                             await completeWorkout();
                           }}
-                          className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl h-14 text-lg font-semibold shadow-lg"
+                          className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl h-14 text-lg font-semibold shadow-lg disabled:opacity-70 disabled:pointer-events-none"
                         >
                           <div className="flex items-center gap-3">
-                            <CheckCircle className="w-6 h-6" />
-                            Complete Workout
+                            {isCompletingWorkout ? (
+                              <>
+                                <Loader2 className="w-6 h-6 animate-spin" />
+                                Completing…
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-6 h-6" />
+                                Complete Workout
+                              </>
+                            )}
                           </div>
                         </Button>
                       </div>
@@ -7905,6 +8013,7 @@ export default function LiveWorkout() {
                   }}
                 >
                   <Button
+                    disabled={isCompletingWorkout}
                     onClick={async () => {
                       console.log(
                         "🔘 Completion modal button clicked - View Progress"
@@ -7923,15 +8032,25 @@ export default function LiveWorkout() {
                       borderRadius: "20px",
                       border: "none",
                       boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                      cursor: "pointer",
+                      cursor: isCompletingWorkout ? "not-allowed" : "pointer",
+                      opacity: isCompletingWorkout ? 0.7 : 1,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "8px",
                     }}
                   >
-                    <Trophy style={{ width: "20px", height: "20px" }} />
-                    View Progress
+                    {isCompletingWorkout ? (
+                      <>
+                        <Loader2 style={{ width: "20px", height: "20px" }} className="animate-spin" />
+                        Completing…
+                      </>
+                    ) : (
+                      <>
+                        <Trophy style={{ width: "20px", height: "20px" }} />
+                        View Progress
+                      </>
+                    )}
                   </Button>
 
                   <Button

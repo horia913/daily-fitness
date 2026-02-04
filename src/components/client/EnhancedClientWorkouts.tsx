@@ -1663,14 +1663,16 @@ export default function EnhancedClientWorkouts({
               </GlassCard>
             </div>
 
-            {/* This Week's Workouts */}
+            {/* This Week's Workouts - dedupe by id to avoid duplicate React keys */}
             {thisWeekAssignments.length > 0 && (
               <section className="mb-8">
                 <h3 className="text-xl font-semibold leading-tight fc-text-primary mb-4 pl-1">
                   This Week
                 </h3>
                 <div className="flex flex-col gap-3">
-                  {thisWeekAssignments.map((assignment) => {
+                  {Array.from(
+                    new Map(thisWeekAssignments.map((a) => [a.id, a])).values()
+                  ).map((assignment) => {
                     const workoutDate = new Date(assignment.scheduled_date);
                     const isCompleted = assignment.completed;
                     const isSkipped = assignment.status === "skipped";

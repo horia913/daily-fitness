@@ -14,6 +14,7 @@ import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
+import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 
 export function DropSetExecutor({
   block,
@@ -21,6 +22,8 @@ export function DropSetExecutor({
   onNextBlock,
   e1rmMap = {},
   onE1rmUpdate,
+  lastPerformedWeightByExerciseId = {},
+  lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
   allBlocks = [],
@@ -49,37 +52,39 @@ export function DropSetExecutor({
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
   const isManuallyEditingDropWeight = useRef(false);
+  const [isWeightPristine, setIsWeightPristine] = useState(true);
 
-  // Get drop percentage from drop_set table or default to 20% (block_parameters removed)
-  const dropPercentage = 20; // TODO: Get from workout_drop_sets table
+  const exerciseId = currentExercise?.exercise_id ?? "";
+  const sessionStickyWeight = exerciseId ? lastPerformedWeightByExerciseId[exerciseId] ?? null : null;
+  const lastSessionWeight = exerciseId ? lastSessionWeightByExerciseId[exerciseId] ?? null : null;
+  const loadPercentage = currentExercise?.load_percentage ?? null;
+  const e1rm = exerciseId ? e1rmMap[exerciseId] ?? null : null;
+  const { default_weight, suggested_weight, source } = getWeightDefaultAndSuggestion({
+    sessionStickyWeight: sessionStickyWeight ?? null,
+    lastSessionWeight: lastSessionWeight ?? null,
+    loadPercentage,
+    e1rm: e1rm ?? null,
+  });
+
+  const dropPercentage = 20;
   const exerciseReps = currentExercise?.reps || block.block.reps_per_set || "";
-  const dropSetReps = exerciseReps; // TODO: Get from workout_drop_sets table
+  const dropSetReps = exerciseReps;
 
-  // Pre-fill with suggested weight - recalculate when e1rmMap is populated
   useEffect(() => {
-    if (currentExercise?.load_percentage && currentExercise?.exercise_id) {
-      // Check if e1rmMap has data for this exercise
-      const hasE1rm = e1rmMap[currentExercise.exercise_id] && e1rmMap[currentExercise.exercise_id] > 0;
-      // Only set if weight is empty or if e1rmMap was just populated
-      const weightIsEmpty = !initialWeight || initialWeight.trim() === "" || parseFloat(initialWeight) === 0;
-      
-      if (hasE1rm && weightIsEmpty) {
-        const suggested = calculateSuggestedWeightUtil(
-          currentExercise.exercise_id,
-          currentExercise.load_percentage,
-          e1rmMap
-        );
-        if (suggested && suggested > 0) {
-          setInitialWeight(suggested.toString());
-          // Calculate drop weight (reduce by drop percentage)
-          const dropWeightValue = suggested * (1 - dropPercentage / 100);
-          const roundedDropWeight = Math.round(dropWeightValue * 2) / 2;
-          setDropWeight(roundedDropWeight.toString());
-          isManuallyEditingDropWeight.current = false;
-        }
-      }
+    setIsWeightPristine(true);
+  }, [completedSets, currentExerciseIndex, exerciseId]);
+
+  useEffect(() => {
+    if (!isWeightPristine) return;
+    if (default_weight != null && default_weight > 0) {
+      setInitialWeight(String(default_weight));
+      const dropWeightValue = default_weight * (1 - dropPercentage / 100);
+      setDropWeight(String(Math.round(dropWeightValue * 2) / 2));
+    } else {
+      setInitialWeight("");
+      setDropWeight("");
     }
-  }, [currentExercise?.exercise_id, currentExercise?.load_percentage, e1rmMap, dropPercentage, initialWeight]);
+  }, [isWeightPristine, default_weight, completedSets, exerciseId, dropPercentage]);
 
   // Auto-calculate drop weight when initial weight changes
   // Always recalculate when initial weight changes (unless user is actively editing drop weight)
@@ -132,21 +137,11 @@ export function DropSetExecutor({
     },
   ];
 
-  if (currentExercise?.load_percentage) {
-    const suggestedWeight = calculateSuggestedWeightUtil(
-      currentExercise.exercise_id,
-      currentExercise.load_percentage,
-      e1rmMap
-    );
-    const loadDisplay = formatLoadPercentage(
-      currentExercise.load_percentage,
-      suggestedWeight
-    );
+  if (currentExercise?.load_percentage != null) {
+    const suggestedForDisplay = source === "percent_e1rm" ? suggested_weight : null;
+    const loadDisplay = formatLoadPercentage(currentExercise.load_percentage, suggestedForDisplay);
     if (loadDisplay) {
-      blockDetails.push({
-        label: "LOAD",
-        value: loadDisplay,
-      });
+      blockDetails.push({ label: "LOAD", value: loadDisplay });
     }
   }
 
@@ -237,33 +232,7 @@ export function DropSetExecutor({
         if (newCompletedSets >= totalSets) {
           onBlockComplete(block.block.id, loggedSetsArray);
         } else {
-          // Check if rest timer will show - if so, don't clear inputs yet
-          const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-          if (restSeconds === 0) {
-            // No rest timer, clear inputs immediately
-            const suggested = currentExercise?.load_percentage
-              ? calculateSuggestedWeightUtil(
-                  currentExercise.exercise_id,
-                  currentExercise.load_percentage,
-                  e1rmMap
-                )
-              : null;
-            if (suggested) {
-              setInitialWeight(suggested.toString());
-              const dropWeightValue = suggested * (1 - dropPercentage / 100);
-              const roundedDropWeight = Math.round(dropWeightValue * 2) / 2;
-              setDropWeight(roundedDropWeight.toString());
-              isManuallyEditingDropWeight.current = false;
-            } else {
-              setInitialWeight("");
-              setDropWeight("");
-              isManuallyEditingDropWeight.current = false;
-            }
-            setInitialReps("");
-            setDropReps("");
-          }
-          // If restSeconds > 0, rest timer will show and inputs will be cleared
-          // when the timer completes and completedSets updates
+          // Advancing to next set: parent updates lastPerformedWeightByExerciseId and completedSets; useEffect will apply defaults
         }
       } else {
         addToast({
@@ -294,16 +263,35 @@ export function DropSetExecutor({
           Initial (100%)
         </h4>
         <div className="grid grid-cols-2 gap-4">
-          <LargeInput
-            label="Weight"
-            value={initialWeight}
-            onChange={setInitialWeight}
-            placeholder="0"
-            step="0.5"
-            unit="kg"
-            showStepper
-            stepAmount={2.5}
-          />
+          <div className="space-y-2">
+            <LargeInput
+              label="Weight"
+              value={initialWeight}
+              onChange={(val) => {
+                setIsWeightPristine(false);
+                setInitialWeight(val);
+              }}
+              placeholder="0"
+              step="0.5"
+              unit="kg"
+              showStepper
+              stepAmount={2.5}
+            />
+            {suggested_weight != null && suggested_weight > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setInitialWeight(String(suggested_weight));
+                  setIsWeightPristine(false);
+                  const dropVal = suggested_weight * (1 - dropPercentage / 100);
+                  setDropWeight(String(Math.round(dropVal * 2) / 2));
+                }}
+                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {loadPercentage != null ? `${loadPercentage}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
+              </button>
+            )}
+          </div>
           <LargeInput
             label="Reps"
             value={initialReps}

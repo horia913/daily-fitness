@@ -15,6 +15,7 @@ import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
+import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 
 export function EmomExecutor({
   block,
@@ -22,6 +23,8 @@ export function EmomExecutor({
   onNextBlock,
   e1rmMap = {},
   onE1rmUpdate,
+  lastPerformedWeightByExerciseId = {},
+  lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
   allBlocks = [],
@@ -59,18 +62,32 @@ export function EmomExecutor({
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [isActive, setIsActive] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isWeightPristine, setIsWeightPristine] = useState(true);
 
-  // Pre-fill with suggested weight
+  const exerciseId = currentExercise?.exercise_id ?? "";
+  const sessionStickyWeight = exerciseId ? lastPerformedWeightByExerciseId[exerciseId] ?? null : null;
+  const lastSessionWeight = exerciseId ? lastSessionWeightByExerciseId[exerciseId] ?? null : null;
+  const loadPercentage = currentExercise?.load_percentage ?? null;
+  const e1rm = exerciseId ? e1rmMap[exerciseId] ?? null : null;
+  const { default_weight, suggested_weight, source } = getWeightDefaultAndSuggestion({
+    sessionStickyWeight: sessionStickyWeight ?? null,
+    lastSessionWeight: lastSessionWeight ?? null,
+    loadPercentage,
+    e1rm: e1rm ?? null,
+  });
+
   useEffect(() => {
-    if (currentExercise?.load_percentage && !weight) {
-      const suggested = calculateSuggestedWeightUtil(
-        currentExercise.exercise_id,
-        currentExercise.load_percentage,
-        e1rmMap
-      );
-      if (suggested) setWeight(suggested.toString());
+    setIsWeightPristine(true);
+  }, [currentExerciseIndex, exerciseId]);
+
+  useEffect(() => {
+    if (!isWeightPristine) return;
+    if (default_weight != null && default_weight > 0) {
+      setWeight(String(default_weight));
+    } else {
+      setWeight("");
     }
-  }, [currentExercise, e1rmMap, weight]);
+  }, [isWeightPristine, default_weight, currentExerciseIndex, exerciseId]);
 
   // Timer logic - countdown each minute
   useEffect(() => {
@@ -138,15 +155,11 @@ export function EmomExecutor({
     });
   }
 
-  if (currentExercise?.load_percentage) {
-    const suggestedWeight = calculateSuggestedWeightUtil(
-      currentExercise.exercise_id,
-      currentExercise.load_percentage,
-      e1rmMap
-    );
+  if (currentExercise?.load_percentage != null) {
+    const suggestedForDisplay = source === "percent_e1rm" ? suggested_weight : null;
     const loadDisplay = formatLoadPercentage(
       currentExercise.load_percentage,
-      suggestedWeight
+      suggestedForDisplay
     );
     if (loadDisplay) {
       blockDetails.push({
@@ -217,8 +230,8 @@ export function EmomExecutor({
           duration: 2000,
         });
 
-        // If all minutes complete, finish block
-        if (currentMinute >= durationMinutes && timeRemaining === 0) {
+        // If this was the last minute, mark block complete (don't require timeRemaining === 0)
+        if (currentMinute >= durationMinutes) {
           const loggedSetsArray: LoggedSet[] = [
             {
               id: `temp-${Date.now()}`,
@@ -272,16 +285,33 @@ export function EmomExecutor({
       {/* Weight and Reps Input */}
       <GlassCard elevation={1} className="p-4">
         <div className="grid grid-cols-2 gap-4">
-          <LargeInput
-            label="Weight"
-            value={weight}
-            onChange={setWeight}
-            placeholder="0"
-            step="0.5"
-            unit="kg"
-            showStepper
-            stepAmount={2.5}
-          />
+          <div className="space-y-2">
+            <LargeInput
+              label="Weight"
+              value={weight}
+              onChange={(val) => {
+                setIsWeightPristine(false);
+                setWeight(val);
+              }}
+              placeholder="0"
+              step="0.5"
+              unit="kg"
+              showStepper
+              stepAmount={2.5}
+            />
+            {suggested_weight != null && suggested_weight > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setWeight(String(suggested_weight));
+                  setIsWeightPristine(false);
+                }}
+                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {currentExercise?.load_percentage != null ? `${currentExercise.load_percentage}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
+              </button>
+            )}
+          </div>
           <LargeInput
             label="Reps Completed"
             value={reps}
@@ -296,15 +326,30 @@ export function EmomExecutor({
     </div>
   );
 
+  const handleCompleteBlock = () => {
+    const loggedSetsArray: LoggedSet[] = [];
+    onBlockComplete(block.block.id, loggedSetsArray);
+  };
+
   const logButton = (
-    <Button
-      onClick={handleLog}
-      disabled={isLoggingSet || !isActive}
-      className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white text-lg py-4"
-    >
-      <CheckCircle className="w-5 h-5 mr-2" />
-      {isLoggingSet ? "Logging..." : "LOG WORK"}
-    </Button>
+    <div className="space-y-3">
+      <Button
+        onClick={handleLog}
+        disabled={isLoggingSet || !isActive}
+        className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white text-lg py-4"
+      >
+        <CheckCircle className="w-5 h-5 mr-2" />
+        {isLoggingSet ? "Logging..." : "LOG WORK"}
+      </Button>
+      <Button
+        onClick={handleCompleteBlock}
+        variant="outline"
+        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-lg py-4 border-0"
+      >
+        <CheckCircle className="w-5 h-5 mr-2" />
+        Complete Block
+      </Button>
+    </div>
   );
 
   return (

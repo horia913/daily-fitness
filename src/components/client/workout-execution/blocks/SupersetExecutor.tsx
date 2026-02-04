@@ -15,6 +15,7 @@ import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
+import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 
 export function SupersetExecutor({
   block,
@@ -22,6 +23,8 @@ export function SupersetExecutor({
   onNextBlock,
   e1rmMap = {},
   onE1rmUpdate,
+  lastPerformedWeightByExerciseId = {},
+  lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
   allBlocks = [],
@@ -50,26 +53,39 @@ export function SupersetExecutor({
   const [repsB, setRepsB] = useState("");
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
+  const [isWeightAPristine, setIsWeightAPristine] = useState(true);
+  const [isWeightBPristine, setIsWeightBPristine] = useState(true);
 
-  // Pre-fill with suggested weights
+  const resultA = getWeightDefaultAndSuggestion({
+    sessionStickyWeight: exerciseA?.exercise_id ? (lastPerformedWeightByExerciseId[exerciseA.exercise_id] ?? null) : null,
+    lastSessionWeight: exerciseA?.exercise_id ? (lastSessionWeightByExerciseId[exerciseA.exercise_id] ?? null) : null,
+    loadPercentage: exerciseA?.load_percentage ?? null,
+    e1rm: exerciseA?.exercise_id ? (e1rmMap[exerciseA.exercise_id] ?? null) : null,
+  });
+  const resultB = getWeightDefaultAndSuggestion({
+    sessionStickyWeight: exerciseB?.exercise_id ? (lastPerformedWeightByExerciseId[exerciseB.exercise_id] ?? null) : null,
+    lastSessionWeight: exerciseB?.exercise_id ? (lastSessionWeightByExerciseId[exerciseB.exercise_id] ?? null) : null,
+    loadPercentage: exerciseB?.load_percentage ?? null,
+    e1rm: exerciseB?.exercise_id ? (e1rmMap[exerciseB.exercise_id] ?? null) : null,
+  });
+
   useEffect(() => {
-    if (exerciseA?.load_percentage && !weightA) {
-      const suggested = calculateSuggestedWeightUtil(
-        exerciseA.exercise_id,
-        exerciseA.load_percentage,
-        e1rmMap
-      );
-      if (suggested) setWeightA(suggested.toString());
+    setIsWeightAPristine(true);
+    setIsWeightBPristine(true);
+  }, [completedSets]);
+
+  useEffect(() => {
+    if (isWeightAPristine) {
+      if (resultA.default_weight != null && resultA.default_weight > 0) setWeightA(String(resultA.default_weight));
+      else setWeightA("");
     }
-    if (exerciseB?.load_percentage && !weightB) {
-      const suggested = calculateSuggestedWeightUtil(
-        exerciseB.exercise_id,
-        exerciseB.load_percentage,
-        e1rmMap
-      );
-      if (suggested) setWeightB(suggested.toString());
+  }, [isWeightAPristine, resultA.default_weight]);
+  useEffect(() => {
+    if (isWeightBPristine) {
+      if (resultB.default_weight != null && resultB.default_weight > 0) setWeightB(String(resultB.default_weight));
+      else setWeightB("");
     }
-  }, [exerciseA, exerciseB, e1rmMap, weightA, weightB]);
+  }, [isWeightBPristine, resultB.default_weight]);
 
   // Block details
   const blockDetails: BlockDetail[] = [
@@ -95,21 +111,11 @@ export function SupersetExecutor({
         value: exerciseA.reps,
       });
     }
-    if (exerciseA.load_percentage) {
-      const suggestedWeight = calculateSuggestedWeightUtil(
-        exerciseA.exercise_id,
-        exerciseA.load_percentage,
-        e1rmMap
-      );
-      const loadDisplay = formatLoadPercentage(
-        exerciseA.load_percentage,
-        suggestedWeight
-      );
+    if (exerciseA.load_percentage != null) {
+      const suggestedForDisplay = resultA.source === "percent_e1rm" ? resultA.suggested_weight : null;
+      const loadDisplay = formatLoadPercentage(exerciseA.load_percentage, suggestedForDisplay);
       if (loadDisplay) {
-        blockDetails.push({
-          label: "LOAD (A)",
-          value: loadDisplay,
-        });
+        blockDetails.push({ label: "LOAD (A)", value: loadDisplay });
       }
     }
   }
@@ -125,21 +131,11 @@ export function SupersetExecutor({
         value: exerciseB.reps,
       });
     }
-    if (exerciseB.load_percentage) {
-      const suggestedWeight = calculateSuggestedWeightUtil(
-        exerciseB.exercise_id,
-        exerciseB.load_percentage,
-        e1rmMap
-      );
-      const loadDisplay = formatLoadPercentage(
-        exerciseB.load_percentage,
-        suggestedWeight
-      );
+    if (exerciseB.load_percentage != null) {
+      const suggestedForDisplay = resultB.source === "percent_e1rm" ? resultB.suggested_weight : null;
+      const loadDisplay = formatLoadPercentage(exerciseB.load_percentage, suggestedForDisplay);
       if (loadDisplay) {
-        blockDetails.push({
-          label: "LOAD (B)",
-          value: loadDisplay,
-        });
+        blockDetails.push({ label: "LOAD (B)", value: loadDisplay });
       }
     }
   }
@@ -237,18 +233,7 @@ export function SupersetExecutor({
         if (newCompletedSets >= totalSets) {
           onBlockComplete(block.block.id, loggedSetsArray);
         } else {
-          // Check if rest timer will show - if so, don't clear inputs yet
-          const currentExercise = block.block.exercises?.[currentExerciseIndex];
-          const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-          if (restSeconds === 0) {
-            // No rest timer, clear inputs immediately
-            setWeightA("");
-            setRepsA("");
-            setWeightB("");
-            setRepsB("");
-          }
-          // If restSeconds > 0, rest timer will show and inputs will be cleared
-          // when the timer completes and completedSets updates
+          // Advancing to next set: parent updates lastPerformedWeightByExerciseId and completedSets; useEffect will apply defaults
         }
       } else {
         addToast({
@@ -280,16 +265,23 @@ export function SupersetExecutor({
           )}
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <LargeInput
-            label="Weight"
-            value={weightA}
-            onChange={setWeightA}
-            placeholder="0"
-            step="0.5"
-            unit="kg"
-            showStepper
-            stepAmount={2.5}
-          />
+          <div className="space-y-2">
+            <LargeInput
+              label="Weight"
+              value={weightA}
+              onChange={(val) => { setIsWeightAPristine(false); setWeightA(val); }}
+              placeholder="0"
+              step="0.5"
+              unit="kg"
+              showStepper
+              stepAmount={2.5}
+            />
+            {resultA.suggested_weight != null && resultA.suggested_weight > 0 && (
+              <button type="button" onClick={() => { setWeightA(String(resultA.suggested_weight)); setIsWeightAPristine(false); }} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                {exerciseA?.load_percentage != null ? `${exerciseA.load_percentage}% → ${resultA.suggested_weight} kg` : `Suggested: ${resultA.suggested_weight} kg`} (tap to apply)
+              </button>
+            )}
+          </div>
           <LargeInput
             label="Reps"
             value={repsA}
@@ -317,16 +309,23 @@ export function SupersetExecutor({
           )}
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <LargeInput
-            label="Weight"
-            value={weightB}
-            onChange={setWeightB}
-            placeholder="0"
-            step="0.5"
-            unit="kg"
-            showStepper
-            stepAmount={2.5}
-          />
+          <div className="space-y-2">
+            <LargeInput
+              label="Weight"
+              value={weightB}
+              onChange={(val) => { setIsWeightBPristine(false); setWeightB(val); }}
+              placeholder="0"
+              step="0.5"
+              unit="kg"
+              showStepper
+              stepAmount={2.5}
+            />
+            {resultB.suggested_weight != null && resultB.suggested_weight > 0 && (
+              <button type="button" onClick={() => { setWeightB(String(resultB.suggested_weight)); setIsWeightBPristine(false); }} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                {exerciseB?.load_percentage != null ? `${exerciseB.load_percentage}% → ${resultB.suggested_weight} kg` : `Suggested: ${resultB.suggested_weight} kg`} (tap to apply)
+              </button>
+            )}
+          </div>
           <LargeInput
             label="Reps"
             value={repsB}

@@ -12,6 +12,11 @@ export interface BaseBlockExecutorProps {
   onNextBlock: () => void;
   e1rmMap?: Record<string, number>;
   onE1rmUpdate?: (exerciseId: string, e1rm: number) => void;
+  /** Session-level last performed weight per exercise (sticky default) */
+  lastPerformedWeightByExerciseId?: Record<string, number>;
+  /** Last-session weight per exercise (earliest set in most recent completed workout) */
+  lastSessionWeightByExerciseId?: Record<string, number>;
+  onWeightLogged?: (exerciseId: string, weight: number) => void;
   sessionId?: string | null;
   assignmentId?: string;
   allBlocks?: LiveWorkoutBlock[];

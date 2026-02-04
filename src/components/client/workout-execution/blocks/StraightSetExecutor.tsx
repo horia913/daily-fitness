@@ -15,6 +15,7 @@ import {
 } from "../BaseBlockExecutor";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { RPEModal } from "@/components/client/RPEModal";
+import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 
 interface StraightSetExecutorProps extends BaseBlockExecutorProps {}
 
@@ -24,6 +25,8 @@ export function StraightSetExecutor({
   onNextBlock,
   e1rmMap = {},
   onE1rmUpdate,
+  lastPerformedWeightByExerciseId = {},
+  lastSessionWeightByExerciseId = {},
   sessionId,
   assignmentId,
   allBlocks = [],
@@ -57,34 +60,44 @@ export function StraightSetExecutor({
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [loggedSetsArray, setLoggedSetsArray] = useState<LoggedSet[]>([]);
-  
+  /** Pristine: apply default only when true; set false on user edit; set true when advancing to next set */
+  const [isWeightPristine, setIsWeightPristine] = useState(true);
+
   // RPE Modal State
   const [showRpeModal, setShowRpeModal] = useState(false);
   const [pendingSetLogId, setPendingSetLogId] = useState<string | null>(null);
 
-  // Pre-fill with suggested weight when set number or exercise changes
+  const exerciseId = currentExercise?.exercise_id ?? "";
+  const sessionStickyWeight = exerciseId ? lastPerformedWeightByExerciseId[exerciseId] ?? null : null;
+  const lastSessionWeight = exerciseId ? lastSessionWeightByExerciseId[exerciseId] ?? null : null;
+  const loadPercentage = currentExercise?.load_percentage ?? null;
+  const e1rm = exerciseId ? e1rmMap[exerciseId] ?? null : null;
+  const { default_weight, suggested_weight, source } = getWeightDefaultAndSuggestion({
+    sessionStickyWeight: sessionStickyWeight ?? null,
+    lastSessionWeight: lastSessionWeight ?? null,
+    loadPercentage,
+    e1rm: e1rm ?? null,
+  });
+
+  // Apply truth-based default only when entering new set/exercise and pristine; never autofill e1RM/%
   useEffect(() => {
-    if (currentExercise?.load_percentage && currentExercise?.exercise_id) {
-      const suggestedWeight = calculateSuggestedWeightUtil(
-        currentExercise.exercise_id,
-        currentExercise.load_percentage,
-        e1rmMap
-      );
-      if (suggestedWeight && suggestedWeight > 0) {
-        setWeight(suggestedWeight.toString());
-      } else {
-        setWeight("");
-      }
+    setIsWeightPristine(true);
+  }, [completedSets, currentExerciseIndex, exerciseId]);
+
+  useEffect(() => {
+    if (!isWeightPristine) return;
+    if (default_weight != null && default_weight > 0) {
+      setWeight(String(default_weight));
     } else {
       setWeight("");
     }
     setReps("");
   }, [
+    isWeightPristine,
+    default_weight,
     completedSets,
     currentExerciseIndex,
-    currentExercise?.exercise_id,
-    currentExercise?.load_percentage,
-    e1rmMap,
+    exerciseId,
   ]);
 
   // Get block details for display
@@ -104,19 +117,15 @@ export function StraightSetExecutor({
     },
   ];
 
-  // Add LOAD if available
-  const loadPercentage = currentExercise?.load_percentage;
+  // Add LOAD if available (display only; suggestion chip shown separately when default_weight is null)
+  const loadPercentageDisplay = currentExercise?.load_percentage;
   if (
-    loadPercentage !== null &&
-    loadPercentage !== undefined &&
+    loadPercentageDisplay !== null &&
+    loadPercentageDisplay !== undefined &&
     currentExercise?.exercise_id
   ) {
-    const suggestedWeight = calculateSuggestedWeightUtil(
-      currentExercise.exercise_id,
-      loadPercentage,
-      e1rmMap
-    );
-    const loadDisplay = formatLoadPercentage(loadPercentage, suggestedWeight);
+    const suggestedForDisplay = source === "percent_e1rm" ? suggested_weight : null;
+    const loadDisplay = formatLoadPercentage(loadPercentageDisplay, suggestedForDisplay);
     if (loadDisplay) {
       blockDetails.push({
         label: "LOAD",
@@ -257,16 +266,9 @@ export function StraightSetExecutor({
           // Complete the block
           onBlockComplete(block.block.id, updatedLoggedSets);
         } else {
-          // Check if rest timer will show - if so, don't clear inputs yet
-          const restSeconds =
-            currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-          if (restSeconds === 0) {
-            // No rest timer, clear inputs immediately (will be pre-filled by useEffect)
-            setWeight("");
-            setReps("");
-          }
-          // If restSeconds > 0, rest timer will show and inputs will be cleared
-          // when the timer completes and completedSets updates (via useEffect)
+          // Advancing to next set: parent will update lastPerformedWeightByExerciseId and completedSets;
+          // useEffect will run (pristine reset + default from sticky) and set weight for next set.
+          // If rest timer > 0, inputs clear when timer completes and completedSets updates.
         }
       } else {
         addToast({
@@ -340,16 +342,34 @@ export function StraightSetExecutor({
           Set {currentSetNumber} of {totalSets}
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <LargeInput
-            label="Weight"
-            value={weight}
-            onChange={setWeight}
-            placeholder="0"
-            step="0.5"
-            unit="kg"
-            showStepper
-            stepAmount={2.5}
-          />
+          <div className="space-y-2">
+            <LargeInput
+              label="Weight"
+              value={weight}
+              onChange={(val) => {
+                setIsWeightPristine(false);
+                setWeight(val);
+              }}
+              placeholder="0"
+              step="0.5"
+              unit="kg"
+              showStepper
+              stepAmount={2.5}
+            />
+            {/* Tap-to-apply suggestion only when no truth-based default (single weight source) */}
+            {suggested_weight != null && suggested_weight > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setWeight(String(suggested_weight));
+                  setIsWeightPristine(false);
+                }}
+                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {loadPercentageDisplay != null ? `${loadPercentageDisplay}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
+              </button>
+            )}
+          </div>
           <LargeInput
             label="Reps"
             value={reps}
