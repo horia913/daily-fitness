@@ -6,7 +6,6 @@ import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/contexts/ThemeContext'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
-import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import {
@@ -69,7 +68,7 @@ interface ClientProfile {
 function ClientProgramDetailsContent() {
   const params = useParams()
   const router = useRouter()
-  const { isDark, getSemanticColor, performanceSettings } = useTheme()
+  const { performanceSettings } = useTheme()
   
   const clientId = params.id as string
   const programId = params.programId as string
@@ -217,14 +216,14 @@ function ClientProgramDetailsContent() {
     return (
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
-          <GlassCard elevation={2} className="fc-glass fc-card p-8">
+        <div className="relative z-10 mx-auto w-full max-w-7xl fc-page">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8">
             <div className="animate-pulse space-y-4">
               <div className="h-8 rounded-xl bg-[color:var(--fc-glass-highlight)] w-1/3"></div>
               <div className="h-4 rounded-xl bg-[color:var(--fc-glass-highlight)] w-2/3"></div>
               <div className="h-64 rounded-xl bg-[color:var(--fc-glass-highlight)]"></div>
             </div>
-          </GlassCard>
+          </div>
         </div>
       </AnimatedBackground>
     )
@@ -234,8 +233,8 @@ function ClientProgramDetailsContent() {
     return (
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
-          <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center">
+        <div className="relative z-10 mx-auto w-full max-w-7xl fc-page">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
             <AlertCircle className="w-16 h-16 mx-auto mb-4 fc-text-error" />
             <h2 className="text-xl font-bold fc-text-primary mb-2">Program Not Found</h2>
             <p className="fc-text-dim mb-4">This program assignment could not be found.</p>
@@ -245,7 +244,7 @@ function ClientProgramDetailsContent() {
                 Back to Client
               </Button>
             </Link>
-          </GlassCard>
+          </div>
         </div>
       </AnimatedBackground>
     )
@@ -255,17 +254,15 @@ function ClientProgramDetailsContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-        {/* Back Button */}
-        <Link href={`/coach/clients/${clientId}`}>
-          <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to {clientName}
-          </Button>
+      <div className="relative z-10 mx-auto w-full max-w-7xl fc-page flex flex-col" style={{ gap: "var(--fc-gap-sections)" }}>
+        {/* Back */}
+        <Link href={`/coach/clients/${clientId}`} className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-4 py-2.5 w-fit text-[color:var(--fc-text-primary)]">
+          <ArrowLeft className="w-4 h-4" />
+          Back to {clientName}
         </Link>
 
         {/* Header */}
-        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-8">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div className="flex items-start gap-4">
               <div className="fc-icon-tile fc-icon-workouts w-14 h-14">
@@ -329,11 +326,11 @@ function ClientProgramDetailsContent() {
               </Link>
             </div>
           </div>
-        </GlassCard>
+        </div>
 
         {/* Program Overview Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <GlassCard elevation={2} className="fc-glass fc-card p-4">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
             <div className="flex items-center gap-3">
               <div className="fc-icon-tile fc-icon-workouts w-10 h-10">
                 <Clock className="w-5 h-5" />
@@ -343,9 +340,9 @@ function ClientProgramDetailsContent() {
                 <p className="text-sm fc-text-dim">Weeks</p>
               </div>
             </div>
-          </GlassCard>
+          </div>
 
-          <GlassCard elevation={2} className="fc-glass fc-card p-4">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
             <div className="flex items-center gap-3">
               <div className="fc-icon-tile fc-icon-workouts w-10 h-10">
                 <Dumbbell className="w-5 h-5" />
@@ -355,9 +352,9 @@ function ClientProgramDetailsContent() {
                 <p className="text-sm fc-text-dim">Total Workouts</p>
               </div>
             </div>
-          </GlassCard>
+          </div>
 
-          <GlassCard elevation={2} className="fc-glass fc-card p-4">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
             <div className="flex items-center gap-3">
               <div className="fc-icon-tile fc-icon-habits w-10 h-10">
                 <Users className="w-5 h-5" />
@@ -369,9 +366,9 @@ function ClientProgramDetailsContent() {
                 <p className="text-sm fc-text-dim">Target</p>
               </div>
             </div>
-          </GlassCard>
+          </div>
 
-          <GlassCard elevation={2} className="fc-glass fc-card p-4">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
             <div className="flex items-center gap-3">
               <div className="fc-icon-tile fc-icon-warning w-10 h-10">
                 <Star className="w-5 h-5" />
@@ -383,12 +380,12 @@ function ClientProgramDetailsContent() {
                 <p className="text-sm fc-text-dim">Level</p>
               </div>
             </div>
-          </GlassCard>
+          </div>
         </div>
 
         {/* Progress Section */}
         {progress && (
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
             <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
               <Target className="w-5 h-5 fc-text-workouts" />
               Client Progress
@@ -396,11 +393,11 @@ function ClientProgramDetailsContent() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                 <p className="text-sm fc-text-dim">Current Week</p>
-                <p className="text-2xl font-bold fc-text-primary">{progress.current_week_index + 1}</p>
+                <p className="text-2xl font-bold fc-text-primary">{progress.current_week_number ?? ((progress as any).current_week_index != null ? (progress as any).current_week_index + 1 : 1)}</p>
               </div>
               <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                 <p className="text-sm fc-text-dim">Current Day</p>
-                <p className="text-2xl font-bold fc-text-primary">{progress.current_day_index + 1}</p>
+                <p className="text-2xl font-bold fc-text-primary">{progress.current_day_number ?? ((progress as any).current_day_index != null ? (progress as any).current_day_index + 1 : 1)}</p>
               </div>
               <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
                 <p className="text-sm fc-text-dim">Status</p>
@@ -409,19 +406,19 @@ function ClientProgramDetailsContent() {
                 </p>
               </div>
             </div>
-          </GlassCard>
+          </div>
         )}
 
         {/* Description */}
         {program.description && (
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
             <h2 className="text-xl font-bold fc-text-primary mb-3">Description</h2>
             <p className="fc-text-dim leading-relaxed">{program.description}</p>
-          </GlassCard>
+          </div>
         )}
 
         {/* Weekly Schedule */}
-        <GlassCard elevation={2} className="fc-glass fc-card p-6">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
           <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
             <Calendar className="w-5 h-5 fc-text-workouts" />
             Weekly Schedule
@@ -453,10 +450,10 @@ function ClientProgramDetailsContent() {
               )
             })}
           </div>
-        </GlassCard>
+        </div>
 
         {/* Full Schedule by Week */}
-        <GlassCard elevation={2} className="fc-glass fc-card p-6">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
           <h2 className="text-xl font-bold fc-text-primary mb-4 flex items-center gap-2">
             <Dumbbell className="w-5 h-5 fc-text-workouts" />
             Full Program Schedule ({schedule.length} workouts)
@@ -501,7 +498,7 @@ function ClientProgramDetailsContent() {
               </div>
             ))}
           </div>
-        </GlassCard>
+        </div>
       </div>
     </AnimatedBackground>
   )

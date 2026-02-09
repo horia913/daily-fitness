@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Challenges Management | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --prismatic-glow: linear-gradient(90deg, #ef444455, #3b82f655, #10b98155);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Anodized Prismatic Tension */
+        .crystal-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(200%);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            position: relative;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.3s ease;
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-4px);
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%; left: -100%; width: 300%; height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .prismatic-edge {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary), var(--accent));
+            opacity: 0.6;
+        }
+
+        .btn-fab {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-fab:active { transform: scale(0.9) rotate(90deg); }
+
+        .tag-active {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10B981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .tag-upcoming {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3B82F6;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .text-h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; }
+        .text-h2 { font-size: 20px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s cubic-bezier(0, 1, 0, 1);
+        }
+
+        .collapsible-active .collapsible-content {
+            max-height: 1000px;
+            transition: max-height 1s ease-in;
+        }
+
+        .swipe-hint {
+            animation: swipeAnim 2s infinite;
+        }
+
+        @keyframes swipeAnim {
+            0%, 100% { transform: translateX(0); opacity: 0.5; }
+            50% { transform: translateX(-10px); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header -->
+    <header class="max-w-screen-xl mx-auto flex justify-between items-end mb-12">
+        <div>
+            <div class="flex items-center gap-2 mb-2">
+                <span class="w-8 h-[2px] bg-accent"></span>
+                <span class="text-accent text-sm font-bold tracking-widest uppercase">Coach Portal</span>
+            </div>
+            <h1 class="text-h1">Challenges Management</h1>
+        </div>
+        <div class="hidden md:flex gap-3">
+            <button class="px-6 h-12 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all font-medium">Analytics</button>
+            <button class="px-6 h-12 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all font-medium">History</button>
+        </div>
+    </header>
+
+    <main class="max-w-screen-xl mx-auto space-y-12">
+        
+        <!-- ACTIVE CHALLENGES -->
+        <section id="active-challenges">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-h2 flex items-center gap-2">
+                    <i data-lucide="zap" class="w-5 h-5 text-primary"></i>
+                    Active Now
+                </h2>
+                <span class="mono text-xs bg-white/5 px-2 py-1 rounded">2 RUNNING</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Challenge Card 1 -->
+                <div class="crystal-card kinetic-shimmer p-6 cursor-pointer group">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="tag-active px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Live</div>
+                        <div class="flex -space-x-3">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=1" class="w-8 h-8 rounded-full border-2 border-black" />
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=2" class="w-8 h-8 rounded-full border-2 border-black" />
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=3" class="w-8 h-8 rounded-full border-2 border-black" />
+                            <div class="w-8 h-8 rounded-full border-2 border-black bg-neutral-800 flex items-center justify-center text-[10px] font-bold">+18</div>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-2xl font-bold mb-2 group-hover:text-accent transition-colors">Vertical Leap Peak</h3>
+                    <p class="text-neutral-400 text-sm mb-6 line-clamp-2">High-intensity plyometric volume challenge focusing on fast-twitch fiber activation.</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="p-3 bg-white/5 rounded-xl border border-white/5">
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold mb-1">Time Remaining</div>
+                            <div class="text-lg font-bold mono text-primary">03d : 14h</div>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-xl border border-white/5">
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold mb-1">Participants</div>
+                            <div class="text-lg font-bold mono">22 Athletes</div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-neutral-300 flex items-center gap-2">
+                            <i data-lucide="trending-up" class="w-4 h-4 text-accent"></i>
+                            +12% Avg. Progress
+                        </span>
+                        <i data-lucide="chevron-right" class="w-5 h-5 text-neutral-500 group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                    <div class="prismatic-edge"></div>
+                </div>
+
+                <!-- Challenge Card 2 -->
+                <div class="crystal-card kinetic-shimmer p-6 cursor-pointer group">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="tag-active px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Live</div>
+                        <div class="flex -space-x-3">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=9" class="w-8 h-8 rounded-full border-2 border-black" />
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=10" class="w-8 h-8 rounded-full border-2 border-black" />
+                            <div class="w-8 h-8 rounded-full border-2 border-black bg-neutral-800 flex items-center justify-center text-[10px] font-bold">+5</div>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-2xl font-bold mb-2 group-hover:text-secondary transition-colors">Morning Mobility Streak</h3>
+                    <p class="text-neutral-400 text-sm mb-6 line-clamp-2">Daily 15-minute flow before 9:00 AM. Consistency is the only metric that matters.</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="p-3 bg-white/5 rounded-xl border border-white/5">
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold mb-1">Time Remaining</div>
+                            <div class="text-lg font-bold mono text-primary">12h : 44m</div>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-xl border border-white/5">
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold mb-1">Participants</div>
+                            <div class="text-lg font-bold mono">8 Athletes</div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-neutral-300 flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-4 h-4 text-secondary"></i>
+                            14 Day Streak Goal
+                        </span>
+                        <i data-lucide="chevron-right" class="w-5 h-5 text-neutral-500 group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                    <div class="prismatic-edge" style="background: var(--secondary)"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- UPCOMING CHALLENGES -->
+        <section id="upcoming-challenges">
+            <h2 class="text-h2 flex items-center gap-2 mb-6">
+                <i data-lucide="calendar-days" class="w-5 h-5 text-secondary"></i>
+                Upcoming
+            </h2>
+            <div class="space-y-4">
+                <div class="crystal-card p-4 flex items-center gap-6 group hover:bg-white/5">
+                    <div class="w-16 h-16 rounded-2xl bg-secondary/10 flex flex-col items-center justify-center text-secondary border border-secondary/20 shrink-0">
+                        <span class="text-xs font-bold uppercase">Jan</span>
+                        <span class="text-xl font-bold">01</span>
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="font-bold text-lg group-hover:text-secondary transition-colors">2024 Rebirth: 30 Day Shred</h4>
+                        <div class="flex items-center gap-4 mt-1">
+                            <span class="text-xs text-neutral-500 flex items-center gap-1">
+                                <i data-lucide="users" class="w-3 h-3"></i> 45 Enrolled
+                            </span>
+                            <span class="text-xs text-neutral-500 flex items-center gap-1">
+                                <i data-lucide="award" class="w-3 h-3"></i> Pro License Req.
+                            </span>
+                        </div>
+                    </div>
+                    <button class="p-3 bg-white/5 rounded-xl text-neutral-400 group-hover:text-white group-hover:bg-secondary/20 transition-all">
+                        <i data-lucide="edit-3" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- COMPLETED CHALLENGES (Collapsible) -->
+        <section id="completed-challenges" class="collapsible-section">
+            <button onclick="toggleCollapsible()" class="w-full flex items-center justify-between py-4 border-b border-white/10 group">
+                <h2 class="text-h2 flex items-center gap-2 mb-0">
+                    <i data-lucide="check-circle-2" class="w-5 h-5 text-neutral-500"></i>
+                    Completed
+                </h2>
+                <i data-lucide="chevron-down" id="collapse-icon" class="w-6 h-6 text-neutral-500 group-hover:text-white transition-all"></i>
+            </button>
+            
+            <div class="collapsible-content pt-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="crystal-card p-5 bg-neutral-900/50 grayscale hover:grayscale-0 transition-all">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent">
+                                <i data-lucide="trophy" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm">Deadlift PR Race</h4>
+                                <p class="text-[10px] text-neutral-500 font-bold uppercase">Winner: Marcus T.</p>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-neutral-400">
+                            <span>12 Participants</span>
+                            <span>Ended Dec 15</span>
+                        </div>
+                    </div>
+                    <!-- Repeat for more completed challenges -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FAB -->
+    <button onclick="openCreateModal()" class="fixed bottom-8 right-8 btn-fab rounded-full flex items-center justify-center z-50">
+        <i data-lucide="plus" class="w-8 h-8 text-white"></i>
+    </button>
+
+    <!-- Navigation (From Reference) -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 bg-black/80 backdrop-blur-xl border-t border-white/10 z-40">
+        <div class="max-w-screen-xl mx-auto flex items-center gap-4">
+            <div class="flex flex-1 justify-around md:justify-start md:gap-12">
+                <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white">
+                    <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Client</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-primary">
+                    <i data-lucide="swords" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Challenges</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white">
+                    <i data-lucide="users" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Roster</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Swipe Hint for Mobile -->
+    <div class="md:hidden fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-2 text-white/30 text-[10px] font-bold uppercase tracking-widest swipe-hint">
+        <i data-lucide="arrow-left" class="w-3 h-3"></i>
+        Swipe to Edit
+    </div>
+
+    <script>
+        // Initialize Lucide
+        lucide.createIcons();
+
+        // Staggered entrance animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+
+        // Collapsible Logic
+        function toggleCollapsible() {
+            const section = document.querySelector('.collapsible-section');
+            const icon = document.getElementById('collapse-icon');
+            section.classList.toggle('collapsible-active');
+            icon.style.transform = section.classList.contains('collapsible-active') ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+
+        // Haptic Feedback for FAB
+        function openCreateModal() {
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate([20, 10, 20]);
+            }
+            // Mock Modal Call
+            alert("Open Full-Screen Create Challenge Modal");
+        }
+
+        // Mock Swipe Simulation (Visual only)
+        document.querySelectorAll('.crystal-card').forEach(card => {
+            let startX;
+            card.addEventListener('touchstart', e => startX = e.touches[0].clientX);
+            card.addEventListener('touchend', e => {
+                let diff = startX - e.changedTouches[0].clientX;
+                if (diff > 50) {
+                    card.style.transform = 'translateX(-80px)';
+                    setTimeout(() => card.style.transform = 'translateX(0)', 1500);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure Drop Set | Kinetic Glass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --drop-set: #A855F7;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .drop-set-card {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(168, 85, 247, 0.02) 100%);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-primary {
+            height: 56px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:active { transform: scale(0.95); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4); }
+
+        .btn-secondary {
+            height: 56px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1.5px solid var(--glass-border);
+            color: #FFFFFF;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+
+        .input-group label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #9CA3AF;
+            margin-bottom: 8px;
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 14px 16px;
+            color: white;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--drop-set);
+            background: rgba(168, 85, 247, 0.05);
+            box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.1);
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(168, 85, 247, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.05) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #141414;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .search-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .search-item:hover {
+            background: rgba(168, 85, 247, 0.2);
+        }
+
+        .badge-protocol {
+            background: rgba(168, 85, 247, 0.2);
+            color: #D8B4FE;
+            border: 1px solid rgba(168, 85, 247, 0.4);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header -->
+    <header class="max-w-2xl mx-auto flex items-center justify-between mb-8">
+        <div class="flex items-center gap-4">
+            <button class="w-12 h-12 flex items-center justify-center rounded-2xl crystal-card hover:bg-white/10 transition-colors">
+                <i data-lucide="arrow-left" class="w-6 h-6"></i>
+            </button>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">Add Exercise</h1>
+                <p class="text-sm text-neutral-400">Template Builder</p>
+            </div>
+        </div>
+        <div class="badge-protocol px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest mono">
+            Drop Set
+        </div>
+    </header>
+
+    <main class="max-w-2xl mx-auto space-y-6">
+        
+        <!-- Main Configuration Card -->
+        <section class="crystal-card drop-set-card p-6 md:p-8 kinetic-shimmer">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
+                    <i data-lucide="trending-down" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold">Drop Set Configuration</h2>
+                    <p class="text-sm text-neutral-400">High intensity, descending weight</p>
+                </div>
+            </div>
+
+            <form class="space-y-6">
+                <!-- Exercise Type Selector -->
+                <div class="input-group">
+                    <label>Protocol Type</label>
+                    <select class="appearance-none cursor-pointer">
+                        <option value="straight">Straight Set</option>
+                        <option value="superset">Superset</option>
+                        <option value="drop_set" selected>Drop Set (Advanced)</option>
+                        <option value="amrap">AMRAP</option>
+                    </select>
+                </div>
+
+                <!-- Searchable Exercise Selector -->
+                <div class="input-group relative">
+                    <label>Exercise Selection <span class="text-red-500">*</span></label>
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500"></i>
+                        <input type="text" id="exercise-search" placeholder="Search movements..." class="pl-12" required>
+                    </div>
+                    <div id="results" class="search-results absolute w-full z-10">
+                        <div class="search-item">Dumbbell Lateral Raise</div>
+                        <div class="search-item">Leg Extension</div>
+                        <div class="search-item">Cable Tricep Pushdown</div>
+                        <div class="search-item">Seated Leg Curl</div>
+                    </div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="input-group">
+                        <label>Main Reps Goal</label>
+                        <input type="text" name="exercise_reps" placeholder="e.g., 8-10" class="mono">
+                    </div>
+                    <div class="input-group">
+                        <label>Drop Reps Goal</label>
+                        <input type="text" name="drop_set_reps" placeholder="e.g., 10-12" class="mono">
+                    </div>
+                    <div class="input-group">
+                        <label>Weight Drop %</label>
+                        <div class="relative">
+                            <input type="number" name="drop_percentage" placeholder="20" min="0" max="100" class="mono pr-12">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 font-bold">%</span>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Rest Period (Sec)</label>
+                        <div class="relative">
+                            <input type="number" placeholder="90" class="mono pr-12">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 font-bold">s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Secondary/Optional Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
+                    <div class="input-group">
+                        <label>Initial Load (% 1RM)</label>
+                        <input type="number" placeholder="75" class="mono">
+                    </div>
+                    <div class="input-group">
+                        <label>Intensity (RPE)</label>
+                        <input type="number" placeholder="9" class="mono">
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="input-group">
+                    <label>Coaching Notes</label>
+                    <textarea rows="3" placeholder="Perform the drop immediately with no rest..."></textarea>
+                </div>
+            </form>
+        </section>
+
+        <!-- Tooltip/Help -->
+        <div class="flex items-center gap-3 px-4 text-neutral-500">
+            <i data-lucide="info" class="w-5 h-5"></i>
+            <p class="text-sm">Drop sets are typically performed on the final set of an exercise.</p>
+        </div>
+    </main>
+
+    <!-- Fixed Footer Action Bar -->
+    <footer class="fixed bottom-0 left-0 right-0 p-6 bg-black/60 backdrop-blur-xl border-t border-white/10 z-50">
+        <div class="max-w-2xl mx-auto flex gap-4">
+            <button class="btn-secondary flex-1 rounded-2xl font-bold uppercase tracking-widest text-sm">
+                Cancel
+            </button>
+            <button id="save-btn" class="btn-primary flex-[2] rounded-2xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                Add to Template
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Search Dropdown Toggle
+        const searchInput = document.getElementById('exercise-search');
+        const results = document.getElementById('results');
+
+        searchInput.addEventListener('focus', () => {
+            results.style.display = 'block';
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !results.contains(e.target)) {
+                results.style.display = 'none';
+            }
+        });
+
+        const items = document.querySelectorAll('.search-item');
+        items.forEach(item => {
+            item.addEventListener('click', () => {
+                searchInput.value = item.innerText;
+                results.style.display = 'none';
+            });
+        });
+
+        // Save Feedback
+        const saveBtn = document.getElementById('save-btn');
+        saveBtn.addEventListener('click', () => {
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<i data-lucide="check" class="w-5 h-5"></i> Added!';
+            saveBtn.style.background = 'linear-gradient(135deg, #10B981 0%, #059669 100%)';
+            saveBtn.style.boxShadow = '0 4px 16px rgba(16, 185, 129, 0.3)';
+            lucide.createIcons();
+
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate([20, 10, 20]);
+            }
+
+            setTimeout(() => {
+                saveBtn.innerHTML = originalText;
+                saveBtn.style.background = '';
+                saveBtn.style.boxShadow = '';
+                lucide.createIcons();
+            }, 2000);
+        });
+
+        // Entrance Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const card = document.querySelector('.crystal-card');
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(30px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 100);
+        });
+    </script>
+</body>
+</html></html>

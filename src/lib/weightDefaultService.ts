@@ -31,6 +31,25 @@ export interface GetWeightDefaultAndSuggestionResult {
 }
 
 /**
+ * Coach-prescribed weight from load % and client e1RM.
+ * Use this to always show "Apply suggested (X kg)" when coach set a load % and we have e1RM.
+ */
+export function getCoachSuggestedWeight(
+  loadPercentage: number | null | undefined,
+  e1rm: number | null | undefined
+): number | null {
+  if (
+    loadPercentage != null &&
+    loadPercentage > 0 &&
+    e1rm != null &&
+    e1rm > 0
+  ) {
+    return Math.round((e1rm * (loadPercentage / 100)) * 2) / 2;
+  }
+  return null;
+}
+
+/**
  * Returns default weight (truth-based autofill) and/or suggested weight (tap-to-apply only).
  * Guarantee: default_weight !== null => suggested_weight === null.
  * Priority: sticky_session > last_session > percent_e1rm (suggestion only) > none.

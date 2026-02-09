@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MealPlanService } from "@/lib/mealPlanService";
-import { ArrowLeft, ChefHat } from "lucide-react";
+import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 
 export default function CreateMealPlanPage() {
@@ -66,32 +66,36 @@ export default function CreateMealPlanPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="p-4 sm:p-6">
-          <div className="max-w-2xl mx-auto space-y-6">
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8">
-              <div className="flex items-center gap-4">
-                <Link href="/coach/nutrition/meal-plans">
-                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
-                    <ArrowLeft className="w-4 h-4" />
-                  </Button>
-                </Link>
-                <div className="flex-1">
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Meal Plan Builder
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                    Create Meal Plan
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Create a new nutrition plan for your clients.
-                  </p>
-                </div>
+        <div className="p-4 sm:p-6 md:p-8 pb-32 relative z-10">
+          <div className="max-w-4xl mx-auto space-y-6">
+            <header className="flex items-center justify-between mb-8">
+              <Link
+                href="/coach/nutrition"
+                className="fc-glass fc-card w-10 h-10 flex items-center justify-center rounded-full hover:opacity-90 transition-opacity"
+              >
+                <ArrowLeft className="w-5 h-5 fc-text-primary" />
+              </Link>
+              <div className="text-center flex-1 px-4">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight fc-text-primary">
+                  Create Meal Plan
+                </h1>
+                <p className="text-sm fc-text-dim mt-1">
+                  Design a bespoke nutrition protocol
+                </p>
               </div>
-            </GlassCard>
+              <button
+                type="button"
+                className="fc-glass fc-card w-10 h-10 flex items-center justify-center rounded-full fc-text-dim"
+                aria-label="More options"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+            </header>
 
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8">
             <form
               onSubmit={handleSubmit}
-              className={`${theme.card} ${theme.shadow} rounded-3xl p-6 sm:p-8 space-y-6`}
+              className="space-y-6"
             >
               <div className="space-y-2">
                 <Label className={`${theme.text} font-semibold`}>
@@ -142,7 +146,7 @@ export default function CreateMealPlanPage() {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <Link href="/coach/nutrition/meal-plans" className="flex-1">
+                <Link href="/coach/nutrition" className="flex-1">
                   <Button
                     type="button"
                     variant="outline"
@@ -160,6 +164,7 @@ export default function CreateMealPlanPage() {
                 </Button>
               </div>
             </form>
+            </GlassCard>
           </div>
         </div>
       </AnimatedBackground>

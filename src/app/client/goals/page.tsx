@@ -50,12 +50,15 @@ import {
   Calendar as CalendarIcon,
   Clock as ClockIcon,
   Target as TargetIcon,
+  ChevronDown,
+  Archive,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { GoalCard } from "@/components/goals/GoalCard";
 import { CustomGoalForm } from "@/components/goals/CustomGoalForm";
+import { withTimeout } from "@/lib/withTimeout";
 
 interface Goal {
   id: string;
@@ -243,6 +246,7 @@ export default function ClientGoals() {
   const { user } = useAuth();
   const { performanceSettings, isDark, getSemanticColor } = useTheme();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [presetGoalTemplates, setPresetGoalTemplates] = useState<PresetGoal[]>(
     []
@@ -283,6 +287,7 @@ export default function ClientGoals() {
     target_date: "",
     priority: "medium" as Goal["priority"],
   });
+  const [completedSectionOpen, setCompletedSectionOpen] = useState(false);
 
   const goalCategories: GoalCategory[] = [
     {
@@ -348,6 +353,8 @@ export default function ClientGoals() {
 
     setLoading(true);
     try {
+      await withTimeout(
+        (async () => {
       const { data, error } = await supabase
         .from("goals")
         .select("*")
@@ -417,9 +424,14 @@ export default function ClientGoals() {
       });
 
       setGoals(goalsWithProgress);
-    } catch (error) {
+        })(),
+        30000,
+        "timeout"
+      );
+    } catch (error: any) {
       console.error("Error loading goals:", error);
       setGoals([]);
+      setLoadError(error?.message === "timeout" ? "Loading took too long. Please try again." : (error?.message || "Failed to load goals"));
     } finally {
       setLoading(false);
     }
@@ -930,7 +942,7 @@ export default function ClientGoals() {
     } else if (status === "paused") {
       return <PauseCircle className="w-6 h-6 text-yellow-500" />;
     } else if (status === "cancelled") {
-      return <XCircle className="w-6 h-6 text-red-500" />;
+      return <XCircle className="w-6 h-6 fc-text-error" />;
     } else {
       return (
         <CategoryIcon
@@ -1157,293 +1169,244 @@ export default function ClientGoals() {
     );
   }
 
+  if (loadError) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+          <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center max-w-md">
+            <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+            <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadGoals(); }} className="fc-btn fc-btn-primary">
+              Retry
+            </Button>
+          </GlassCard>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
   const stats = getGoalStats();
+  const completedGoalsList = goals.filter((g) => g.status === "completed");
+  const nonCompletedGoals = goals.filter((g) => g.status !== "completed");
+  const activeFiltered = filteredAndSortedGoals(
+    nonCompletedGoals.filter((g) => {
+      if (activeTab !== "all" && g.category !== activeTab) return false;
+      if (filterStatus !== "all") {
+        const norm = g.status === "in_progress" ? "active" : g.status;
+        return norm === filterStatus;
+      }
+      return true;
+    })
+  );
 
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-24 md:pb-8">
-          <div className="p-4 pb-8">
-            <div className="max-w-6xl mx-auto space-y-6">
-              <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                      <Target className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                        Goal Center
-                      </span>
-                      <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                        My Goals
-                      </h1>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        {getMotivationalMessage()}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => setShowPresetSelection(true)}
-                    className="fc-btn fc-btn-primary"
-                  >
-                    <Target className="w-5 h-5 mr-2" />
-                    Select a Goal
-                  </Button>
+        <div className="relative z-10 min-h-screen fc-page">
+          <div className="max-w-6xl mx-auto flex flex-col" style={{ gap: "var(--fc-gap-sections)" }}>
+            {/* Header: eyebrow + Your Goals + active/total (mockup) */}
+            <header className="flex justify-between items-end flex-wrap gap-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="w-12 h-0.5 bg-[color:var(--fc-status-error)]" aria-hidden />
+                  <span className="fc-micro fc-text-error font-mono">GOAL CENTER</span>
                 </div>
-              </GlassCard>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                <GlassCard elevation={1} className="fc-glass fc-card p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                      <Target className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Total Goals</p>
-                      <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">
-                        {stats.total}
-                      </p>
-                    </div>
-                  </div>
-                </GlassCard>
-                <GlassCard elevation={1} className="fc-glass fc-card p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                      <CheckCircle className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Active Goals</p>
-                      <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">
-                        {stats.active}
-                      </p>
-                    </div>
-                  </div>
-                </GlassCard>
-                <GlassCard elevation={1} className="fc-glass fc-card p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl flex items-center justify-center">
-                      <Trophy className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Completed</p>
-                      <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">
-                        {stats.completed}
-                      </p>
-                    </div>
-                  </div>
-                </GlassCard>
-                <GlassCard elevation={1} className="fc-glass fc-card p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center">
-                      <TrendingUp className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[color:var(--fc-text-subtle)]">Avg Progress</p>
-                      <p className="text-xl font-bold text-[color:var(--fc-text-primary)]">
-                        {stats.avgProgress}%
-                      </p>
-                    </div>
-                  </div>
-                </GlassCard>
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tight fc-text-primary">
+                  Your Goals
+                </h1>
               </div>
+              <div className="hidden md:block text-right">
+                <div className="font-mono text-2xl font-bold fc-text-primary">
+                  {String(stats.active).padStart(2, "0")} / {String(stats.total).padStart(2, "0")}
+                </div>
+                <div className="fc-micro fc-text-subtle uppercase tracking-widest">Active / Total</div>
+              </div>
+            </header>
 
-              <GlassCard elevation={2} className="fc-glass fc-card p-4">
-                <div className="flex flex-col gap-4 lg:flex-row">
-                  <div className="flex flex-col gap-4 lg:flex-row">
-                    <div className="flex-1 w-full">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
-                        Category
-                      </label>
-                      <Tabs
-                        value={activeTab}
-                        onValueChange={setActiveTab}
-                        className="w-full"
-                      >
-                        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 bg-slate-100 dark:bg-slate-700">
-                          <TabsTrigger value="all" className="text-xs">
-                            All
-                          </TabsTrigger>
-                          {goalCategories.map((category) => (
-                            <TabsTrigger
-                              key={category.id}
-                              value={category.id}
-                              className="text-xs"
-                            >
-                              <category.icon className="w-3 h-3 mr-1" />
-                              {category.name}
-                            </TabsTrigger>
-                          ))}
-                        </TabsList>
-                      </Tabs>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-                      <div className="flex-1 min-w-0">
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
-                          Status
-                        </label>
-                        <Select
-                          value={filterStatus}
-                          onValueChange={(
-                            value:
-                              | "all"
-                              | "active"
-                              | "completed"
-                              | "paused"
-                              | "cancelled"
-                          ) => setFilterStatus(value)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <Filter className="w-4 h-4 mr-2" />
-                            <SelectValue placeholder="Filter by Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="paused">Paused</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
-                          Sort by
-                        </label>
-                        <Select
-                          value={sortBy}
-                          onValueChange={(
-                            value: "newest" | "oldest" | "priority" | "progress"
-                          ) => setSortBy(value)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SortAsc className="w-4 h-4 mr-2" />
-                            <SelectValue placeholder="Sort Goals" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="newest">Newest First</SelectItem>
-                            <SelectItem value="oldest">Oldest First</SelectItem>
-                            <SelectItem value="priority">Priority</SelectItem>
-                            <SelectItem value="progress">Progress</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+            {/* Hero stats: one monolith card — circular progress + 3 stats (mockup) */}
+            <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl p-8 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+              <div className="relative w-32 h-32 flex-shrink-0">
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                  <circle cx="50" cy="50" r="44" fill="none" stroke="var(--fc-glass-border-strong)" strokeWidth="8" />
+                  <circle
+                    cx="50" cy="50" r="44"
+                    fill="none"
+                    stroke="url(#goalsHeroGradient)"
+                    strokeWidth="12"
+                    strokeDasharray={276}
+                    strokeDashoffset={276 - (276 * stats.avgProgress) / 100}
+                    strokeLinecap="round"
+                  />
+                  <defs>
+                    <linearGradient id="goalsHeroGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="var(--fc-status-error)" />
+                      <stop offset="100%" stopColor="var(--fc-domain-workouts)" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold font-mono fc-text-primary">{stats.avgProgress}%</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 flex-1 w-full">
+                <div>
+                  <div className="fc-micro fc-text-subtle mb-1">Avg progress</div>
+                  <div className="text-2xl md:text-3xl font-bold font-mono fc-text-success">{stats.avgProgress}%</div>
+                </div>
+                <div>
+                  <div className="fc-micro fc-text-subtle mb-1">Active / total</div>
+                  <div className="text-2xl md:text-3xl font-bold font-mono fc-text-primary">
+                    {stats.active}<span className="text-lg opacity-50">/{stats.total}</span>
                   </div>
                 </div>
-              </GlassCard>
+                <div className="col-span-2 md:col-span-1">
+                  <div className="fc-micro fc-text-subtle mb-1">Next goal</div>
+                  <div className="text-base md:text-lg font-semibold leading-tight fc-text-primary truncate">
+                    {activeFiltered[0]?.title ?? "—"}
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
 
-              {/* SECTION 1: PRESET GOALS (Auto-tracked) */}
-              <div className="mb-12">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            {/* Filter bar: compact, token-styled */}
+            <GlassCard elevation={1} className="fc-glass fc-card p-4 rounded-xl">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+                <div className="flex-1 min-w-0">
+                  <label className="fc-micro fc-text-subtle mb-2 block">Category</label>
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="fc-glass-soft border border-[color:var(--fc-glass-border)] grid w-full grid-cols-4 lg:grid-cols-7 h-9">
+                      <TabsTrigger value="all" className="text-xs fc-text-dim data-[state=active]:fc-text-primary">All</TabsTrigger>
+                      {goalCategories.map((cat) => (
+                        <TabsTrigger key={cat.id} value={cat.id} className="text-xs fc-text-dim data-[state=active]:fc-text-primary">
+                          <cat.icon className="w-3 h-3 mr-1" />
+                          {cat.name}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4 lg:w-auto">
+                  <div className="min-w-0">
+                    <label className="fc-micro fc-text-subtle mb-2 block">Status</label>
+                    <Select value={filterStatus} onValueChange={(v: typeof filterStatus) => setFilterStatus(v)}>
+                      <SelectTrigger className="fc-glass-soft border border-[color:var(--fc-glass-border)] w-full sm:w-36">
+                        <Filter className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="paused">Paused</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="fc-micro fc-text-subtle mb-2 block">Sort</label>
+                    <Select value={sortBy} onValueChange={(v: typeof sortBy) => setSortBy(v)}>
+                      <SelectTrigger className="fc-glass-soft border border-[color:var(--fc-glass-border)] w-full sm:w-36">
+                        <SortAsc className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Sort" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="newest">Newest</SelectItem>
+                        <SelectItem value="oldest">Oldest</SelectItem>
+                        <SelectItem value="priority">Priority</SelectItem>
+                        <SelectItem value="progress">Progress</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+
+            {/* Active goals section */}
+            <section>
+              <div className="fc-section-heading">
+                <h2>Active goals</h2>
+                <div className="fc-line" aria-hidden />
+              </div>
+              {activeFiltered.length === 0 ? (
+                <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center rounded-2xl">
+                  <Target className="w-12 h-12 mx-auto mb-4 fc-text-subtle" />
+                  <p className="fc-text-primary font-medium mb-2">No active goals</p>
+                  <p className="text-sm fc-text-dim mb-4">Use the button below to add a preset goal, or create a custom goal.</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button onClick={() => setShowPresetSelection(true)} className="fc-btn fc-btn-primary">
+                      <Target className="w-4 h-4 mr-2" /> Preset goal
+                    </Button>
+                    <Button onClick={() => setShowCustomGoalForm(true)} variant="outline" className="fc-btn fc-btn-secondary">
+                      <Plus className="w-4 h-4 mr-2" /> Custom goal
+                    </Button>
+                  </div>
+                </GlassCard>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" style={{ gap: "var(--fc-gap-cards)" }}>
+                  {activeFiltered.map((goal) => (
+                    <GoalCard
+                      key={goal.id}
+                      goal={goal as Goal}
+                      isAutoTracked={isPresetGoal(goal)}
+                      onDelete={handleDeleteGoal}
+                      onUpdate={updateGoalProgress}
+                      onEdit={startEditing}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Completed goals: collapsible */}
+            <section className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setCompletedSectionOpen((o) => !o)}
+                className="w-full flex items-center justify-between p-6 hover:bg-[color:var(--fc-glass-soft)] transition-colors text-left"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center">
+                    <Archive className="w-5 h-5 fc-text-subtle" />
+                  </div>
                   <div>
-                    <h2
-                      className="text-2xl md:text-3xl font-bold mb-2"
-                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                    >
-                      Preset Goals
-                    </h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Auto-updated from your activities
-                    </p>
+                    <h3 className="font-bold fc-text-primary">Completed goals</h3>
+                    <p className="text-xs fc-text-subtle uppercase font-mono">{completedGoalsList.length} completed</p>
                   </div>
-                  <Button
-                    onClick={() => setShowPresetSelection(true)}
-                    className="w-full sm:w-auto"
-                    size="lg"
-                    style={{
-                      background: getSemanticColor("success").gradient,
-                      boxShadow: `0 4px 12px ${
-                        getSemanticColor("success").primary
-                      }30`,
-                    }}
-                  >
-                    <Plus className="w-5 h-5 mr-2" />
-                    Add Preset Goal
-                  </Button>
                 </div>
-
-                {filteredAndSortedGoals(presetGoalItems).length === 0 ? (
-                  <GlassCard elevation={2} className="p-8 text-center">
-                    <Target className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-                    <p className="text-slate-600 dark:text-slate-300 font-medium mb-2">
-                      No preset goals yet
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Add a preset goal to track your fitness automatically!
-                    </p>
-                  </GlassCard>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredAndSortedGoals(presetGoalItems).map((goal) => (
+                <ChevronDown className={`w-5 h-5 fc-text-subtle transition-transform duration-300 ${completedSectionOpen ? "rotate-180" : ""}`} />
+              </button>
+              <div className={completedSectionOpen ? "block" : "hidden"}>
+                <div className="px-6 pb-6 pt-0 space-y-4">
+                  {completedGoalsList.length === 0 ? (
+                    <p className="text-sm fc-text-dim py-4">No completed goals yet.</p>
+                  ) : (
+                    filteredAndSortedGoals(completedGoalsList).map((goal) => (
                       <GoalCard
                         key={goal.id}
                         goal={goal as Goal}
-                        isAutoTracked={true}
-                        onDelete={handleDeleteGoal}
-                        onUpdate={updateGoalProgress}
-                        onEdit={startEditing}
+                        isAutoTracked={isPresetGoal(goal)}
+                        compact
                       />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* SECTION 2: CUSTOM GOALS (Manual-tracked) */}
-              <div className="mb-12">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                  <div>
-                    <h2
-                      className="text-2xl md:text-3xl font-bold mb-2"
-                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                    >
-                      Custom Goals
-                    </h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Track anything you want (manual updates)
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => setShowCustomGoalForm(true)}
-                    className="w-full sm:w-auto"
-                    size="lg"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #3B82F6 0%, #14B8A6 100%)",
-                      boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
-                    }}
-                  >
-                    <Plus className="w-5 h-5 mr-2" />
-                    Create Custom Goal
-                  </Button>
+                    ))
+                  )}
                 </div>
-
-                {filteredAndSortedGoals(customGoalItems).length === 0 ? (
-                  <GlassCard elevation={2} className="p-8 text-center">
-                    <Target className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-                    <p className="text-slate-600 dark:text-slate-300 font-medium mb-2">
-                      No custom goals yet
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Create a custom goal to track anything you want!
-                    </p>
-                  </GlassCard>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredAndSortedGoals(customGoalItems).map((goal) => (
-                      <GoalCard
-                        key={goal.id}
-                        goal={goal as Goal}
-                        isAutoTracked={false}
-                        onDelete={handleDeleteGoal}
-                        onUpdate={updateGoalProgress}
-                        onEdit={startEditing}
-                      />
-                    ))}
-                  </div>
-                )}
               </div>
+            </section>
+
+            {/* Floating action button (mockup): add new goal */}
+            <div className="fixed bottom-8 right-8 z-40">
+              <button
+                type="button"
+                onClick={() => setShowPresetSelection(true)}
+                className="fc-fab group"
+                aria-label="Add new goal"
+              >
+                <Plus className="w-8 h-8 text-white" />
+                <span className="absolute right-full mr-3 fc-glass border border-[color:var(--fc-glass-border)] px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-lg fc-text-primary">
+                  Add goal
+                </span>
+              </button>
+            </div>
 
               {/* Custom Goal Form Modal */}
               <CustomGoalForm
@@ -2184,7 +2147,6 @@ export default function ClientGoals() {
                 </div>
               )}
             </div>
-          </div>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

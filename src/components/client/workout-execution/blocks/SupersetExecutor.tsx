@@ -13,9 +13,9 @@ import { LargeInput } from "../ui/LargeInput";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
-import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
+import { getWeightDefaultAndSuggestion, getCoachSuggestedWeight } from "@/lib/weightDefaultService";
+import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 
 export function SupersetExecutor({
   block,
@@ -39,6 +39,7 @@ export function SupersetExecutor({
   onAlternativesClick,
   onRestTimerClick,
   onSetComplete,
+  onLastSetLoggedForRest,
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const exerciseA = block.block.exercises?.[0];
@@ -68,6 +69,8 @@ export function SupersetExecutor({
     loadPercentage: exerciseB?.load_percentage ?? null,
     e1rm: exerciseB?.exercise_id ? (e1rmMap[exerciseB.exercise_id] ?? null) : null,
   });
+  const coachSuggestedA = getCoachSuggestedWeight(exerciseA?.load_percentage ?? null, exerciseA?.exercise_id ? (e1rmMap[exerciseA.exercise_id] ?? null) : null);
+  const coachSuggestedB = getCoachSuggestedWeight(exerciseB?.load_percentage ?? null, exerciseB?.exercise_id ? (e1rmMap[exerciseB.exercise_id] ?? null) : null);
 
   useEffect(() => {
     setIsWeightAPristine(true);
@@ -225,8 +228,16 @@ export function SupersetExecutor({
           duration: 2000,
         });
 
-        // Update parent with new completed sets count
         const newCompletedSets = completedSets + 1;
+        if (newCompletedSets < totalSets) {
+          onLastSetLoggedForRest?.({
+            weight: weightANum,
+            reps: repsANum,
+            setNumber: setNumber,
+            totalSets,
+            isPr: result.isNewPR,
+          });
+        }
         onSetComplete?.(newCompletedSets);
 
         // Complete block if last set
@@ -251,9 +262,9 @@ export function SupersetExecutor({
   const loggingInputs = (
     <div className="space-y-6">
       {/* Exercise A */}
-      <GlassCard elevation={1} className="p-4">
+      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
         <div className="mb-4">
-          <h4 className="font-semibold text-blue-800 dark:text-blue-200 text-lg">
+          <h4 className="font-semibold text-lg" style={{ color: "var(--fc-accent-cyan)" }}>
             Exercise A: {exerciseA?.exercise?.name || "Exercise A"}
           </h4>
           {exerciseA && (
@@ -276,10 +287,11 @@ export function SupersetExecutor({
               showStepper
               stepAmount={2.5}
             />
-            {resultA.suggested_weight != null && resultA.suggested_weight > 0 && (
-              <button type="button" onClick={() => { setWeightA(String(resultA.suggested_weight)); setIsWeightAPristine(false); }} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                {exerciseA?.load_percentage != null ? `${exerciseA.load_percentage}% → ${resultA.suggested_weight} kg` : `Suggested: ${resultA.suggested_weight} kg`} (tap to apply)
-              </button>
+            {coachSuggestedA != null && coachSuggestedA > 0 && (
+              <ApplySuggestedWeightButton
+                suggestedKg={coachSuggestedA}
+                onApply={() => { setWeightA(String(coachSuggestedA)); setIsWeightAPristine(false); }}
+              />
             )}
           </div>
           <LargeInput
@@ -292,12 +304,12 @@ export function SupersetExecutor({
             stepAmount={1}
           />
         </div>
-      </GlassCard>
+      </div>
 
       {/* Exercise B */}
-      <GlassCard elevation={1} className="p-4">
+      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
         <div className="mb-4">
-          <h4 className="font-semibold text-purple-800 dark:text-purple-200 text-lg">
+          <h4 className="font-semibold text-lg" style={{ color: "var(--fc-accent-purple)" }}>
             Exercise B: {exerciseB?.exercise?.name || "Exercise B"}
           </h4>
           {exerciseB && (
@@ -320,10 +332,11 @@ export function SupersetExecutor({
               showStepper
               stepAmount={2.5}
             />
-            {resultB.suggested_weight != null && resultB.suggested_weight > 0 && (
-              <button type="button" onClick={() => { setWeightB(String(resultB.suggested_weight)); setIsWeightBPristine(false); }} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                {exerciseB?.load_percentage != null ? `${exerciseB.load_percentage}% → ${resultB.suggested_weight} kg` : `Suggested: ${resultB.suggested_weight} kg`} (tap to apply)
-              </button>
+            {coachSuggestedB != null && coachSuggestedB > 0 && (
+              <ApplySuggestedWeightButton
+                suggestedKg={coachSuggestedB}
+                onApply={() => { setWeightB(String(coachSuggestedB)); setIsWeightBPristine(false); }}
+              />
             )}
           </div>
           <LargeInput
@@ -336,7 +349,7 @@ export function SupersetExecutor({
             stepAmount={1}
           />
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 
@@ -344,7 +357,8 @@ export function SupersetExecutor({
     <Button
       onClick={handleLog}
       disabled={isLoggingSet}
-      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg py-4"
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <Zap className="w-5 h-5 mr-2" />
       {isLoggingSet ? "Logging..." : "LOG SUPERSET"}

@@ -30,129 +30,26 @@ import {
 import Link from "next/link";
 
 const menuItems = [
-  {
-    title: "Client Management",
-    description: "Manage clients, view progress, and assign workouts",
-    icon: Users,
-    href: "/coach/clients",
-    color: "bg-blue-100 text-blue-600",
-  },
-  {
-    title: "Programs & Workouts",
-    description: "Create and manage workout programs and templates",
-    icon: Dumbbell,
-    href: "/coach/programs-workouts",
-    color: "bg-green-100 text-green-600",
-  },
-  {
-    title: "Exercise Library",
-    description: "Manage your exercise database and create custom exercises",
-    icon: Library,
-    href: "/coach/exercises",
-    color: "bg-violet-100 text-violet-600",
-  },
-  {
-    title: "Exercise Categories",
-    description: "Organize exercises with custom categories",
-    icon: Layers,
-    href: "/coach/exercise-categories",
-    color: "bg-purple-100 text-purple-600",
-  },
-  {
-    title: "Workout Categories",
-    description: "Organize workout templates and programs",
-    icon: FolderTree,
-    href: "/coach/categories",
-    color: "bg-pink-100 text-pink-600",
-  },
-  {
-    title: "Nutrition Management",
-    description: "Create meal plans and track client nutrition",
-    icon: Apple,
-    href: "/coach/nutrition",
-    color: "bg-orange-100 text-orange-600",
-  },
-  {
-    title: "Analytics & Reports",
-    description: "View client progress and generate reports",
-    icon: BarChart3,
-    href: "/coach/analytics",
-    color: "bg-indigo-100 text-indigo-600",
-  },
-  {
-    title: "Client Progress",
-    description: "Monitor client progress and improvements",
-    icon: TrendingUp,
-    href: "/coach/progress",
-    color: "bg-emerald-100 text-emerald-600",
-  },
-  {
-    title: "Goals & Habits",
-    description: "Set goals and track client habits",
-    icon: Target,
-    href: "/coach/goals",
-    color: "bg-yellow-100 text-yellow-600",
-  },
-  {
-    title: "Session Management",
-    description: "Schedule and manage client sessions",
-    icon: Calendar,
-    href: "/coach/sessions",
-    color: "bg-teal-100 text-teal-600",
-  },
-  {
-    title: "Challenges",
-    description: "Create and manage client challenges",
-    icon: Trophy,
-    href: "/coach/challenges",
-    color: "bg-amber-100 text-amber-600",
-  },
-  {
-    title: "Availability Settings",
-    description: "Set your availability for client session bookings",
-    icon: Clock,
-    href: "/coach/availability",
-    color: "bg-purple-100 text-purple-600",
-  },
-  {
-    title: "Coach Profile",
-    description: "Manage your profile, settings, and account information",
-    icon: User,
-    href: "/coach/profile",
-    color: "bg-slate-100 text-slate-600",
-  },
+  { title: "Client Management", description: "Manage clients, view progress, and assign workouts", icon: Users, href: "/coach/clients", iconTile: "fc-icon-workouts" },
+  { title: "Programs & Workouts", description: "Create and manage workout programs and templates", icon: Dumbbell, href: "/coach/programs-workouts", iconTile: "fc-icon-workouts" },
+  { title: "Exercise Library", description: "Manage your exercise database and create custom exercises", icon: Library, href: "/coach/exercises", iconTile: "fc-icon-challenges" },
+  { title: "Exercise Categories", description: "Organize exercises with custom categories", icon: Layers, href: "/coach/exercise-categories", iconTile: "fc-icon-challenges" },
+  { title: "Workout Categories", description: "Organize workout templates and programs", icon: FolderTree, href: "/coach/categories", iconTile: "fc-icon-challenges" },
+  { title: "Nutrition Management", description: "Create meal plans and track client nutrition", icon: Apple, href: "/coach/nutrition", iconTile: "fc-icon-meals" },
+  { title: "Analytics & Reports", description: "View client progress and generate reports", icon: BarChart3, href: "/coach/analytics", iconTile: "fc-icon-workouts" },
+  { title: "Client Progress", description: "Monitor client progress and improvements", icon: TrendingUp, href: "/coach/progress", iconTile: "fc-icon-meals" },
+  { title: "Goals & Habits", description: "Set goals and track client habits", icon: Target, href: "/coach/goals", iconTile: "fc-icon-habits" },
+  { title: "Session Management", description: "Schedule and manage client sessions", icon: Calendar, href: "/coach/sessions", iconTile: "fc-icon-workouts" },
+  { title: "Challenges", description: "Create and manage client challenges", icon: Trophy, href: "/coach/challenges", iconTile: "fc-icon-challenges" },
+  { title: "Availability Settings", description: "Set your availability for client session bookings", icon: Clock, href: "/coach/availability", iconTile: "fc-icon-challenges" },
+  { title: "Coach Profile", description: "Manage your profile, settings, and account information", icon: User, href: "/coach/profile", iconTile: "fc-icon-neutral" },
 ];
 
-// Admin-only menu items
 const adminMenuItems = [
-  {
-    title: "Goal Templates",
-    description: "Manage goal types that clients can select",
-    icon: Target,
-    href: "/admin/goal-templates",
-    color: "bg-blue-100 text-blue-600",
-  },
-  {
-    title: "Habit Categories",
-    description: "Manage categories for organizing client habits",
-    icon: Sparkles,
-    href: "/admin/habit-categories",
-    color: "bg-violet-100 text-violet-600",
-  },
-  {
-    title: "Achievement Templates",
-    description: "Manage achievements and badges clients can earn",
-    icon: Award,
-    href: "/admin/achievement-templates",
-    color: "bg-amber-100 text-amber-600",
-  },
-  {
-    title: "Tracking Sources",
-    description: "View available data sources for auto-tracking",
-    icon: Database,
-    href: "/admin/tracking-sources",
-    color: "bg-cyan-100 text-cyan-600",
-  },
+  { title: "Goal Templates", description: "Manage goal types that clients can select", icon: Target, href: "/admin/goal-templates", iconTile: "fc-icon-workouts" },
+  { title: "Habit Categories", description: "Manage categories for organizing client habits", icon: Sparkles, href: "/admin/habit-categories", iconTile: "fc-icon-challenges" },
+  { title: "Achievement Templates", description: "Manage achievements and badges clients can earn", icon: Award, href: "/admin/achievement-templates", iconTile: "fc-icon-habits" },
+  { title: "Tracking Sources", description: "View available data sources for auto-tracking", icon: Database, href: "/admin/tracking-sources", iconTile: "fc-icon-workouts" },
 ];
 
 export default function CoachMenu() {
@@ -166,21 +63,18 @@ export default function CoachMenu() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 py-6 pb-24 space-y-6">
           <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-                  <Users className="w-7 h-7 text-white" />
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+                  <Users className="w-7 h-7" />
                 </div>
                 <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Coach Toolkit
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
+                  <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)] sm:text-3xl">
                     Coach Menu
                   </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
+                  <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
                     Access all your coaching tools and features.
                   </p>
                 </div>
@@ -195,8 +89,8 @@ export default function CoachMenu() {
                 <Link href={item.href} key={index}>
                   <GlassCard elevation={2} className="fc-glass fc-card p-6 h-full transition-all hover:scale-[1.02] hover:shadow-xl">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                        <Icon className="w-6 h-6 text-white" />
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${item.iconTile}`}>
+                        <Icon className="w-6 h-6" />
                       </div>
                       <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
                         {item.title}
@@ -214,13 +108,13 @@ export default function CoachMenu() {
           {/* Admin Section - Only visible to admin users */}
           {isAdmin && (
             <>
-              <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10 border-2 border-amber-500/30">
+              <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10 border-2" borderColor="color-mix(in srgb, var(--fc-status-warning) 35%, transparent)">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: "linear-gradient(to bottom right, var(--fc-status-warning), var(--fc-domain-habits))" }}>
                     <Settings className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <span className="px-2 py-1 text-xs font-medium bg-amber-500/20 text-amber-600 rounded-full border border-amber-500/30">
+                    <span className="px-2 py-1 text-xs font-medium rounded-full border fc-text-warning" style={{ background: "color-mix(in srgb, var(--fc-status-warning) 18%, transparent)", borderColor: "color-mix(in srgb, var(--fc-status-warning) 35%, transparent)" }}>
                       ADMIN ONLY
                     </span>
                     <h2 className="mt-2 text-xl font-bold text-[color:var(--fc-text-primary)]">
@@ -237,8 +131,8 @@ export default function CoachMenu() {
                     const Icon = item.icon;
                     return (
                       <Link href={item.href} key={`admin-${index}`}>
-                        <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-100/50 dark:bg-slate-800/50 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-all">
-                          <div className={`w-10 h-10 rounded-xl ${item.color} flex items-center justify-center`}>
+                        <div className="flex items-center gap-4 p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] hover:opacity-90 transition-all">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.iconTile}`}>
                             <Icon className="w-5 h-5" />
                           </div>
                           <div>
@@ -295,7 +189,7 @@ export default function CoachMenu() {
               </Link>
               {isAdmin && (
                 <Link href="/admin">
-                  <Button className="fc-btn bg-amber-500 hover:bg-amber-600 text-white">
+                  <Button className="fc-btn text-white" style={{ background: "var(--fc-status-warning)" }}>
                     <Settings className="w-4 h-4 mr-2" />
                     Admin Panel
                   </Button>

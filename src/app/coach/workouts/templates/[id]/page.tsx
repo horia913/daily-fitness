@@ -11,7 +11,7 @@ import { useExerciseLibrary } from "@/hooks/useCoachData";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
+
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +39,7 @@ export default function WorkoutTemplateDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const templateId = useMemo(() => String(params?.id || ""), [params]);
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { getSemanticColor, performanceSettings } = useTheme();
   const { user, loading: authLoading } = useAuth();
 
   // Load exercises for name lookup
@@ -110,12 +110,10 @@ export default function WorkoutTemplateDetailsPage() {
       setLoading(true);
       setError(null);
 
-      // Use efficient single-template fetch instead of loading all templates
-      const found = await WorkoutTemplateService.getWorkoutTemplateById(templateId);
+      // Use efficient single-template fetch; skip exercise count (we derive it from blocks below)
+      const found = await WorkoutTemplateService.getWorkoutTemplateById(templateId, { skipExerciseCount: true });
       if (found) {
         setTemplate(found);
-        // Use exercise_count from template (calculated using same logic)
-        setExerciseCount(found.exercise_count || 0);
       } else {
         setError("Template not found");
       }
@@ -131,9 +129,7 @@ export default function WorkoutTemplateDetailsPage() {
     try {
       const blocks = await WorkoutBlockService.getWorkoutBlocks(templateId);
       setWorkoutBlocks(blocks || []);
-      // Also update exercise count using the same counting logic as getWorkoutTemplates
-      const count = await WorkoutTemplateService.countExercisesForTemplate(templateId);
-      setExerciseCount(count);
+      setExerciseCount(WorkoutBlockService.countExercisesFromBlocks(blocks || []));
     } catch (error: any) {
       console.error("Error loading workout blocks:", error);
       setWorkoutBlocks([]);
@@ -185,10 +181,10 @@ export default function WorkoutTemplateDetailsPage() {
         <div className="relative z-10 p-4 sm:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="animate-pulse space-y-6">
-              <GlassCard elevation={1} className="fc-glass fc-card p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
                 <div className="h-8 rounded mb-4 bg-[color:var(--fc-glass-highlight)]"></div>
                 <div className="h-4 rounded w-2/3 bg-[color:var(--fc-glass-highlight)]"></div>
-              </GlassCard>
+              </div>
             </div>
           </div>
         </div>
@@ -201,7 +197,7 @@ export default function WorkoutTemplateDetailsPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 flex items-center justify-center p-4">
-          <GlassCard elevation={2} className="fc-glass fc-card p-8 max-w-md text-center">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 max-w-md text-center">
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
               style={{
@@ -227,7 +223,7 @@ export default function WorkoutTemplateDetailsPage() {
                 Back to Templates
               </Button>
             </Link>
-          </GlassCard>
+          </div>
         </div>
       </AnimatedBackground>
     );
@@ -237,98 +233,83 @@ export default function WorkoutTemplateDetailsPage() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex flex-col gap-5">
-              <div className="flex items-center gap-4">
-                <Link href="/coach/workouts/templates">
-                  <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
-                    <ArrowLeft className="w-4 h-4" />
-                  </Button>
-                </Link>
-
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{
-                      background: getSemanticColor("trust").gradient,
-                      boxShadow: `0 4px 12px ${
-                        getSemanticColor("trust").primary
-                      }30`,
-                    }}
-                  >
-                    <CategoryIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                      Template Overview
-                    </span>
-                    <h1 className="mt-3 text-xl sm:text-2xl lg:text-3xl font-bold truncate text-[color:var(--fc-text-primary)]">
-                      {template.name}
-                    </h1>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <span
-                  className="text-xs sm:text-sm px-3 py-1 rounded-full font-semibold"
-                  style={{
-                    background: `${getSemanticColor("trust").primary}20`,
-                    color: getSemanticColor("trust").primary,
-                  }}
-                >
-                  {template.category || "General"}
-                </span>
-                <span
-                  className="text-xs sm:text-sm px-3 py-1 rounded-full font-semibold capitalize"
-                  style={{
-                    background: `${getDifficultyColor(
-                      template.difficulty_level
-                    )}20`,
-                    color: getDifficultyColor(template.difficulty_level),
-                  }}
-                >
-                  {template.difficulty_level}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-end gap-2">
-                <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost" onClick={handleDuplicate}>
-                  <CopyIcon className="w-4 h-4" />
+      <div className="relative z-10 p-4 sm:p-6 pt-10">
+        <div className="max-w-5xl mx-auto space-y-8">
+          <nav className="flex flex-wrap items-center justify-between gap-4">
+            <Link
+              href="/coach/workouts/templates"
+              className="flex items-center gap-2 fc-text-dim hover:fc-text-primary transition-colors group"
+            >
+              <span className="p-2 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] group-hover:bg-white/10 transition-colors">
+                <ArrowLeft className="w-5 h-5" />
+              </span>
+              <span className="font-medium">Back to Templates</span>
+            </Link>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost" onClick={handleDuplicate}>
+                <CopyIcon className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Duplicate</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="fc-btn border-red-500/30 text-red-500 hover:bg-red-500/10"
+                onClick={handleDelete}
+              >
+                <Trash2 className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Delete</span>
+              </Button>
+              <Link href={`/coach/workouts/templates/${template.id}/edit`}>
+                <Button size="sm" className="fc-btn fc-btn-primary">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Template
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="fc-btn fc-btn-ghost"
-                  onClick={handleDelete}
-                  style={{ color: getSemanticColor("critical").primary }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-                <Link href={`/coach/workouts/templates/${template.id}/edit`}>
-                  <Button size="sm" className="fc-btn fc-btn-primary">
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
-                </Link>
-              </div>
+              </Link>
             </div>
-          </GlassCard>
+          </nav>
+
+          <header className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <span
+                className="text-xs sm:text-sm px-3 py-1 rounded-full font-semibold uppercase tracking-wider border"
+                style={{
+                  background: `${getSemanticColor("trust").primary}20`,
+                  color: getSemanticColor("trust").primary,
+                  borderColor: `${getSemanticColor("trust").primary}40`,
+                }}
+              >
+                {template.category || "General"}
+              </span>
+              <span
+                className="text-xs sm:text-sm px-3 py-1 rounded-full font-semibold capitalize border"
+                style={{
+                  background: `${getDifficultyColor(template.difficulty_level)}20`,
+                  color: getDifficultyColor(template.difficulty_level),
+                  borderColor: `${getDifficultyColor(template.difficulty_level)}40`,
+                }}
+              >
+                {template.difficulty_level}
+              </span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight fc-text-primary">
+              {template.name}
+            </h1>
+            {template.description && (
+              <p className="text-lg fc-text-dim max-w-2xl leading-relaxed">
+                {template.description}
+              </p>
+            )}
+          </header>
 
           {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Duration */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div
                   className="w-12 h-12 rounded-full flex items-center justify-center"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
+                    background: "var(--fc-surface-sunken)",
                   }}
                 >
                   <Clock
@@ -341,7 +322,7 @@ export default function WorkoutTemplateDetailsPage() {
                     <AnimatedNumber
                       value={template.estimated_duration}
                       className="text-2xl font-bold"
-                      color={isDark ? "#fff" : "#1A1A1A"}
+                      color="var(--fc-text-primary)"
                     />
                     <span className="text-sm text-[color:var(--fc-text-dim)]">
                       min
@@ -352,17 +333,15 @@ export default function WorkoutTemplateDetailsPage() {
                   </p>
                 </div>
               </div>
-            </GlassCard>
+            </div>
 
             {/* Exercises */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div
                   className="w-12 h-12 rounded-full flex items-center justify-center"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
+                    background: "var(--fc-surface-sunken)",
                   }}
                 >
                   <Dumbbell
@@ -374,24 +353,22 @@ export default function WorkoutTemplateDetailsPage() {
                   <AnimatedNumber
                     value={exerciseCount}
                     className="text-2xl font-bold"
-                    color={isDark ? "#fff" : "#1A1A1A"}
+                    color="var(--fc-text-primary)"
                   />
                   <p className="text-xs text-[color:var(--fc-text-dim)]">
                     Exercises
                   </p>
                 </div>
               </div>
-            </GlassCard>
+            </div>
 
             {/* Usage Count */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div
                   className="w-12 h-12 rounded-full flex items-center justify-center"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
+                    background: "var(--fc-surface-sunken)",
                   }}
                 >
                   <Users
@@ -403,24 +380,22 @@ export default function WorkoutTemplateDetailsPage() {
                   <AnimatedNumber
                     value={template.usage_count || 0}
                     className="text-2xl font-bold"
-                    color={isDark ? "#fff" : "#1A1A1A"}
+                    color="var(--fc-text-primary)"
                   />
                   <p className="text-xs text-[color:var(--fc-text-dim)]">
                     Assignments
                   </p>
                 </div>
               </div>
-            </GlassCard>
+            </div>
 
             {/* Rating */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div
                   className="w-12 h-12 rounded-full flex items-center justify-center"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
+                    background: "var(--fc-surface-sunken)",
                   }}
                 >
                   <Star
@@ -434,7 +409,7 @@ export default function WorkoutTemplateDetailsPage() {
                       value={template.rating || 0}
                       decimals={1}
                       className="text-2xl font-bold"
-                      color={isDark ? "#fff" : "#1A1A1A"}
+                      color="var(--fc-text-primary)"
                     />
                     <span className="text-sm text-[color:var(--fc-text-dim)]">
                       / 5
@@ -445,42 +420,19 @@ export default function WorkoutTemplateDetailsPage() {
                   </p>
                 </div>
               </div>
-            </GlassCard>
+            </div>
           </div>
 
-          {/* Description */}
-          {template.description && (
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
-              <h3 className="text-lg font-bold mb-3 text-[color:var(--fc-text-primary)]">
-                Description
-              </h3>
-              <p className="leading-relaxed text-[color:var(--fc-text-secondary)]">
-                {template.description}
-              </p>
-            </GlassCard>
-          )}
-
           {/* Workout Flow */}
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+          <section>
             <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: getSemanticColor("success").gradient,
-                    boxShadow: `0 4px 12px ${
-                      getSemanticColor("success").primary
-                    }30`,
-                  }}
-                >
-                  <Dumbbell className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
-                    Workout Flow ({workoutBlocks.length} items)
-                  </h3>
-                </div>
-              </div>
+              <h2 className="text-2xl font-bold tracking-tight fc-text-primary flex items-center gap-3">
+                <Activity className="w-6 h-6 fc-text-dim" />
+                Workout Flow
+              </h2>
+              <span className="text-sm fc-text-dim font-mono">
+                {workoutBlocks.length} block{workoutBlocks.length !== 1 ? "s" : ""}
+              </span>
             </div>
 
             {workoutBlocks.length > 0 ? (
@@ -722,24 +674,32 @@ export default function WorkoutTemplateDetailsPage() {
                         exercise.exercise_id || "no-id"
                       }-${order}-${index}`;
 
+                  const blockBorderColor =
+                    blockType === "straight_set"
+                      ? "var(--fc-accent-indigo, #6366f1)"
+                      : blockType === "superset"
+                        ? "var(--fc-accent-amber, #f59e0b)"
+                        : blockType === "amrap" || blockType === "emom" || blockType === "for_time" || blockType === "tabata" || blockType === "circuit"
+                          ? "var(--fc-accent-success, #10b981)"
+                          : "var(--fc-glass-border)";
                   return (
-                    <ExerciseBlockCard
-                      key={uniqueKey}
-                      exercise={exercise}
-                      index={index}
-                      availableExercises={availableExercises}
-                      renderMode="view"
-                    />
+                    <div key={uniqueKey} className="rounded-2xl border-l-4" style={{ borderLeftColor: blockBorderColor }}>
+                      <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5">
+                        <ExerciseBlockCard
+                          exercise={exercise}
+                          index={index}
+                          availableExercises={availableExercises}
+                          renderMode="view"
+                        />
+                      </div>
+                    </div>
                   );
                 })}
               </div>
             ) : (
               <div className="text-center py-12">
                 <Dumbbell
-                  className="w-24 h-24 mx-auto mb-4"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                  }}
+                  className="w-24 h-24 mx-auto mb-4 fc-text-dim"
                 />
                 <h4 className="text-xl font-bold mb-2 text-[color:var(--fc-text-primary)]">
                   No exercises yet
@@ -755,7 +715,7 @@ export default function WorkoutTemplateDetailsPage() {
                 </Link>
               </div>
             )}
-          </GlassCard>
+          </section>
         </div>
       </div>
     </AnimatedBackground>

@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { supabase } from "@/lib/supabase";
 import WorkoutTemplateService, {
@@ -14,6 +13,7 @@ import WorkoutTemplateService, {
   WorkoutTemplate,
 } from "@/lib/workoutTemplateService";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   Calendar,
   Edit,
@@ -24,6 +24,9 @@ import {
   ArrowLeft,
   Dumbbell,
   Coffee,
+  Share2,
+  MoreHorizontal,
+  Settings2,
 } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -106,7 +109,7 @@ function ProgramDetailsContent() {
     return (
       <AnimatedBackground>
         <div className="min-h-screen flex items-center justify-center p-4">
-          <GlassCard elevation={2} className="p-8 text-center">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
             <div
               className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
               style={{
@@ -121,7 +124,7 @@ function ProgramDetailsContent() {
             >
               Loading program...
             </p>
-          </GlassCard>
+          </div>
         </div>
       </AnimatedBackground>
     );
@@ -131,7 +134,7 @@ function ProgramDetailsContent() {
     return (
       <AnimatedBackground>
         <div className="min-h-screen flex items-center justify-center p-4">
-          <GlassCard elevation={2} className="p-8 text-center">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
             <p
               style={{
                 color: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
@@ -146,7 +149,7 @@ function ProgramDetailsContent() {
             >
               Back to Programs
             </Button>
-          </GlassCard>
+          </div>
         </div>
       </AnimatedBackground>
     );
@@ -172,73 +175,89 @@ function ProgramDetailsContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen p-4 sm:p-6">
-        <div className="max-w-5xl mx-auto space-y-6 relative z-10">
-          <Button
-            variant="ghost"
-            onClick={() => (window.location.href = "/coach/programs")}
-            className="fc-btn fc-btn-ghost"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Programs
-          </Button>
+      <div className="min-h-screen p-4 sm:p-6 pb-24">
+        <div className="max-w-5xl mx-auto space-y-8 relative z-10">
+          <nav className="flex items-center justify-between">
+            <Link
+              href="/coach/programs"
+              className="flex items-center gap-2 fc-text-dim hover:fc-text-primary transition-colors font-medium"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back to Programs
+            </Link>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full fc-glass border border-[color:var(--fc-glass-border)]">
+                <Share2 className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full fc-glass border border-[color:var(--fc-glass-border)]">
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </div>
+          </nav>
 
-          <GlassCard elevation={3} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-              <div className="flex items-start gap-4 flex-1 min-w-0">
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+          <header className="flex flex-wrap items-start justify-between gap-6">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <span
+                  className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border"
                   style={{
-                    background: getSemanticColor("success").gradient,
-                    boxShadow: `0 4px 12px ${
-                      getSemanticColor("success").primary
-                    }30`,
+                    background: `${getSemanticColor("critical").primary}15`,
+                    color: getSemanticColor("critical").primary,
+                    borderColor: `${getSemanticColor("critical").primary}30`,
                   }}
                 >
-                  <Calendar className="w-7 h-7 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Program Overview
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] break-words">
-                    {program.name}
-                  </h1>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className="text-xs px-2 py-1 rounded-lg font-semibold capitalize"
-                      style={{
-                        background: `${
-                          getDifficultyColor(program.difficulty_level).primary
-                        }20`,
-                        color: getDifficultyColor(program.difficulty_level)
-                          .primary,
-                      }}
-                    >
-                      {program.difficulty_level}
-                    </span>
-                    <span className="text-sm text-[color:var(--fc-text-dim)]">
-                      Created {new Date(program.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
+                  {program.difficulty_level} {program.target_audience?.replace("_", " ") || ""}
+                </span>
+                <span className="fc-text-dim font-mono text-xs">ID: {program.id.slice(0, 8)}</span>
               </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Button
-                  onClick={() =>
-                    (window.location.href = `/coach/programs/${program.id}/edit`)
-                  }
-                  className="fc-btn fc-btn-primary flex-1 sm:flex-initial"
-                >
-                  <Edit className="w-4 h-4 mr-2" /> Edit Program
-                </Button>
+              <h1 className="text-3xl font-bold tracking-tight fc-text-primary mb-4">
+                {program.name}
+              </h1>
+              {program.description && (
+                <p className="text-lg fc-text-dim leading-relaxed">
+                  {program.description}
+                </p>
+              )}
+            </div>
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 flex flex-col gap-4 min-w-[220px]">
+              <div className="flex justify-between items-center">
+                <span className="text-sm fc-text-dim">Assigned Clients</span>
+                <span className="fc-badge fc-badge-strong text-xs">0 ACTIVE</span>
+              </div>
+              <Link
+                href={`/coach/programs/${program.id}/edit`}
+                className="text-sm font-semibold fc-text-primary flex items-center gap-1.5 hover:underline"
+              >
+                Manage Access <ArrowLeft className="w-3 h-3 rotate-180" />
+              </Link>
+            </div>
+          </header>
+
+          <div className="rounded-2xl border-l-4" style={{ borderLeftColor: getSemanticColor("trust").primary }}>
+          <div
+            className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 flex flex-col md:flex-row items-center justify-between gap-6"
+          >
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: `${getSemanticColor("trust").primary}20` }}>
+                <TrendingUp className="w-7 h-7" style={{ color: getSemanticColor("trust").primary }} />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold fc-text-primary">Progression</h3>
+                <p className="text-sm fc-text-dim mt-1">Edit rules and weekly schedule in program settings.</p>
               </div>
             </div>
-          </GlassCard>
+            <Link href={`/coach/programs/${program.id}/edit`}>
+              <Button variant="outline" className="fc-btn fc-btn-ghost rounded-2xl font-bold shrink-0">
+                <Settings2 className="w-4 h-4 mr-2" />
+                Edit Program
+              </Button>
+            </Link>
+          </div>
+          </div>
 
           {/* Stats Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <GlassCard elevation={2} className="fc-glass fc-card p-5 text-center">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 text-center">
               <div
                 className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
                 style={{
@@ -259,9 +278,9 @@ function ProgramDetailsContent() {
               <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
                 Total Weeks
               </div>
-            </GlassCard>
+            </div>
 
-            <GlassCard elevation={2} className="fc-glass fc-card p-5 text-center">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 text-center">
               <div
                 className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
                 style={{
@@ -282,9 +301,9 @@ function ProgramDetailsContent() {
               <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
                 Active Clients
               </div>
-            </GlassCard>
+            </div>
 
-            <GlassCard elevation={2} className="fc-glass fc-card p-5 text-center">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 text-center">
               <div
                 className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
                 style={{
@@ -305,9 +324,9 @@ function ProgramDetailsContent() {
               <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
                 Avg Duration (w)
               </div>
-            </GlassCard>
+            </div>
 
-            <GlassCard elevation={2} className="fc-glass fc-card p-5 text-center">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5 text-center">
               <div
                 className="mx-auto mb-3 rounded-xl w-12 h-12 flex items-center justify-center"
                 style={{
@@ -328,24 +347,14 @@ function ProgramDetailsContent() {
               <div className="text-xs mt-1 text-[color:var(--fc-text-dim)]">
                 Target Audience
               </div>
-            </GlassCard>
+            </div>
           </div>
 
-          {/* Description */}
-          {program.description && (
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
-              <h3 className="text-lg font-bold mb-3 text-[color:var(--fc-text-primary)]">
-                Program Description
-              </h3>
-              <p className="text-sm leading-relaxed text-[color:var(--fc-text-secondary)]">
-                {program.description}
-              </p>
-            </GlassCard>
-          )}
-
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
-            <h3 className="text-lg font-bold mb-4 text-[color:var(--fc-text-primary)]">
-              Weekly Schedule (Week 1)
+          <section className="space-y-4">
+            <h2 className="text-xs font-bold uppercase tracking-widest fc-text-dim">Training Schedule</h2>
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            <h3 className="text-lg font-bold mb-4 fc-text-primary">
+              Week 1
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {dayNames.map((label, idx) => {
@@ -417,7 +426,8 @@ function ProgramDetailsContent() {
                 );
               })}
             </div>
-          </GlassCard>
+          </div>
+          </section>
         </div>
       </div>
     </AnimatedBackground>

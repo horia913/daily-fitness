@@ -454,22 +454,19 @@ export default function CoachGoals() {
         <div className="min-h-screen pb-24">
           <div className="px-6 pt-10">
             <div className="max-w-7xl mx-auto space-y-6">
-              <GlassCard className="p-6 md:p-8">
+              <GlassCard elevation={2} className="fc-glass fc-card p-6 md:p-8">
                 <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-3">
-                    <Badge className="fc-badge fc-badge-strong w-fit">Goal Command</Badge>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg">
-                        <Target className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                          Client Goals
-                        </h1>
-                        <p className="text-sm text-[color:var(--fc-text-dim)]">
-                          Set outcomes and auto-track progress from workouts and metrics.
-                        </p>
-                      </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+                      <Target className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                        Client Goals
+                      </h1>
+                      <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                        Set outcomes and auto-track progress from workouts and metrics.
+                      </p>
                     </div>
                   </div>
                 </div>

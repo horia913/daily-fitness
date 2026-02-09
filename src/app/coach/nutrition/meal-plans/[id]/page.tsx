@@ -229,7 +229,7 @@ export default function MealPlanDetailPage() {
                 <h2 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
                   Meal Plan Not Found
                 </h2>
-                <Link href="/coach/nutrition/meal-plans">
+                <Link href="/coach/nutrition">
                   <Button className="fc-btn fc-btn-primary">Back to Meal Plans</Button>
                 </Link>
               </GlassCard>
@@ -248,16 +248,19 @@ export default function MealPlanDetailPage() {
           <div className="max-w-4xl mx-auto space-y-6">
             <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
               <div className="flex items-start gap-4">
-                <Link href="/coach/nutrition/meal-plans">
-                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
-                    <ArrowLeft className="w-4 h-4" />
-                  </Button>
+                <Link href="/coach/nutrition" className="fc-glass fc-card w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
+                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                 </Link>
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                      {mealPlan.name}
-                    </h1>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora-green)]/20 text-[color:var(--fc-accent-green)] shrink-0">
+                        <ChefHat className="w-6 h-6" />
+                      </div>
+                      <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                        {mealPlan.name}
+                      </h1>
+                    </div>
                     <Link href={`/coach/nutrition/meal-plans/${mealPlan.id}/edit`}>
                       <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost">
                         <Edit className="w-4 h-4" />

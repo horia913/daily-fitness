@@ -87,20 +87,20 @@ export async function getPreviousWeekWorkoutData(
       .map((pda) => pda.workout_assignment_id)
       .filter((id): id is string => !!id);
 
-    // Get program assignment progress to determine week dates
-    const { data: progress } = await supabase
-      .from('program_assignment_progress')
-      .select('cycle_start_date')
-      .eq('assignment_id', assignmentId)
+    // Get cycle start date from program_assignments.start_date (canonical source)
+    const { data: assignmentData } = await supabase
+      .from('program_assignments')
+      .select('start_date')
+      .eq('id', assignmentId)
       .eq('client_id', user.id)
       .maybeSingle();
 
-    if (!progress) {
+    if (!assignmentData || !assignmentData.start_date) {
       return null;
     }
 
     // Calculate date range for previous week
-    const cycleStart = new Date(progress.cycle_start_date);
+    const cycleStart = new Date(assignmentData.start_date);
     const previousWeekStart = new Date(cycleStart);
     previousWeekStart.setDate(cycleStart.getDate() + (previousWeek - 1) * 7);
     const previousWeekEnd = new Date(previousWeekStart);

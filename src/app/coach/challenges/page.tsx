@@ -72,41 +72,39 @@ function CoachChallengesPageContent() {
     );
   }
 
+  const activeCount = challenges.filter(c => c.status === 'active').length;
+
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl space-y-6">
-        <GlassCard elevation={1} className="p-6 md:p-8">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-3">
-              <Badge className="fc-badge fc-badge-strong w-fit">Challenge Hub</Badge>
-              <div className="flex items-center gap-4">
-                <Link href="/coach">
-                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                </Link>
-                <div>
-                  <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                    Challenges
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Launch seasonal competitions, track participation, and award winners.
-                  </p>
-                </div>
-              </div>
+      <div className="relative z-10 max-w-screen-xl mx-auto px-6 md:px-10 py-8 pb-32 space-y-12">
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-8 h-0.5 rounded-full bg-[color:var(--fc-accent-success)]" />
+              <span className="text-sm font-bold tracking-widest uppercase fc-text-dim">Coach Portal</span>
             </div>
+            <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Challenges Management</h1>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost rounded-xl hidden md:inline-flex">
+              Analytics
+            </Button>
+            <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost rounded-xl hidden md:inline-flex">
+              History
+            </Button>
             <Button
               onClick={() => alert("Create challenge feature - integrate with createChallenge service")}
-              className="fc-btn fc-btn-primary"
+              className="fc-btn fc-btn-primary rounded-xl"
             >
               <Plus className="w-5 h-5 mr-2" />
               Create Challenge
             </Button>
           </div>
+        </header>
 
-          <div className="mt-6 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mb-6">
             {["all", "draft", "active", "completed"].map((status) => (
               <Button
                 key={status}
@@ -126,10 +124,19 @@ function CoachChallengesPageContent() {
                 {status.charAt(0).toUpperCase() + status.slice(1)}
               </Button>
             ))}
-          </div>
-        </GlassCard>
+        </div>
 
         {/* Challenges Grid */}
+        <section>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider fc-text-dim flex items-center gap-2">
+              <Trophy className="w-5 h-5" style={{ color: getSemanticColor("energy").primary }} />
+              Active Now
+            </h2>
+            {activeCount > 0 && (
+              <span className="font-mono text-xs fc-glass-soft px-2 py-1 rounded">{activeCount} RUNNING</span>
+            )}
+          </div>
         {filteredChallenges.length === 0 ? (
           <GlassCard elevation={2} className="p-12">
             <div className="text-center">
@@ -203,6 +210,16 @@ function CoachChallengesPageContent() {
             ))}
           </div>
         )}
+        </section>
+
+        <Button
+          onClick={() => alert("Create challenge feature")}
+          className="fixed bottom-8 right-8 z-50 h-14 w-14 rounded-2xl fc-btn-primary shadow-lg"
+          size="icon"
+          aria-label="Create challenge"
+        >
+          <Plus className="w-6 h-6" />
+        </Button>
       </div>
     </AnimatedBackground>
   );

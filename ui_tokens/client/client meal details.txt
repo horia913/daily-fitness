@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meal Detail | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --membrane: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(239, 68, 68, 0.1) 100%);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Spectral Bio-Membrane Layering */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .membrane-overlay {
+            position: absolute;
+            inset: 0;
+            background: var(--membrane);
+            mix-blend-mode: overlay;
+            pointer-events: none;
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-primary {
+            height: 52px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-secondary {
+            height: 52px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .btn-destructive {
+            height: 52px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #EF4444;
+        }
+
+        .macro-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.1);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .macro-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            border-radius: 4px;
+            transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        /* Lightbox effects */
+        #lightbox.active {
+            display: flex;
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .meal-image-container {
+            height: 50vh;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .meal-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+
+        .meal-image-container:active img {
+            transform: scale(1.05);
+        }
+
+        .floating-nav {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body class="pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Top Action Bar -->
+    <nav class="floating-nav">
+        <button onclick="window.history.back()" class="w-12 h-12 rounded-2xl crystal-card flex items-center justify-center text-white/80 hover:text-white transition-all">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+    </nav>
+
+    <!-- Meal Photo Section -->
+    <section class="meal-image-container group cursor-zoom-in" onclick="openLightbox()">
+        <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=1200" alt="Grilled Salmon Salad" id="mainMealPhoto">
+        <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60"></div>
+        <div class="absolute bottom-6 left-6 right-6">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-[12px] font-bold tracking-widest uppercase border border-blue-500/30">Lunch</span>
+                <span class="text-white/60 text-sm mono">Logged 12:42 PM</span>
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight">Grilled Salmon & Quinoa</h1>
+        </div>
+        <div class="membrane-overlay"></div>
+    </section>
+
+    <!-- Details Sheet -->
+    <main class="px-6 -mt-6 relative z-10">
+        <div class="crystal-card p-6 space-y-8 kinetic-shimmer">
+            
+            <!-- Date & Meta -->
+            <div class="flex justify-between items-center border-b border-white/5 pb-6">
+                <div>
+                    <p class="text-white/40 text-[10px] uppercase tracking-[0.2em] mb-1 font-bold">Timeline</p>
+                    <p class="text-lg font-semibold mono">Dec 25, 2025</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-white/40 text-[10px] uppercase tracking-[0.2em] mb-1 font-bold">Status</p>
+                    <p class="text-accent flex items-center gap-1.5 font-semibold">
+                        <i data-lucide="check-circle-2" class="w-4 h-4"></i> Verified
+                    </p>
+                </div>
+            </div>
+
+            <!-- Macros Visualization -->
+            <div>
+                <div class="flex justify-between items-end mb-6">
+                    <h3 class="text-xl font-bold">Macronutrients</h3>
+                    <div class="text-right">
+                        <span class="text-3xl font-bold mono">582</span>
+                        <span class="text-white/40 text-sm ml-1">kcal</span>
+                    </div>
+                </div>
+                
+                <div class="space-y-5">
+                    <!-- Protein -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-blue-400 font-medium flex items-center gap-2">
+                                <div class="w-2 h-2 rounded-full bg-blue-400"></div> Protein
+                            </span>
+                            <span class="mono">42g <span class="text-white/30 text-xs">/ 35%</span></span>
+                        </div>
+                        <div class="macro-bar">
+                            <div class="macro-progress bg-blue-500" style="width: 75%"></div>
+                        </div>
+                    </div>
+                    <!-- Carbs -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-emerald-400 font-medium flex items-center gap-2">
+                                <div class="w-2 h-2 rounded-full bg-emerald-400"></div> Carbs
+                            </span>
+                            <span class="mono">56g <span class="text-white/30 text-xs">/ 45%</span></span>
+                        </div>
+                        <div class="macro-bar">
+                            <div class="macro-progress bg-emerald-500" style="width: 55%"></div>
+                        </div>
+                    </div>
+                    <!-- Fat -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-red-400 font-medium flex items-center gap-2">
+                                <div class="w-2 h-2 rounded-full bg-red-400"></div> Fats
+                            </span>
+                            <span class="mono">18g <span class="text-white/30 text-xs">/ 20%</span></span>
+                        </div>
+                        <div class="macro-bar">
+                            <div class="macro-progress bg-red-500" style="width: 30%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coach Feedback -->
+            <div class="bg-blue-500/5 rounded-3xl p-5 border-l-4 border-blue-500">
+                <div class="flex items-center gap-4 mb-3">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" class="w-10 h-10 rounded-full bg-neutral-800 border border-white/10">
+                    <div>
+                        <p class="font-bold text-sm">Coach Marcus</p>
+                        <p class="text-[10px] text-white/40 uppercase mono">Reviewed 1h ago</p>
+                    </div>
+                    <div class="ml-auto flex gap-2">
+                        <button class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-blue-400">
+                            <i data-lucide="thumbs-up" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+                <p class="text-sm text-white/80 leading-relaxed italic">
+                    "Great choice on the omega-3 rich salmon today. The quinoa portion is perfect for your post-workout recovery. Keep this up!"
+                </p>
+            </div>
+        </div>
+
+        <!-- Sticky Actions -->
+        <div class="mt-8 grid grid-cols-2 gap-4">
+            <button class="btn-secondary rounded-2xl flex items-center justify-center gap-2 font-semibold">
+                <i data-lucide="edit-3" class="w-5 h-5"></i>
+                Edit Details
+            </button>
+            <button onclick="confirmDelete()" class="btn-destructive rounded-2xl flex items-center justify-center gap-2 font-semibold transition-all hover:bg-red-500/20 active:scale-95">
+                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                Delete
+            </button>
+        </div>
+    </main>
+
+    <!-- Lightbox Overlay -->
+    <div id="lightbox" class="fixed inset-0 z-[100] bg-black/95 hidden flex-col items-center justify-center p-4" onclick="closeLightbox()">
+        <button class="absolute top-8 right-8 text-white/60 hover:text-white">
+            <i data-lucide="x" class="w-8 h-8"></i>
+        </button>
+        <img src="" id="lightboxImg" class="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl">
+        <p class="mt-6 text-white/40 text-sm">Pinch to zoom / Swipe to dismiss</p>
+    </div>
+
+    <!-- Confirm Modal (Hidden) -->
+    <div id="deleteModal" class="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md hidden items-center justify-center p-6">
+        <div class="crystal-card p-8 max-w-sm w-full text-center scale-95 transition-transform duration-300">
+            <div class="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-2xl font-bold mb-2">Delete Meal?</h3>
+            <p class="text-white/60 mb-8 leading-relaxed">This action cannot be undone. This meal will be removed from your nutrition history.</p>
+            <div class="space-y-3">
+                <button onclick="hideDeleteModal()" class="w-full btn-primary rounded-2xl font-bold">No, Keep It</button>
+                <button onclick="hideDeleteModal()" class="w-full h-12 text-white/40 hover:text-red-400 transition-colors text-sm font-medium">Yes, Delete Permanently</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide
+        lucide.createIcons();
+
+        // Lightbox Logic
+        function openLightbox() {
+            const src = document.getElementById('mainMealPhoto').src;
+            const lightbox = document.getElementById('lightbox');
+            const lightboxImg = document.getElementById('lightboxImg');
+            lightboxImg.src = src;
+            lightbox.classList.add('active');
+            lightbox.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            const lightbox = document.getElementById('lightbox');
+            lightbox.classList.remove('active');
+            setTimeout(() => { lightbox.style.display = 'none'; }, 300);
+            document.body.style.overflow = 'auto';
+        }
+
+        // Delete Confirmation Logic
+        function confirmDelete() {
+            const modal = document.getElementById('deleteModal');
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.querySelector('.crystal-card').style.transform = 'scale(1)';
+            }, 10);
+            if (window.navigator.vibrate) window.navigator.vibrate(50);
+        }
+
+        function hideDeleteModal() {
+            const modal = document.getElementById('deleteModal');
+            modal.querySelector('.crystal-card').style.transform = 'scale(0.95)';
+            setTimeout(() => { modal.style.display = 'none'; }, 200);
+        }
+
+        // Entry Animations
+        document.addEventListener('DOMContentLoaded', () => {
+            const card = document.querySelector('.crystal-card');
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 150);
+
+            // Animate progress bars
+            const bars = document.querySelectorAll('.macro-progress');
+            bars.forEach(bar => {
+                const targetWidth = bar.style.width;
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.width = targetWidth;
+                }, 600);
+            });
+        });
+    </script>
+</body>
+</html>

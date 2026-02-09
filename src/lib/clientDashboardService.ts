@@ -103,47 +103,16 @@ export async function calculateWeeklyProgress(clientId: string): Promise<{ curre
 
     const current = completedLogs?.length || 0;
 
-    // FIRST: Check if client has an active program to determine weekly goal
-    const { data: activeAssignment, error: assignmentError } = await supabase
-      .from('program_assignments')
-      .select('id, program_id')
-      .eq('client_id', clientId)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Use canonical programStateService for program-based weekly goal
+    const { getProgramState } = await import('./programStateService');
+    const programState = await getProgramState(supabase, clientId);
 
-    if (!assignmentError && activeAssignment?.program_id) {
-      // Program-based client: get weekly goal from program_progress + program_schedule
-      const { data: progress } = await supabase
-        .from('program_progress')
-        .select('current_week_index')
-        .eq('program_assignment_id', activeAssignment.id)
-        .maybeSingle();
-
-      const currentWeekIndex = progress?.current_week_index ?? 0;
-
-      // Get the program schedule to determine days in current week
-      const { data: scheduleRows } = await supabase
-        .from('program_schedule')
-        .select('week_number')
-        .eq('program_id', activeAssignment.program_id);
-
-      if (scheduleRows && scheduleRows.length > 0) {
-        // Get unique week numbers sorted
-        const uniqueWeeks = [...new Set(scheduleRows.map(r => r.week_number))].sort((a, b) => a - b);
-        const actualWeekNumber = uniqueWeeks[currentWeekIndex] || uniqueWeeks[0] || 1;
-        
-        // Count days in this week
-        const { data: weekDays } = await supabase
-          .from('program_schedule')
-          .select('id')
-          .eq('program_id', activeAssignment.program_id)
-          .eq('week_number', actualWeekNumber);
-
-        const goal = weekDays?.length || 0;
-        return { current, goal };
-      }
+    if (programState.assignment && programState.slots.length > 0) {
+      // Count slots in the current week
+      const currentWeekSlots = programState.slots.filter(
+        s => s.week_number === programState.currentWeekNumber
+      ).length;
+      return { current, goal: currentWeekSlots };
     }
 
     // FALLBACK: Legacy workout_assignments with scheduled_date
@@ -290,7 +259,7 @@ export async function getDashboardStats(clientId: string): Promise<DashboardStat
 
 /**
  * Get today's workout assignment with template details
- * Now supports both program-based workouts (via program_progress) and 
+ * Now supports both program-based workouts (via programStateService) and 
  * legacy workout_assignments with scheduled_date
  */
 export interface TodaysWorkout {
@@ -308,7 +277,7 @@ export interface TodaysWorkout {
 
 export async function getTodaysWorkout(clientId: string): Promise<TodaysWorkout | null> {
   try {
-    // FIRST: Check for active program workout using program_progress
+    // FIRST: Check for active program workout using programStateService (via programProgressService)
     const { getCurrentWorkoutFromProgress } = await import('./programProgressService');
     const programWorkout = await getCurrentWorkoutFromProgress(supabase, clientId);
     

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Availability Settings | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --filament: rgba(59, 130, 246, 0.2);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Machined Filament Effect */
+        .filament-line {
+            position: absolute;
+            background: linear-gradient(90deg, transparent, var(--secondary), transparent);
+            height: 1px;
+            width: 100%;
+            opacity: 0.2;
+            filter: blur(1px);
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-action {
+            height: 48px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .btn-preset {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 0 20px;
+            white-space: nowrap;
+        }
+
+        .btn-preset:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-2px);
+        }
+
+        .save-bar {
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid var(--glass-border);
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+        }
+
+        .btn-save {
+            height: 56px;
+            background: linear-gradient(135deg, var(--accent) 0%, #059669 100%);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
+        }
+
+        /* Schedule Grid Styling */
+        .schedule-container {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 140px);
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            gap: 8px;
+            padding: 4px;
+        }
+
+        .schedule-container::-webkit-scrollbar { display: none; }
+
+        .time-label {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            color: #737373;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .slot {
+            height: 64px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .slot.available {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: inset 0 0 12px rgba(59, 130, 246, 0.1);
+        }
+
+        .slot.available::after {
+            content: 'GROUP';
+            font-size: 8px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            color: var(--secondary);
+            margin-top: 4px;
+        }
+
+        .slot:active { transform: scale(0.96); }
+
+        .day-header {
+            text-align: center;
+            padding-bottom: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(16, 185, 129, 0.07) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .blocked-date-item {
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.1);
+        }
+    </style>
+</head>
+<body class="p-6 pb-40">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Section -->
+    <header class="max-w-screen-xl mx-auto mb-10">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-8 h-[2px] bg-primary"></div>
+            <span class="mono text-xs font-bold uppercase tracking-[0.3em] text-primary">System Config</span>
+        </div>
+        <h1 class="text-[30px] font-bold tracking-tight mb-2 leading-tight">Session Availability</h1>
+        <p class="text-neutral-400 text-base">Define your weekly kinetic windows for small group sessions.</p>
+    </header>
+
+    <!-- Quick Presets -->
+    <section class="max-w-screen-xl mx-auto mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold">Smart Presets</h2>
+            <button class="text-sm text-neutral-500 hover:text-white transition-colors">Clear All</button>
+        </div>
+        <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            <button class="btn-action btn-preset">
+                <i data-lucide="calendar-days" class="w-4 h-4"></i>
+                Mon-Fri Standard
+            </button>
+            <button class="btn-action btn-preset">
+                <i data-lucide="zap" class="w-4 h-4"></i>
+                Weekends Only
+            </button>
+            <button class="btn-action btn-preset">
+                <i data-lucide="moon" class="w-4 h-4"></i>
+                Evening Blocks
+            </button>
+        </div>
+    </section>
+
+    <!-- Weekly Grid -->
+    <section class="max-w-screen-xl mx-auto mb-12">
+        <div class="crystal-card p-6 kinetic-shimmer">
+            <div class="filament-line top-1/4"></div>
+            <div class="filament-line top-3/4"></div>
+            
+            <div class="flex items-center gap-2 mb-6">
+                <i data-lucide="users" class="w-5 h-5 text-secondary"></i>
+                <span class="text-sm font-bold uppercase tracking-widest text-secondary">Group Capacity: 4 Participants</span>
+            </div>
+
+            <div class="schedule-container">
+                <!-- Empty corner -->
+                <div></div>
+                <!-- Headers -->
+                <div class="day-header"><span class="block text-sm font-bold">MON</span><span class="text-[10px] text-neutral-500 mono">DEC 18</span></div>
+                <div class="day-header"><span class="block text-sm font-bold">TUE</span><span class="text-[10px] text-neutral-500 mono">DEC 19</span></div>
+                <div class="day-header"><span class="block text-sm font-bold">WED</span><span class="text-[10px] text-neutral-500 mono">DEC 20</span></div>
+                <div class="day-header"><span class="block text-sm font-bold">THU</span><span class="text-[10px] text-neutral-500 mono">DEC 21</span></div>
+                <div class="day-header"><span class="block text-sm font-bold">FRI</span><span class="text-[10px] text-neutral-500 mono">DEC 22</span></div>
+                <div class="day-header text-primary"><span class="block text-sm font-bold">SAT</span><span class="text-[10px] opacity-50 mono">DEC 23</span></div>
+                <div class="day-header text-primary"><span class="block text-sm font-bold">SUN</span><span class="text-[10px] opacity-50 mono">DEC 24</span></div>
+
+                <!-- Time Rows -->
+                <!-- 08:00 AM -->
+                <div class="time-label mono">08:00 AM</div>
+                <div class="slot available" onclick="toggleSlot(this)"><i data-lucide="check" class="w-4 h-4 text-secondary"></i></div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+                <div class="slot available" onclick="toggleSlot(this)"><i data-lucide="check" class="w-4 h-4 text-secondary"></i></div>
+                <div class="slot available" onclick="toggleSlot(this)"><i data-lucide="check" class="w-4 h-4 text-secondary"></i></div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+
+                <!-- 09:00 AM -->
+                <div class="time-label mono">09:00 AM</div>
+                <div class="slot available" onclick="toggleSlot(this)"><i data-lucide="check" class="w-4 h-4 text-secondary"></i></div>
+                <div class="slot available" onclick="toggleSlot(this)"><i data-lucide="check" class="w-4 h-4 text-secondary"></i></div>
+                <div class="slot available" onclick="toggleSlot(this)"><i data-lucide="check" class="w-4 h-4 text-secondary"></i></div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+                <div class="slot available" onclick="toggleSlot(this)"><i data-lucide="check" class="w-4 h-4 text-secondary"></i></div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+
+                <!-- 10:00 AM -->
+                <div class="time-label mono">10:00 AM</div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+                <div class="slot available" onclick="toggleSlot(this)"><i data-lucide="check" class="w-4 h-4 text-secondary"></i></div>
+                <div class="slot available" onclick="toggleSlot(this)"><i data-lucide="check" class="w-4 h-4 text-secondary"></i></div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+                <div class="slot available" onclick="toggleSlot(this)"><i data-lucide="check" class="w-4 h-4 text-secondary"></i></div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+                <div class="slot" onclick="toggleSlot(this)"></div>
+
+                <!-- Continues for other hours... simplified for brevity -->
+                <div class="time-label mono">...</div>
+                <div class="col-span-7 h-16 flex items-center justify-center text-neutral-600 italic text-sm">Scroll to view evening slots</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Blocked Dates Section -->
+    <section class="max-w-screen-xl mx-auto mb-10">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-semibold">Blackout Dates</h2>
+            <button class="btn-action bg-primary/10 text-primary border border-primary/20 px-4 h-10 rounded-lg text-sm">
+                <i data-lucide="plus" class="w-4 h-4"></i> Add Exception
+            </button>
+        </div>
+
+        <div class="space-y-4">
+            <div class="crystal-card p-4 flex items-center justify-between blocked-date-item">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+                        <i data-lucide="plane" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold">Dec 24 - Jan 02</div>
+                        <div class="text-xs text-neutral-400 uppercase tracking-widest mono">Annual Winter Break</div>
+                    </div>
+                </div>
+                <button class="p-2 hover:bg-primary/20 rounded-lg text-neutral-500 hover:text-primary transition-all">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="crystal-card p-4 flex items-center justify-between blocked-date-item">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+                        <i data-lucide="user-minus" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold">Jan 15</div>
+                        <div class="text-xs text-neutral-400 uppercase tracking-widest mono">Personal / Professional Development</div>
+                    </div>
+                </div>
+                <button class="p-2 hover:bg-primary/20 rounded-lg text-neutral-500 hover:text-primary transition-all">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sticky Save Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 save-bar z-50">
+        <div class="max-w-screen-xl mx-auto flex items-center gap-4">
+            <div class="hidden md:flex flex-col flex-1">
+                <span class="text-xs text-neutral-400 uppercase font-bold tracking-widest">Status</span>
+                <span class="text-accent flex items-center gap-1 font-semibold">
+                    <span class="w-2 h-2 bg-accent rounded-full animate-pulse"></span>
+                    Changes Unsaved
+                </span>
+            </div>
+            <button class="btn-action btn-save w-full md:w-64 text-white uppercase tracking-[0.15em]">
+                <i data-lucide="save" class="w-5 h-5"></i>
+                Save Strategy
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // Initialize Lucide
+        lucide.createIcons();
+
+        // Toggle Slot Availability
+        function toggleSlot(el) {
+            const isAvailable = el.classList.contains('available');
+            
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(15);
+            }
+
+            if (isAvailable) {
+                el.classList.remove('available');
+                el.innerHTML = '';
+            } else {
+                el.classList.add('available');
+                el.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-secondary"></i>';
+                lucide.createIcons();
+            }
+        }
+
+        // Entrance Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const sections = document.querySelectorAll('section, header');
+            sections.forEach((sec, i) => {
+                sec.style.opacity = '0';
+                sec.style.transform = 'translateY(15px)';
+                setTimeout(() => {
+                    sec.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    sec.style.opacity = '1';
+                    sec.style.transform = 'translateY(0)';
+                }, i * 120);
+            });
+        });
+    </script>
+</body>
+</html>

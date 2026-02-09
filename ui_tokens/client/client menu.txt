@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Menu | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Vitreous Prismatic Lattice Effects */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .crystal-card:active { transform: scale(0.96); }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 10%, rgba(239, 68, 68, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 20% 90%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .icon-gradient-red { background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.05) 100%); color: #EF4444; }
+        .icon-gradient-blue { background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.05) 100%); color: #3B82F6; }
+        .icon-gradient-green { background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%); color: #10B981; }
+        .icon-gradient-orange { background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.05) 100%); color: #F59E0B; }
+
+        .btn-secondary {
+            height: 52px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1.5px solid rgba(59, 130, 246, 0.3);
+            color: #3B82F6;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .btn-secondary:hover { 
+            background: rgba(59, 130, 246, 0.2);
+            border-color: #3B82F6;
+        }
+
+        .bottom-nav {
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .scroll-container::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="p-6 md:p-10 pb-40 scroll-container">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Section -->
+    <header class="flex justify-between items-center mb-10">
+        <div>
+            <h1 class="text-[30px] font-bold tracking-tight">Menu</h1>
+            <p class="text-sm text-neutral-400 mt-0.5">Manage your crystalline fitness experience</p>
+        </div>
+        <div class="relative group cursor-pointer">
+            <div class="w-14 h-14 rounded-full border-2 border-white/10 overflow-hidden crystal-card p-0.5">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt="Avatar" class="w-full h-full object-cover rounded-full">
+            </div>
+            <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-accent border-4 border-[#0A0A0A] rounded-full"></div>
+        </div>
+    </header>
+
+    <!-- Greeting Hero -->
+    <div class="mb-10">
+        <h2 class="text-xl font-medium text-neutral-300">Hey <span class="text-white font-bold">Alex!</span></h2>
+        <div class="h-1 w-12 bg-primary rounded-full mt-2"></div>
+    </div>
+
+    <!-- Menu Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+        
+        <!-- Profile -->
+        <div class="crystal-card kinetic-shimmer p-5 flex flex-col justify-between min-h-[160px] cursor-pointer">
+            <div class="w-12 h-12 rounded-2xl icon-gradient-blue flex items-center justify-center mb-4">
+                <i data-lucide="user" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">Profile</h3>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+                <p class="text-sm text-neutral-500 mt-1">Edit profile & settings</p>
+            </div>
+        </div>
+
+        <!-- Goals -->
+        <div class="crystal-card kinetic-shimmer p-5 flex flex-col justify-between min-h-[160px] cursor-pointer">
+            <div class="w-12 h-12 rounded-2xl icon-gradient-red flex items-center justify-center mb-4">
+                <i data-lucide="target" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">Goals</h3>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+                <p class="text-sm text-neutral-500 mt-1">Track your targets</p>
+            </div>
+        </div>
+
+        <!-- Habits -->
+        <div class="crystal-card kinetic-shimmer p-5 flex flex-col justify-between min-h-[160px] cursor-pointer">
+            <div class="w-12 h-12 rounded-2xl icon-gradient-orange flex items-center justify-center mb-4">
+                <i data-lucide="flame" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">Habits</h3>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+                <p class="text-sm text-neutral-500 mt-1">Daily consistency</p>
+            </div>
+        </div>
+
+        <!-- Workout Logs -->
+        <div class="crystal-card kinetic-shimmer p-5 flex flex-col justify-between min-h-[160px] cursor-pointer">
+            <div class="w-12 h-12 rounded-2xl icon-gradient-blue flex items-center justify-center mb-4">
+                <i data-lucide="book" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">Logs</h3>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+                <p class="text-sm text-neutral-500 mt-1">Full history</p>
+            </div>
+        </div>
+
+        <!-- PRs -->
+        <div class="crystal-card kinetic-shimmer p-5 flex flex-col justify-between min-h-[160px] cursor-pointer">
+            <div class="w-12 h-12 rounded-2xl icon-gradient-orange flex items-center justify-center mb-4">
+                <i data-lucide="trophy" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">PRs</h3>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+                <p class="text-sm text-neutral-500 mt-1">Your achievements</p>
+            </div>
+        </div>
+
+        <!-- Achievements -->
+        <div class="crystal-card kinetic-shimmer p-5 flex flex-col justify-between min-h-[160px] cursor-pointer">
+            <div class="w-12 h-12 rounded-2xl icon-gradient-green flex items-center justify-center mb-4">
+                <i data-lucide="award" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">Badges</h3>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+                <p class="text-sm text-neutral-500 mt-1">Unlocked rewards</p>
+            </div>
+        </div>
+
+        <!-- Leaderboard -->
+        <div class="crystal-card kinetic-shimmer p-5 flex flex-col justify-between min-h-[160px] cursor-pointer">
+            <div class="w-12 h-12 rounded-2xl icon-gradient-blue flex items-center justify-center mb-4">
+                <i data-lucide="users" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">Ranks</h3>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+                <p class="text-sm text-neutral-500 mt-1">Compare with others</p>
+            </div>
+        </div>
+
+        <!-- Challenges -->
+        <div class="crystal-card kinetic-shimmer p-5 flex flex-col justify-between min-h-[160px] cursor-pointer">
+            <div class="w-12 h-12 rounded-2xl icon-gradient-red flex items-center justify-center mb-4">
+                <i data-lucide="flag" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">Events</h3>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+                <p class="text-sm text-neutral-500 mt-1">Active challenges</p>
+            </div>
+        </div>
+
+        <!-- Clipcards -->
+        <div class="crystal-card kinetic-shimmer p-5 flex flex-col justify-between min-h-[160px] cursor-pointer">
+            <div class="w-12 h-12 rounded-2xl icon-gradient-blue flex items-center justify-center mb-4">
+                <i data-lucide="book-open" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">Learn</h3>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+                <p class="text-sm text-neutral-500 mt-1">Tips & education</p>
+            </div>
+        </div>
+
+        <!-- Programs -->
+        <div class="crystal-card kinetic-shimmer p-5 flex flex-col justify-between min-h-[160px] cursor-pointer col-span-2 md:col-span-1">
+            <div class="w-12 h-12 rounded-2xl icon-gradient-green flex items-center justify-center mb-4">
+                <i data-lucide="calendar" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold">Programs</h3>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+                <p class="text-sm text-neutral-500 mt-1">Your training plan</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="mt-12 space-y-4">
+        <button class="btn-secondary w-full rounded-2xl flex items-center justify-center gap-3">
+            <i data-lucide="message-square" class="w-5 h-5"></i>
+            Contact Coach Marcus
+        </button>
+        <div class="flex justify-center">
+            <button class="text-sm text-neutral-500 hover:text-white flex items-center gap-2 transition-colors py-2">
+                <i data-lucide="help-circle" class="w-4 h-4"></i>
+                Help & Support
+            </button>
+        </div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 bottom-nav z-50">
+        <div class="max-w-screen-xl mx-auto flex items-center gap-4">
+            <div class="flex flex-1 justify-around">
+                <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-neutral-300">
+                    <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Dash</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-neutral-500">
+                    <i data-lucide="calendar" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Plan</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-primary">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Menu</span>
+                </button>
+            </div>
+            <button class="bg-primary shadow-2xl shadow-red-500/20 w-14 h-14 rounded-2xl flex items-center justify-center transform active:scale-90 transition-transform">
+                <i data-lucide="plus" class="w-6 h-6"></i>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        lucide.createIcons();
+
+        // Reveal animation for menu cards
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 40);
+            });
+        });
+
+        // Haptic feedback simulation
+        document.querySelectorAll('.crystal-card, .btn-secondary, nav button').forEach(el => {
+            el.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(12);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

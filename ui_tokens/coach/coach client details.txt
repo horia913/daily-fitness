@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Profile | Vitreous Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #070708;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Surfaces */
+        .crystal-surface {
+            background: linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(160%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease;
+        }
+
+        .crystal-surface:hover {
+            box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -150%;
+            left: -150%;
+            width: 400%;
+            height: 400%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: rotate(0deg) translate(-10%, -10%); }
+            100% { transform: rotate(0deg) translate(10%, 10%); }
+        }
+
+        /* Typography Hierarchy */
+        .text-h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+        .text-h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+        .text-body { font-size: 16px; line-height: 1.6; }
+        .text-caption { font-size: 14px; color: #9CA3AF; }
+
+        /* Buttons & Interactions */
+        .btn-action {
+            height: 52px;
+            min-width: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .btn-action:active { transform: scale(0.92); }
+        .btn-action.primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.25);
+            color: white;
+            font-weight: 600;
+            padding: 0 24px;
+        }
+
+        .btn-action.secondary {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            color: #FFFFFF;
+        }
+
+        .btn-action.secondary:hover { background: rgba(255,255,255,0.1); }
+
+        /* Tabs Navigation */
+        .tab-bar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+        }
+        .tab-bar::-webkit-scrollbar { display: none; }
+
+        .tab-item {
+            padding: 12px 20px;
+            white-space: nowrap;
+            font-weight: 500;
+            color: #6B7280;
+            position: relative;
+            transition: color 0.3s ease;
+        }
+
+        .tab-item.active {
+            color: #FFFFFF;
+        }
+
+        .tab-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 3px;
+            background: var(--secondary);
+            border-radius: 4px;
+            box-shadow: 0 0 12px var(--secondary);
+        }
+
+        .status-pulse {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .bg-gradient-mesh {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 10% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .progress-ring-circle {
+            transition: stroke-dashoffset 1s ease-in-out;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 lg:max-w-6xl lg:mx-auto">
+    <div class="bg-gradient-mesh"></div>
+
+    <!-- Client Header -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+        <div class="flex items-center gap-6">
+            <div class="relative">
+                <div class="w-24 h-24 md:w-28 md:h-28 rounded-full border-2 border-white/10 p-1 bg-gradient-to-tr from-blue-500/20 to-red-500/20">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alexander" alt="Client Avatar" class="w-full h-full rounded-full object-cover bg-neutral-900">
+                </div>
+                <div class="absolute top-2 right-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-2">
+                    <div class="status-pulse"></div>
+                    <span class="text-[10px] font-bold tracking-widest uppercase text-accent">Active</span>
+                </div>
+            </div>
+            <div>
+                <h1 class="text-h1">Alexander Pierce</h1>
+                <div class="flex items-center gap-3 mt-1">
+                    <span class="text-caption mono">ID: #PX-9920</span>
+                    <span class="w-1 h-1 bg-neutral-700 rounded-full"></span>
+                    <span class="text-caption">Hybrid Athlete Program</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex gap-3 h-14">
+            <button class="btn-action secondary group" aria-label="Send Message">
+                <i data-lucide="message-circle" class="w-6 h-6 group-hover:text-secondary transition-colors"></i>
+            </button>
+            <button class="btn-action secondary group" aria-label="Video Call">
+                <i data-lucide="video" class="w-6 h-6 group-hover:text-accent transition-colors"></i>
+            </button>
+            <button class="btn-action primary flex items-center gap-2">
+                <i data-lucide="plus" class="w-5 h-5"></i>
+                <span>Assign Workout</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Stats Grid -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
+        <!-- Compliance Card -->
+        <div class="crystal-surface kinetic-shimmer p-6 flex items-center gap-6">
+            <div class="relative w-20 h-20">
+                <svg viewBox="0 0 100 100" class="w-full h-full">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"></circle>
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="url(#blue_grad)" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="42" stroke-linecap="round" class="progress-ring-circle"></circle>
+                    <defs>
+                        <linearGradient id="blue_grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#3B82F6" />
+                            <stop offset="100%" style="stop-color:#60A5FA" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <span class="text-lg font-bold mono">85%</span>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-caption font-medium uppercase tracking-wider mb-1">Compliance</h3>
+                <p class="text-h2">Above Target</p>
+                <p class="text-[12px] text-accent font-medium mt-1">↑ 4% vs last month</p>
+            </div>
+        </div>
+
+        <!-- Streak Card -->
+        <div class="crystal-surface p-6 flex items-center gap-6 border-l-4 border-l-red-500/50">
+            <div class="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-primary">
+                <i data-lucide="flame" class="w-8 h-8"></i>
+            </div>
+            <div>
+                <h3 class="text-caption font-medium uppercase tracking-wider mb-1">Consistency</h3>
+                <p class="text-h2">12 Day Streak</p>
+                <p class="text-[12px] text-neutral-400 mt-1 italic">Personal Best: 24 days</p>
+            </div>
+        </div>
+
+        <!-- Workouts Card -->
+        <div class="crystal-surface p-6 flex items-center gap-6">
+            <div class="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-secondary">
+                <i data-lucide="dumbbell" class="w-8 h-8"></i>
+            </div>
+            <div>
+                <h3 class="text-caption font-medium uppercase tracking-wider mb-1">Volume</h3>
+                <p class="text-h2">47 Completed</p>
+                <p class="text-[12px] text-neutral-400 mt-1">64,200 kg total moved</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="border-b border-white/5 mb-8">
+        <div class="tab-bar flex overflow-x-auto gap-2 pb-1">
+            <button class="tab-item active" onclick="switchTab(this)">Progress</button>
+            <button class="tab-item" onclick="switchTab(this)">Workouts</button>
+            <button class="tab-item" onclick="switchTab(this)">Nutrition <span class="bg-red-500/20 text-red-400 text-[10px] px-1.5 py-0.5 rounded-full ml-1">2</span></button>
+            <button class="tab-item" onclick="switchTab(this)">Goals</button>
+            <button class="tab-item" onclick="switchTab(this)">Habits</button>
+            <button class="tab-item" onclick="switchTab(this)">Meals</button>
+            <button class="tab-item" onclick="switchTab(this)">FMS</button>
+        </div>
+    </nav>
+
+    <!-- Tab Content Area -->
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Main Chart/Data (Progress Tab View) -->
+        <div class="lg:col-span-8 space-y-6">
+            <div class="crystal-surface p-8 min-h-[400px]">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 class="text-h2 mb-1">Strength Trajectory</h2>
+                        <p class="text-caption">Composite Load across primary lifts</p>
+                    </div>
+                    <select class="bg-neutral-800 border-none text-sm rounded-lg px-3 py-2 outline-none cursor-pointer">
+                        <option>Last 3 Months</option>
+                        <option>Last Year</option>
+                    </select>
+                </div>
+                
+                <!-- Chart Visualization Placeholder -->
+                <div class="h-64 flex items-end gap-2 px-2">
+                    <div class="flex-1 bg-gradient-to-t from-blue-500/40 to-blue-400/10 rounded-t-lg transition-all hover:from-blue-500/60" style="height: 60%"></div>
+                    <div class="flex-1 bg-gradient-to-t from-blue-500/40 to-blue-400/10 rounded-t-lg transition-all hover:from-blue-500/60" style="height: 45%"></div>
+                    <div class="flex-1 bg-gradient-to-t from-blue-500/40 to-blue-400/10 rounded-t-lg transition-all hover:from-blue-500/60" style="height: 75%"></div>
+                    <div class="flex-1 bg-gradient-to-t from-blue-500/40 to-blue-400/10 rounded-t-lg transition-all hover:from-blue-500/60" style="height: 65%"></div>
+                    <div class="flex-1 bg-gradient-to-t from-blue-500/40 to-blue-400/10 rounded-t-lg transition-all hover:from-blue-500/60" style="height: 90%"></div>
+                    <div class="flex-1 bg-gradient-to-t from-red-500/50 to-red-400/20 rounded-t-lg transition-all" style="height: 95%"></div>
+                </div>
+                <div class="flex justify-between mt-4 text-caption mono uppercase text-[10px]">
+                    <span>Oct</span><span>Nov</span><span>Dec</span><span>Jan</span><span>Feb</span><span>Today</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="crystal-surface p-6">
+                    <h4 class="text-sm font-bold uppercase tracking-widest text-neutral-500 mb-4">Top Lift PRs</h4>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-body">Back Squat</span>
+                            <span class="mono font-bold text-accent">145kg</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-body">Bench Press</span>
+                            <span class="mono font-bold text-accent">102kg</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-body">Deadlift</span>
+                            <span class="mono font-bold text-accent">180kg</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="crystal-surface p-6">
+                    <h4 class="text-sm font-bold uppercase tracking-widest text-neutral-500 mb-4">Body Composition</h4>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-body">Weight</span>
+                            <span class="mono font-bold">84.2kg <span class="text-red-400 text-sm">↓</span></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-body">Body Fat %</span>
+                            <span class="mono font-bold">14.2%</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-body">Lean Mass</span>
+                            <span class="mono font-bold">72.1kg</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Activity / Coach Notes -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="crystal-surface p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-h2">Recent Activity</h3>
+                    <button class="text-secondary text-sm font-medium">View All</button>
+                </div>
+                <div class="space-y-6">
+                    <div class="flex gap-4">
+                        <div class="w-1 h-auto bg-accent/30 rounded-full"></div>
+                        <div>
+                            <p class="text-body font-medium">Completed Upper A</p>
+                            <p class="text-caption">2 hours ago • 68 min</p>
+                            <div class="flex gap-2 mt-2">
+                                <span class="text-[10px] bg-neutral-800 px-2 py-1 rounded-md text-neutral-400">RPE 8</span>
+                                <span class="text-[10px] bg-accent/20 px-2 py-1 rounded-md text-accent font-bold">2 PRs</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="w-1 h-auto bg-blue-500/30 rounded-full"></div>
+                        <div>
+                            <p class="text-body font-medium">Logged Nutrition</p>
+                            <p class="text-caption">6 hours ago • Perfect Compliance</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="w-1 h-auto bg-neutral-700 rounded-full"></div>
+                        <div>
+                            <p class="text-body font-medium">Missed Cardio Session</p>
+                            <p class="text-caption">Yesterday • Rest Day taken</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="crystal-surface p-6 border-t-4 border-t-secondary/40">
+                <h3 class="text-h2 mb-4 flex items-center gap-2">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                    Coach's Note
+                </h3>
+                <p class="text-sm text-neutral-300 italic leading-relaxed mb-4">
+                    "Alex is responding well to the higher volume. For the next phase, we'll shift focus to eccentric tempo on the squat to address that sticking point at the bottom. Great intensity lately."
+                </p>
+                <div class="flex items-center gap-3">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Coach" class="w-8 h-8 rounded-full bg-neutral-800">
+                    <div>
+                        <p class="text-[12px] font-bold">Marcus Thorne</p>
+                        <p class="text-[10px] text-neutral-500 uppercase">Head Coach</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Haptic Feedback for Primary Buttons
+        document.querySelectorAll('.btn-action.primary').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(12);
+                }
+            });
+        });
+
+        // Tab Switching Logic
+        function switchTab(element) {
+            document.querySelectorAll('.tab-item').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            element.classList.add('active');
+            
+            // Subtle feedback
+            if (window.navigator.vibrate) { window.navigator.vibrate(5); }
+        }
+
+        // Animation on entry
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.crystal-surface, header, nav');
+            elements.forEach((el, i) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(15px)';
+                setTimeout(() => {
+                    el.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                }, i * 80);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,324 @@
+/**
+ * Complete Workout Service (Unified Pipeline)
+ * 
+ * SINGLE entry point for completing a workout — used by BOTH:
+ *   - Client flow: POST /api/complete-workout
+ *   - Coach flow:  POST /api/coach/pickup/mark-complete
+ * 
+ * Steps:
+ * 1. Fetch workout_log, verify ownership
+ * 2. Idempotency guard (already completed → no-op 200)
+ * 3. Compute totals from workout_set_logs
+ * 4. Update workout_logs (completed_at, totals)
+ * 5. Update workout_sessions status if session_id provided
+ * 6. Program completion (if program_assignment_id + program_schedule_id on log):
+ *    a. INSERT INTO program_day_completions (ON CONFLICT DO NOTHING — idempotent)
+ *    b. Find next uncompleted slot via programStateService
+ *    c. Update program_progress cache
+ * 7. Sync goals/achievements (non-blocking, unchanged)
+ * 
+ * Does NOT:
+ *   - Call advance_program_progress RPC (replaced)
+ *   - Write to program_day_assignments
+ *   - Write to program_assignment_progress
+ *   - Write to program_workout_completions
+ */
+
+import { SupabaseClient } from '@supabase/supabase-js'
+import {
+  getProgramSlots,
+  getNextSlot,
+  updateProgressCache,
+} from './programStateService'
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
+
+export interface CompleteWorkoutParams {
+  supabaseAdmin: SupabaseClient  // Service role client (bypasses RLS)
+  supabaseAuth: SupabaseClient   // Session client (for RLS-protected reads)
+  workoutLogId: string
+  clientId: string
+  completedBy: string            // user.id of the actor (client or coach)
+  durationMinutes?: number
+  sessionId?: string
+  notes?: string
+}
+
+export interface CompleteWorkoutResult {
+  success: boolean
+  alreadyCompleted: boolean
+  workoutLog: any
+  totals: {
+    sets: number
+    reps: number
+    weight: number
+    duration_minutes: number
+  }
+  programProgression: {
+    status: 'advanced' | 'program_completed' | 'no_program' | 'already_recorded'
+    currentWeekNumber?: number
+    currentDayNumber?: number
+    isCompleted?: boolean
+    programAssignmentId?: string
+    programScheduleId?: string
+  } | null
+}
+
+// ============================================================================
+// MAIN FUNCTION
+// ============================================================================
+
+export async function completeWorkout(params: CompleteWorkoutParams): Promise<CompleteWorkoutResult> {
+  const {
+    supabaseAdmin,
+    supabaseAuth,
+    workoutLogId,
+    clientId,
+    completedBy,
+    durationMinutes,
+    sessionId,
+    notes,
+  } = params
+
+  // ========================================================================
+  // STEP 1: Fetch workout_log and verify ownership
+  // ========================================================================
+  console.log('[completeWorkoutService] Fetching workout_log:', workoutLogId)
+  const { data: workoutLog, error: logError } = await supabaseAdmin
+    .from('workout_logs')
+    .select('id, started_at, completed_at, client_id, workout_assignment_id, program_assignment_id, program_schedule_id')
+    .eq('id', workoutLogId)
+    .eq('client_id', clientId)
+    .single()
+
+  if (logError || !workoutLog) {
+    console.error('[completeWorkoutService] Workout log not found:', logError)
+    throw new Error(`Workout log not found: ${workoutLogId}`)
+  }
+
+  // ========================================================================
+  // STEP 2: Idempotency guard — if already completed, return no-op
+  // ========================================================================
+  if (workoutLog.completed_at) {
+    console.log('[completeWorkoutService] Already completed, returning no-op:', workoutLogId)
+    return {
+      success: true,
+      alreadyCompleted: true,
+      workoutLog,
+      totals: { sets: 0, reps: 0, weight: 0, duration_minutes: 0 },
+      programProgression: null,
+    }
+  }
+
+  // ========================================================================
+  // STEP 3: Fetch workout_set_logs and compute totals
+  // ========================================================================
+  const { data: setLogs, error: setsError } = await supabaseAdmin
+    .from('workout_set_logs')
+    .select('id, weight, reps, exercise_id, completed_at, workout_log_id')
+    .eq('workout_log_id', workoutLogId)
+    .eq('client_id', clientId)
+
+  if (setsError) {
+    console.error('[completeWorkoutService] Error fetching set logs:', setsError)
+    throw new Error(`Failed to fetch set logs: ${setsError.message}`)
+  }
+
+  const totalSetsCompleted = setLogs?.length || 0
+  const totalRepsCompleted = setLogs?.reduce((sum, set) => sum + (set.reps || 0), 0) || 0
+  const totalWeightLifted = setLogs?.reduce((sum, set) => sum + ((set.weight || 0) * (set.reps || 0)), 0) || 0
+
+  // ========================================================================
+  // STEP 4: Calculate duration and update workout_logs
+  // ========================================================================
+  const completedAt = new Date()
+  let totalDurationMinutes: number
+
+  if (durationMinutes !== undefined && durationMinutes !== null) {
+    totalDurationMinutes = Math.round(durationMinutes)
+  } else {
+    const startedAt = workoutLog.started_at ? new Date(workoutLog.started_at) : new Date()
+    const durationMs = completedAt.getTime() - startedAt.getTime()
+    totalDurationMinutes = Math.round(durationMs / 1000 / 60)
+  }
+
+  const { data: updatedLog, error: updateError } = await supabaseAdmin
+    .from('workout_logs')
+    .update({
+      completed_at: completedAt.toISOString(),
+      total_duration_minutes: totalDurationMinutes,
+      total_sets_completed: totalSetsCompleted,
+      total_reps_completed: totalRepsCompleted,
+      total_weight_lifted: totalWeightLifted,
+    })
+    .eq('id', workoutLogId)
+    .select()
+    .single()
+
+  if (updateError) {
+    console.error('[completeWorkoutService] Error updating workout_log:', updateError)
+    throw new Error(`Failed to update workout log: ${updateError.message}`)
+  }
+
+  // ========================================================================
+  // STEP 5: Update workout_sessions status if session_id provided
+  // ========================================================================
+  const isValidUuid = (value: string | null | undefined): boolean => {
+    if (!value) return false
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  }
+
+  if (isValidUuid(sessionId)) {
+    const { error: sessionUpdateError } = await supabaseAdmin
+      .from('workout_sessions')
+      .update({
+        status: 'completed',
+        completed_at: completedAt.toISOString(),
+      })
+      .eq('id', sessionId!)
+      .eq('client_id', clientId)
+
+    if (sessionUpdateError) {
+      console.warn('[completeWorkoutService] Failed to update session (non-blocking):', sessionUpdateError)
+    }
+  }
+
+  // ========================================================================
+  // STEP 6: Program completion (if workout is part of a program)
+  // ========================================================================
+  let programProgression: CompleteWorkoutResult['programProgression'] = null
+
+  if (workoutLog.program_assignment_id && workoutLog.program_schedule_id) {
+    const programAssignmentId = workoutLog.program_assignment_id
+    const programScheduleId = workoutLog.program_schedule_id
+
+    console.log('[completeWorkoutService] Recording program day completion:', {
+      programAssignmentId,
+      programScheduleId,
+      completedBy,
+    })
+
+    // 6a. INSERT into ledger (idempotent via ON CONFLICT DO NOTHING)
+    const { error: ledgerError, data: ledgerData } = await supabaseAdmin
+      .from('program_day_completions')
+      .insert({
+        program_assignment_id: programAssignmentId,
+        program_schedule_id: programScheduleId,
+        completed_at: completedAt.toISOString(),
+        completed_by: completedBy,
+        notes: notes || null,
+      })
+      .select('id')
+      .maybeSingle()
+
+    if (ledgerError) {
+      // Check for unique violation (already recorded) — this is expected and fine
+      if (ledgerError.code === '23505') {
+        console.log('[completeWorkoutService] Day already recorded in ledger (idempotent)')
+        programProgression = {
+          status: 'already_recorded',
+          programAssignmentId,
+          programScheduleId,
+        }
+      } else {
+        console.error('[completeWorkoutService] Error writing to ledger:', ledgerError)
+        // Non-fatal: workout is already marked complete, ledger write failed
+        // The ledger can be reconciled later
+      }
+    }
+
+    // 6b. Find next uncompleted slot
+    if (!programProgression) {
+      // Get program_id from assignment
+      const { data: assignment } = await supabaseAdmin
+        .from('program_assignments')
+        .select('program_id')
+        .eq('id', programAssignmentId)
+        .single()
+
+      if (assignment) {
+        const nextSlotResult = await getNextSlot(supabaseAdmin, programAssignmentId, assignment.program_id)
+        const allSlots = await getProgramSlots(supabaseAdmin, assignment.program_id)
+        const lastSlot = allSlots[allSlots.length - 1]
+
+        // 6c. Update progress cache
+        if (lastSlot) {
+          await updateProgressCache(supabaseAdmin, programAssignmentId, nextSlotResult, lastSlot)
+        }
+
+        const isComplete = nextSlotResult === null && allSlots.length > 0
+        const referenceSlot = nextSlotResult ?? lastSlot
+
+        // If program is fully completed, update assignment status
+        if (isComplete) {
+          const { error: assignmentUpdateError } = await supabaseAdmin
+            .from('program_assignments')
+            .update({ status: 'completed' })
+            .eq('id', programAssignmentId)
+
+          if (assignmentUpdateError) {
+            console.warn('[completeWorkoutService] Failed to mark assignment completed (non-blocking):', assignmentUpdateError)
+          }
+        }
+
+        programProgression = {
+          status: isComplete ? 'program_completed' : 'advanced',
+          currentWeekNumber: referenceSlot?.week_number,
+          currentDayNumber: referenceSlot?.day_number,
+          isCompleted: isComplete,
+          programAssignmentId,
+          programScheduleId,
+        }
+      }
+    }
+  } else {
+    programProgression = { status: 'no_program' }
+  }
+
+  // ========================================================================
+  // STEP 7: Sync goals and achievements (non-blocking)
+  // ========================================================================
+  try {
+    const { syncWorkoutConsistencyGoal } = await import('@/lib/goalSyncService')
+    const { data: consistencyGoals } = await supabaseAdmin
+      .from('goals')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('status', 'active')
+      .or('title.ilike.%Workout Consistency%,title.ilike.%workouts per week%')
+
+    if (consistencyGoals && consistencyGoals.length > 0) {
+      for (const goal of consistencyGoals) {
+        await syncWorkoutConsistencyGoal(goal.id, clientId)
+      }
+    }
+  } catch (syncError) {
+    console.error('[completeWorkoutService] Failed to sync goals (non-blocking):', syncError)
+  }
+
+  try {
+    const { AchievementService } = await import('@/lib/achievementService')
+    await AchievementService.checkAndUnlockAchievements(clientId, 'workout_count')
+    await AchievementService.checkAndUnlockAchievements(clientId, 'streak_weeks')
+  } catch (achievementError) {
+    console.error('[completeWorkoutService] Failed to check achievements (non-blocking):', achievementError)
+  }
+
+  // ========================================================================
+  // RETURN
+  // ========================================================================
+  return {
+    success: true,
+    alreadyCompleted: false,
+    workoutLog: updatedLog,
+    totals: {
+      sets: totalSetsCompleted,
+      reps: totalRepsCompleted,
+      weight: totalWeightLifted,
+      duration_minutes: totalDurationMinutes,
+    },
+    programProgression,
+  }
+}

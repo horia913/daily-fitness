@@ -513,12 +513,12 @@ export default function EnhancedWorkoutTemplateManager({
         <div className="animate-pulse p-6 space-y-6">
           <div className="max-w-7xl mx-auto space-y-6">
             <div className={`${theme.card} rounded-2xl p-6`}>
-              <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+              <div className="h-8 bg-[var(--fc-surface-sunken)] rounded mb-4"></div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {[...Array(8)].map((_, i) => (
                   <div
                     key={i}
-                    className="h-48 bg-slate-200 dark:bg-slate-700 rounded-2xl"
+                    className="h-48 bg-[var(--fc-surface-sunken)] rounded-2xl"
                   ></div>
                 ))}
               </div>
@@ -889,7 +889,7 @@ export default function EnhancedWorkoutTemplateManager({
             <div className="space-y-6">
               {/* Search Bar */}
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 fc-text-dim w-5 h-5" />
                 <Input
                   placeholder="Search workout templates..."
                   value={searchTerm}
@@ -1090,7 +1090,7 @@ export default function EnhancedWorkoutTemplateManager({
               }}
             >
               <div className="relative mb-6">
-                <BookOpen className="w-20 h-20 text-slate-400 mx-auto" />
+                <BookOpen className="w-20 h-20 fc-text-dim mx-auto" />
                 <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                   <Plus className="w-3 h-3 text-white" />
                 </div>
@@ -1263,7 +1263,7 @@ export default function EnhancedWorkoutTemplateManager({
             >
               {clients.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "32px 0" }}>
-                  <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <Users className="w-12 h-12 fc-text-dim mx-auto mb-4" />
                   <p
                     style={{
                       fontSize: "14px",
@@ -1977,10 +1977,10 @@ function WorkoutTemplateListItem({
       <CardContent className="p-6">
         <div className="flex items-center gap-4">
           {/* Template Image */}
-          <div className="relative w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl overflow-hidden flex-shrink-0">
+          <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0" style={{ background: "var(--fc-surface-sunken)" }}>
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20"></div>
             <div className="w-full h-full flex items-center justify-center">
-              <Dumbbell className="w-8 h-8 text-slate-400" />
+              <Dumbbell className="w-8 h-8 fc-text-dim" />
             </div>
           </div>
 
@@ -2004,7 +2004,7 @@ function WorkoutTemplateListItem({
                   >
                     {template.difficulty_level}
                   </Badge>
-                  <div className="flex items-center gap-1 text-xs text-slate-500">
+                  <div className="flex items-center gap-1 text-xs fc-text-dim">
                     <Clock className="w-3 h-3" />
                     <span>{template.estimated_duration}m</span>
                   </div>
@@ -2018,7 +2018,7 @@ function WorkoutTemplateListItem({
               </p>
             )}
 
-            <div className="flex items-center gap-4 text-xs text-slate-500">
+            <div className="flex items-center gap-4 text-xs fc-text-dim">
               <span>{template.exercises?.length || 0} exercises</span>
               <div className="flex items-center gap-1">
                 <Users className="w-3 h-3" />

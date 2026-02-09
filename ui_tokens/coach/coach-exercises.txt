@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exercise Library | Prismatic Tectonic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --tectonic-red: rgba(239, 68, 68, 0.15);
+            --tectonic-blue: rgba(59, 130, 246, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Tectonic Shard Backgrounds */
+        .tectonic-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .shard {
+            position: absolute;
+            background: linear-gradient(45deg, var(--tectonic-red), transparent);
+            filter: blur(60px);
+            opacity: 0.4;
+            transform: rotate(-15deg);
+        }
+
+        .shard-1 { width: 60%; height: 40%; top: -10%; left: -10%; background: var(--tectonic-red); }
+        .shard-2 { width: 50%; height: 50%; bottom: -10%; right: -10%; background: var(--tectonic-blue); }
+
+        /* Crystal Card Architecture */
+        .crystal-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(12px) saturate(150%);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-4px) scale(1.01);
+            background: linear-gradient(165deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 100%);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        /* Prismatic Search Bar */
+        .search-container {
+            background: rgba(10, 10, 10, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 100;
+        }
+
+        .search-input {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--secondary);
+            background: rgba(255,255,255,0.08);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+        }
+
+        /* Custom Scrollbar */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Buttons & Interaction */
+        .btn-filter {
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .btn-filter.active {
+            background: var(--secondary);
+            border-color: var(--secondary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-filter:hover:not(.active) {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-1px);
+        }
+
+        .fab-add {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+        }
+
+        .fab-add:hover {
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 12px 32px rgba(16, 185, 129, 0.6);
+        }
+
+        .badge {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        /* Grid Transitions */
+        .exercise-grid {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        @media (min-width: 1024px) {
+            .exercise-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        .tectonic-label {
+            position: relative;
+            display: inline-block;
+            padding-bottom: 4px;
+        }
+
+        .tectonic-label::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 40%;
+            height: 2px;
+            background: var(--primary);
+        }
+    </style>
+</head>
+<body class="pb-24">
+    <div class="tectonic-bg">
+        <div class="shard shard-1"></div>
+        <div class="shard shard-2"></div>
+    </div>
+
+    <!-- Sticky Header & Search -->
+    <header class="search-container sticky top-0 px-6 pt-8 pb-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+                <div>
+                    <h1 class="text-3xl font-bold tracking-tight tectonic-label">Exercise Archive</h1>
+                    <p class="text-sm text-neutral-400 mt-1 mono">Database Index: 412 entries</p>
+                </div>
+                <div class="relative flex-1 max-w-xl">
+                    <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500"></i>
+                    <input type="text" placeholder="Search by name, muscle or equipment..." 
+                           class="search-input w-full h-14 pl-12 pr-4 rounded-2xl text-base placeholder:text-neutral-500">
+                    <div class="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2">
+                        <kbd class="hidden md:inline-flex h-6 items-center gap-1 rounded border border-white/10 bg-white/5 px-1.5 font-mono text-[10px] font-medium text-neutral-400">
+                            <span>⌘</span>K
+                        </kbd>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Horizontal Filters -->
+            <div class="flex flex-col gap-4">
+                <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-2">
+                    <button class="btn-filter active">All Muscles</button>
+                    <button class="btn-filter">Chest</button>
+                    <button class="btn-filter">Back</button>
+                    <button class="btn-filter">Legs</button>
+                    <button class="btn-filter">Shoulders</button>
+                    <button class="btn-filter">Arms</button>
+                    <button class="btn-filter">Core</button>
+                </div>
+                <div class="flex items-center gap-4 border-t border-white/5 pt-4 overflow-x-auto hide-scrollbar">
+                    <div class="flex items-center gap-2 text-neutral-500 mr-2">
+                        <i data-lucide="filter" class="w-4 h-4"></i>
+                        <span class="text-xs uppercase font-bold mono">Filters:</span>
+                    </div>
+                    <button class="btn-filter text-xs">Barbell</button>
+                    <button class="btn-filter text-xs">Dumbbell</button>
+                    <button class="btn-filter text-xs">Cable</button>
+                    <button class="btn-filter text-xs">Bodyweight</button>
+                    <span class="h-4 w-[1px] bg-white/10 mx-2"></span>
+                    <button class="btn-filter text-xs">Compound</button>
+                    <button class="btn-filter text-xs">Isolation</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-6 mt-8">
+        <div class="exercise-grid">
+            
+            <!-- Card 1 -->
+            <div class="crystal-card p-5 kinetic-shimmer relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <i data-lucide="dumbbell" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="badge bg-neutral-800 text-neutral-400 border border-white/5">Advanced</span>
+                        <span class="badge bg-blue-500/20 text-blue-400 border border-blue-500/30">Compound</span>
+                    </div>
+                </div>
+                <h3 class="text-lg font-bold mb-1 leading-tight">Barbell Conventional Deadlift</h3>
+                <p class="text-sm text-neutral-400 mb-4 mono uppercase">Lower Body • Glutes, Back</p>
+                <div class="flex items-center justify-between border-t border-white/5 pt-4 mt-2">
+                    <div class="flex gap-2">
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <button class="text-xs font-bold text-secondary hover:underline">View Mechanics →</button>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="crystal-card p-5 kinetic-shimmer relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                        <i data-lucide="layers" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="badge bg-neutral-800 text-neutral-400 border border-white/5">Beginner</span>
+                        <span class="badge bg-green-500/20 text-green-400 border border-green-500/30">Isolation</span>
+                    </div>
+                </div>
+                <h3 class="text-lg font-bold mb-1 leading-tight">Dumbbell Lateral Raise</h3>
+                <p class="text-sm text-neutral-400 mb-4 mono uppercase">Shoulders • Lateral Delts</p>
+                <div class="flex items-center justify-between border-t border-white/5 pt-4 mt-2">
+                    <div class="flex gap-2">
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <button class="text-xs font-bold text-secondary hover:underline">View Mechanics →</button>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="crystal-card p-5 kinetic-shimmer relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                        <i data-lucide="box" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="badge bg-neutral-800 text-neutral-400 border border-white/5">Intermediate</span>
+                        <span class="badge bg-blue-500/20 text-blue-400 border border-blue-500/30">Compound</span>
+                    </div>
+                </div>
+                <h3 class="text-lg font-bold mb-1 leading-tight">Bulgarian Split Squat</h3>
+                <p class="text-sm text-neutral-400 mb-4 mono uppercase">Legs • Quads, Glutes</p>
+                <div class="flex items-center justify-between border-t border-white/5 pt-4 mt-2">
+                    <div class="flex gap-2">
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <button class="text-xs font-bold text-secondary hover:underline">View Mechanics →</button>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="crystal-card p-5 kinetic-shimmer relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400">
+                        <i data-lucide="zap" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="badge bg-neutral-800 text-neutral-400 border border-white/5">Intermediate</span>
+                        <span class="badge bg-blue-500/20 text-blue-400 border border-blue-500/30">Compound</span>
+                    </div>
+                </div>
+                <h3 class="text-lg font-bold mb-1 leading-tight">Pull-Ups (Wide Grip)</h3>
+                <p class="text-sm text-neutral-400 mb-4 mono uppercase">Back • Lats, Biceps</p>
+                <div class="flex items-center justify-between border-t border-white/5 pt-4 mt-2">
+                    <div class="flex gap-2">
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <button class="text-xs font-bold text-secondary hover:underline">View Mechanics →</button>
+                </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="crystal-card p-5 kinetic-shimmer relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
+                        <i data-lucide="anchor" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="badge bg-neutral-800 text-neutral-400 border border-white/5">Beginner</span>
+                        <span class="badge bg-green-500/20 text-green-400 border border-green-500/30">Isolation</span>
+                    </div>
+                </div>
+                <h3 class="text-lg font-bold mb-1 leading-tight">Cable Face Pulls</h3>
+                <p class="text-sm text-neutral-400 mb-4 mono uppercase">Shoulders • Rear Delts</p>
+                <div class="flex items-center justify-between border-t border-white/5 pt-4 mt-2">
+                    <div class="flex gap-2">
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <button class="text-xs font-bold text-secondary hover:underline">View Mechanics →</button>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="crystal-card p-5 kinetic-shimmer relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400">
+                        <i data-lucide="activity" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="badge bg-neutral-800 text-neutral-400 border border-white/5">Advanced</span>
+                        <span class="badge bg-blue-500/20 text-blue-400 border border-blue-500/30">Compound</span>
+                    </div>
+                </div>
+                <h3 class="text-lg font-bold mb-1 leading-tight">Barbell Overhead Press</h3>
+                <p class="text-sm text-neutral-400 mb-4 mono uppercase">Shoulders • Front Delts, Triceps</p>
+                <div class="flex items-center justify-between border-t border-white/5 pt-4 mt-2">
+                    <div class="flex gap-2">
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                        </button>
+                        <button class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 transition-colors">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <button class="text-xs font-bold text-secondary hover:underline">View Mechanics →</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Floating Action Button -->
+    <button class="fab-add group">
+        <i data-lucide="plus" class="w-8 h-8 text-white"></i>
+        <span class="absolute right-20 bg-accent text-white px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">Add New Exercise</span>
+    </button>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Staggered entry animation for cards
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+
+        // Search bar focus effect
+        const searchInput = document.querySelector('.search-input');
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+
+        // Vibrate on click for FAB
+        const fab = document.querySelector('.fab-add');
+        fab.addEventListener('click', () => {
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(15);
+            }
+        });
+
+        // Filter button toggle logic
+        const filterBtns = document.querySelectorAll('.btn-filter');
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Simplified toggle for demo
+                if(btn.parentElement.classList.contains('overflow-x-auto')) {
+                    btn.parentElement.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.toggle('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

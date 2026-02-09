@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { withTimeout } from '@/lib/withTimeout'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -172,6 +173,7 @@ export default function ClientScheduling() {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
   const [selectedDate, setSelectedDate] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [booking, setBooking] = useState(false)
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [showBookingModal, setShowBookingModal] = useState(false)
@@ -207,42 +209,30 @@ export default function ClientScheduling() {
   const loadCoaches = async () => {
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        console.log('No user found')
-        setLoading(false)
-        return
-      }
-
-      console.log('Loading coaches for user:', user.id)
-
-      // Get coaches (users with role 'coach' or 'admin' so admins can be selected)
-      const { data: coachesData, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .in('role', ['coach', 'admin'])
-
-      console.log('Coaches data:', coachesData)
-      console.log('Coaches error:', error)
-
-      if (error) {
-        console.error('Error loading coaches:', error)
-        setCoaches([])
-        setLoading(false)
-        return
-      }
-
-      setCoaches(coachesData || [])
-      if (coachesData && coachesData.length > 0) {
-        setSelectedCoach(coachesData[0].id)
-        console.log('Selected first coach:', coachesData[0].id)
-      } else {
-        console.log('No coaches found')
-        setSelectedCoach('')
-      }
-    } catch (error) {
+      setLoadError(null)
+      await withTimeout(
+        (async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) throw new Error('Not authenticated')
+          const { data: coachesData, error } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .in('role', ['coach', 'admin'])
+          if (error) throw error
+          setCoaches(coachesData || [])
+          if (coachesData && coachesData.length > 0) {
+            setSelectedCoach(coachesData[0].id)
+          } else {
+            setSelectedCoach('')
+          }
+        })(),
+        30000,
+        'timeout'
+      )
+    } catch (error: any) {
       console.error('Error loading coaches:', error)
       setCoaches([])
+      setLoadError(error?.message === 'timeout' ? 'Loading took too long. Please try again.' : (error?.message || 'Failed to load scheduling'))
     } finally {
       setLoading(false)
     }
@@ -564,12 +554,27 @@ export default function ClientScheduling() {
     return { totalSessions, activeClipCards, upcomingSessions, selectedCoachName }
   }
 
+  if (loadError) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <AnimatedBackground>
+          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page px-4 flex items-center justify-center min-h-[40vh]">
+            <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center max-w-md">
+              <p className="fc-text-dim mb-4">{loadError}</p>
+              <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadCoaches(); }} className="fc-btn fc-btn-primary">Retry</Button>
+            </GlassCard>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    )
+  }
+
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page">
             <div className="fc-glass fc-card p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -594,34 +599,25 @@ export default function ClientScheduling() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Calendar className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Booking Hub
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                    Book Session
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    {getMotivationalMessage()}
-                  </p>
-                </div>
-              </div>
-              <Button
-                onClick={() => setSelectedDate(formatDate(new Date()))}
-                className="fc-btn fc-btn-primary"
-              >
-                <Calendar className="w-5 h-5 mr-2" />
-                Jump to Today
-              </Button>
+        <div className="relative z-10 mx-auto w-full max-w-2xl fc-page px-4 sm:px-6 pb-40 flex flex-col gap-8">
+          {/* Header (mockup: Scheduling, subtitle, help) */}
+          <header className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight fc-text-primary">
+                Scheduling
+              </h1>
+              <p className="text-sm fc-text-dim mt-1">
+                Book your session with your coach
+              </p>
             </div>
-          </GlassCard>
+            <button
+              type="button"
+              className="w-12 h-12 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-subtle hover:fc-text-primary transition-colors"
+              aria-label="Help"
+            >
+              <AlertCircle className="w-6 h-6" />
+            </button>
+          </header>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <GlassCard elevation={1} className="fc-glass fc-card p-4">

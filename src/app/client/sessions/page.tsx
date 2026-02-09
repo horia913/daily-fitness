@@ -129,6 +129,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { fetchApi } from '@/lib/apiClient'
+import { withTimeout } from '@/lib/withTimeout'
 
 interface Session {
   id: string
@@ -154,8 +155,9 @@ export default function ClientSessions() {
   const { performanceSettings } = useTheme()
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('all')
-  const [filterStatus, setFilterStatus] = useState<'all' | 'scheduled' | 'completed' | 'cancelled' | 'no_show'>('all')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'scheduled' | 'completed' | 'cancelled' | 'no_show'>('scheduled')
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'rating' | 'duration'>('newest')
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
   const [showDetails, setShowDetails] = useState(false)
@@ -269,51 +271,55 @@ export default function ClientSessions() {
 
   const loadSessions = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      setLoadError(null)
+      await withTimeout(
+        (async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
 
-      // First, get the booked sessions
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('booked_sessions')
-        .select('*')
-        .eq('client_id', user.id)
-        .order('created_at', { ascending: false })
+          const { data: sessionsData, error: sessionsError } = await supabase
+            .from('booked_sessions')
+            .select('*')
+            .eq('client_id', user.id)
+            .order('created_at', { ascending: false })
 
-      if (sessionsError) {
-        console.error('Error fetching sessions:', sessionsError)
-        setSessions([])
-        return
-      }
-
-      // Then, get the time slot and coach details for each session
-      const sessionsWithDetails = await Promise.all(
-        (sessionsData || []).map(async (session) => {
-          // Get time slot details
-          const { data: timeSlot } = await supabase
-            .from('coach_time_slots')
-            .select('date, start_time, end_time')
-            .eq('id', session.time_slot_id)
-            .single()
-
-          // Get coach details
-          const { data: coach } = await supabase
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('id', session.coach_id)
-            .single()
-
-          return {
-            ...session,
-            time_slot: timeSlot || { date: '', start_time: '', end_time: '' },
-            coach: coach || { first_name: '', last_name: '' }
+          if (sessionsError) {
+            console.error('Error fetching sessions:', sessionsError)
+            setSessions([])
+            throw new Error(sessionsError.message || 'Failed to load sessions')
           }
-        })
-      )
 
-      setSessions(sessionsWithDetails)
-    } catch (error) {
+          const sessionsWithDetails = await Promise.all(
+            (sessionsData || []).map(async (session) => {
+              const { data: timeSlot } = await supabase
+                .from('coach_time_slots')
+                .select('date, start_time, end_time')
+                .eq('id', session.time_slot_id)
+                .single()
+
+              const { data: coach } = await supabase
+                .from('profiles')
+                .select('first_name, last_name')
+                .eq('id', session.coach_id)
+                .single()
+
+              return {
+                ...session,
+                time_slot: timeSlot || { date: '', start_time: '', end_time: '' },
+                coach: coach || { first_name: '', last_name: '' }
+              }
+            })
+          )
+
+          setSessions(sessionsWithDetails)
+        })(),
+        30000,
+        'timeout'
+      )
+    } catch (error: any) {
       console.error('Error loading sessions:', error)
       setSessions([])
+      setLoadError(error?.message === 'timeout' ? 'Loading took too long. Please try again.' : (error?.message || 'Failed to load sessions'))
     } finally {
       setLoading(false)
     }
@@ -633,7 +639,7 @@ export default function ClientSessions() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-4xl fc-page px-4 sm:px-6 lg:px-12">
             <GlassCard elevation={2} className="fc-glass fc-card p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -656,6 +662,35 @@ export default function ClientSessions() {
     )
   }
 
+  if (loadError) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <ClientTypeGuard requiredType="in_gym">
+          <AnimatedBackground>
+            {performanceSettings.floatingParticles && <FloatingParticles />}
+            <div className="relative z-10 mx-auto w-full max-w-4xl fc-page px-4 sm:px-6 lg:px-12">
+              <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center">
+                <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setLoadError(null)
+                    setLoading(true)
+                    loadSessions()
+                  }}
+                  className="fc-btn fc-btn-primary"
+                >
+                  <RefreshCw className="w-5 h-5 mr-2" />
+                  Retry
+                </Button>
+              </GlassCard>
+            </div>
+          </AnimatedBackground>
+        </ClientTypeGuard>
+      </ProtectedRoute>
+    )
+  }
+
   const stats = getSessionStats()
 
   return (
@@ -663,24 +698,40 @@ export default function ClientSessions() {
       <ClientTypeGuard requiredType="in_gym">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Calendar className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Session Tracker
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                    Training Log
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    {getMotivationalMessage()}
-                  </p>
-                </div>
+        <div className="relative z-10 mx-auto w-full max-w-4xl fc-page space-y-8 px-4 sm:px-6 lg:px-12">
+          <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                Sessions
+              </h1>
+              <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                Manage your training schedule and coach syncs.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex bg-[color:var(--fc-glass-highlight)] p-1 rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus('scheduled')}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                    filterStatus === 'scheduled'
+                      ? 'bg-white text-black shadow-sm'
+                      : 'text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]'
+                  }`}
+                >
+                  Upcoming
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus('completed')}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                    filterStatus === 'completed'
+                      ? 'bg-white text-black shadow-sm'
+                      : 'text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]'
+                  }`}
+                >
+                  History
+                </button>
               </div>
               <Button
                 onClick={openBookingModal}
@@ -690,7 +741,7 @@ export default function ClientSessions() {
                 Book a Session
               </Button>
             </div>
-          </GlassCard>
+          </header>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <GlassCard elevation={1} className="fc-glass fc-card p-4">
@@ -909,6 +960,16 @@ export default function ClientSessions() {
               )}
             </div>
           </div>
+
+          {/* Floating action button: Book session (matches mockup) */}
+          <button
+            type="button"
+            onClick={openBookingModal}
+            className="fixed bottom-24 right-6 w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/40 flex items-center justify-center text-white hover:from-emerald-600 hover:to-emerald-700 transition-all z-50"
+            aria-label="Book a session"
+          >
+            <Plus className="w-7 h-7" />
+          </button>
 
         {/* Booking Modal */}
         {showBookingModal && (

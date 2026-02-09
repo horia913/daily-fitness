@@ -8,9 +8,10 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-import { GlassCard } from "@/components/ui/GlassCard";
+
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Coffee, Apple, Utensils, Zap } from "lucide-react";
+import { withTimeout } from "@/lib/withTimeout";
+import { ChevronLeft, Coffee, Apple, Utensils, Zap, Edit3, Trash2, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
 interface MealItem {
@@ -74,6 +75,7 @@ export default function MealDetailPage() {
   const mealId = params.id as string;
   const [meal, setMeal] = useState<Meal | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     // Wait for auth to finish loading before attempting to load meal data
@@ -101,14 +103,14 @@ export default function MealDetailPage() {
   const loadMeal = async () => {
     try {
       setLoading(true);
-
-      // Ensure user is available
+      setLoadError(null);
       if (!user?.id) {
-        console.error("User not available");
         setLoading(false);
         return;
       }
 
+      await withTimeout(
+        (async () => {
       // Parse meal ID - format is "mealType-meal_plan_id" (e.g., "breakfast-c034da40-3956-44f8-b157-69ed2da6ccf9")
       // UUIDs have a fixed format with 5 parts separated by dashes: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
       // So we need to find where the meal type ends (first dash) and the UUID starts (next dash)
@@ -200,12 +202,35 @@ export default function MealDetailPage() {
       };
 
       setMeal(constructedMeal);
+      })(),
+        30000,
+        "timeout"
+      );
     } catch (error) {
       console.error("Error loading meal:", error);
+      setLoadError(error instanceof Error ? error.message : "Failed to load meal");
     } finally {
       setLoading(false);
     }
   };
+
+  if (loadError) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <AnimatedBackground>
+          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10 flex items-center justify-center">
+            <div className="fc-surface rounded-2xl p-8 text-center max-w-md">
+              <p className="fc-text-dim mb-4">{loadError}</p>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadMeal(); }} className="fc-btn fc-btn-primary">Retry</Button>
+                <Button asChild variant="outline" className="fc-btn fc-btn-secondary"><Link href="/client/nutrition"><ChevronLeft className="w-4 h-4 mr-2" />Back to Nutrition</Link></Button>
+              </div>
+            </div>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
 
   if (loading) {
     return (
@@ -214,7 +239,7 @@ export default function MealDetailPage() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-5xl">
-              <div className="fc-glass fc-card p-6 sm:p-10">
+                <div className="fc-surface p-6 sm:p-10">
                 <div className="animate-pulse space-y-4">
                   <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
                   <div className="h-10 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
@@ -235,7 +260,7 @@ export default function MealDetailPage() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-5xl">
-              <div className="fc-glass fc-card p-10 text-center">
+              <div className="fc-surface p-10 text-center">
                 <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
                   Meal not found
                 </h2>
@@ -284,76 +309,90 @@ export default function MealDetailPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
-          <div className="mx-auto w-full max-w-5xl space-y-8">
-            <div className="flex items-center gap-3">
-              <Link href="/client/nutrition">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="fc-btn fc-btn-secondary h-10 w-10 rounded-xl"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-              </Link>
-              <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                Nutrition
-              </span>
-            </div>
+        <div className="relative z-10 min-h-screen pb-32">
+          <nav className="absolute top-6 left-6 z-20">
+            <Link href="/client/nutrition">
+              <button type="button" className="w-12 h-12 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-primary hover:fc-glass-soft transition-colors" aria-label="Back">
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+            </Link>
+          </nav>
 
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-start gap-4">
-                  <div
-                    className={`flex h-12 w-12 items-center justify-center rounded-2xl ${colorClass}`}
-                  >
-                    <Icon className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                      {meal.name}
-                    </h1>
-                    <p className="text-sm capitalize text-[color:var(--fc-text-dim)]">
-                      {meal.meal_type}
-                    </p>
+          <div className="relative h-48 sm:h-56 bg-gradient-to-b from-[color:var(--fc-glass-highlight)] to-[color:var(--fc-bg-base)] rounded-b-3xl overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-transparent to-transparent opacity-80" />
+            <div className="absolute bottom-6 left-6 right-6">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="bg-[color:var(--fc-domain-workouts)]/20 fc-text-workouts px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-[color:var(--fc-domain-workouts)]/30">
+                  {meal.meal_type}
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight fc-text-primary">
+                {meal.name}
+              </h1>
+            </div>
+          </div>
+
+          <main className="px-4 sm:px-6 -mt-6 relative z-10 max-w-2xl mx-auto">
+            <div className="fc-surface rounded-3xl p-6 border border-[color:var(--fc-surface-card-border)] space-y-8">
+              <div className="flex justify-between items-center border-b border-[color:var(--fc-glass-border)] pb-6">
+                <div>
+                  <p className="text-[10px] fc-text-subtle uppercase tracking-widest font-bold mb-1">Meal</p>
+                  <p className="text-lg font-semibold font-mono fc-text-primary">{meal.name}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] fc-text-subtle uppercase tracking-widest font-bold mb-1">Status</p>
+                  <p className="fc-text-success flex items-center gap-1.5 font-semibold text-sm">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Logged
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-end mb-6">
+                  <h3 className="text-xl font-bold fc-text-primary">Macronutrients</h3>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold font-mono fc-text-primary">{totalCalories}</span>
+                    <span className="fc-text-dim text-sm ml-1">kcal</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="fc-glass-soft fc-card p-3">
-                    <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                      Calories
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="fc-text-workouts font-medium flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[color:var(--fc-domain-workouts)]" /> Protein
+                      </span>
+                      <span className="font-mono">{totalProtein}g <span className="fc-text-dim text-xs">/ {Math.round(proteinPercent * 100)}%</span></span>
                     </div>
-                    <div className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                      {totalCalories}
-                    </div>
-                  </div>
-                  <div className="fc-glass-soft fc-card p-3">
-                    <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                      Protein
-                    </div>
-                    <div className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                      {totalProtein}g
+                    <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
+                      <div className="h-full rounded-full bg-[color:var(--fc-domain-workouts)] transition-all" style={{ width: `${Math.round(proteinPercent * 100)}%` }} />
                     </div>
                   </div>
-                  <div className="fc-glass-soft fc-card p-3">
-                    <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                      Carbs
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="fc-text-success font-medium flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[color:var(--fc-status-success)]" /> Carbs
+                      </span>
+                      <span className="font-mono">{totalCarbs}g <span className="fc-text-dim text-xs">/ {Math.round(carbsPercent * 100)}%</span></span>
                     </div>
-                    <div className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                      {totalCarbs}g
+                    <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
+                      <div className="h-full rounded-full bg-[color:var(--fc-status-success)] transition-all" style={{ width: `${Math.round(carbsPercent * 100)}%` }} />
                     </div>
                   </div>
-                  <div className="fc-glass-soft fc-card p-3">
-                    <div className="text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                      Fat
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="fc-text-error font-medium flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[color:var(--fc-status-error)]" /> Fats
+                      </span>
+                      <span className="font-mono">{totalFat}g <span className="fc-text-dim text-xs">/ {Math.round(fatPercent * 100)}%</span></span>
                     </div>
-                    <div className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                      {totalFat}g
+                    <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
+                      <div className="h-full rounded-full bg-[color:var(--fc-status-error)] transition-all" style={{ width: `${Math.round(fatPercent * 100)}%` }} />
                     </div>
                   </div>
                 </div>
               </div>
-            </GlassCard>
+            </div>
 
             {mealItems.length > 0 ? (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -396,7 +435,7 @@ export default function MealDetailPage() {
                           : 0;
 
                       return (
-                        <div key={item.id} className="fc-glass fc-card p-4">
+                        <div key={item.id} className="fc-surface p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <h4 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
@@ -487,7 +526,7 @@ export default function MealDetailPage() {
                   </div>
                 </section>
 
-                <GlassCard elevation={2} className="fc-glass fc-card p-6">
+                <div className="fc-surface rounded-2xl p-6">
                   <div className="space-y-4">
                     <div>
                       <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
@@ -575,10 +614,10 @@ export default function MealDetailPage() {
                       </div>
                     </div>
                   </div>
-                </GlassCard>
+                </div>
               </div>
             ) : (
-              <div className="fc-glass fc-card p-12 text-center">
+              <div className="fc-surface p-12 text-center">
                 <p className="text-sm text-[color:var(--fc-text-dim)]">
                   No ingredients added yet.
                 </p>
@@ -586,15 +625,24 @@ export default function MealDetailPage() {
             )}
 
             {meal.notes && (
-              <GlassCard elevation={1} className="fc-glass fc-card p-6">
-                <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                  Notes
-                </h3>
-                <p className="mt-2 text-sm text-[color:var(--fc-text-dim)] leading-relaxed">
-                  {meal.notes}
-                </p>
-              </GlassCard>
+              <div className="fc-surface rounded-2xl p-6">
+                <h3 className="text-lg font-semibold fc-text-primary">Notes</h3>
+                <p className="mt-2 text-sm fc-text-dim leading-relaxed">{meal.notes}</p>
+              </div>
             )}
+          </main>
+
+          <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent z-50 pointer-events-none">
+            <div className="max-w-2xl mx-auto grid grid-cols-2 gap-4 pointer-events-auto">
+              <Button variant="outline" className="h-12 rounded-2xl fc-glass border font-semibold gap-2">
+                <Edit3 className="w-5 h-5" />
+                Edit Details
+              </Button>
+              <Button variant="outline" className="h-12 rounded-2xl border-[color:var(--fc-status-error)]/40 fc-text-error font-semibold gap-2 bg-[color:var(--fc-status-error)]/10">
+                <Trash2 className="w-5 h-5" />
+                Delete
+              </Button>
+            </div>
           </div>
         </div>
       </AnimatedBackground>

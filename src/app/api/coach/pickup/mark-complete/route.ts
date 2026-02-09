@@ -1,29 +1,25 @@
 /**
  * POST /api/coach/pickup/mark-complete
  * 
- * Marks the current training day as complete and advances the client's program progression.
+ * Coach endpoint to mark the current training day as complete.
+ * 
+ * REFACTORED: Now uses the same unified pipeline as client completion.
+ * 1. Auth: verify coach owns client
+ * 2. Get client's current slot via programStateService
+ * 3. Reuse or create workout_log for that slot
+ * 4. Call completeWorkout() with completedBy = coach.id
  * 
  * Body: { clientId: UUID, notes?: string }
- * 
- * Uses the shared advance_program_progress RPC function for:
- * - DB-level idempotency (INSERT ON CONFLICT DO NOTHING)
- * - Consistent advancement logic for both coach and client flows
- * 
- * RPC returns status:
- * - 'advanced': Successfully advanced to next day/week
- * - 'already_completed': Day was already marked complete (returns 409)
- * - 'completed': Program was already fully completed (returns 409)
- * - 'error': An error occurred (returns 500)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiAuth, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
+import { getProgramState } from '@/lib/programStateService'
+import { completeWorkout } from '@/lib/completeWorkoutService'
 
 export async function POST(request: NextRequest) {
   try {
     // 1. Authenticate
-    // supabaseAuth = session-based client (runs as authenticated user with RLS)
-    // supabaseAdmin = service role client (bypasses RLS - use for access control checks)
     const { user, supabaseAuth, supabaseAdmin } = await validateApiAuth(request)
     
     // 2. Parse request body
@@ -74,106 +70,186 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================================
-    // 5. Call the shared RPC function for program progression
-    //    This handles: finding assignment, idempotency, advancement
-    //    Uses supabaseAuth (session client) so RLS is enforced and auth.uid() works
+    // 5. Get client's program state using canonical resolver
     // ========================================================================
-    console.log(`[pickup/mark-complete] Calling advance_program_progress RPC for client: ${clientId}`);
-    
-    const { data: rpcResult, error: rpcError } = await supabaseAuth.rpc(
-      'advance_program_progress',
-      {
-        p_client_id: clientId,
-        p_completed_by: user.id, // Coach is completing on behalf of client
-        p_notes: notes || null
+    console.log(`[pickup/mark-complete] Getting program state for client: ${clientId}`)
+    const state = await getProgramState(supabaseAdmin, clientId)
+
+    if (!state.assignment) {
+      return NextResponse.json(
+        { error: 'no_active_assignment', message: 'Client has no active program assignment' },
+        { status: 404 }
+      )
+    }
+
+    if (state.isCompleted) {
+      return NextResponse.json(
+        { error: 'Program already completed', message: 'All program workouts have been completed', is_completed: true },
+        { status: 409 }
+      )
+    }
+
+    if (!state.nextSlot) {
+      return NextResponse.json(
+        { error: 'No next slot', message: 'No uncompleted slots found' },
+        { status: 409 }
+      )
+    }
+
+    const programAssignmentId = state.assignment.id
+    const programScheduleId = state.nextSlot.id
+    const templateId = state.nextSlot.template_id
+
+    console.log(`[pickup/mark-complete] Next slot:`, {
+      schedule_id: programScheduleId,
+      week: state.nextSlot.week_number,
+      day: state.nextSlot.day_number,
+      template_id: templateId,
+    })
+
+    // ========================================================================
+    // 6. Reuse or create workout_log for this slot
+    //    Same logic as start-from-progress: check for existing incomplete log
+    // ========================================================================
+    let workoutLogId: string
+
+    // Check for existing incomplete workout_log for this program day
+    const { data: existingLog } = await supabaseAdmin
+      .from('workout_logs')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('program_assignment_id', programAssignmentId)
+      .eq('program_schedule_id', programScheduleId)
+      .is('completed_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (existingLog) {
+      workoutLogId = existingLog.id
+      console.log(`[pickup/mark-complete] Reusing existing incomplete log: ${workoutLogId}`)
+    } else {
+      // Need to create workout_assignment + workout_log
+      // Get template info
+      const { data: template } = await supabaseAdmin
+        .from('workout_templates')
+        .select('id, name, description, estimated_duration, coach_id')
+        .eq('id', templateId)
+        .single()
+
+      if (!template) {
+        return NextResponse.json(
+          { error: 'Template not found', message: `Template ${templateId} not found` },
+          { status: 404 }
+        )
       }
-    );
 
-    if (rpcError) {
-      console.error('[pickup/mark-complete] RPC error:', rpcError);
-      return NextResponse.json(
-        { 
-          error: 'Failed to advance program progress',
-          details: rpcError.message,
-        },
-        { status: 500 }
-      )
+      const today = new Date().toISOString().split('T')[0]
+      const slotsInWeek = state.slots.filter(s => s.week_number === state.nextSlot!.week_number)
+      const dayPosition = slotsInWeek.findIndex(s => s.id === state.nextSlot!.id) + 1
+      const positionLabel = `Week ${state.nextSlot.week_number} • Day ${dayPosition}`
+
+      // Create workout_assignment
+      const { data: newAssignment, error: assignmentError } = await supabaseAdmin
+        .from('workout_assignments')
+        .insert({
+          workout_template_id: templateId,
+          client_id: clientId,
+          coach_id: template.coach_id || user.id,
+          name: `${positionLabel}: ${template.name}`,
+          description: template.description,
+          estimated_duration: template.estimated_duration || 60,
+          assigned_date: today,
+          scheduled_date: today,
+          status: 'assigned',
+          is_customized: false,
+          notes: `Program: ${state.assignment.name || 'Program'} - ${positionLabel} (coach pickup)`,
+        })
+        .select()
+        .single()
+
+      if (assignmentError || !newAssignment) {
+        console.error('[pickup/mark-complete] Error creating assignment:', assignmentError)
+        return NextResponse.json(
+          { error: 'Failed to create workout assignment', details: assignmentError?.message },
+          { status: 500 }
+        )
+      }
+
+      // Create workout_log
+      const { data: newLog, error: logError } = await supabaseAdmin
+        .from('workout_logs')
+        .insert({
+          workout_assignment_id: newAssignment.id,
+          client_id: clientId,
+          started_at: new Date().toISOString(),
+          program_assignment_id: programAssignmentId,
+          program_schedule_id: programScheduleId,
+        })
+        .select()
+        .single()
+
+      if (logError || !newLog) {
+        console.error('[pickup/mark-complete] Error creating log:', logError)
+        return NextResponse.json(
+          { error: 'Failed to create workout log', details: logError?.message },
+          { status: 500 }
+        )
+      }
+
+      workoutLogId = newLog.id
+      console.log(`[pickup/mark-complete] Created new assignment + log: ${workoutLogId}`)
     }
 
-    console.log('[pickup/mark-complete] RPC result:', JSON.stringify(rpcResult, null, 2));
-
     // ========================================================================
-    // 6. Handle RPC response statuses
+    // 7. Call unified completion pipeline
     // ========================================================================
+    console.log(`[pickup/mark-complete] Calling completeWorkout for log: ${workoutLogId}`)
     
-    // Handle error status from RPC
-    if (rpcResult?.status === 'error') {
-      const statusCode = rpcResult.error === 'no_active_assignment' ? 404 : 500;
-      return NextResponse.json(
-        { 
-          error: rpcResult.error,
-          message: rpcResult.message,
-        },
-        { status: statusCode }
-      )
-    }
+    const result = await completeWorkout({
+      supabaseAdmin,
+      supabaseAuth,
+      workoutLogId,
+      clientId,
+      completedBy: user.id, // Coach is completing on behalf of client
+      notes: notes || undefined,
+    })
 
-    // Handle already_completed (day was already marked complete)
-    if (rpcResult?.status === 'already_completed') {
-      return NextResponse.json(
-        { 
-          error: 'Day already completed',
-          message: rpcResult.message,
-          current_week_index: rpcResult.current_week_index,
-          current_day_index: rpcResult.current_day_index,
-        },
-        { status: 409 }
-      )
-    }
-
-    // Handle completed (program was already fully finished)
-    if (rpcResult?.status === 'completed') {
-      return NextResponse.json(
-        { 
-          error: 'Program already completed',
-          message: rpcResult.message,
-          is_completed: true,
-          current_week_index: rpcResult.current_week_index,
-          current_day_index: rpcResult.current_day_index,
-        },
-        { status: 409 }
-      )
+    // Handle idempotent case
+    if (result.alreadyCompleted) {
+      return NextResponse.json({
+        success: true,
+        message: 'Day was already completed',
+        already_completed: true,
+      }, { status: 200 })
     }
 
     // ========================================================================
-    // 7. Build success response for 'advanced' status
+    // 8. Build response
     // ========================================================================
     const response: any = {
       success: true,
-      message: rpcResult.message,
+      message: result.programProgression?.status === 'program_completed'
+        ? 'Program completed!'
+        : 'Day marked complete',
       
       // What was just completed
       completed: {
-        week_index: rpcResult.completed_week_index,
-        day_index: rpcResult.completed_day_index,
+        week_number: state.nextSlot.week_number,
+        day_number: state.nextSlot.day_number,
       },
       
       // New state
-      program_assignment_id: rpcResult.program_assignment_id,
-      program_id: rpcResult.program_id,
-      program_name: rpcResult.program_name || 'Program',
+      program_assignment_id: programAssignmentId,
+      program_id: state.assignment.program_id,
+      program_name: state.assignment.name || 'Program',
       
-      current_week_index: rpcResult.current_week_index,
-      current_day_index: rpcResult.current_day_index,
-      is_completed: rpcResult.is_completed,
-      
-      // Debug info from RPC
-      week_numbers: rpcResult.week_numbers,
-      days_in_week_count: rpcResult.days_in_week_count,
-      next_week_number: rpcResult.next_week_number,
-      next_day_of_week: rpcResult.next_day_of_week,
-    };
+      current_week_number: result.programProgression?.currentWeekNumber,
+      current_day_number: result.programProgression?.currentDayNumber,
+      is_completed: result.programProgression?.isCompleted || false,
+    }
 
+    console.log(`[pickup/mark-complete] Success:`, response)
     return NextResponse.json(response)
     
   } catch (error: any) {

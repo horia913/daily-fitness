@@ -7,7 +7,6 @@ import WorkoutTemplateForm from "@/components/WorkoutTemplateForm";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useTheme } from "@/contexts/ThemeContext";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,30 +36,34 @@ export default function CreateWorkoutTemplatePage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen p-2 sm:p-4">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  onClick={handleClose}
-                  className="fc-btn fc-btn-ghost h-10 w-10"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-                <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Workout Builder
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                    Create Template
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Define exercises, blocks, and execution flow.
-                  </p>
-                </div>
+        <div className="relative z-10 min-h-screen pb-24">
+          <header className="sticky top-0 z-50 fc-glass border-b border-[color:var(--fc-glass-border)] px-4 sm:px-6 py-4 flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleClose}
+                className="fc-btn fc-btn-ghost h-10 w-10 rounded-xl"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight fc-text-primary">
+                  Create Template
+                </h1>
+                <p className="text-sm fc-text-dim">Builder Mode</p>
               </div>
-            </GlassCard>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-[color:var(--fc-glass-border)] fc-text-primary"
+              onClick={() => {}}
+            >
+              Preview
+            </Button>
+          </header>
+          <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
             <WorkoutTemplateForm
               isOpen={true}
               onClose={handleClose}

@@ -9,22 +9,10 @@ import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Flame, 
-  Target, 
-  CheckCircle, 
-  TrendingUp, 
-  Trophy, 
-  Sparkles,
-  Plus,
-  BarChart3,
-  Heart,
-  Droplets,
-  Dumbbell,
-  Moon,
-  Circle
-} from 'lucide-react'
+import Link from 'next/link'
+import { Flame, Target, CheckCircle, Plus, BarChart3, ChevronDown, LayoutGrid } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { withTimeout } from '@/lib/withTimeout'
 
 interface HabitAssignment {
   id: string
@@ -39,12 +27,15 @@ interface HabitAssignment {
   streak_days: number
   completion_rate: number
   category?: string
+  /** Last 7 days (oldest to newest): true if logged that day */
+  week_days_logged?: boolean[]
 }
 
 export default function ClientHabitsPage() {
   const { user } = useAuth()
   const { performanceSettings } = useTheme()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [habits, setHabits] = useState<HabitAssignment[]>([])
   const [optimisticUpdates, setOptimisticUpdates] = useState<Set<string>>(new Set())
   const [showAnalytics, setShowAnalytics] = useState(false)
@@ -57,11 +48,14 @@ export default function ClientHabitsPage() {
 
   const loadHabits = async () => {
     if (!user) return
-    
+
     setLoading(true)
+    setLoadError(null)
     try {
+      await withTimeout(
+        (async () => {
       const today = new Date().toISOString().split('T')[0]
-      
+
       // Get user's active habit assignments
       const { data: assignments, error: assignmentsError } = await supabase
         .from('habit_assignments')
@@ -145,6 +139,15 @@ export default function ClientHabitsPage() {
           const completedDays = weekLogs?.length || 0
           const completionRate = Math.round((completedDays / expectedDays) * 100)
 
+          const weekDates: string[] = []
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date()
+            d.setDate(d.getDate() - i)
+            weekDates.push(d.toISOString().split('T')[0])
+          }
+          const loggedSet = new Set((weekLogs || []).map((r: { log_date: string }) => r.log_date))
+          const weekDaysLogged = weekDates.map(date => loggedSet.has(date))
+
           return {
             id: assignment.id,
             habit_id: assignment.habit_id,
@@ -157,59 +160,21 @@ export default function ClientHabitsPage() {
             is_logged_today: loggedToday.has(assignment.id),
             streak_days: streakDays,
             completion_rate: completionRate,
-            category: 'wellness'
+            category: 'wellness',
+            week_days_logged: weekDaysLogged
           }
         })
       )
 
       setHabits(habitsWithStats)
-    } catch (error) {
+        })(),
+        30000,
+        'timeout'
+      )
+    } catch (error: any) {
       console.error('Error loading habits:', error)
-      // Set fallback data for demo
-      setHabits([
-        {
-          id: '1',
-          habit_id: '1',
-          habit_name: 'Drink 3L of Water',
-          habit_description: 'Stay hydrated throughout the day',
-          habit_icon: '💧',
-          frequency_type: 'daily',
-          target_days: 1,
-          start_date: new Date().toISOString().split('T')[0],
-          is_logged_today: false,
-          streak_days: 5,
-          completion_rate: 85,
-          category: 'hydration'
-        },
-        {
-          id: '2',
-          habit_id: '2',
-          habit_name: '10,000 Steps',
-          habit_description: 'Walk at least 10,000 steps daily',
-          habit_icon: '🚶',
-          frequency_type: 'daily',
-          target_days: 1,
-          start_date: new Date().toISOString().split('T')[0],
-          is_logged_today: true,
-          streak_days: 12,
-          completion_rate: 92,
-          category: 'fitness'
-        },
-        {
-          id: '3',
-          habit_id: '3',
-          habit_name: 'Meditate 10 min',
-          habit_description: 'Practice mindfulness daily',
-          habit_icon: '🧘',
-          frequency_type: 'daily',
-          target_days: 1,
-          start_date: new Date().toISOString().split('T')[0],
-          is_logged_today: false,
-          streak_days: 8,
-          completion_rate: 78,
-          category: 'wellness'
-        }
-      ])
+      setHabits([])
+      setLoadError(error?.message === 'timeout' ? 'Loading took too long. Please try again.' : (error?.message || 'Failed to load habits'))
     } finally {
       setLoading(false)
     }
@@ -301,6 +266,16 @@ export default function ClientHabitsPage() {
     }
   }
 
+  const getCategoryIconBg = (category?: string) => {
+    switch (category) {
+      case 'fitness': return 'bg-green-500/10 border-green-500/20'
+      case 'hydration': return 'bg-blue-500/10 border-blue-500/20'
+      case 'wellness': return 'bg-purple-500/10 border-purple-500/20'
+      case 'sleep': return 'bg-indigo-500/10 border-indigo-500/20'
+      default: return 'bg-[color:var(--fc-domain-neutral)]/10 border-[color:var(--fc-glass-border)]'
+    }
+  }
+
   const getStreakColor = (streak: number) => {
     if (streak >= 21) return 'text-yellow-600 bg-yellow-50 border-yellow-200'
     if (streak >= 7) return 'text-orange-600 bg-orange-50 border-orange-200'
@@ -331,302 +306,222 @@ export default function ClientHabitsPage() {
     )
   }
 
+  if (loadError) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center">
+              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+              <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadHabits(); }} className="fc-btn fc-btn-primary">
+                Retry
+              </Button>
+            </GlassCard>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    )
+  }
+
+  const bestStreak = habits.length > 0 ? Math.max(...habits.map(h => h.streak_days), 0) : 0
+  const weekdayLetters = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+  const getDayLabels = () => {
+    const out: string[] = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      out.push(weekdayLetters[d.getDay()])
+    }
+    return out
+  }
+  const dayLabels = getDayLabels()
+
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
-                  <Flame className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Habit Studio
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                    Daily Habits
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    {getMotivationalMessage()}
-                  </p>
-                </div>
+        <div className="relative z-10 mx-auto w-full max-w-6xl fc-page flex flex-col pb-36" style={{ gap: "var(--fc-gap-sections)" }}>
+          {/* Header: title left, streak badge right */}
+          <header>
+            <div className="flex justify-between items-start gap-4 mb-6">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight fc-text-primary">
+                  Daily Habits
+                </h1>
+                <p className="text-sm fc-text-dim mt-1">
+                  {getMotivationalMessage()}
+                </p>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                  {completedHabitsCount}/{habits.length} completed
+              {habits.length > 0 && (
+                <div className="flex items-center gap-1.5 px-4 py-2 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)] shadow-lg fc-text-success font-bold text-sm font-mono">
+                  <Flame className="w-5 h-5 fill-current" />
+                  {totalStreakDays} day{totalStreakDays !== 1 ? 's' : ''}
                 </div>
-                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                  {totalStreakDays} total streak
-                </div>
-                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                  {averageCompletionRate}% this week
-                </div>
-              </div>
+              )}
             </div>
-          </GlassCard>
 
+            {/* Stats grid: 4 cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <Target className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1">
-                  {habits.length}
-                </div>
-                <div className="text-sm text-[color:var(--fc-text-subtle)]">Total Habits</div>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 flex flex-col justify-center rounded-2xl">
+                <span className="text-sm fc-text-subtle mb-1">Active habits</span>
+                <span className="text-2xl font-bold font-mono fc-text-primary">{habits.length}</span>
               </GlassCard>
-
-              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <CheckCircle className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1">
-                  {completedHabitsCount}
-                </div>
-                <div className="text-sm text-[color:var(--fc-text-subtle)]">Completed Today</div>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 flex flex-col justify-center rounded-2xl border-l-4 border-l-[color:var(--fc-status-success)]">
+                <span className="text-sm fc-text-subtle mb-1">Today</span>
+                <span className="text-2xl font-bold font-mono fc-text-primary">{completedHabitsCount}<span className="text-lg opacity-50">/{habits.length || 1}</span></span>
               </GlassCard>
-
-              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <Flame className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1">
-                  {Math.max(...habits.map(h => h.streak_days), 0)}
-                </div>
-                <div className="text-sm text-[color:var(--fc-text-subtle)]">Best Streak</div>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 hidden md:flex flex-col justify-center rounded-2xl">
+                <span className="text-sm fc-text-subtle mb-1">Completion rate</span>
+                <span className="text-2xl font-bold font-mono fc-text-primary">{averageCompletionRate}%</span>
               </GlassCard>
-
-              <GlassCard elevation={1} className="fc-glass fc-card p-4 text-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <Trophy className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1">
-                  {averageCompletionRate}%
-                </div>
-                <div className="text-sm text-[color:var(--fc-text-subtle)]">Avg Completion</div>
+              <GlassCard elevation={1} className="fc-glass fc-card p-4 hidden md:flex flex-col justify-center rounded-2xl">
+                <span className="text-sm fc-text-subtle mb-1">Best streak</span>
+                <span className="text-2xl font-bold font-mono fc-text-primary">{bestStreak}</span>
               </GlassCard>
             </div>
+          </header>
 
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center">
-                  <Target className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                    Today&apos;s Habits
-                  </h2>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Check off what you&apos;ve completed today.
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                {habits.length > 0 ? (
-                  <div className="space-y-4">
-                    {habits.map(habit => (
-                      <div 
-                        key={habit.id} 
-                        className={`fc-glass-soft fc-card p-5 border transition-all duration-300 ${
-                          habit.is_logged_today 
-                            ? 'border-emerald-400/50 shadow-[0_0_16px_rgba(16,185,129,0.2)]' 
-                            : 'border-[color:var(--fc-glass-border)]'
-                        }`}
+          {/* Section: Today's checklist + habit cards */}
+          <section className="space-y-6">
+            <h2 className="text-xl font-semibold fc-text-primary mb-4 flex items-center gap-2">
+              Today&apos;s checklist
+              {habits.length > 0 && completedHabitsCount < habits.length && (
+                <span className="w-2 h-2 rounded-full bg-[color:var(--fc-status-success)] animate-pulse" aria-hidden />
+              )}
+            </h2>
+
+            {habits.length > 0 ? (
+              <div className="space-y-6">
+                {habits.map(habit => (
+                  <GlassCard key={habit.id} elevation={2} className="fc-glass fc-card p-5 rounded-2xl border border-[color:var(--fc-glass-border)] transition-all hover:border-[color:var(--fc-glass-border-strong)]">
+                    <div className="flex items-center gap-5 mb-5">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl border ${getCategoryIconBg(habit.category)}`}>
+                        {habit.habit_icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-end mb-1">
+                          <h3 className="font-bold text-lg fc-text-primary">{habit.habit_name}</h3>
+                          <span className="font-mono text-sm fc-text-success">{habit.completion_rate}%</span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full overflow-hidden bg-[color:var(--fc-glass-highlight)]">
+                          <div
+                            className="h-full rounded-full transition-all duration-500 bg-[color:var(--fc-status-success)]"
+                            style={{ width: `${habit.completion_rate}%` }}
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handleHabitToggle(habit.id)}
+                        disabled={optimisticUpdates.has(habit.id)}
+                        className={`fc-btn h-12 w-12 rounded-2xl flex-shrink-0 border-2 ${habit.is_logged_today ? 'fc-btn-primary border-transparent' : 'fc-btn-secondary border-[color:var(--fc-glass-border)]'}`}
                       >
-                        <div className="flex items-center gap-4">
-                          {/* Habit Icon */}
-                          <div className={`w-16 h-16 bg-gradient-to-br ${getCategoryColor(habit.category)} rounded-2xl flex items-center justify-center text-2xl`}>
-                            {habit.habit_icon}
-                          </div>
-                          
-                          {/* Habit Content */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                              <h3 className={`text-lg font-bold ${
-                                habit.is_logged_today ? 'line-through text-[color:var(--fc-text-subtle)]' : 'text-[color:var(--fc-text-primary)]'
-                              }`}>
-                                {habit.habit_name}
-                              </h3>
-                              <Badge className={`text-xs ${getStreakColor(habit.streak_days)}`}>
-                                <Flame className="w-3 h-3 mr-1" />
-                                {habit.streak_days} day{habit.streak_days !== 1 ? 's' : ''}
-                              </Badge>
-                            </div>
-                            
-                            {habit.habit_description && (
-                              <p className="text-sm text-[color:var(--fc-text-dim)] mb-3">{habit.habit_description}</p>
-                            )}
-                            
-                            {/* Progress and Stats */}
-                            <div className="flex items-center gap-4 flex-wrap">
-                              <div className="flex items-center gap-2 text-sm text-[color:var(--fc-text-subtle)]">
-                                <TrendingUp className="w-4 h-4" />
-                                {habit.completion_rate}% this week
-                              </div>
-                              <div className="flex items-center gap-2 text-sm text-[color:var(--fc-text-subtle)]">
-                                <Target className="w-4 h-4" />
-                                {habit.frequency_type}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Completion Toggle */}
-                          <div className="flex-shrink-0">
-                            <Button
-                              onClick={() => handleHabitToggle(habit.id)}
-                              disabled={optimisticUpdates.has(habit.id)}
-                              className={`fc-btn h-11 w-11 rounded-2xl ${
-                                habit.is_logged_today
-                                  ? 'fc-btn-primary'
-                                  : 'fc-btn-secondary'
+                        <CheckCircle className="w-6 h-6" />
+                      </Button>
+                    </div>
+                    {habit.week_days_logged && (
+                      <div className="flex items-center justify-between pt-4 border-t border-[color:var(--fc-glass-border)]">
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {habit.week_days_logged.map((logged, i) => (
+                            <div
+                              key={i}
+                              className={`w-8 h-8 rounded-lg border flex items-center justify-center text-[10px] font-mono ${
+                                logged ? 'fc-text-success bg-[color:var(--fc-status-success)]/20 border-[color:var(--fc-status-success)]/40' : 'border-[color:var(--fc-glass-border)] fc-text-subtle'
                               }`}
                             >
-                              {habit.is_logged_today ? (
-                                <CheckCircle className="w-5 h-5" />
-                              ) : (
-                                <Circle className="w-5 h-5" />
-                              )}
-                            </Button>
-                          </div>
+                              {dayLabels[i]}
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="w-20 h-20 bg-[color:var(--fc-glass-highlight)] rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Target className="w-10 h-10 text-[color:var(--fc-text-subtle)]" />
-                    </div>
-                    <h3 className="text-lg font-bold text-[color:var(--fc-text-primary)] mb-2">No habits assigned yet</h3>
-                    <p className="text-[color:var(--fc-text-dim)] mb-6">
-                      Your coach will assign habits for you to track, or you can add your own
-                    </p>
-                    <Button className="fc-btn fc-btn-primary">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Your First Habit
-                    </Button>
-                  </div>
-                )}
-
-                {/* Completion Celebration */}
-                {habits.length > 0 && (
-                  <div className={`flex items-center justify-between p-5 rounded-2xl border transition-all duration-300 ${
-                    allHabitsCompleted 
-                      ? 'border-emerald-300/60 bg-emerald-500/10' 
-                      : 'border-sky-300/60 bg-sky-500/10'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                        allHabitsCompleted 
-                          ? 'bg-gradient-to-br from-emerald-500 to-green-600' 
-                          : 'bg-gradient-to-br from-sky-500 to-blue-600'
-                      }`}>
-                        {allHabitsCompleted ? (
-                          <Trophy className="w-6 h-6 text-white" />
-                        ) : (
-                          <Target className="w-6 h-6 text-white" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="font-bold text-lg text-[color:var(--fc-text-primary)]">
-                          {completedHabitsCount}/{habits.length} habits completed
-                        </div>
-                        <div className="text-sm text-[color:var(--fc-text-dim)]">
-                          {allHabitsCompleted ? 'Perfect day! 🎉' : 'Keep going! 💪'}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {allHabitsCompleted && (
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
-                        <span className="text-emerald-600 font-semibold">All Done!</span>
+                        <span className="text-[10px] uppercase tracking-widest fc-text-subtle font-bold">
+                          {habit.streak_days} day{habit.streak_days !== 1 ? 's' : ''}
+                        </span>
                       </div>
                     )}
-                  </div>
-                )}
+                  </GlassCard>
+                ))}
               </div>
-            </GlassCard>
+            ) : (
+              <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center rounded-2xl">
+                <Target className="w-12 h-12 mx-auto mb-4 fc-text-subtle" />
+                <h3 className="text-lg font-bold fc-text-primary mb-2">No habits yet</h3>
+                <p className="text-sm fc-text-dim mb-6">Get started by adding a habit to track.</p>
+                <Button className="fc-btn fc-btn-primary">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add habit
+                </Button>
+              </GlassCard>
+            )}
+          </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Button 
+          {/* Collapsible: Weekly progress */}
+          {habits.length > 0 && (
+            <section className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden">
+              <button
+                type="button"
                 onClick={() => setShowAnalytics(!showAnalytics)}
-                className="fc-btn fc-btn-secondary h-12 text-base font-semibold"
+                className="w-full flex justify-between items-center p-6 hover:bg-[color:var(--fc-glass-soft)] transition-colors text-left"
               >
-                <BarChart3 className="w-5 h-5 mr-2" />
-                View Analytics
-              </Button>
-              
-              <Button 
-                className="fc-btn fc-btn-primary h-12 text-base font-semibold"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Add New Habit
-              </Button>
-            </div>
-
-            {showAnalytics && (
-              <GlassCard elevation={2} className="fc-glass fc-card p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center">
-                    <BarChart3 className="w-5 h-5 text-white" />
+                <h3 className="text-xl font-semibold fc-text-primary">Weekly Performance</h3>
+                <ChevronDown className={`w-5 h-5 fc-text-subtle transition-transform ${showAnalytics ? 'rotate-180' : ''}`} />
+              </button>
+              {showAnalytics && (
+                <div className="px-6 pb-6 pt-0 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 h-2 rounded-full overflow-hidden bg-[color:var(--fc-glass-highlight)]">
+                      <div className="h-full bg-[color:var(--fc-status-success)] transition-all duration-500" style={{ width: `${averageCompletionRate}%` }} />
+                    </div>
+                    <span className="font-mono text-xs fc-text-primary">{averageCompletionRate}%</span>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                      Habit Analytics
-                    </h3>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Weekly progress snapshots per habit.
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-6">
+                  <div className="space-y-4">
                     {habits.map(habit => (
-                      <div key={habit.id} className="fc-glass-soft fc-card p-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="text-2xl">{habit.habit_icon}</div>
-                            <div>
-                              <h4 className="font-bold text-[color:var(--fc-text-primary)]">{habit.habit_name}</h4>
-                              <p className="text-sm text-[color:var(--fc-text-subtle)]">{habit.frequency_type}</p>
-                            </div>
-                          </div>
-                          <Badge className={getStreakColor(habit.streak_days)}>
+                      <div key={habit.id} className="fc-glass-soft fc-card p-4 rounded-xl border border-[color:var(--fc-glass-border)]">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold fc-text-primary">{habit.habit_name}</span>
+                          <Badge className={`text-xs ${getStreakColor(habit.streak_days)}`}>
                             <Flame className="w-3 h-3 mr-1" />
-                            {habit.streak_days} days
+                            {habit.streak_days}
                           </Badge>
                         </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div className="text-center">
-                            <div className="text-[color:var(--fc-text-subtle)] mb-1">Completion Rate</div>
-                            <div className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{habit.completion_rate}%</div>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="fc-text-subtle">Completion</span>
+                            <span className="font-mono font-bold fc-text-primary ml-2">{habit.completion_rate}%</span>
                           </div>
-                          <div className="text-center">
-                            <div className="text-[color:var(--fc-text-subtle)] mb-1">Current Streak</div>
-                            <div className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{habit.streak_days}</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-[color:var(--fc-text-subtle)] mb-1">Status</div>
-                            <div className={`text-lg font-bold ${
-                              habit.is_logged_today ? 'text-emerald-500' : 'text-[color:var(--fc-text-subtle)]'
-                            }`}>
-                              {habit.is_logged_today ? 'Completed' : 'Pending'}
-                            </div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-[color:var(--fc-text-subtle)] mb-1">Category</div>
-                            <div className="text-lg font-bold text-[color:var(--fc-text-primary)] capitalize">{habit.category}</div>
+                          <div>
+                            <span className="fc-text-subtle">Today</span>
+                            <span className="font-semibold fc-text-primary ml-2">{habit.is_logged_today ? 'Done' : 'Pending'}</span>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-              </GlassCard>
-            )}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Fixed bottom nav: pill (3 icons) + Add Habit — mockup layout */}
+          <nav className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
+            <div className="h-20 bg-gradient-to-t from-[color:var(--fc-bg-base)] to-transparent" aria-hidden />
+            <div className="max-w-6xl mx-auto px-4 md:px-6 flex items-center justify-between gap-4 -mt-14 pb-6 pointer-events-auto">
+              <div className="fc-glass fc-card rounded-full border border-[color:var(--fc-glass-border)] p-1.5 flex items-center gap-1 shadow-lg">
+                <Link href="/client" className="fc-glass-soft w-10 h-10 rounded-full flex items-center justify-center border border-transparent text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-glass-border)] transition-colors" aria-label="Dashboard">
+                  <LayoutGrid className="w-5 h-5" />
+                </Link>
+                <span className="fc-glass-soft w-10 h-10 rounded-full flex items-center justify-center border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]" aria-label="Habits (current)">
+                  <CheckCircle className="w-5 h-5" />
+                </span>
+                <button type="button" onClick={() => { setShowAnalytics(a => !a) }} className="fc-glass-soft w-10 h-10 rounded-full flex items-center justify-center border border-transparent text-[color:var(--fc-text-subtle)] hover:text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-glass-border)] transition-colors" aria-label="Weekly performance">
+                  <BarChart3 className="w-5 h-5" />
+                </button>
+              </div>
+              <Button className="fc-btn fc-btn-primary h-12 px-6 rounded-2xl font-bold shadow-lg">
+                <Plus className="w-5 h-5 mr-2" />
+                Add habit
+              </Button>
+            </div>
+          </nav>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

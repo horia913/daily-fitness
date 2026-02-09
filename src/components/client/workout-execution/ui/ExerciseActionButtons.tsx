@@ -34,10 +34,11 @@ export function ExerciseActionButtons({
           onClick={() => {
             onVideoClick(videoUrl, exercise.exercise?.name);
           }}
-          className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
+          className="p-2 rounded-lg transition-colors"
+          style={{ color: "var(--fc-status-error)" }}
           title={`Watch ${exercise.exercise?.name} Video`}
         >
-          <Youtube className="w-5 h-5 text-red-600 dark:text-red-400" />
+          <Youtube className="w-5 h-5" />
         </Button>
       )}
       {exercise.exercise_id && onAlternativesClick && (
@@ -46,10 +47,11 @@ export function ExerciseActionButtons({
           size="sm"
           type="button"
           onClick={() => onAlternativesClick(exercise.exercise_id)}
-          className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
+          className="p-2 rounded-lg transition-colors"
+          style={{ color: "var(--fc-accent-cyan)" }}
           title={`View ${exercise.exercise?.name} Alternatives`}
         >
-          <RefreshCw className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <RefreshCw className="w-5 h-5" />
         </Button>
       )}
     </div>

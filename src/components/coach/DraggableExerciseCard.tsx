@@ -143,7 +143,7 @@ export default function DraggableExerciseCard({
   return (
     <Card 
       className={`${theme.card} ${theme.shadow} rounded-2xl border-2 transition-all duration-300 ${
-        isExpanded ? 'border-blue-300 dark:border-blue-700' : 'hover:border-slate-300 dark:hover:border-slate-600'
+        isExpanded ? 'border-blue-300 dark:border-blue-700' : 'hover:border-[color:var(--fc-surface-card-border)]'
       } ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${
@@ -159,8 +159,8 @@ export default function DraggableExerciseCard({
         <div className="flex items-center gap-4">
           {/* Drag Handle */}
           {isEditing && (
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 cursor-move hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-              <GripVertical className="w-4 h-4 text-slate-500" />
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg cursor-move transition-colors" style={{ background: "var(--fc-surface-sunken)" }}>
+            <GripVertical className="w-4 h-4 fc-text-dim" />
             </div>
           )}
 
@@ -170,7 +170,7 @@ export default function DraggableExerciseCard({
           </div>
 
           {/* Exercise Image */}
-          <div className="relative w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl overflow-hidden flex-shrink-0">
+          <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0" style={{ background: "var(--fc-surface-sunken)" }}>
             {exercise.exercise?.image_url ? (
               <img 
                 src={exercise.exercise.image_url} 
@@ -179,7 +179,7 @@ export default function DraggableExerciseCard({
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <CategoryIcon className="w-8 h-8 text-slate-400" />
+                <CategoryIcon className="w-8 h-8 fc-text-dim" />
               </div>
             )}
           </div>
@@ -196,7 +196,7 @@ export default function DraggableExerciseCard({
                 {isInlineEditing ? (
                   <div className="flex items-center gap-4 text-sm">
                     <div className="flex items-center gap-2">
-                      <label className="text-slate-500">Sets:</label>
+                      <label className="fc-text-dim">Sets:</label>
                       <Input
                         type="number"
                         value={editingData.sets}
@@ -207,7 +207,7 @@ export default function DraggableExerciseCard({
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-slate-500">Reps:</label>
+                      <label className="fc-text-dim">Reps:</label>
                       <Input
                         value={editingData.reps}
                         onChange={(e) => setEditingData({ ...editingData, reps: e.target.value })}
@@ -216,7 +216,7 @@ export default function DraggableExerciseCard({
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-slate-500">Rest:</label>
+                      <label className="fc-text-dim">Rest:</label>
                       <Input
                         value={formatRestTime(editingData.rest_seconds)}
                         onChange={(e) => setEditingData({ ...editingData, rest_seconds: parseRestTime(e.target.value) })}
@@ -226,7 +226,7 @@ export default function DraggableExerciseCard({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-4 text-sm text-slate-500">
+                  <div className="flex items-center gap-4 text-sm fc-text-dim">
                     <div className="flex items-center gap-1">
                       <Dumbbell className="w-3 h-3" />
                       <span>{exercise.sets} sets × {exercise.reps} reps</span>
@@ -300,7 +300,7 @@ export default function DraggableExerciseCard({
 
             {/* Expanded Content */}
             {isExpanded && (
-              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div className="mt-4 pt-4 border-t border-[color:var(--fc-surface-card-border)]">
                 <div className="space-y-4">
                   {/* Exercise Description */}
                   {exercise.exercise?.description && (
@@ -365,7 +365,7 @@ export default function DraggableExerciseCard({
 
                   {/* Quick Actions */}
                   {isExpanded && !isInlineEditing && (
-                    <div className="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-2 pt-2 border-t border-[color:var(--fc-surface-card-border)]">
                       <Button
                         variant="outline"
                         size="sm"

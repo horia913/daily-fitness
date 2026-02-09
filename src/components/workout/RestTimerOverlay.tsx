@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Timer, SkipForward, Play, Pause, Check, Plus, Minus } from 'lucide-react'
 
 interface RestTimerOverlayProps {
@@ -85,189 +84,174 @@ export function RestTimerOverlay({
 
   if (!isActive) return null
 
+  // Dynamic ring color based on state
+  const ringColor = isCompleted
+    ? 'var(--fc-status-success)'
+    : showWarning
+    ? 'var(--fc-status-warning)'
+    : 'var(--fc-domain-workouts)'
+
+  const ringBgColor = showWarning
+    ? 'color-mix(in srgb, var(--fc-status-warning) 25%, transparent)'
+    : 'var(--fc-surface-sunken)'
+
   return (
-    <div className={`fixed inset-0 flex items-center justify-center z-50 p-4 transition-all duration-500 ${
-      showWarning ? 'bg-gradient-to-br from-orange-900/80 to-red-900/80' : 'bg-black/60'
-    }`}>
-      <Card className={`w-full max-w-lg shadow-2xl border-0 transition-all duration-500 ${
-        showWarning ? 'bg-gradient-to-br from-orange-50 to-red-50' : 'bg-white'
-      }`}>
-        <CardContent className="p-8">
-          <div className="space-y-8">
-            {/* Header */}
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-6 backdrop-blur-xl"
+      style={{ background: 'color-mix(in srgb, var(--fc-app-bg) 85%, transparent)' }}
+    >
+      <div className="w-full max-w-sm flex flex-col items-center gap-6">
+        {/* Timer Icon */}
+        <div
+          className="w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-500"
+          style={{
+            background: showWarning
+              ? 'color-mix(in srgb, var(--fc-status-warning) 20%, transparent)'
+              : 'color-mix(in srgb, var(--fc-domain-workouts) 20%, transparent)',
+          }}
+        >
+          <Timer
+            className={`w-6 h-6 transition-all duration-500 ${showWarning ? 'animate-pulse' : ''}`}
+            style={{ color: showWarning ? 'var(--fc-status-warning)' : 'var(--fc-domain-workouts)' }}
+          />
+        </div>
+
+        {/* Title */}
+        <div className="text-center">
+          <h2 className="text-xl font-bold fc-text-primary mb-1">
+            {isCompleted ? 'Rest Complete' : showWarning ? 'Almost Ready' : 'Rest Time'}
+          </h2>
+          {exerciseName && (
+            <p className="text-sm fc-text-dim">
+              {exerciseName} {nextSet && totalSets ? `• Set ${nextSet}/${totalSets}` : ''}
+            </p>
+          )}
+        </div>
+
+        {/* Timer Ring */}
+        <div className="relative w-52 h-52">
+          <svg className="w-52 h-52 transform -rotate-90" viewBox="0 0 100 100">
+            {/* Background Circle */}
+            <circle
+              cx="50"
+              cy="50"
+              r="44"
+              stroke={ringBgColor}
+              strokeWidth="6"
+              fill="none"
+              className="transition-all duration-500"
+            />
+            {/* Progress Circle */}
+            <circle
+              cx="50"
+              cy="50"
+              r="44"
+              stroke={ringColor}
+              strokeWidth="6"
+              fill="none"
+              strokeLinecap="round"
+              strokeDasharray={`${2 * Math.PI * 44}`}
+              strokeDashoffset={`${2 * Math.PI * 44 * (1 - progress / 100)}`}
+              className="transition-all duration-1000 ease-out"
+            />
+          </svg>
+          
+          {/* Time Display */}
+          <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
-              <div className={`flex items-center justify-center mb-6 transition-all duration-500 ${
-                showWarning ? 'animate-pulse' : ''
-              }`}>
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-500 ${
-                  showWarning 
-                    ? 'bg-gradient-to-br from-orange-500 to-red-600 shadow-lg' 
-                    : 'bg-gradient-to-br from-blue-500 to-indigo-600'
-                }`}>
-                  <Timer className={`w-8 h-8 ${showWarning ? 'text-white' : 'text-white'}`} />
+              {isCompleted ? (
+                <div className="flex flex-col items-center">
+                  <Check className="w-12 h-12 mb-1" style={{ color: 'var(--fc-status-success)' }} />
+                  <span className="text-base font-bold fc-text-primary">Done!</span>
                 </div>
-              </div>
-              <h2 className={`text-3xl font-bold mb-3 transition-colors duration-500 ${
-                showWarning ? 'text-orange-800' : 'text-slate-800'
-              }`}>
-                {isCompleted ? 'Rest Complete!' : showWarning ? 'Almost Ready!' : 'Rest Time'}
-              </h2>
-              {exerciseName && (
-                <p className={`text-lg transition-colors duration-500 ${
-                  showWarning ? 'text-orange-600' : 'text-slate-600'
-                }`}>
-                  {exerciseName} • Set {nextSet} of {totalSets}
-                </p>
+              ) : (
+                <>
+                  <div
+                    className={`text-5xl font-bold font-mono transition-all duration-500 ${showWarning ? 'animate-pulse' : ''}`}
+                    style={{ color: showWarning ? 'var(--fc-status-warning)' : 'var(--fc-text-primary)' }}
+                  >
+                    {formatTime(timeLeft)}
+                  </div>
+                  <p className="text-xs fc-text-dim mt-1 font-mono">
+                    {showWarning ? 'Get ready!' : `${Math.round(progress)}%`}
+                  </p>
+                </>
               )}
             </div>
+          </div>
+        </div>
 
-            {/* Timer Display */}
-            <div className="text-center">
-              <div className="relative w-56 h-56 mx-auto mb-8">
-                {/* Progress Circle */}
-                <svg className="w-56 h-56 transform -rotate-90" viewBox="0 0 100 100">
-                  {/* Background Circle */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    stroke={showWarning ? "rgb(251 146 60)" : "rgb(226 232 240)"}
-                    strokeWidth="10"
-                    fill="none"
-                    className="transition-all duration-500"
-                  />
-                  {/* Progress Circle */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    stroke={showWarning ? "rgb(239 68 68)" : "rgb(59 130 246)"}
-                    strokeWidth="10"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 45}`}
-                    strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress / 100)}`}
-                    className={`transition-all duration-1000 ease-out ${
-                      showWarning ? 'drop-shadow-lg' : ''
-                    }`}
-                  />
-                </svg>
-                
-                {/* Time Display */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className={`text-6xl font-bold transition-all duration-500 ${
-                      isCompleted 
-                        ? 'text-green-600' 
-                        : showWarning 
-                        ? 'text-orange-600 animate-pulse' 
-                        : 'text-slate-800'
-                    }`}>
-                      {isCompleted ? (
-                        <div className="flex flex-col items-center">
-                          <Check className="w-20 h-20 mx-auto mb-2" />
-                          <span className="text-2xl">Done!</span>
-                        </div>
-                      ) : (
-                        formatTime(timeLeft)
-                      )}
-                    </div>
-                    {!isCompleted && (
-                      <p className={`text-lg font-medium mt-3 transition-colors duration-500 ${
-                        showWarning ? 'text-orange-600' : 'text-slate-500'
-                      }`}>
-                        {showWarning ? 'Get Ready!' : `${Math.round(progress)}% complete`}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
+        {/* Controls */}
+        {!isCompleted && (
+          <div className="w-full space-y-4">
+            {/* Time Adjustment */}
+            <div className="flex items-center justify-center gap-6">
+              <button
+                onClick={() => adjustTime(-15)}
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95"
+                style={{ background: 'var(--fc-surface-sunken)' }}
+              >
+                <Minus className="w-4 h-4 fc-text-dim" />
+              </button>
+              <span className="text-xs fc-text-dim font-mono">±15s</span>
+              <button
+                onClick={() => adjustTime(15)}
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95"
+                style={{ background: 'var(--fc-surface-sunken)' }}
+              >
+                <Plus className="w-4 h-4 fc-text-dim" />
+              </button>
             </div>
 
-            {/* Controls */}
-            {!isCompleted && (
-              <div className="space-y-4">
-                {/* Time Adjustment */}
-                <div className="flex items-center justify-center gap-4">
-                  <Button
-                    onClick={() => adjustTime(-15)}
-                    variant="ghost"
-                    size="sm"
-                    className="w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200"
-                  >
-                    <Minus className="w-5 h-5" />
-                  </Button>
-                  <span className="text-sm font-medium text-slate-600">-15s</span>
-                  
-                  <Button
-                    onClick={() => adjustTime(15)}
-                    variant="ghost"
-                    size="sm"
-                    className="w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </Button>
-                  <span className="text-sm font-medium text-slate-600">+15s</span>
-                </div>
-
-                {/* Main Controls */}
-                <div className="flex gap-4">
-                  <Button
-                    onClick={() => setIsPaused(!isPaused)}
-                    variant={showWarning ? "default" : "outline"}
-                    size="lg"
-                    className={`flex-1 rounded-2xl transition-all duration-300 ${
-                      showWarning 
-                        ? 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg' 
-                        : 'hover:bg-blue-50 hover:border-blue-300'
-                    }`}
-                  >
-                    {isPaused ? (
-                      <>
-                        <Play className="w-5 h-5 mr-2" />
-                        Resume
-                      </>
-                    ) : (
-                      <>
-                        <Pause className="w-5 h-5 mr-2" />
-                        Pause
-                      </>
-                    )}
-                  </Button>
-                  
-                  <Button
-                    onClick={onSkip}
-                    variant="outline"
-                    size="lg"
-                    className={`flex-1 rounded-2xl transition-all duration-300 ${
-                      showWarning 
-                        ? 'border-orange-300 text-orange-600 hover:bg-orange-50' 
-                        : 'hover:bg-green-50 hover:border-green-300'
-                    }`}
-                  >
-                    <SkipForward className="w-5 h-5 mr-2" />
-                    Skip
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Completion Message */}
-            {isCompleted && (
-              <div className="text-center space-y-4">
-                <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-200">
-                  <p className="text-xl text-green-700 font-bold">
-                    🎉 Ready for your next set!
-                  </p>
-                  <p className="text-sm text-green-600 mt-1">
-                    Great job! Time to crush it! 💪
-                  </p>
-                </div>
-              </div>
-            )}
+            {/* Main Controls */}
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setIsPaused(!isPaused)}
+                variant="fc-secondary"
+                className="flex-1 h-12 rounded-xl font-semibold"
+              >
+                {isPaused ? (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Resume
+                  </>
+                ) : (
+                  <>
+                    <Pause className="w-4 h-4 mr-2" />
+                    Pause
+                  </>
+                )}
+              </Button>
+              
+              <Button
+                onClick={onSkip}
+                variant="fc-primary"
+                className="flex-1 h-12 rounded-xl font-semibold"
+              >
+                <SkipForward className="w-4 h-4 mr-2" />
+                Skip
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        )}
+
+        {/* Completion Message */}
+        {isCompleted && (
+          <div
+            className="text-center px-6 py-4 rounded-2xl w-full"
+            style={{
+              background: 'color-mix(in srgb, var(--fc-status-success) 10%, var(--fc-surface-card))',
+              border: '1px solid color-mix(in srgb, var(--fc-status-success) 25%, transparent)',
+            }}
+          >
+            <p className="text-base font-bold fc-text-primary">
+              Ready for your next set!
+            </p>
+            <p className="text-xs fc-text-dim mt-1">
+              Great job. Time to crush it.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

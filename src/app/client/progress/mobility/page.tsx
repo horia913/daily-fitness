@@ -6,7 +6,6 @@ import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -150,7 +149,7 @@ export default function MobilityMetricsPage() {
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-glass fc-card p-8">
+            <div className="fc-surface p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -175,38 +174,38 @@ export default function MobilityMetricsPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <Link href="/client/progress">
-                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
-                    <ArrowLeft className="h-5 w-5" />
-                  </Button>
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
+                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                 </Link>
-                <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Progress Hub
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                    Mobility Metrics
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Track flexibility progress and mobility assessments over time.
-                  </p>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+                    <Activity className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                      Mobility Metrics
+                    </h1>
+                    <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                      Track flexibility progress and mobility assessments over time.
+                    </p>
+                  </div>
                 </div>
               </div>
-              <Button onClick={() => setShowAddModal(true)} className="fc-btn fc-btn-primary">
+              <Button onClick={() => setShowAddModal(true)} className="fc-btn fc-btn-primary shrink-0">
                 <Plus className="mr-2 h-5 w-5" />
                 New Assessment
               </Button>
             </div>
-          </GlassCard>
+          </div>
 
           {/* Metrics List */}
           {metrics.length > 0 ? (
             <>
               <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-[0_8px_18px_rgba(16,185,129,0.35)]">
                       <Activity className="h-5 w-5" />
@@ -218,9 +217,9 @@ export default function MobilityMetricsPage() {
                       </p>
                     </div>
                   </div>
-                </GlassCard>
+                </div>
 
-                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-white shadow-[0_8px_18px_rgba(59,130,246,0.35)]">
                       <Calendar className="h-5 w-5" />
@@ -237,9 +236,9 @@ export default function MobilityMetricsPage() {
                       </p>
                     </div>
                   </div>
-                </GlassCard>
+                </div>
 
-                <GlassCard elevation={1} className="fc-glass fc-card p-4">
+                <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-[0_8px_18px_rgba(245,158,11,0.35)]">
                       <TrendingUp className="h-5 w-5" />
@@ -251,12 +250,12 @@ export default function MobilityMetricsPage() {
                       </p>
                     </div>
                   </div>
-                </GlassCard>
+                </div>
               </div>
 
               <div className="mt-6 space-y-4">
                 {metrics.map((metric) => (
-                  <GlassCard key={metric.id} elevation={2} className="fc-glass fc-card p-6">
+                  <div key={metric.id} className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="flex flex-wrap items-center gap-3">
                         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-domain-meals)]">
@@ -408,12 +407,12 @@ export default function MobilityMetricsPage() {
                         </p>
                       </div>
                     )}
-                  </GlassCard>
+                  </div>
                 ))}
               </div>
             </>
           ) : (
-            <div className="mt-6 fc-glass fc-card p-10 text-center">
+            <div className="mt-6 fc-surface p-10 text-center">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[color:var(--fc-glass-highlight)]">
                 <Activity className="h-10 w-10 text-[color:var(--fc-text-subtle)]" />
               </div>

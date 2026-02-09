@@ -19,17 +19,25 @@ interface RPEModalProps {
  */
 
 const RPE_OPTIONS = [
-  { value: 1, emoji: '😴', label: 'Very Easy', color: 'bg-green-500', description: 'Could do many more' },
-  { value: 2, emoji: '😌', label: 'Easy', color: 'bg-green-400', description: 'Barely any effort' },
-  { value: 3, emoji: '🙂', label: 'Light', color: 'bg-lime-400', description: 'Light effort' },
-  { value: 4, emoji: '😊', label: 'Moderate', color: 'bg-lime-500', description: 'Comfortable' },
-  { value: 5, emoji: '😐', label: 'Somewhat Hard', color: 'bg-yellow-400', description: 'Starting to work' },
-  { value: 6, emoji: '😤', label: 'Hard', color: 'bg-yellow-500', description: 'Challenging' },
-  { value: 7, emoji: '😓', label: 'Very Hard', color: 'bg-orange-400', description: '2-3 reps left' },
-  { value: 8, emoji: '😰', label: 'Really Hard', color: 'bg-orange-500', description: '1-2 reps left' },
-  { value: 9, emoji: '🥵', label: 'Max Effort', color: 'bg-red-500', description: '1 rep left' },
-  { value: 10, emoji: '🔥', label: 'Failure', color: 'bg-red-600', description: 'Could not do more' },
+  { value: 1, emoji: '😴', label: 'Very Easy', description: 'Could do many more' },
+  { value: 2, emoji: '😌', label: 'Easy', description: 'Barely any effort' },
+  { value: 3, emoji: '🙂', label: 'Light', description: 'Light effort' },
+  { value: 4, emoji: '😊', label: 'Moderate', description: 'Comfortable' },
+  { value: 5, emoji: '😐', label: 'Somewhat Hard', description: 'Starting to work' },
+  { value: 6, emoji: '😤', label: 'Hard', description: 'Challenging' },
+  { value: 7, emoji: '😓', label: 'Very Hard', description: '2-3 reps left' },
+  { value: 8, emoji: '😰', label: 'Really Hard', description: '1-2 reps left' },
+  { value: 9, emoji: '🥵', label: 'Max Effort', description: '1 rep left' },
+  { value: 10, emoji: '🔥', label: 'Failure', description: 'Could not do more' },
 ];
+
+// Color gradient from green (easy) to red (max)
+function getRpeColor(value: number): string {
+  if (value <= 3) return 'var(--fc-status-success)';
+  if (value <= 5) return 'var(--fc-status-warning)';
+  if (value <= 7) return 'var(--fc-domain-workouts)';
+  return 'var(--fc-status-error)';
+}
 
 export function RPEModal({ isOpen, onSelect, onSkip, onClose }: RPEModalProps) {
   const [selectedRpe, setSelectedRpe] = useState<number | null>(null);
@@ -69,65 +77,73 @@ export function RPEModal({ isOpen, onSelect, onSkip, onClose }: RPEModalProps) {
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
       onClick={handleBackdropClick}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 dark:bg-black/70 backdrop-blur-sm" />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'color-mix(in srgb, var(--fc-app-bg) 70%, transparent)' }} />
       
-      {/* Modal - Centered on all screens, light/dark mode support */}
+      {/* Modal */}
       <div 
         className={`relative w-full max-w-[320px] sm:max-w-sm 
-          bg-white dark:bg-slate-900 
-          rounded-2xl border border-slate-200 dark:border-slate-700 
-          shadow-xl dark:shadow-none
+          fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)]
+          shadow-xl
           transform transition-all duration-300 ease-out
-          ${isAnimating ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
+          ${isAnimating ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-4'}`}
         onAnimationEnd={() => setIsAnimating(false)}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--fc-surface-card-border)' }}>
           <div>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-white">How hard was that set?</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Rate your perceived exertion</p>
+            <h3 className="text-base font-semibold fc-text-primary">How hard was that?</h3>
+            <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold">Rate of Perceived Exertion</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+            className="p-1.5 fc-text-dim rounded-full transition-colors"
+            style={{ background: 'var(--fc-surface-sunken)' }}
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
         
         {/* RPE Grid */}
         <div className="px-3 py-3">
           <div className="grid grid-cols-5 gap-1.5">
-            {RPE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => handleSelect(option.value)}
-                className={`relative flex flex-col items-center justify-center p-2 rounded-lg 
-                  transition-all duration-150 active:scale-95
-                  ${selectedRpe === option.value 
-                    ? `${option.color} ring-2 ring-white dark:ring-white ring-offset-1 ring-offset-white dark:ring-offset-slate-900` 
-                    : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
-              >
-                <span className="text-xl">{option.emoji}</span>
-                <span className={`text-sm font-bold ${selectedRpe === option.value ? 'text-white' : 'text-slate-700 dark:text-slate-200'}`}>
-                  {option.value}
-                </span>
-              </button>
-            ))}
+            {RPE_OPTIONS.map((option) => {
+              const isSelected = selectedRpe === option.value;
+              const color = getRpeColor(option.value);
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => handleSelect(option.value)}
+                  className="relative flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-150 active:scale-95"
+                  style={{
+                    background: isSelected
+                      ? color
+                      : 'var(--fc-surface-sunken)',
+                    ...(isSelected ? { boxShadow: `0 0 12px ${color}` } : {}),
+                  }}
+                >
+                  <span className="text-xl">{option.emoji}</span>
+                  <span
+                    className="text-sm font-bold font-mono"
+                    style={{ color: isSelected ? 'white' : 'var(--fc-text-primary)' }}
+                  >
+                    {option.value}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           
           {/* Legend for selected */}
           {selectedRpe && (
-            <div className="mt-3 text-center animate-fade-in">
-              <p className="text-slate-900 dark:text-white font-medium text-sm">
+            <div className="mt-3 text-center">
+              <p className="fc-text-primary font-semibold text-sm">
                 {RPE_OPTIONS[selectedRpe - 1].label}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs fc-text-dim">
                 {RPE_OPTIONS[selectedRpe - 1].description}
               </p>
             </div>
@@ -135,7 +151,7 @@ export function RPEModal({ isOpen, onSelect, onSkip, onClose }: RPEModalProps) {
           
           {/* Quick Legend */}
           {!selectedRpe && (
-            <div className="mt-3 flex justify-between text-[10px] text-slate-400 dark:text-slate-500 px-1">
+            <div className="mt-3 flex justify-between text-[10px] fc-text-dim px-1 font-mono">
               <span>1-4: Easy</span>
               <span>5-6: Mod</span>
               <span>7-8: Hard</span>
@@ -148,7 +164,8 @@ export function RPEModal({ isOpen, onSelect, onSkip, onClose }: RPEModalProps) {
         <div className="px-3 pb-4 pt-1">
           <button
             onClick={handleSkip}
-            className="w-full py-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-xs"
+            className="w-full py-2 fc-text-dim rounded-xl transition-colors text-xs font-medium"
+            style={{ background: 'var(--fc-surface-sunken)' }}
           >
             Skip for now
           </button>

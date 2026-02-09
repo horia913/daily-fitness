@@ -58,6 +58,7 @@ export function AuthWrapper() {
     }>
   >([]);
   const [explicitSubmit, setExplicitSubmit] = useState(false);
+  const [hasInviteInUrl, setHasInviteInUrl] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
@@ -66,17 +67,17 @@ export function AuthWrapper() {
   const getPasswordStrength = (password: string) => {
     if (password.length === 0) return { score: 0, label: "", color: "" };
     if (password.length < 6)
-      return { score: 1, label: "Weak", color: "text-red-500" };
+      return { score: 1, label: "Weak", color: "fc-text-error" };
     if (password.length < 8)
-      return { score: 2, label: "Fair", color: "text-orange-500" };
+      return { score: 2, label: "Fair", color: "fc-text-warning" };
     if (
       password.length >= 8 &&
       /[A-Z]/.test(password) &&
       /[0-9]/.test(password)
     ) {
-      return { score: 3, label: "Strong", color: "text-green-500" };
+      return { score: 3, label: "Strong", color: "fc-text-success" };
     }
-    return { score: 2, label: "Good", color: "text-yellow-500" };
+    return { score: 2, label: "Good", color: "fc-text-warning" };
   };
 
   const passwordStrength = getPasswordStrength(password);
@@ -167,6 +168,7 @@ export function AuthWrapper() {
       const trimmedCode = inviteParam.trim();
       setInviteCode(trimmedCode);
       setIsLogin(false); // Switch to signup mode
+      setHasInviteInUrl(true); // Hide Sign In / Sign Up tabs for invite-only flow
       console.log('✅ Invite code set from URL:', trimmedCode);
     }
 
@@ -368,71 +370,75 @@ export function AuthWrapper() {
   return (
     <AuthLayout>
       <AuthFormContainer
-        title={isLogin ? "Welcome Back!" : "Start Your Journey"}
+        title={hasInviteInUrl ? "Create your account" : isLogin ? "Welcome Back!" : "Start Your Journey"}
         description={
-          isLogin
-            ? "Sign in to continue your fitness journey"
-            : "Create your account and begin transforming your health"
+          hasInviteInUrl
+            ? "Use the details from your invite link to get started"
+            : isLogin
+              ? "Sign in to continue your fitness journey"
+              : "Create your account and begin transforming your health"
         }
       >
-        {/* Segmented Control */}
-        <div className="mb-8">
-          <div className="bg-slate-100 rounded-2xl p-1 flex">
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(true);
-                setError("");
-                setExplicitSubmit(false);
-              }}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition-all duration-200 ${
-                isLogin
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-800"
-              }`}
-            >
-              <LogIn className="w-4 h-4" />
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(false);
-                setError("");
-                setExplicitSubmit(false);
-              }}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition-all duration-200 ${
-                !isLogin
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-800"
-              }`}
-            >
-              <UserPlus className="w-4 h-4" />
-              Sign Up
-            </button>
+        {/* Segmented Control - hidden when client arrives via invite link (sign-up only) */}
+        {!hasInviteInUrl && (
+          <div className="mb-8">
+            <div className="fc-glass-soft rounded-2xl p-1 flex border border-[color:var(--fc-glass-border)]">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLogin(true);
+                  setError("");
+                  setExplicitSubmit(false);
+                }}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition-all duration-200 ${
+                  isLogin
+                    ? "fc-glass-base border border-[color:var(--fc-glass-border)] shadow-sm fc-text-primary"
+                    : "fc-text-dim hover:fc-text-primary"
+                }`}
+              >
+                <LogIn className="w-4 h-4" />
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLogin(false);
+                  setError("");
+                  setExplicitSubmit(false);
+                }}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition-all duration-200 ${
+                  !isLogin
+                    ? "fc-glass-base border border-[color:var(--fc-glass-border)] shadow-sm fc-text-primary"
+                    : "fc-text-dim hover:fc-text-primary"
+                }`}
+              >
+                <UserPlus className="w-4 h-4" />
+                Sign Up
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <form
           onSubmit={handleAuth}
           onKeyDown={handleKeyDown}
           className="space-y-6"
         >
-          {/* Enhanced Error Message */}
+          {/* Error Message (Design System v2) */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-red-200 flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="w-3 h-3 text-red-600" />
+            <div className="fc-glass-soft border border-[color:var(--fc-status-error)] fc-text-error px-4 py-3 rounded-2xl text-sm flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "color-mix(in srgb, var(--fc-status-error) 25%, transparent)" }}>
+                <AlertCircle className="w-3 h-3" />
               </div>
               {error}
             </div>
           )}
 
-          {/* Enhanced Success Message */}
+          {/* Success Message (Design System v2) */}
           {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-2xl text-sm flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-green-200 flex items-center justify-center flex-shrink-0">
-                <CheckCircle className="w-3 h-3 text-green-600" />
+            <div className="fc-glass-soft border border-[color:var(--fc-status-success)] fc-text-success px-4 py-3 rounded-2xl text-sm flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "color-mix(in srgb, var(--fc-status-success) 25%, transparent)" }}>
+                <CheckCircle className="w-3 h-3" />
               </div>
               {success}
             </div>
@@ -444,19 +450,20 @@ export function AuthWrapper() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="firstName"
-                    className="text-sm font-medium text-slate-700"
+                    className="text-sm font-medium fc-text-primary"
                   >
                     First Name
                   </Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 fc-text-dim" />
                     <Input
                       id="firstName"
                       type="text"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required={!isLogin}
-                      className="pl-10 h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                      variant="fc"
+                      className="pl-10 h-12 rounded-xl"
                       placeholder="John"
                     />
                   </div>
@@ -464,19 +471,20 @@ export function AuthWrapper() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="lastName"
-                    className="text-sm font-medium text-slate-700"
+                    className="text-sm font-medium fc-text-primary"
                   >
                     Last Name
                   </Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 fc-text-dim" />
                     <Input
                       id="lastName"
                       type="text"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       required={!isLogin}
-                      className="pl-10 h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                      variant="fc"
+                      className="pl-10 h-12 rounded-xl"
                       placeholder="Doe"
                     />
                   </div>
@@ -486,20 +494,20 @@ export function AuthWrapper() {
               <div className="space-y-2">
                 <Label
                   htmlFor="coach"
-                  className="text-sm font-medium text-slate-700"
+                  className="text-sm font-medium fc-text-primary"
                 >
                   Select Your Coach
                 </Label>
                 <div className="relative">
-                  <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+                  <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 fc-text-dim z-10" />
                   <Select
                     value={selectedCoachId}
                     onValueChange={setSelectedCoachId}
                   >
-                    <SelectTrigger className="pl-10 h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500">
+                    <SelectTrigger className="pl-10 h-12 rounded-xl border-[color:var(--fc-glass-border)] bg-[var(--fc-glass-soft)] focus:border-[var(--fc-accent-cyan)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)]">
                       <SelectValue placeholder="Choose your fitness coach" />
                     </SelectTrigger>
-                    <SelectContent className="rounded-xl border-slate-200">
+                    <SelectContent className="rounded-xl border-[color:var(--fc-glass-border)] bg-[var(--fc-glass-base)]">
                       {coaches.map((coach) => (
                         <SelectItem
                           key={coach.id}
@@ -515,7 +523,7 @@ export function AuthWrapper() {
                   </Select>
                 </div>
                 {coaches.length === 0 && (
-                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                  <p className="text-xs fc-text-dim mt-1 flex items-center gap-1">
                     <Users className="w-3 h-3" />
                     No coaches available. Please contact support.
                   </p>
@@ -525,12 +533,12 @@ export function AuthWrapper() {
               <div className="space-y-2">
                 <Label
                   htmlFor="inviteCode"
-                  className="text-sm font-medium text-slate-700"
+                  className="text-sm font-medium fc-text-primary"
                 >
                   Invite Code
                 </Label>
                 <div className="relative">
-                  <Gift className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Gift className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 fc-text-dim" />
                   <Input
                     id="inviteCode"
                     type="text"
@@ -538,10 +546,11 @@ export function AuthWrapper() {
                     onChange={(e) => setInviteCode(e.target.value)}
                     placeholder="Enter your invite code"
                     required={!isLogin}
-                    className="pl-10 h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                    variant="fc"
+                    className="pl-10 h-12 rounded-xl"
                   />
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs fc-text-dim mt-1">
                   Ask your coach or contact support for an invite code
                 </p>
               </div>
@@ -551,19 +560,20 @@ export function AuthWrapper() {
           <div className="space-y-2">
             <Label
               htmlFor="email"
-              className="text-sm font-medium text-slate-700"
+              className="text-sm font-medium fc-text-primary"
             >
               Email Address
             </Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 fc-text-dim" />
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="pl-10 h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                variant="fc"
+                className="pl-10 h-12 rounded-xl"
                 placeholder="john@example.com"
               />
             </div>
@@ -572,12 +582,12 @@ export function AuthWrapper() {
           <div className="space-y-2">
             <Label
               htmlFor="password"
-              className="text-sm font-medium text-slate-700"
+              className="text-sm font-medium fc-text-primary"
             >
               Password
             </Label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 fc-text-dim" />
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
@@ -585,13 +595,14 @@ export function AuthWrapper() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="pl-10 pr-12 h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                variant="fc"
+                className="pl-10 pr-12 h-12 rounded-xl"
                 placeholder="Enter your password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 fc-text-dim hover:fc-text-primary transition-colors"
               >
                 {showPassword ? (
                   <EyeOff className="w-4 h-4" />
@@ -605,48 +616,66 @@ export function AuthWrapper() {
             {!isLogin && password && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">Password strength:</span>
+                  <span className="fc-text-dim">Password strength:</span>
                   <span className={`font-medium ${passwordStrength.color}`}>
                     {passwordStrength.label}
                   </span>
                 </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
+                <div className="w-full rounded-full h-2 fc-progress-track">
                   <div
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      passwordStrength.score === 1
-                        ? "bg-red-500 w-1/3"
-                        : passwordStrength.score === 2
-                        ? "bg-orange-500 w-2/3"
-                        : passwordStrength.score === 3
-                        ? "bg-green-500 w-full"
-                        : "w-0"
-                    }`}
+                    className="h-2 rounded-full transition-all duration-300 fc-progress-fill"
+                    style={{
+                      width:
+                        passwordStrength.score === 1
+                          ? "33%"
+                          : passwordStrength.score === 2
+                          ? "66%"
+                          : passwordStrength.score === 3
+                          ? "100%"
+                          : "0",
+                      background:
+                        passwordStrength.score === 1
+                          ? "var(--fc-status-error)"
+                          : passwordStrength.score === 2
+                          ? "var(--fc-status-warning)"
+                          : "var(--fc-status-success)",
+                    }}
                   ></div>
                 </div>
-                <div className="text-xs text-slate-500 space-y-1">
+                <div className="text-xs fc-text-dim space-y-1">
                   <div className="flex items-center gap-2">
                     <div
-                      className={`w-2 h-2 rounded-full ${
-                        password.length >= 6 ? "bg-green-500" : "bg-slate-300"
-                      }`}
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        background:
+                          password.length >= 6
+                            ? "var(--fc-status-success)"
+                            : "var(--fc-glass-border)",
+                      }}
                     ></div>
                     <span>At least 6 characters</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div
-                      className={`w-2 h-2 rounded-full ${
-                        password.length >= 8 ? "bg-green-500" : "bg-slate-300"
-                      }`}
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        background:
+                          password.length >= 8
+                            ? "var(--fc-status-success)"
+                            : "var(--fc-glass-border)",
+                      }}
                     ></div>
                     <span>At least 8 characters (recommended)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div
-                      className={`w-2 h-2 rounded-full ${
-                        /[A-Z]/.test(password) && /[0-9]/.test(password)
-                          ? "bg-green-500"
-                          : "bg-slate-300"
-                      }`}
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        background:
+                          /[A-Z]/.test(password) && /[0-9]/.test(password)
+                            ? "var(--fc-status-success)"
+                            : "var(--fc-glass-border)",
+                      }}
                     ></div>
                     <span>Numbers and uppercase letters</span>
                   </div>
@@ -658,13 +687,14 @@ export function AuthWrapper() {
 
           <Button
             type="submit"
-            className="w-full h-12 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+            variant="fc-primary"
+            className="w-full h-12 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
             disabled={loading}
             onClick={() => setExplicitSubmit(true)}
           >
             {loading ? (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-70"></div>
                 {isLogin ? "Signing In..." : "Creating Account..."}
               </div>
             ) : (
@@ -685,18 +715,17 @@ export function AuthWrapper() {
           <div className="mt-4 text-center">
             <button
               type="button"
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              className="fc-text-dim hover:fc-text-primary text-sm font-medium transition-colors"
             >
               Forgot your password?
             </button>
           </div>
         )}
 
-
         {/* Security Assurance */}
-        <div className="mt-6 pt-6 border-t border-slate-200">
-          <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
-            <Shield className="w-4 h-4 text-green-600" />
+        <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
+          <div className="flex items-center justify-center gap-2 text-sm fc-text-dim">
+            <Shield className="w-4 h-4 fc-text-success" />
             <span>Your data is protected with enterprise-grade security</span>
           </div>
         </div>

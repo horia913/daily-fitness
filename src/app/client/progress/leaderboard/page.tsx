@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Trophy, Search } from "lucide-react";
@@ -144,54 +143,52 @@ function LeaderboardPageContent() {
   const currentUserEntry = leaderboardData.find((entry) => entry.client_id === user?.id);
   const userRank = currentUserEntry?.rank || null;
 
-  return (
-    <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <Link href="/client/progress">
-                <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              </Link>
+  function LeaderboardBody() {
+    return (
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-8 sm:px-6 lg:px-10 fc-page space-y-8">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
+              <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
+            </Link>
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-[color:var(--fc-accent)] shrink-0" style={{ backgroundColor: "var(--fc-aurora)", opacity: 0.2 }}>
+                <Trophy className="w-6 h-6" />
+              </div>
               <div>
-                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                  Progress Hub
-                </span>
-                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                  Leaderboard
+                <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                  Global ranks
                 </h1>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  Compete with {leaderboardData.length} athletes.
+                <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                  Comparing with {leaderboardData.length} athletes
                 </p>
               </div>
             </div>
+          </div>
+        </div>
 
-            {userRank && (
-              <div className="fc-glass-soft fc-card px-4 py-3 text-right">
-                <p className="text-xs text-[color:var(--fc-text-subtle)]">Your Rank</p>
-                <p className="text-3xl font-bold text-[color:var(--fc-accent-cyan)]">
-                  #{userRank}
+        {currentUserEntry && (
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 border-l-4 border-l-[color:var(--fc-accent-blue)]">
+            <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className="flex-1 text-center md:text-left">
+                <h2 className="text-xl font-bold fc-text-primary mb-1">
+                  You&apos;re #{currentUserEntry.rank} of {leaderboardData.length}
+                </h2>
+                <p className="text-sm fc-text-dim mb-4">
+                  Your score: <span className="font-mono font-bold fc-text-primary">{formatScore(currentUserEntry.score ?? 0, metricType)}</span>
                 </p>
               </div>
-            )}
+              <div className="fc-glass-soft px-4 py-3 rounded-xl border border-[color:var(--fc-glass-border)]">
+                <p className="text-xs fc-text-subtle">Your rank</p>
+                <p className="text-2xl font-bold font-mono fc-text-workouts">#{currentUserEntry.rank}</p>
+              </div>
+            </div>
           </div>
-        </GlassCard>
+        )}
 
-        <GlassCard elevation={2} className="fc-glass fc-card p-6 space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-              Filters
-            </h2>
-            <p className="text-sm text-[color:var(--fc-text-dim)]">
-              Choose a time window, metric, and exercise set.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="sticky top-0 z-10 fc-glass-soft py-4 -mx-4 px-4 sm:mx-0 sm:px-0 rounded-xl border-b border-[color:var(--fc-glass-border)] backdrop-blur-xl mb-4" style={{ backgroundColor: "var(--fc-bg-base)", opacity: 0.8 }}>
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
+          <div className="flex gap-2 p-1 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)] w-full sm:w-auto">
             {["this_month", "this_week", "all_time"].map((window) => (
               <Button
                 key={window}
@@ -296,7 +293,6 @@ function LeaderboardPageContent() {
                 placeholder="Search for an exercise..."
                 value={searchQuery}
                 onChange={(e) => handleExerciseSearch(e.target.value)}
-                variant="fc"
               />
               {exerciseSearchResults.length > 0 && (
                 <div className="rounded-2xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass-soft)] p-2 max-h-48 overflow-y-auto">
@@ -318,12 +314,13 @@ function LeaderboardPageContent() {
               )}
             </div>
           )}
-        </GlassCard>
+          </div>
+        </div>
 
-        <GlassCard elevation={2} className="fc-glass fc-card p-6">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-500 shadow-[0_8px_18px_rgba(245,158,11,0.35)]">
-              <Trophy className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 rounded-full flex items-center justify-center fc-text-warning" style={{ backgroundColor: "var(--fc-status-warning)", opacity: 0.2 }}>
+              <Trophy className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
@@ -357,7 +354,7 @@ function LeaderboardPageContent() {
                   className={cn(
                     "fc-glass-soft fc-card p-4 transition-all",
                     entry.client_id === user?.id
-                      ? "border border-[color:var(--fc-accent-cyan)]/50 shadow-[0_0_0_1px_rgba(8,145,178,0.25)]"
+                      ? "border-2 border-[color:var(--fc-accent-cyan)]"
                       : "border border-[color:var(--fc-glass-border)]"
                   )}
                 >
@@ -368,7 +365,7 @@ function LeaderboardPageContent() {
                         entry.rank === 1
                           ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white"
                           : entry.rank === 2
-                          ? "bg-gradient-to-br from-slate-300 to-slate-500 text-white"
+                          ? "bg-gradient-to-br from-gray-300 to-gray-500 text-white"
                           : entry.rank === 3
                           ? "bg-gradient-to-br from-amber-700 to-orange-900 text-white"
                           : "bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-primary)]"
@@ -396,13 +393,13 @@ function LeaderboardPageContent() {
               ))}
             </div>
           )}
-        </GlassCard>
+        </div>
 
         {/* Motivational Section */}
-        {userRank && userRank > 3 && (
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+        {userRank != null && userRank > 3 ? (
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-amber-400 to-orange-500 shadow-[0_8px_18px_rgba(245,158,11,0.35)]">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg">
                 <Trophy className="w-8 h-8 text-white" />
               </div>
               <div className="flex-1">
@@ -410,13 +407,22 @@ function LeaderboardPageContent() {
                   Keep Climbing!
                 </h3>
                 <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  You're ranked #{userRank}. Push harder to reach the top. 🔥
+                  {"You're ranked #"}
+                  {userRank}
+                  {". Push harder to reach the top."}
                 </p>
               </div>
             </div>
-          </GlassCard>
-        )}
+          </div>
+        ) : null}
       </div>
+    );
+  }
+
+  return (
+    <AnimatedBackground>
+      {performanceSettings?.floatingParticles && <FloatingParticles />}
+      <LeaderboardBody />
     </AnimatedBackground>
   );
 }

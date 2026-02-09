@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout History | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --gold: #F59E0B;
+            --bg-dark: #070708;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Prismatic Stratified Glow Effect */
+        .prism-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .prism-card::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 28px;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(59, 130, 246, 0.3), transparent 60%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .pr-hero {
+            background: radial-gradient(circle at 20% 30%, rgba(245, 158, 11, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 70%, rgba(239, 68, 68, 0.1) 0%, transparent 50%),
+                        rgba(255, 255, 255, 0.02);
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -150%;
+            width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent);
+            transform: skewX(-25deg);
+            animation: shimmer-swipe 4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes shimmer-swipe {
+            0% { left: -150%; }
+            50% { left: 150%; }
+            100% { left: 150%; }
+        }
+
+        .sticky-filter {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: rgba(7, 7, 8, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--glass-border);
+            margin: 0 -1.5rem;
+            padding: 1rem 1.5rem;
+        }
+
+        .btn-filter {
+            padding: 0.5rem 1.25rem;
+            border-radius: 99px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
+            white-space: nowrap;
+        }
+
+        .btn-filter.active {
+            background: white;
+            color: black;
+            border-color: white;
+        }
+
+        .workout-row {
+            transition: all 0.3s ease;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .workout-row:last-child { border-bottom: none; }
+
+        .expand-transition {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .expanded .expand-transition {
+            max-height: 1000px;
+        }
+
+        .gold-glow {
+            text-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+        }
+
+        .fab {
+            box-shadow: 0 12px 32px rgba(59, 130, 246, 0.4);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .fab:hover { transform: scale(1.1) translateY(-4px); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+        .modal-overlay {
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(12px);
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body class="p-6 pb-24">
+
+    <!-- Header Section -->
+    <header class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight">Workout Logs</h1>
+            <p class="text-neutral-400 text-sm mt-1">Reflecting on the grind.</p>
+        </div>
+        <button class="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+            <i data-lucide="search" class="w-5 h-5"></i>
+        </button>
+    </header>
+
+    <!-- PR Summary Hero Card -->
+    <section class="mb-8">
+        <div class="prism-card pr-hero p-6 kinetic-shimmer">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <span class="text-gold font-bold mono tracking-widest text-[10px] uppercase">Monthly Milestone</span>
+                    <h2 class="text-4xl font-black mt-2 gold-glow">12 PRs <span class="text-lg font-medium text-neutral-300">this month</span></h2>
+                </div>
+                <div class="w-14 h-14 bg-gold/20 rounded-2xl flex items-center justify-center">
+                    <i data-lucide="trophy" class="w-8 h-8 text-gold"></i>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white/5 rounded-2xl p-4 border border-white/5">
+                    <div class="flex items-center gap-2 mb-1">
+                        <i data-lucide="trending-up" class="w-4 h-4 text-accent"></i>
+                        <span class="text-xs text-neutral-400 font-medium">Max Deadlift</span>
+                    </div>
+                    <div class="text-xl font-bold mono">145<span class="text-sm text-neutral-500 ml-1">kg</span></div>
+                    <div class="text-[10px] text-accent font-bold mt-1">+5kg PR Yesterday</div>
+                </div>
+                <div class="bg-white/5 rounded-2xl p-4 border border-white/5">
+                    <div class="flex items-center gap-2 mb-1">
+                        <i data-lucide="zap" class="w-4 h-4 text-secondary"></i>
+                        <span class="text-xs text-neutral-400 font-medium">Bench Press</span>
+                    </div>
+                    <div class="text-xl font-bold mono">92.5<span class="text-sm text-neutral-500 ml-1">kg</span></div>
+                    <div class="text-[10px] text-secondary font-bold mt-1">+2.5kg PR 3d ago</div>
+                </div>
+                <div class="bg-white/5 rounded-2xl p-4 border border-white/5 flex items-center justify-center group cursor-pointer hover:bg-white/10 transition-colors">
+                    <span class="text-sm font-semibold text-neutral-300 group-hover:text-white transition-colors">View All PRs</span>
+                    <i data-lucide="chevron-right" class="w-4 h-4 ml-2"></i>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sticky Filter Bar -->
+    <nav class="sticky-filter flex items-center gap-3 overflow-x-auto no-scrollbar mb-6">
+        <button class="btn-filter active">All Time</button>
+        <button class="btn-filter">This Month</button>
+        <button class="btn-filter">This Week</button>
+        <div class="w-[1px] h-6 bg-white/10 mx-1"></div>
+        <button class="btn-filter">
+            <i data-lucide="filter" class="w-4 h-4 inline mr-2"></i>Exercises
+        </button>
+        <button class="btn-filter">Muscle Groups</button>
+    </nav>
+
+    <!-- Workout Cards List -->
+    <div class="space-y-6">
+        <!-- Card 1: Expanded by default for demo -->
+        <div class="prism-card workout-container overflow-hidden expanded">
+            <div class="p-6 cursor-pointer flex justify-between items-center" onclick="toggleCard(this)">
+                <div class="flex gap-4 items-center">
+                    <div class="w-12 h-12 rounded-2xl bg-primary/10 flex flex-col items-center justify-center border border-primary/20">
+                        <span class="text-[10px] font-bold text-primary leading-none">JAN</span>
+                        <span class="text-lg font-black text-white leading-none mt-0.5">24</span>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg">Pull Day: Upper Back Focus</h3>
+                        <div class="flex gap-4 mt-1">
+                            <span class="text-xs text-neutral-400 flex items-center gap-1">
+                                <i data-lucide="clock" class="w-3 h-3"></i> 52m
+                            </span>
+                            <span class="text-xs text-neutral-400 flex items-center gap-1">
+                                <i data-lucide="layers" class="w-3 h-3"></i> 18 Sets
+                            </span>
+                            <span class="text-xs text-gold flex items-center gap-1 font-bold">
+                                <i data-lucide="award" class="w-3 h-3"></i> 2 PRs
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <i data-lucide="chevron-down" class="w-5 h-5 text-neutral-500 transition-transform duration-300 arrow-icon"></i>
+            </div>
+            
+            <div class="expand-transition px-6 pb-6">
+                <div class="pt-2 border-t border-white/5 space-y-4">
+                    <!-- Exercise row -->
+                    <div class="flex justify-between items-center group cursor-pointer" onclick="openExerciseDetail('Lat Pulldown')">
+                        <div class="flex-1">
+                            <h4 class="font-semibold text-sm group-hover:text-secondary transition-colors">Lat Pulldown (Wide Grip)</h4>
+                            <p class="text-xs text-neutral-500 mono mt-0.5">3 Sets • Top set 75kg × 12</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <span class="bg-accent/10 text-accent text-[10px] px-2 py-0.5 rounded font-bold uppercase">Volume +12%</span>
+                            <i data-lucide="bar-chart-2" class="w-4 h-4 text-neutral-600"></i>
+                        </div>
+                    </div>
+                    <!-- Exercise row with PR -->
+                    <div class="flex justify-between items-center group cursor-pointer" onclick="openExerciseDetail('Weighted Pullups')">
+                        <div class="flex-1">
+                            <h4 class="font-semibold text-sm group-hover:text-secondary transition-colors">Weighted Pullups</h4>
+                            <p class="text-xs text-neutral-500 mono mt-0.5">4 Sets • BW + 20kg × 8</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <span class="bg-gold/10 text-gold text-[10px] px-2 py-0.5 rounded font-bold uppercase">🏆 New PR</span>
+                            <i data-lucide="bar-chart-2" class="w-4 h-4 text-neutral-600"></i>
+                        </div>
+                    </div>
+                    <!-- Exercise row -->
+                    <div class="flex justify-between items-center group cursor-pointer" onclick="openExerciseDetail('Seated Cable Row')">
+                        <div class="flex-1">
+                            <h4 class="font-semibold text-sm group-hover:text-secondary transition-colors">Seated Cable Row</h4>
+                            <p class="text-xs text-neutral-500 mono mt-0.5">3 Sets • 60kg × 15</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <i data-lucide="bar-chart-2" class="w-4 h-4 text-neutral-600"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 flex gap-3">
+                    <button class="flex-1 h-10 rounded-xl bg-white/5 border border-white/10 text-sm font-medium flex items-center justify-center gap-2 hover:bg-white/10 transition-all">
+                        <i data-lucide="share-2" class="w-4 h-4"></i> Share
+                    </button>
+                    <button class="flex-1 h-10 rounded-xl bg-white/5 border border-white/10 text-sm font-medium flex items-center justify-center gap-2 hover:bg-white/10 transition-all text-primary/80">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="prism-card workout-container overflow-hidden">
+            <div class="p-6 cursor-pointer flex justify-between items-center" onclick="toggleCard(this)">
+                <div class="flex gap-4 items-center">
+                    <div class="w-12 h-12 rounded-2xl bg-white/5 flex flex-col items-center justify-center border border-white/10">
+                        <span class="text-[10px] font-bold text-neutral-400 leading-none">JAN</span>
+                        <span class="text-lg font-black text-white leading-none mt-0.5">22</span>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg">Push Day: Chest & Shoulders</h3>
+                        <div class="flex gap-4 mt-1">
+                            <span class="text-xs text-neutral-400 flex items-center gap-1">
+                                <i data-lucide="clock" class="w-3 h-3"></i> 48m
+                            </span>
+                            <span class="text-xs text-neutral-400 flex items-center gap-1">
+                                <i data-lucide="layers" class="w-3 h-3"></i> 16 Sets
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <i data-lucide="chevron-down" class="w-5 h-5 text-neutral-500 transition-transform duration-300 arrow-icon"></i>
+            </div>
+            
+            <div class="expand-transition px-6 pb-6">
+                <div class="pt-2 border-t border-white/5 space-y-4">
+                    <div class="text-center py-4 text-neutral-500 text-sm italic">Expanding detailed sets...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Action Button -->
+    <div class="fixed bottom-8 right-6 flex flex-col items-end gap-4 z-50">
+        <button class="fab w-14 h-14 rounded-2xl bg-gradient-to-br from-secondary to-blue-700 text-white flex items-center justify-center shadow-2xl">
+            <i data-lucide="download" class="w-6 h-6"></i>
+        </button>
+    </div>
+
+    <!-- Exercise Detail Modal -->
+    <div id="exerciseModal" class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="modal-overlay absolute inset-0" onclick="closeModal()"></div>
+        <div class="prism-card w-full max-w-xl bg-[#0F0F11] rounded-t-3xl sm:rounded-3xl relative z-10 p-6 shadow-2xl transform translate-y-full transition-transform duration-500" id="modalContent">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h2 id="modalTitle" class="text-2xl font-bold">Lat Pulldown</h2>
+                    <p class="text-neutral-400 text-sm">Progressive Overload History</p>
+                </div>
+                <button onclick="closeModal()" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="mb-8 h-48 w-full">
+                <canvas id="progressionChart"></canvas>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <span class="text-[10px] text-neutral-500 uppercase font-bold mono">Personal Best</span>
+                    <div class="text-2xl font-black mt-1">100<span class="text-sm font-normal text-neutral-500 ml-1">kg</span></div>
+                    <p class="text-[10px] text-accent mt-1">↑ 8% this month</p>
+                </div>
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <span class="text-[10px] text-neutral-500 uppercase font-bold mono">Est. 1RM</span>
+                    <div class="text-2xl font-black mt-1">112<span class="text-sm font-normal text-neutral-500 ml-1">kg</span></div>
+                    <p class="text-[10px] text-neutral-500 mt-1">Based on last set</p>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <button class="flex-1 py-4 rounded-2xl bg-white text-black font-bold flex items-center justify-center gap-2 hover:bg-neutral-200 transition-colors">
+                    <i data-lucide="share" class="w-4 h-4"></i> Share PR
+                </button>
+                <button class="flex-1 py-4 rounded-2xl bg-white/5 border border-white/10 font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition-colors">
+                    <i data-lucide="file-text" class="w-4 h-4"></i> Export CSV
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        function toggleCard(header) {
+            const container = header.parentElement;
+            container.classList.toggle('expanded');
+            
+            const icon = header.querySelector('.arrow-icon');
+            if(container.classList.contains('expanded')) {
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        let myChart;
+        function openExerciseDetail(name) {
+            document.getElementById('modalTitle').innerText = name;
+            const modal = document.getElementById('exerciseModal');
+            const content = document.getElementById('modalContent');
+            
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            content.classList.remove('translate-y-full');
+
+            // Initialize Chart
+            const ctx = document.getElementById('progressionChart').getContext('2d');
+            if (myChart) myChart.destroy();
+            
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Dec 1', 'Dec 15', 'Jan 1', 'Jan 10', 'Jan 24'],
+                    datasets: [{
+                        label: 'Weight (kg)',
+                        data: [65, 67.5, 70, 72.5, 75],
+                        borderColor: '#3B82F6',
+                        backgroundColor: (context) => {
+                            const chart = context.chart;
+                            const {ctx, canvas, chartArea} = chart;
+                            if (!chartArea) return null;
+                            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                            gradient.addColorStop(0, 'rgba(59, 130, 246, 0)');
+                            gradient.addColorStop(1, 'rgba(59, 130, 246, 0.2)');
+                            return gradient;
+                        },
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#3B82F6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#666', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('exerciseModal');
+            const content = document.getElementById('modalContent');
+            content.classList.add('translate-y-full');
+            setTimeout(() => {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }, 200);
+        }
+
+        // Animation for chips
+        document.querySelectorAll('.btn-filter').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>
+
+NO HEAT MAP ITS STUPID!

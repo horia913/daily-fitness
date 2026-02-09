@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coach Intelligence | Radiant Obsidian</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --warning: #F59E0B;
+            --bg-obsidian: #0A0A0A;
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-bg: rgba(255, 255, 255, 0.03);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-obsidian);
+            color: #FFFFFF;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Radiant Obsidian Effects */
+        .crystal-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(160%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1), border-color 0.3s ease;
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255,255,255,0.15);
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -150%;
+            left: -150%;
+            width: 400%;
+            height: 400%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.03) 50%, transparent 55%);
+            animation: sweep 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes sweep {
+            0% { transform: translate(-20%, -20%) rotate(0deg); }
+            100% { transform: translate(20%, 20%) rotate(5deg); }
+        }
+
+        /* Typography Scale per Analysis */
+        .text-h1 { font-size: 30px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
+        .text-h2 { font-size: 20px; line-height: 1.25; font-weight: 600; }
+        .text-h3 { font-size: 18px; line-height: 1.25; font-weight: 500; }
+        .text-body { font-size: 16px; line-height: 1.625; }
+        .text-caption { font-size: 14px; line-height: 1.4; color: #9CA3AF; }
+
+        /* Button System */
+        .btn-primary {
+            height: 48px;
+            padding: 0 24px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+
+        .btn-orange { background: linear-gradient(135deg, #F97316 0%, #EA580C 100%); }
+        .btn-purple { background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); }
+        .btn-blue { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); }
+        .btn-green { background: linear-gradient(135deg, #10B981 0%, #059669 100%); }
+
+        .status-pill {
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1px solid transparent;
+        }
+
+        .status-pill.upcoming { background: rgba(59, 130, 246, 0.15); color: #60A5FA; border-color: rgba(59, 130, 246, 0.2); }
+        .status-pill.completed { background: rgba(16, 185, 129, 0.15); color: #34D399; border-color: rgba(16, 185, 129, 0.2); }
+        .status-pill.cancelled { background: rgba(239, 68, 68, 0.15); color: #F87171; border-color: rgba(239, 68, 68, 0.2); }
+
+        /* Layout Utilities */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .activity-thread::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 40px;
+            bottom: 0;
+            width: 1px;
+            background: linear-gradient(to bottom, var(--glass-border) 0%, transparent 100%);
+        }
+
+        .bg-mesh {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 10% 10%, rgba(239, 68, 68, 0.04) 0%, transparent 40%),
+                radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.04) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .ring-progress {
+            transform: rotate(-90deg);
+            transition: stroke-dashoffset 1s ease-out;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10 max-w-7xl mx-auto">
+    <div class="bg-mesh"></div>
+
+    <!-- 01 TODAY'S OVERVIEW HEADER -->
+    <header class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
+        <div class="space-y-1">
+            <h1 class="text-h1">Good morning, Coach Marcus!</h1>
+            <p class="text-caption mono flex items-center gap-2">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+                Tuesday, Dec 31, 2025
+            </p>
+        </div>
+        <div class="flex items-center gap-4 bg-white/5 p-2 rounded-2xl border border-white/5">
+            <div class="text-right px-2">
+                <div class="text-xs text-neutral-500 uppercase font-bold tracking-widest">Global Status</div>
+                <div class="text-sm font-semibold text-accent flex items-center gap-1 justify-end">
+                    <span class="w-2 h-2 bg-accent rounded-full animate-pulse"></span> Systems Optimal
+                </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl crystal-card overflow-hidden">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=CoachMarcus" alt="Coach" class="w-full h-full object-cover">
+            </div>
+        </div>
+    </header>
+
+    <!-- 02 TODAY'S SESSIONS HERO -->
+    <section class="mb-10">
+        <div class="crystal-card kinetic-shimmer p-8 relative overflow-hidden">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h2 class="text-h2 mb-1">Today's Schedule</h2>
+                    <p class="text-caption">You have <span class="text-white font-bold">5 sessions</span> remaining today</p>
+                </div>
+                <button class="text-sm font-semibold text-secondary hover:text-white transition-colors flex items-center gap-2">
+                    View Full Calendar <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Sessions Horizontal Scroll -->
+            <div class="flex overflow-x-auto gap-4 no-scrollbar pb-2 -mx-2 px-2">
+                <!-- Session Item 1 -->
+                <div class="flex-none w-[280px] p-5 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all cursor-pointer group">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono text-sm font-bold text-secondary">09:00 AM</span>
+                        <span class="status-pill upcoming">Upcoming</span>
+                    </div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" class="w-10 h-10 rounded-full bg-neutral-800" alt="">
+                        <div>
+                            <div class="font-bold">Alex Rivera</div>
+                            <div class="text-xs text-neutral-400">Main Gym • Floor A</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="flex-1 py-2 rounded-lg bg-white/5 text-xs font-bold hover:bg-white/10 transition-colors">Details</button>
+                        <button class="w-10 h-10 flex items-center justify-center rounded-lg bg-secondary/20 text-secondary hover:bg-secondary hover:text-white transition-all">
+                            <i data-lucide="message-square" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Session Item 2 -->
+                <div class="flex-none w-[280px] p-5 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all cursor-pointer">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono text-sm font-bold text-accent">10:30 AM</span>
+                        <span class="status-pill completed">Completed</span>
+                    </div>
+                    <div class="flex items-center gap-3 mb-4 opacity-60">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" class="w-10 h-10 rounded-full bg-neutral-800" alt="">
+                        <div>
+                            <div class="font-bold">Sarah Chen</div>
+                            <div class="text-xs text-neutral-400">Power Rack 2</div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-accent font-medium flex items-center gap-1">
+                        <i data-lucide="check-circle" class="w-3 h-3"></i> Logged: 12,400kg Volume
+                    </div>
+                </div>
+
+                <!-- Session Item 3 -->
+                <div class="flex-none w-[280px] p-5 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all cursor-pointer">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono text-sm font-bold text-secondary">01:00 PM</span>
+                        <span class="status-pill upcoming">Upcoming</span>
+                    </div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Mike" class="w-10 h-10 rounded-full bg-neutral-800" alt="">
+                        <div>
+                            <div class="font-bold">Mike Tyson</div>
+                            <div class="text-xs text-neutral-400">Boxing Ring</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="flex-1 py-2 rounded-lg bg-white/5 text-xs font-bold hover:bg-white/10 transition-colors">Details</button>
+                        <button class="w-10 h-10 flex items-center justify-center rounded-lg bg-secondary/20 text-secondary">
+                            <i data-lucide="message-square" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 03 CLIENT STATUS GRID & QUICK ACTIONS -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-10">
+        
+        <!-- Status Grid (8 cols) -->
+        <div class="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div class="crystal-card p-6 border-l-4 border-l-accent">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                        <i data-lucide="users" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-accent/60">Target: 30</span>
+                </div>
+                <div class="text-3xl font-bold mono">24</div>
+                <div class="text-caption">Active Clients</div>
+                <div class="mt-4 h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div class="h-full bg-accent rounded-full" style="width: 80%"></div>
+                </div>
+            </div>
+
+            <div class="crystal-card p-6 border-l-4 border-l-warning">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center text-warning">
+                        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-warning/60">Immediate</span>
+                </div>
+                <div class="text-3xl font-bold mono">3</div>
+                <div class="text-caption">At-Risk (7d inactive)</div>
+                <div class="mt-4 flex -space-x-2">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=A" class="w-6 h-6 rounded-full border border-black bg-neutral-800">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=B" class="w-6 h-6 rounded-full border border-black bg-neutral-800">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=C" class="w-6 h-6 rounded-full border border-black bg-neutral-800">
+                </div>
+            </div>
+
+            <div class="crystal-card p-6 border-l-4 border-l-primary">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <i data-lucide="trophy" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-primary/60">Weekly</span>
+                </div>
+                <div class="text-3xl font-bold mono">5</div>
+                <div class="text-caption">New PRs Logged</div>
+                <div class="mt-4 text-xs font-semibold text-primary animate-pulse">
+                    Hot streak this week! 🔥
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions (4 cols) -->
+        <div class="lg:col-span-4 grid grid-cols-2 gap-4">
+            <button class="btn-primary btn-orange w-full text-xs">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i> Create Workout
+            </button>
+            <button class="btn-primary btn-purple w-full text-xs">
+                <i data-lucide="layers" class="w-4 h-4"></i> Assign Prog
+            </button>
+            <button class="btn-primary btn-blue w-full text-xs">
+                <i data-lucide="send" class="w-4 h-4"></i> Message All
+            </button>
+            <button class="btn-primary btn-green w-full text-xs">
+                <i data-lucide="calendar-days" class="w-4 h-4"></i> Schedule
+            </button>
+        </div>
+    </div>
+
+    <!-- 04 ACTIVITY & ANALYTICS -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Recent Activity Feed -->
+        <div class="lg:col-span-7 crystal-card p-8">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-h2">Recent Activity</h2>
+                <button class="p-2 hover:bg-white/5 rounded-lg transition-colors"><i data-lucide="filter" class="w-4 h-4"></i></button>
+            </div>
+            <div class="space-y-8 relative activity-thread">
+                <div class="flex gap-6 relative">
+                    <div class="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent shrink-0 z-10">
+                        <i data-lucide="dumbbell" class="w-5 h-5"></i>
+                    </div>
+                    <div class="flex-1 pb-4">
+                        <div class="flex justify-between mb-1">
+                            <span class="font-bold">Alex Rivera</span>
+                            <span class="text-caption mono text-[11px]">12m ago</span>
+                        </div>
+                        <p class="text-sm text-neutral-300">Completed <span class="text-white font-medium">Pull Day: Hypertrophy</span></p>
+                        <div class="mt-2 flex gap-2">
+                            <span class="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded border border-accent/20">🏆 2 New PRs</span>
+                            <span class="text-[10px] bg-white/5 text-neutral-400 px-2 py-0.5 rounded">RPE 8</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-6 relative">
+                    <div class="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary shrink-0 z-10">
+                        <i data-lucide="camera" class="w-5 h-5"></i>
+                    </div>
+                    <div class="flex-1 pb-4">
+                        <div class="flex justify-between mb-1">
+                            <span class="font-bold">Sarah Chen</span>
+                            <span class="text-caption mono text-[11px]">45m ago</span>
+                        </div>
+                        <p class="text-sm text-neutral-300">Logged a daily check-in photo</p>
+                        <button class="mt-3 text-xs text-secondary font-bold flex items-center gap-1">Review Photo <i data-lucide="arrow-up-right" class="w-3 h-3"></i></button>
+                    </div>
+                </div>
+
+                <div class="flex gap-6 relative">
+                    <div class="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center text-warning shrink-0 z-10">
+                        <i data-lucide="calendar-x" class="w-5 h-5"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between mb-1">
+                            <span class="font-bold text-neutral-200">Mike Tyson</span>
+                            <span class="text-caption mono text-[11px]">2h ago</span>
+                        </div>
+                        <p class="text-sm text-neutral-400">Cancelled session scheduled for tomorrow</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Overview -->
+        <div class="lg:col-span-5 flex flex-col gap-8">
+            <div class="crystal-card p-8 flex-1">
+                <h3 class="text-h2 mb-8">Weekly Compliance</h3>
+                <div class="flex items-center justify-around">
+                    <div class="relative w-32 h-32">
+                        <svg viewBox="0 0 100 100" class="w-full h-full ring-progress">
+                            <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="10"></circle>
+                            <circle cx="50" cy="50" r="44" fill="none" stroke="url(#accentGradient)" stroke-width="10" stroke-dasharray="276" stroke-dashoffset="36" stroke-linecap="round"></circle>
+                            <defs>
+                                <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#10B981" />
+                                    <stop offset="100%" style="stop-color:#3B82F6" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-2xl font-bold mono">87%</span>
+                            <span class="text-[9px] uppercase tracking-tighter text-neutral-500">Avg Compliance</span>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 rounded bg-accent"></div>
+                            <span class="text-xs text-neutral-400">Completed: <span class="text-white font-bold">18</span></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 rounded bg-secondary"></div>
+                            <span class="text-xs text-neutral-400">Scheduled: <span class="text-white font-bold">22</span></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 rounded bg-primary"></div>
+                            <span class="text-xs text-neutral-400">Missed: <span class="text-white font-bold">4</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="crystal-card p-6 flex items-center justify-between">
+                <div>
+                    <p class="text-caption uppercase text-[10px] tracking-widest font-bold">Monthly Workouts</p>
+                    <div class="text-2xl font-bold mono mt-1">156</div>
+                </div>
+                <div class="flex items-end gap-1 h-12">
+                    <div class="w-2 bg-accent/20 rounded-t h-[40%]"></div>
+                    <div class="w-2 bg-accent/20 rounded-t h-[60%]"></div>
+                    <div class="w-2 bg-accent/20 rounded-t h-[30%]"></div>
+                    <div class="w-2 bg-accent/40 rounded-t h-[80%]"></div>
+                    <div class="w-2 bg-accent rounded-t h-[100%]"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Entry Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.crystal-card, header, .grid > button');
+            elements.forEach((el, i) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    el.style.transition = 'all 0.6s cubic-bezier(0.2, 1, 0.3, 1)';
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                }, i * 60);
+            });
+        });
+
+        // Touch Feedback
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('touchstart', () => {
+                if (window.navigator.vibrate) window.navigator.vibrate(5);
+            });
+        });
+    </script>
+</body>
+</html>

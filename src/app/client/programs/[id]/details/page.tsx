@@ -10,14 +10,14 @@ import {
   Play,
   Dumbbell,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
+import { withTimeout } from "@/lib/withTimeout";
 import WorkoutTemplateService, {
   ProgramSchedule,
   WorkoutTemplate,
@@ -61,14 +61,12 @@ function ProgramDetailsContent() {
       setLoading(true);
       setError(null);
 
-      // Get user ID to check for program assignment
+      await withTimeout(
+        (async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) {
-        setError("User not authenticated");
-        return;
-      }
+      if (!user) throw new Error("User not authenticated");
 
       // Get program details through program_assignments to respect RLS
       // Clients should access workout_programs through program_assignments, not directly
@@ -92,14 +90,12 @@ function ProgramDetailsContent() {
 
       if (assignmentError) {
         console.error("Error fetching program through assignment:", assignmentError);
-        setError("Failed to load program details");
-        return;
+        throw new Error("Failed to load program details");
       }
 
       if (!assignmentData || !assignmentData.program) {
         console.error("Program not found or not assigned to you");
-        setError("Program not found or not assigned to you");
-        return;
+        throw new Error("Program not found or not assigned to you");
       }
 
       const programData = assignmentData.program as any;
@@ -165,6 +161,10 @@ function ProgramDetailsContent() {
       );
 
       setWeeks(weeksData);
+      })(),
+        30000,
+        "timeout"
+      );
     } catch (error) {
       console.error("Error loading program details:", error);
       setError("Failed to load program details");
@@ -204,10 +204,17 @@ function ProgramDetailsContent() {
         <div className="min-h-screen flex items-center justify-center p-4">
           <GlassCard elevation={2} className="p-8 text-center">
             <p className="text-red-500 mb-4">{error || "Program not found"}</p>
-            <Button onClick={() => router.back()} variant="ghost">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Go Back
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              {error && (
+                <Button type="button" onClick={() => id && loadProgramDetails(id as string)} variant="default" className="fc-btn fc-btn-primary">
+                  Retry
+                </Button>
+              )}
+              <Button onClick={() => router.back()} variant="ghost">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Go Back
+              </Button>
+            </div>
           </GlassCard>
         </div>
       </AnimatedBackground>
@@ -219,6 +226,19 @@ function ProgramDetailsContent() {
     0
   );
 
+  const totalMinutes = weeks.reduce(
+    (sum, week) =>
+      sum + week.workouts.reduce((s, w) => s + w.estimated_duration, 0),
+    0
+  );
+  const progressPercent =
+    program.duration_weeks > 0
+      ? Math.min(
+          100,
+          Math.round((weeks.length / program.duration_weeks) * 100)
+        )
+      : 0;
+
   return (
     <AnimatedBackground>
       <div className="relative fc-app-bg isolate">
@@ -226,299 +246,219 @@ function ProgramDetailsContent() {
         <div className="fc-grain-layer" />
         <div className="fc-vignette-layer" />
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen p-4 sm:p-6">
-          <div className="max-w-6xl mx-auto space-y-6 relative z-10">
-          {/* Back Button */}
-          <Button
-            onClick={() => router.back()}
-            variant="ghost"
-            className="mb-4 fc-text-dim hover:fc-text-primary"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-
-          {/* Program Header */}
-          <GlassCard elevation={3} className="fc-glass fc-card p-6">
-            <div className="flex flex-col sm:flex-row items-start justify-between gap-6">
-              <div className="flex items-start gap-4 flex-1">
-                <div className="fc-icon-tile fc-icon-workouts w-14 h-14">
-                  <BookOpen className="w-7 h-7" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs uppercase tracking-[0.3em] fc-text-dim mb-2">
-                    Program Overview
-                  </p>
-                  <h1 className="text-3xl font-bold mb-3 break-words fc-text-primary">
-                    {program.name}
-                  </h1>
-                  {program.description && (
-                    <p className="leading-relaxed fc-text-dim">
-                      {program.description}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <Badge variant="fc-outline" className="px-3 py-1 text-xs font-bold uppercase tracking-[0.2em]">
-                <Calendar className="w-4 h-4 mr-2" />
-                {program.duration_weeks} weeks
-              </Badge>
-            </div>
-          </GlassCard>
-
-          {/* Stats Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <GlassCard elevation={2} className="p-5 text-center">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
-                style={{
-                  background: `${getSemanticColor("trust").primary}20`,
-                }}
-              >
-                <Calendar
-                  className="w-6 h-6"
-                  style={{ color: getSemanticColor("trust").primary }}
-                />
-              </div>
-              <AnimatedNumber
-                value={program.duration_weeks}
-                className="text-3xl font-bold"
-                color={isDark ? "#fff" : "#1A1A1A"}
-              />
-              <p
-                className="text-xs mt-1"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
-                Weeks
-              </p>
-            </GlassCard>
-
-            <GlassCard elevation={2} className="p-5 text-center">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
-                style={{
-                  background: `${getSemanticColor("success").primary}20`,
-                }}
-              >
-                <Dumbbell
-                  className="w-6 h-6"
-                  style={{ color: getSemanticColor("success").primary }}
-                />
-              </div>
-              <AnimatedNumber
-                value={totalWorkouts}
-                className="text-3xl font-bold"
-                color={isDark ? "#fff" : "#1A1A1A"}
-              />
-              <p
-                className="text-xs mt-1"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
-                Workouts
-              </p>
-            </GlassCard>
-
-            <GlassCard elevation={2} className="p-5 text-center">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
-                style={{
-                  background: `${getSemanticColor("warning").primary}20`,
-                }}
-              >
-                <Clock
-                  className="w-6 h-6"
-                  style={{ color: getSemanticColor("warning").primary }}
-                />
-              </div>
-              <AnimatedNumber
-                value={weeks.reduce(
-                  (sum, week) =>
-                    sum +
-                    week.workouts.reduce((s, w) => s + w.estimated_duration, 0),
-                  0
-                )}
-                className="text-3xl font-bold"
-                color={isDark ? "#fff" : "#1A1A1A"}
-              />
-              <p
-                className="text-xs mt-1"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
-                Total Minutes
-              </p>
-            </GlassCard>
-          </div>
-
-          {/* Program Weeks */}
-          <GlassCard elevation={2} className="p-6">
-            <h3
-              className="text-lg font-bold mb-6 flex items-center gap-2"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
-              <BookOpen className="w-5 h-5" />
-              Program Structure
-            </h3>
-
-            {weeks.length === 0 ? (
-              <p
-                className="text-center py-8"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                }}
-              >
-                No workout schedule found for this program.
-              </p>
-            ) : (
-              <div className="space-y-6">
-                {weeks.map((week) => (
-                  <div
-                    key={week.week_number}
-                    className="pb-6 last:pb-0"
-                    style={{
-                      borderBottom:
-                        weeks.indexOf(week) !== weeks.length - 1
-                          ? `1px solid ${
-                              isDark
-                                ? "rgba(255,255,255,0.1)"
-                                : "rgba(0,0,0,0.1)"
-                            }`
-                          : "none",
-                    }}
+        <div className="min-h-screen pb-28">
+          <main className="max-w-4xl mx-auto space-y-8 relative z-10 fc-page px-4 sm:px-6 py-8">
+            {/* Back + Program Header */}
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8 mb-6">
+              <div className="flex flex-col gap-6">
+                <div className="flex items-center gap-4">
+                  <Link
+                    href="/client"
+                    className="fc-glass fc-card w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]"
+                    aria-label="Back to dashboard"
                   >
-                    <h4
-                      className="font-bold text-lg mb-4"
-                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                    >
-                      Week {week.week_number}
-                    </h4>
+                    <ArrowLeft className="w-5 h-5" />
+                  </Link>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+                      <BookOpen className="w-6 h-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-medium uppercase tracking-widest text-[color:var(--fc-text-dim)] block">
+                        My Programs
+                      </span>
+                      <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
+                        {program.name}
+                      </h1>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                  <div className="flex items-center gap-3 fc-text-dim flex-wrap">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4" />
+                      {program.duration_weeks} Weeks
+                    </span>
+                    <span className="w-1 h-1 rounded-full bg-[color:var(--fc-glass-border)]" />
+                    <span className="fc-text-workouts font-semibold">
+                      {weeks.length} weeks loaded
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs fc-text-subtle font-mono mb-1 uppercase tracking-tighter">
+                      Progress
+                    </div>
+                    <div className="text-2xl font-bold font-mono fc-text-primary">
+                      {progressPercent}%
+                    </div>
+                  </div>
+                </div>
+                <div className="h-2 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[color:var(--fc-status-error)] to-[color:var(--fc-domain-workouts)] transition-all duration-500"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            </GlassCard>
 
-                    {week.workouts.length === 0 ? (
-                      <p
-                        className="text-sm"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.5)"
-                            : "rgba(0,0,0,0.5)",
-                        }}
-                      >
-                        No workouts scheduled for this week.
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        {week.workouts.map((workout) => (
-                          <div
-                            key={workout.id}
-                            className="p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                            style={{
-                              background: isDark
-                                ? "rgba(255,255,255,0.05)"
-                                : "rgba(0,0,0,0.03)",
-                              border: `1px solid ${
-                                isDark
-                                  ? "rgba(255,255,255,0.1)"
-                                  : "rgba(0,0,0,0.1)"
-                              }`,
-                            }}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <h5
-                                className="font-semibold mb-1 break-words"
-                                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                              >
-                                {workout.name}
-                              </h5>
-                              {workout.description && (
-                                <p
-                                  className="text-sm break-words"
-                                  style={{
-                                    color: isDark
-                                      ? "rgba(255,255,255,0.6)"
-                                      : "rgba(0,0,0,0.6)",
-                                  }}
-                                >
-                                  {workout.description}
+            {/* Stats horizontal scroll */}
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-4 overflow-x-auto">
+              <GlassCard elevation={2} className="fc-glass fc-card p-5 flex items-center justify-between min-w-[200px] rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <div>
+                  <p className="fc-text-subtle text-xs uppercase font-bold tracking-widest mb-1">
+                    Workouts
+                  </p>
+                  <h3 className="text-2xl font-bold font-mono fc-text-primary">
+                    {totalWorkouts}
+                    <span className="fc-text-dim text-lg"> total</span>
+                  </h3>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-domain-workouts)]/10 flex items-center justify-center">
+                  <Dumbbell className="w-6 h-6 fc-text-workouts" />
+                </div>
+              </GlassCard>
+              <GlassCard elevation={2} className="fc-glass fc-card p-5 flex items-center justify-between min-w-[200px] rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <div>
+                  <p className="fc-text-subtle text-xs uppercase font-bold tracking-widest mb-1">
+                    Weeks
+                  </p>
+                  <h3 className="text-2xl font-bold font-mono fc-text-primary">
+                    {program.duration_weeks}
+                  </h3>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-status-success)]/10 flex items-center justify-center">
+                  <Calendar className="w-6 h-6 fc-text-success" />
+                </div>
+              </GlassCard>
+              <GlassCard elevation={2} className="fc-glass fc-card p-5 flex items-center justify-between min-w-[200px] rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <div>
+                  <p className="fc-text-subtle text-xs uppercase font-bold tracking-widest mb-1">
+                    Est. Total
+                  </p>
+                  <h3 className="text-2xl font-bold font-mono fc-text-primary">
+                    {totalMinutes}
+                    <span className="fc-text-dim text-lg">m</span>
+                  </h3>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-domain-workouts)]/10 flex items-center justify-center">
+                  <Clock className="w-6 h-6 fc-text-workouts" />
+                </div>
+              </GlassCard>
+            </section>
+
+            {/* Program Curriculum */}
+            <section className="space-y-4">
+              <h2 className="text-xl font-bold tracking-tight fc-text-primary px-2">
+                Program Curriculum
+              </h2>
+
+              {weeks.length === 0 ? (
+                <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
+                  <p className="text-center fc-text-dim">
+                    No workout schedule found for this program.
+                  </p>
+                </GlassCard>
+              ) : (
+                <div className="space-y-3">
+                  {weeks.map((week) => (
+                    <GlassCard
+                      key={week.week_number}
+                      elevation={2}
+                      className="fc-glass fc-card p-5 rounded-2xl border border-[color:var(--fc-glass-border)] border-l-2 border-l-[color:var(--fc-glass-border)] hover:border-l-[color:var(--fc-domain-workouts)] transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 h-8 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center">
+                            <span className="text-sm font-bold fc-text-primary">
+                              {week.week_number}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="font-bold fc-text-primary">
+                              Week {week.week_number}
+                            </h4>
+                            <p className="text-xs fc-text-subtle uppercase tracking-widest">
+                              {week.workouts.length} workout
+                              {week.workouts.length !== 1 ? "s" : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <ArrowLeft className="w-5 h-5 fc-text-subtle rotate-180" />
+                      </div>
+                      {week.workouts.length > 0 && (
+                        <div className="mt-4 space-y-2 ml-4 pl-4 border-l-2 border-[color:var(--fc-glass-border)]">
+                          {week.workouts.map((workout) => (
+                            <div
+                              key={workout.id}
+                              className="p-4 rounded-2xl border border-[color:var(--fc-glass-border)] flex items-center justify-between gap-4 fc-glass-soft/50 hover:fc-glass-soft cursor-pointer transition-colors"
+                              onClick={() =>
+                                router.push(
+                                  `/client/workouts/${workout.id}/details`
+                                )
+                              }
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold fc-text-primary">
+                                  {workout.name}
                                 </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 flex-shrink-0">
-                              <div
-                                className="px-3 py-1 rounded-lg flex items-center gap-2"
-                                style={{
-                                  background: isDark
-                                    ? "rgba(255,255,255,0.1)"
-                                    : "rgba(0,0,0,0.05)",
-                                }}
-                              >
-                                <Clock
-                                  className="w-3.5 h-3.5"
-                                  style={{
-                                    color: getSemanticColor("warning").primary,
-                                  }}
-                                />
-                                <span
-                                  className="text-xs font-semibold"
-                                  style={{
-                                    color: isDark
-                                      ? "rgba(255,255,255,0.9)"
-                                      : "rgba(0,0,0,0.9)",
-                                  }}
-                                >
+                                <p className="text-xs fc-text-dim">
                                   {workout.estimated_duration} min
-                                </span>
+                                </p>
                               </div>
                               <Button
                                 size="sm"
-                                onClick={() =>
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   router.push(
                                     `/client/workouts/${workout.id}/details`
-                                  )
-                                }
-                                style={{
-                                  background:
-                                    getSemanticColor("trust").gradient,
-                                  boxShadow: `0 4px 12px ${
-                                    getSemanticColor("trust").primary
-                                  }30`,
+                                  );
                                 }}
+                                className="fc-btn rounded-lg h-9 bg-[color:var(--fc-domain-workouts)] hover:opacity-90 text-white border-0"
                               >
-                                View Details
+                                <Play className="w-4 h-4" />
                               </Button>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </GlassCard>
+                          ))}
+                        </div>
+                      )}
+                    </GlassCard>
+                  ))}
+                </div>
+              )}
+            </section>
 
-          {/* Action Button */}
-          <div className="text-center">
-            <Button
-              onClick={() => router.push("/client/workouts")}
-              size="lg"
-              className="rounded-xl px-8"
-              style={{
-                background: getSemanticColor("energy").gradient,
-                boxShadow: `0 4px 12px ${getSemanticColor("energy").primary}30`,
-              }}
-            >
-              <Play className="w-5 h-5 mr-2" />
-              View All Workouts
-            </Button>
-          </div>
+            {/* Sticky bottom actions */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 z-50 bg-gradient-to-t from-[color:var(--fc-bg-base)]  via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm border-t border-[color:var(--fc-glass-border)]">
+              <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4">
+                <Button
+                  onClick={() => router.push("/client/scheduling")}
+                  variant="outline"
+                  className="flex-1 rounded-2xl h-14 fc-glass border border-[color:var(--fc-glass-border)] font-bold gap-2 fc-text-primary"
+                >
+                  <Calendar className="w-5 h-5" />
+                  <span className="hidden sm:inline">View Schedule</span>
+                  <span className="sm:hidden">Schedule</span>
+                </Button>
+                <Button
+                  onClick={() =>
+                    router.push(
+                      weeks[0]?.workouts[0]?.id
+                        ? `/client/workouts/${weeks[0].workouts[0].id}/details`
+                        : "/client/workouts"
+                    )
+                  }
+                  className="flex-[2] rounded-2xl h-14 font-bold gap-2 bg-[color:var(--fc-status-error)] hover:opacity-90 text-white border-0 uppercase tracking-widest"
+                >
+                  <Play className="w-5 h-5 fill-current" />
+                  Start Today&apos;s Workout
+                  <ArrowLeft className="w-5 h-5 rotate-180" />
+                </Button>
+              </div>
+            </div>
+          </main>
         </div>
       </div>
-    </div>
     </AnimatedBackground>
   );
 }

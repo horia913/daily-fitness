@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Records | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --gold: #F59E0B;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --obsidian: #0D0D0D;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .obsidian-card {
+            background: var(--obsidian);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .pr-hero-gradient {
+            background: radial-gradient(circle at top right, rgba(239, 68, 68, 0.15), transparent 60%),
+                        radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.15), transparent 60%);
+        }
+
+        .gold-glow {
+            filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.4));
+        }
+
+        .btn-share {
+            background: linear-gradient(135deg, #EF4444 0%, #3B82F6 100%);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-share:hover { transform: scale(1.05) translateY(-4px); }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .confetti-particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--gold);
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: float 3s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+
+        .chart-path {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw 2s forwards ease-out;
+        }
+
+        @keyframes draw { to { stroke-dashoffset: 0; } }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapsible-active .collapsible-content {
+            max-height: 500px;
+        }
+
+        .filter-pill {
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .filter-pill.active {
+            background: white;
+            color: black;
+            border-color: white;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10 pb-32">
+    <!-- Background Accents -->
+    <div class="fixed inset-0 pointer-events-none z-[-1]">
+        <div class="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-red-600/10 blur-[120px] rounded-full"></div>
+        <div class="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full"></div>
+    </div>
+
+    <!-- PR Summary Hero -->
+    <header class="crystal-card pr-hero-gradient kinetic-shimmer p-8 mb-10 border-white/20">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-8">
+            <div class="text-center md:text-left">
+                <div class="flex items-center gap-2 justify-center md:justify-start mb-2">
+                    <span class="text-accent font-bold mono text-sm tracking-widest uppercase">Elite Achievement</span>
+                    <div class="h-[1px] w-12 bg-accent/30"></div>
+                </div>
+                <h1 class="text-[56px] font-black tracking-tighter leading-none mb-2">
+                    47 <span class="text-neutral-500 font-light italic">PRs</span>
+                </h1>
+                <div class="flex items-center gap-3 justify-center md:justify-start">
+                    <div class="flex items-center gap-1.5 px-3 py-1 bg-accent/10 border border-accent/20 rounded-full">
+                        <i data-lucide="trending-up" class="w-4 h-4 text-accent"></i>
+                        <span class="text-accent text-sm font-bold">12 this month</span>
+                    </div>
+                    <span class="text-neutral-400 text-sm italic">All-time record reached</span>
+                </div>
+            </div>
+            
+            <div class="relative group">
+                <div class="absolute inset-0 bg-gold/20 blur-3xl rounded-full group-hover:bg-gold/30 transition-all"></div>
+                <div class="w-32 h-32 md:w-40 md:h-40 flex items-center justify-center relative">
+                    <i data-lucide="trophy" class="w-24 h-24 md:w-32 md:h-32 text-gold gold-glow"></i>
+                    <!-- CSS Confetti elements -->
+                    <div class="confetti-particle" style="top:10%; left:20%; animation-delay: 0.1s;"></div>
+                    <div class="confetti-particle" style="top:20%; right:10%; animation-delay: 0.5s;"></div>
+                    <div class="confetti-particle" style="bottom:15%; left:30%; animation-delay: 0.8s;"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Recent PRs Section (Horizontal Scroll) -->
+    <section class="mb-12">
+        <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+            <i data-lucide="zap" class="w-5 h-5 text-primary"></i>
+            Recent Breakthroughs
+        </h2>
+        <div class="flex gap-4 overflow-x-auto pb-4 hide-scrollbar snap-x">
+            <!-- Card 1 -->
+            <div class="flex-none w-[280px] md:w-[320px] crystal-card p-5 border-gold/30 snap-start bg-gradient-to-br from-gold/10 to-transparent">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-2 bg-gold/20 rounded-lg">
+                        <i data-lucide="award" class="w-5 h-5 text-gold"></i>
+                    </div>
+                    <span class="text-[10px] mono text-neutral-400">2 DAYS AGO</span>
+                </div>
+                <h3 class="text-lg font-bold mb-1">Back Squat</h3>
+                <div class="text-2xl font-black mono mb-2 text-gold">145.0 <span class="text-sm font-normal text-neutral-400 italic">kg</span></div>
+                <div class="flex items-center gap-2 text-sm text-neutral-400 bg-black/40 p-2 rounded-lg">
+                    <i data-lucide="chevron-up" class="w-4 h-4 text-accent"></i>
+                    <span>Beat <span class="text-white font-bold">142.5kg</span> (+1.7%)</span>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="flex-none w-[280px] md:w-[320px] crystal-card p-5 border-blue-500/30 snap-start bg-gradient-to-br from-blue-500/10 to-transparent">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-2 bg-blue-500/20 rounded-lg">
+                        <i data-lucide="award" class="w-5 h-5 text-blue-400"></i>
+                    </div>
+                    <span class="text-[10px] mono text-neutral-400">4 DAYS AGO</span>
+                </div>
+                <h3 class="text-lg font-bold mb-1">Bench Press</h3>
+                <div class="text-2xl font-black mono mb-2 text-blue-400">102.5 <span class="text-sm font-normal text-neutral-400 italic">kg</span></div>
+                <div class="flex items-center gap-2 text-sm text-neutral-400 bg-black/40 p-2 rounded-lg">
+                    <i data-lucide="chevron-up" class="w-4 h-4 text-accent"></i>
+                    <span>Beat <span class="text-white font-bold">100.0kg</span> (+2.5%)</span>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="flex-none w-[280px] md:w-[320px] crystal-card p-5 border-red-500/30 snap-start bg-gradient-to-br from-red-500/10 to-transparent">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-2 bg-red-500/20 rounded-lg">
+                        <i data-lucide="award" class="w-5 h-5 text-red-400"></i>
+                    </div>
+                    <span class="text-[10px] mono text-neutral-400">1 WEEK AGO</span>
+                </div>
+                <h3 class="text-lg font-bold mb-1">Deadlift</h3>
+                <div class="text-2xl font-black mono mb-2 text-red-400">185.0 <span class="text-sm font-normal text-neutral-400 italic">kg</span></div>
+                <div class="flex items-center gap-2 text-sm text-neutral-400 bg-black/40 p-2 rounded-lg">
+                    <i data-lucide="chevron-up" class="w-4 h-4 text-accent"></i>
+                    <span>Beat <span class="text-white font-bold">180.0kg</span> (+2.8%)</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Filter Bar -->
+    <nav class="flex gap-2 overflow-x-auto pb-6 hide-scrollbar sticky top-0 bg-black/20 backdrop-blur-xl z-20 py-4 -mx-6 px-6 mb-2">
+        <button class="filter-pill active px-5 py-2 rounded-full border border-neutral-800 text-sm font-semibold">All Exercises</button>
+        <button class="filter-pill px-5 py-2 rounded-full border border-neutral-800 text-sm font-semibold text-neutral-400 hover:border-neutral-600">Squat</button>
+        <button class="filter-pill px-5 py-2 rounded-full border border-neutral-800 text-sm font-semibold text-neutral-400 hover:border-neutral-600">Deadlift</button>
+        <button class="filter-pill px-5 py-2 rounded-full border border-neutral-800 text-sm font-semibold text-neutral-400 hover:border-neutral-600">Bench</button>
+        <button class="filter-pill px-5 py-2 rounded-full border border-neutral-800 text-sm font-semibold text-neutral-400 hover:border-neutral-600">Pull-up</button>
+        <button class="filter-pill px-5 py-2 rounded-full border border-neutral-800 text-sm font-semibold text-neutral-400 hover:border-neutral-600">Overhead Press</button>
+    </nav>
+
+    <!-- PR List (Grouped) -->
+    <main class="space-y-4">
+        <!-- Exercise Group 1 -->
+        <div class="obsidian-card collapsible-group active">
+            <button onclick="toggleCollapsible(this)" class="w-full flex items-center justify-between p-6 text-left">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                        <i data-lucide="dumbbell" class="text-red-500"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold">Back Squat</h3>
+                        <p class="text-sm text-neutral-500 italic">Latest: 145kg (Dec 15)</p>
+                    </div>
+                </div>
+                <i data-lucide="chevron-down" class="w-6 h-6 text-neutral-500"></i>
+            </button>
+            <div class="collapsible-content px-6 pb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- History List -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center p-3 rounded-lg bg-white/5">
+                            <span class="text-sm text-neutral-400">Dec 15, 2024</span>
+                            <div class="flex items-center gap-3">
+                                <span class="mono font-bold">145.0 kg</span>
+                                <span class="text-[10px] text-accent font-bold">+1.7%</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center p-3 rounded-lg bg-white/5">
+                            <span class="text-sm text-neutral-400">Oct 22, 2024</span>
+                            <div class="flex items-center gap-3">
+                                <span class="mono font-bold">142.5 kg</span>
+                                <span class="text-[10px] text-accent font-bold">+5.5%</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center p-3 rounded-lg bg-white/5 opacity-50">
+                            <span class="text-sm text-neutral-400">Sep 05, 2024</span>
+                            <div class="flex items-center gap-3">
+                                <span class="mono font-bold">135.0 kg</span>
+                                <span class="text-[10px] text-accent font-bold">Start</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Mini Chart -->
+                    <div class="h-full min-h-[120px] crystal-card bg-black/40 p-4 flex flex-col">
+                        <span class="text-[10px] mono text-neutral-500 uppercase mb-4 tracking-widest">Progress Curve</span>
+                        <div class="flex-1 w-full relative">
+                            <svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 40">
+                                <path d="M0 40 L20 35 L40 28 L60 22 L80 10 L100 5" fill="none" stroke="url(#lineGradient)" stroke-width="2" stroke-linecap="round" class="chart-path" />
+                                <defs>
+                                    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" style="stop-color:#EF4444" />
+                                        <stop offset="100%" style="stop-color:#3B82F6" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exercise Group 2 -->
+        <div class="obsidian-card collapsible-group">
+            <button onclick="toggleCollapsible(this)" class="w-full flex items-center justify-between p-6 text-left">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                        <i data-lucide="dumbbell" class="text-blue-500"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold">Bench Press</h3>
+                        <p class="text-sm text-neutral-500 italic">Latest: 102.5kg (Dec 12)</p>
+                    </div>
+                </div>
+                <i data-lucide="chevron-down" class="w-6 h-6 text-neutral-500"></i>
+            </button>
+            <div class="collapsible-content px-6 pb-6">
+                <!-- Content here following same structure -->
+            </div>
+        </div>
+
+        <!-- Exercise Group 3 -->
+        <div class="obsidian-card collapsible-group">
+            <button onclick="toggleCollapsible(this)" class="w-full flex items-center justify-between p-6 text-left">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center border border-accent/20">
+                        <i data-lucide="dumbbell" class="text-accent"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold">Deadlift</h3>
+                        <p class="text-sm text-neutral-500 italic">Latest: 185kg (Dec 08)</p>
+                    </div>
+                </div>
+                <i data-lucide="chevron-down" class="w-6 h-6 text-neutral-500"></i>
+            </button>
+            <div class="collapsible-content px-6 pb-6">
+                <!-- Content here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Floating Share Button -->
+    <button class="fixed bottom-8 right-8 btn-share flex items-center gap-3 px-8 py-4 rounded-2xl z-50">
+        <i data-lucide="share-2" class="w-6 h-6"></i>
+        <span class="font-bold tracking-tight">Share All PRs</span>
+    </button>
+
+    <script>
+        // Initialize Lucide
+        lucide.createIcons();
+
+        // Toggle collapsible exercise groups
+        function toggleCollapsible(btn) {
+            const group = btn.parentElement;
+            const icon = btn.querySelector('[data-lucide="chevron-down"]');
+            
+            // Close others (optional)
+            /*
+            document.querySelectorAll('.collapsible-group').forEach(other => {
+                if(other !== group) other.classList.remove('collapsible-active');
+            });
+            */
+
+            group.classList.toggle('collapsible-active');
+            
+            if(group.classList.contains('collapsible-active')) {
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Initialize first one as active for visual demo
+        document.querySelector('.collapsible-group').classList.add('collapsible-active');
+
+        // Filter pills interaction
+        document.querySelectorAll('.filter-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+            });
+        });
+
+        // Vibrate feedback for Share Button
+        document.querySelector('.btn-share').addEventListener('click', () => {
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate([20, 10, 20]);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -234,36 +234,16 @@ export default function AvailabilitySettings() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div style={{ 
-        backgroundColor: isDark ? '#0A0A0A' : '#E8E9F3',
-        backgroundImage: isDark 
-          ? 'linear-gradient(to bottom right, #0A0A0A, #1A1A1A)' 
-          : 'linear-gradient(to bottom right, #E8E9F3, #F5F5FF)',
-        minHeight: '100vh',
-        padding: '24px 20px',
-        paddingBottom: '100px'
-      }}>
-        <div className="max-w-4xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <GlassCard className="p-6 md:p-8">
-            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-3">
-                <Badge className="fc-badge fc-badge-strong w-fit">Availability Hub</Badge>
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg">
-                    <Clock className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                      Availability Settings
-                    </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Set weekly availability and manage time slots for bookings.
-                    </p>
-                  </div>
-                </div>
+        <div className="min-h-screen p-6 pb-40">
+          <div className="max-w-screen-xl mx-auto flex flex-col gap-6">
+            <header className="mb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-8 h-0.5 rounded-full bg-[color:var(--fc-accent-primary)]" />
+                <span className="font-mono text-xs font-bold uppercase tracking-widest fc-text-primary">System Config</span>
               </div>
-            </div>
-          </GlassCard>
+              <h1 className="text-3xl font-bold tracking-tight fc-text-primary mb-2">Session Availability</h1>
+              <p className="fc-text-dim text-base">Define your weekly kinetic windows for small group sessions.</p>
+            </header>
 
           {/* Message */}
           {message && (

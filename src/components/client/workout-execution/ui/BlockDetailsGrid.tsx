@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { GlassCard } from "@/components/ui/GlassCard";
 
 export interface BlockDetail {
   label: string;
@@ -27,24 +26,26 @@ export function BlockDetailsGrid({
     return null;
   }
 
-  const gridCols = columns === 2 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-4";
-
   return (
-    <div className={`grid ${gridCols} gap-4`}>
+    <div className="flex flex-wrap gap-3">
       {validDetails.map((detail, index) => (
-        <GlassCard key={index} elevation={1} className="p-4 text-center">
-          <div className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wide mb-1">
+        <div
+          key={index}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl"
+          style={{ background: "var(--fc-surface-sunken)" }}
+        >
+          <span className="text-[10px] uppercase tracking-wider fc-text-dim font-semibold">
             {detail.label}
-          </div>
-          <div className="text-2xl text-slate-900 dark:text-slate-100 font-bold">
+          </span>
+          <span className="font-mono font-bold text-sm fc-text-primary">
             {detail.value}
             {detail.unit && (
-              <span className="text-lg text-slate-600 dark:text-slate-400 ml-1">
+              <span className="fc-text-dim ml-0.5">
                 {detail.unit}
               </span>
             )}
-          </div>
-        </GlassCard>
+          </span>
+        </div>
       ))}
     </div>
   );

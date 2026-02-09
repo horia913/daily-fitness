@@ -2,7 +2,6 @@
 
 import React from "react";
 import { useTheme } from "@/contexts/ThemeContext";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { BlockDetailsGrid, BlockDetail } from "./ui/BlockDetailsGrid";
 import { ProgressIndicator } from "./ui/ProgressIndicator";
 import { InstructionsBox } from "./ui/InstructionsBox";
@@ -88,14 +87,14 @@ export function BaseBlockExecutorLayout({
   };
 
   return (
-    <GlassCard elevation={2} className="p-6">
+    <div className="fc-surface rounded-2xl p-5 border border-[color:var(--fc-surface-card-border)]">
       <div className="flex items-center justify-between mb-4">
         <BlockTypeBadge
           blockType={block.block.block_type}
           blockName={block.block.block_name}
         />
         <div className="text-right">
-          <div className="text-xs text-slate-500 dark:text-slate-400">
+          <div className="text-xs fc-text-dim font-mono">
             Block {block.block.block_order}
           </div>
         </div>
@@ -111,7 +110,7 @@ export function BaseBlockExecutorLayout({
 
       {/* Section 1: Exercise Name */}
       <div className="mb-4">
-        <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+        <h2 className="text-2xl font-bold fc-text-primary">
           {exerciseName}
         </h2>
         {shouldShowHeaderActions && (
@@ -125,7 +124,7 @@ export function BaseBlockExecutorLayout({
         )}
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Section 2: Block Details Grid */}
         <BlockDetailsGrid details={blockDetails} />
 
@@ -158,7 +157,7 @@ export function BaseBlockExecutorLayout({
           />
         )}
       </div>
-    </GlassCard>
+    </div>
   );
 }
 

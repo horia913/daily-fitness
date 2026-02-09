@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface NavigationControlsProps {
@@ -27,9 +26,12 @@ export function NavigationControls({
   }
 
   return (
-    <GlassCard elevation={1} className="flex items-center justify-between p-4">
-      <div className="text-sm font-medium text-slate-600 dark:text-slate-400">
-        Block {currentBlock} of {totalBlocks}
+    <div
+      className="flex items-center justify-between p-3 rounded-xl"
+      style={{ background: "var(--fc-surface-sunken)" }}
+    >
+      <div className="text-xs font-semibold fc-text-dim font-mono">
+        Block {currentBlock}/{totalBlocks}
       </div>
       <div className="flex items-center gap-2">
         {onPrevious && (
@@ -38,10 +40,10 @@ export function NavigationControls({
             size="sm"
             onClick={onPrevious}
             disabled={!canGoPrevious}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 h-8 px-3 text-xs fc-text-primary border-[color:var(--fc-surface-card-border)]"
           >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
+            <ChevronLeft className="w-3.5 h-3.5" />
+            Prev
           </Button>
         )}
         {onNext && (
@@ -50,13 +52,13 @@ export function NavigationControls({
             size="sm"
             onClick={onNext}
             disabled={!canGoNext}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 h-8 px-3 text-xs fc-text-primary border-[color:var(--fc-surface-card-border)]"
           >
             Next
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
           </Button>
         )}
       </div>
-    </GlassCard>
+    </div>
   );
 }

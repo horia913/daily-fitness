@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from '@/components/ui/textarea'
 import { 
   Calendar,
+  ChevronDown,
   Plus,
   Users,
   Clock,
@@ -72,6 +73,7 @@ export default function CoachSessions() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [sortBy, setSortBy] = useState('date')
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
 
   const [sessionForm, setSessionForm] = useState({
     client_id: '',
@@ -327,40 +329,65 @@ export default function CoachSessions() {
         <div className="min-h-screen pb-24">
         <div className="px-6 pt-10">
           <div className="max-w-7xl mx-auto space-y-6">
-            <GlassCard className="p-6 md:p-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-3">
-                  <Badge className="fc-badge fc-badge-strong w-fit">Session Desk</Badge>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
-                      <CalendarDays className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                        Training Sessions
-                      </h1>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        Schedule, track, and manage coaching appointments.
-                      </p>
-                    </div>
-                  </div>
+            <header className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Session Management</h1>
+                <p className="text-sm fc-text-dim mt-1">Manage your small group training schedule.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="fc-glass rounded-2xl border border-[color:var(--fc-glass-border)] p-1 flex">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('list')}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'list' ? 'fc-glass-soft fc-text-primary shadow-sm' : 'fc-text-dim hover:fc-text-primary'}`}
+                  >
+                    List View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('calendar')}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'calendar' ? 'fc-glass-soft fc-text-primary shadow-sm' : 'fc-text-dim hover:fc-text-primary'}`}
+                  >
+                    Calendar
+                  </button>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  <Dialog open={showCreateSession} onOpenChange={setShowCreateSession}>
-                    <DialogTrigger asChild>
-                      <Button className="fc-btn fc-btn-primary">
-                        <Plus className="w-5 h-5 mr-2" />
-                        Schedule Session
-                      </Button>
-                    </DialogTrigger>
-                  </Dialog>
-                  <Button variant="outline" onClick={loadData} className="fc-btn fc-btn-ghost">
-                    <RefreshCw className="w-5 h-5 mr-2" />
-                    Refresh
-                  </Button>
+                <Button variant="ghost" size="icon" onClick={loadData} className="fc-btn fc-btn-ghost h-12 w-12 rounded-2xl">
+                  <RefreshCw className="w-5 h-5" />
+                </Button>
+              </div>
+            </header>
+
+            {/* Filter bar — mockup: chips All Sessions, Upcoming, Completed, Cancelled */}
+            <section className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+                  {[
+                    { value: "all", label: "All Sessions" },
+                    { value: "scheduled", label: "Upcoming" },
+                    { value: "completed", label: "Completed" },
+                    { value: "cancelled", label: "Cancelled" },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFilterStatus(value)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap border transition-all ${
+                        filterStatus === value
+                          ? "fc-glass-soft fc-text-primary border-[color:var(--fc-glass-border)] shadow-sm"
+                          : "fc-glass border border-[color:var(--fc-glass-border)] fc-text-dim hover:fc-text-primary"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="hidden md:flex items-center gap-2 fc-glass border border-[color:var(--fc-glass-border)] rounded-xl px-4 py-2">
+                  <Calendar className="w-4 h-4 fc-text-dim" />
+                  <span className="text-sm font-medium fc-text-primary">This Week</span>
+                  <ChevronDown className="w-4 h-4 fc-text-dim" />
                 </div>
               </div>
-            </GlassCard>
+            </section>
 
             <GlassCard className="p-5">
               <div className="flex flex-col lg:flex-row gap-4">
@@ -374,18 +401,6 @@ export default function CoachSessions() {
                   />
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="fc-select h-12 w-48">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="scheduled">Scheduled</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                      <SelectItem value="no_show">No Show</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <Select value={sortBy} onValueChange={setSortBy}>
                     <SelectTrigger className="fc-select h-12 w-48">
                       <SelectValue placeholder="Sort by" />
@@ -401,153 +416,114 @@ export default function CoachSessions() {
             </GlassCard>
 
             {/* Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', marginBottom: '20px' }}>
-                <div className="flex items-center gap-4">
-                  <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <CalendarDays style={{ width: '32px', height: '32px', color: '#FFFFFF' }} />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: '40px', fontWeight: '800', color: '#1A1A1A', lineHeight: '1.1' }}>{sessions.length}</p>
-                    <p style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>Total Sessions</p>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <GlassCard className="p-5 flex items-center gap-4 rounded-2xl">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white">
+                  <CalendarDays className="w-7 h-7" />
                 </div>
-              </div>
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', marginBottom: '20px' }}>
-                <div className="flex items-center gap-4">
-                  <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Clock style={{ width: '32px', height: '32px', color: '#FFFFFF' }} />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: '40px', fontWeight: '800', color: '#1A1A1A', lineHeight: '1.1' }}>{sessions.filter(s => s.status === 'scheduled').length}</p>
-                    <p style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>Scheduled</p>
-                  </div>
+                <div>
+                  <p className="text-2xl font-bold fc-text-primary leading-tight">{sessions.length}</p>
+                  <p className="text-sm fc-text-dim">Total Sessions</p>
                 </div>
-              </div>
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', marginBottom: '20px' }}>
-                <div className="flex items-center gap-4">
-                  <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #4CAF50 0%, #81C784 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <CheckCircle style={{ width: '32px', height: '32px', color: '#FFFFFF' }} />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: '40px', fontWeight: '800', color: '#1A1A1A', lineHeight: '1.1' }}>{sessions.filter(s => s.status === 'completed').length}</p>
-                    <p style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>Completed</p>
-                  </div>
+              </GlassCard>
+              <GlassCard className="p-5 flex items-center gap-4 rounded-2xl">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-400 text-white">
+                  <Clock className="w-7 h-7" />
                 </div>
-              </div>
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', marginBottom: '20px' }}>
-                <div className="flex items-center gap-4">
-                  <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #F093FB 0%, #F5576C 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Users style={{ width: '32px', height: '32px', color: '#FFFFFF' }} />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: '40px', fontWeight: '800', color: '#1A1A1A', lineHeight: '1.1' }}>{clients.length}</p>
-                    <p style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>Active Clients</p>
-                  </div>
+                <div>
+                  <p className="text-2xl font-bold fc-text-primary leading-tight">{sessions.filter(s => s.status === 'scheduled').length}</p>
+                  <p className="text-sm fc-text-dim">Scheduled</p>
                 </div>
-              </div>
+              </GlassCard>
+              <GlassCard className="p-5 flex items-center gap-4 rounded-2xl">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-400 text-white">
+                  <CheckCircle className="w-7 h-7" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold fc-text-primary leading-tight">{sessions.filter(s => s.status === 'completed').length}</p>
+                  <p className="text-sm fc-text-dim">Completed</p>
+                </div>
+              </GlassCard>
+              <GlassCard className="p-5 flex items-center gap-4 rounded-2xl">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 to-rose-500 text-white">
+                  <Users className="w-7 h-7" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold fc-text-primary leading-tight">{clients.length}</p>
+                  <p className="text-sm fc-text-dim">Active Clients</p>
+                </div>
+              </GlassCard>
             </div>
 
-            {/* Sessions List */}
-            <div className="space-y-6">
-              <h2 className={`text-2xl font-bold ${theme.text} flex items-center gap-3`}>
-                <div className="p-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                  <CalendarDays className="w-6 h-6 text-white" />
-                </div>
-                Training Sessions
-              </h2>
-              {filteredSessions.length === 0 ? (
-                <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '48px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', textAlign: 'center' }}>
-                    <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-                      <CalendarDays className="w-12 h-12 text-white" />
+            {/* Sessions List or Calendar */}
+            {viewMode === 'calendar' ? (
+              <GlassCard className="p-6 rounded-2xl min-h-[400px] flex items-center justify-center">
+                <p className="text-sm fc-text-dim">Calendar view coming soon. Use List View for now.</p>
+              </GlassCard>
+            ) : (
+              <div className="space-y-4">
+                <h2 className="text-lg font-semibold fc-text-primary">Sessions</h2>
+                {filteredSessions.length === 0 ? (
+                  <GlassCard className="p-12 text-center rounded-2xl">
+                    <div className="p-4 rounded-2xl fc-glass-soft w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                      <CalendarDays className="w-10 h-10 fc-text-primary" />
                     </div>
-                    <h3 className={`text-2xl font-bold ${theme.text} mb-4`}>
-                      No Sessions Yet
-                    </h3>
-                    <p className={`${theme.textSecondary} text-lg mb-8 max-w-md mx-auto`}>
-                      Start scheduling training sessions with your clients to see them here
+                    <h3 className="text-xl font-semibold fc-text-primary mb-2">No sessions yet</h3>
+                    <p className="text-sm fc-text-dim mb-6 max-w-sm mx-auto">
+                      Schedule training sessions with your clients to see them here.
                     </p>
-                    <Dialog open={showCreateSession} onOpenChange={setShowCreateSession}>
-                      <DialogTrigger asChild>
-                        <Button
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg hover:scale-105 transition-all duration-200 px-8 py-3 text-lg font-semibold"
-                        >
-                          <Plus className="w-5 h-5 mr-2" />
-                          Schedule First Session
-                        </Button>
-                      </DialogTrigger>
-                    </Dialog>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredSessions.map(session => (
-                    <div key={session.id} style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', marginBottom: '20px' }}>
+                    <Button onClick={() => setShowCreateSession(true)} className="fc-btn fc-btn-primary">
+                      <Plus className="w-5 h-5 mr-2" />
+                      Schedule first session
+                    </Button>
+                  </GlassCard>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredSessions.map(session => (
+                      <GlassCard key={session.id} className="p-5 rounded-2xl">
                         <div className="space-y-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="p-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                                  {getStatusIcon(session.status)}
-                                </div>
-                                <div className="flex-1">
-                                  <h3 className={`text-lg font-bold ${theme.text} group-hover:text-purple-600 transition-colors`}>
-                                    {session.title}
-                                  </h3>
-                                  {session.client && (
-                                    <p className={`text-sm ${theme.textSecondary}`}>
-                                      {session.client.first_name} {session.client.last_name}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <span className={`${theme.textSecondary} text-sm flex items-center gap-1`}>
-                                    <Calendar className="w-4 h-4" />
-                                    {new Date(session.scheduled_at).toLocaleDateString()}
-                                  </span>
-                                  <span className={`${theme.textSecondary} text-sm flex items-center gap-1`}>
-                                    <Clock className="w-4 h-4" />
-                                    {session.duration_minutes} min
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <span className={`${theme.textSecondary} text-sm`}>Status</span>
-                                  {getStatusBadge(session.status)}
-                                </div>
-                                {session.description && (
-                                  <p className={`text-sm ${theme.textSecondary} line-clamp-2 mt-2`}>
-                                    {session.description}
-                                  </p>
-                                )}
-                              </div>
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 rounded-xl fc-glass-soft shrink-0">
+                              {getStatusIcon(session.status)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold fc-text-primary truncate">{session.title}</h3>
+                              {session.client && (
+                                <p className="text-sm fc-text-dim">
+                                  {session.client.first_name} {session.client.last_name}
+                                </p>
+                              )}
                             </div>
                           </div>
-                          <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEditSession(session)}
-                              className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl"
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deleteSession(session.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                          <div className="flex flex-wrap items-center gap-2 text-sm fc-text-dim">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {new Date(session.scheduled_at).toLocaleDateString()}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {session.duration_minutes} min
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-[color:var(--fc-glass-border)]">
+                            {getStatusBadge(session.status)}
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEditSession(session)} className="fc-btn fc-btn-ghost h-9">
+                                <Edit className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => deleteSession(session.id)} className="text-red-500 hover:text-red-600 h-9">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                      </GlassCard>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Create Session Modal */}
             <Dialog open={showCreateSession} onOpenChange={setShowCreateSession}>
@@ -732,6 +708,16 @@ export default function CoachSessions() {
                 </div>
               </DialogContent>
             </Dialog>
+
+            {/* FAB: New session */}
+            <Button
+              className="fixed bottom-6 right-6 z-50 h-16 w-16 rounded-2xl fc-btn-primary shadow-lg hover:scale-105 transition-transform"
+              size="icon"
+              onClick={() => setShowCreateSession(true)}
+              aria-label="New session"
+            >
+              <Plus className="w-7 h-7" />
+            </Button>
           </div>
         </div>
         </div>

@@ -68,10 +68,10 @@ export function LargeInput({
   return (
     <div className={`space-y-2 ${className}`}>
       {label ? (
-        <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+        <Label className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
           {label}
           {unit && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">
+            <span className="fc-text-dim ml-1 normal-case">
               ({unit})
             </span>
           )}
@@ -88,13 +88,21 @@ export function LargeInput({
           max={max}
           autoFocus={autoFocus}
           disabled={disabled}
-          className="text-2xl sm:text-3xl p-3 sm:p-4 text-center font-bold h-14 sm:h-16 border-2 focus:border-blue-500 dark:focus:border-blue-400 w-full"
+          className="text-2xl sm:text-3xl p-3 sm:p-4 text-center font-bold font-mono h-14 sm:h-16 border-2 rounded-xl fc-text-primary w-full"
+          style={{
+            background: 'var(--fc-surface-card)',
+            borderColor: 'var(--fc-surface-card-border)',
+          }}
         />
         {showStepper && (
           <div className="flex items-center justify-center gap-3">
             <button
               type="button"
-              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl border border-slate-200 dark:border-slate-700 text-lg sm:text-xl font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl text-lg sm:text-xl font-semibold fc-text-dim transition-all active:scale-95"
+              style={{
+                background: 'var(--fc-surface-sunken)',
+                border: '1px solid var(--fc-surface-card-border)',
+              }}
               onClick={() => handleStep(-1)}
               disabled={disabled}
               aria-label={`${label || "Value"} decrease`}
@@ -103,7 +111,11 @@ export function LargeInput({
             </button>
             <button
               type="button"
-              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl border border-slate-200 dark:border-slate-700 text-lg sm:text-xl font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl text-lg sm:text-xl font-semibold fc-text-dim transition-all active:scale-95"
+              style={{
+                background: 'var(--fc-surface-sunken)',
+                border: '1px solid var(--fc-surface-card-border)',
+              }}
               onClick={() => handleStep(1)}
               disabled={disabled}
               aria-label={`${label || "Value"} increase`}

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Challenge Details | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --warning: #F59E0B;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .crystal-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+            transform: rotate(30deg);
+            pointer-events: none;
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-primary {
+            height: 56px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(16, 185, 129, 0.35); }
+
+        .btn-action-sticky {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            right: 24px;
+            z-index: 100;
+        }
+
+        .text-h1 { font-size: 30px; line-height: 1.25; font-weight: 700; }
+        .text-h2 { font-size: 20px; line-height: 1.25; font-weight: 600; }
+        .text-caption { font-size: 14px; line-height: 1.4; font-weight: 400; }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .podium-gradient-1 { background: linear-gradient(180deg, #FCD34D 0%, #B45309 100%); }
+        .podium-gradient-2 { background: linear-gradient(180deg, #E5E7EB 0%, #6B7280 100%); }
+        .podium-gradient-3 { background: linear-gradient(180deg, #D97706 0%, #78350F 100%); }
+
+        .countdown-box {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 8px 12px;
+        }
+
+        .rank-highlight {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, transparent 100%);
+            border-left: 3px solid var(--secondary);
+        }
+
+        .progress-bar-fill {
+            transition: width 1.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* Accordion custom styling */
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+        }
+        .accordion-active .accordion-content {
+            max-height: 500px;
+        }
+        .accordion-active i {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header & Breadcrumb -->
+    <header class="mb-10 max-w-4xl mx-auto">
+        <button class="flex items-center gap-2 text-neutral-400 mb-6 hover:text-white transition-colors">
+            <i data-lucide="chevron-left" class="w-5 h-5"></i>
+            <span class="text-sm font-medium">Back to Challenges</span>
+        </button>
+
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="text-4xl">🏋️</span>
+                    <h1 class="text-h1 tracking-tight">The Squat King Vol. 1</h1>
+                </div>
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="countdown-box flex items-center gap-2">
+                        <i data-lucide="clock" class="w-4 h-4 text-warning"></i>
+                        <span class="mono text-sm font-bold tracking-tight text-warning" id="countdown">3d 14h 22m 04s</span>
+                    </div>
+                    <div class="bg-amber-500/10 border border-amber-500/30 text-amber-500 px-3 py-1.5 rounded-full text-caption font-bold flex items-center gap-2">
+                        <i data-lucide="trophy" class="w-4 h-4"></i>
+                        PRIZE: EXCLUSIVE GEAR BUNDLE
+                    </div>
+                </div>
+            </div>
+            <button class="p-3 crystal-card hover:bg-white/10 transition-colors">
+                <i data-lucide="share-2" class="w-6 h-6"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto grid grid-cols-1 gap-8">
+        
+        <!-- User Progress Card -->
+        <section class="crystal-card kinetic-shimmer p-8 border-l-4 border-l-blue-500 shadow-2xl">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+                <div class="flex-1 w-full">
+                    <p class="text-caption text-blue-400 font-bold uppercase tracking-widest mb-2">Your Performance</p>
+                    <div class="flex items-end gap-4 mb-6">
+                        <div class="text-5xl font-bold tracking-tighter mono">#12</div>
+                        <div class="text-neutral-500 mb-1 font-medium">of 145 participants</div>
+                    </div>
+                    
+                    <div class="space-y-3 mb-6">
+                        <div class="flex justify-between text-sm mono">
+                            <span class="text-neutral-400">Total Volume</span>
+                            <span class="font-bold">8,450 kg <span class="text-neutral-500">/ 12,000 kg</span></span>
+                        </div>
+                        <div class="h-3 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                            <div class="progress-bar-fill h-full bg-gradient-to-r from-blue-600 to-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)]" style="width: 70%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 text-accent bg-accent/10 px-4 py-3 rounded-xl inline-flex w-full md:w-auto">
+                        <i data-lucide="trending-up" class="w-4 h-4"></i>
+                        <span class="text-sm font-semibold tracking-tight">+250kg to overtake #11 (David K.)</span>
+                    </div>
+                </div>
+
+                <div class="flex flex-col items-center justify-center p-6 bg-white/5 rounded-2xl border border-white/10 w-full md:w-48">
+                    <span class="text-caption text-neutral-400 mb-1">Current Points</span>
+                    <span class="text-3xl font-bold mono">845</span>
+                    <div class="mt-4 pt-4 border-t border-white/10 w-full text-center">
+                        <span class="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">Percentile</span>
+                        <p class="text-xl font-bold text-accent">TOP 8%</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Rules Accordion -->
+        <section class="crystal-card" id="rulesAccordion">
+            <button onclick="toggleAccordion()" class="w-full p-6 flex justify-between items-center hover:bg-white/5 transition-colors">
+                <div class="flex items-center gap-3">
+                    <i data-lucide="scroll-text" class="w-6 h-6 text-neutral-400"></i>
+                    <h3 class="text-h2">Challenge Rules & Info</h3>
+                </div>
+                <i data-lucide="chevron-down" class="w-5 h-5 text-neutral-500 transition-transform"></i>
+            </button>
+            <div class="accordion-content px-6 pb-6 text-neutral-300">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
+                    <div>
+                        <h4 class="font-bold text-white mb-3">How to earn points</h4>
+                        <ul class="space-y-3 text-sm">
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-accent mt-0.5 shrink-0"></i>
+                                Log any Squat variation (Back, Front, Goblet).
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-accent mt-0.5 shrink-0"></i>
+                                1kg lifted = 0.1 Points.
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-accent mt-0.5 shrink-0"></i>
+                                Bonus: 50 pts for every workout over 3,000kg.
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-white mb-3">Verification</h4>
+                        <p class="text-sm leading-relaxed mb-4">
+                            All PRs logged during the challenge require video verification. Your coach must approve each session before it reflects on the leaderboard.
+                        </p>
+                        <div class="text-xs text-neutral-500 italic">
+                            Ends Dec 31st, 2023 at 23:59 GMT.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Leaderboard -->
+        <section>
+            <h3 class="text-h2 mb-8 flex items-center gap-3">
+                <i data-lucide="layout-list" class="w-6 h-6 text-blue-500"></i>
+                Leaderboard
+            </h3>
+
+            <!-- Podium SVG Visualization -->
+            <div class="flex items-end justify-center gap-2 md:gap-4 mb-12 h-64 px-4">
+                <!-- 2nd Place -->
+                <div class="flex flex-col items-center flex-1 max-w-[120px]">
+                    <div class="w-12 h-12 md:w-16 md:h-16 rounded-full border-2 border-white/20 mb-3 overflow-hidden crystal-card">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="Sarah" class="w-full h-full object-cover">
+                    </div>
+                    <div class="podium-gradient-2 w-full h-24 rounded-t-xl flex flex-col items-center justify-center shadow-lg">
+                        <span class="text-2xl font-bold">2</span>
+                        <span class="text-[10px] font-bold uppercase opacity-80">9.8k kg</span>
+                    </div>
+                    <span class="text-xs font-semibold mt-2 truncate w-full text-center">Sarah M.</span>
+                </div>
+                <!-- 1st Place -->
+                <div class="flex flex-col items-center flex-1 max-w-[140px]">
+                    <div class="relative">
+                        <div class="w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-amber-500/50 mb-3 overflow-hidden crystal-card">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" alt="Marcus" class="w-full h-full object-cover">
+                        </div>
+                        <i data-lucide="crown" class="w-8 h-8 text-amber-500 absolute -top-6 left-1/2 -translate-x-1/2 fill-current"></i>
+                    </div>
+                    <div class="podium-gradient-1 w-full h-40 rounded-t-xl flex flex-col items-center justify-center shadow-2xl">
+                        <span class="text-3xl font-black">1</span>
+                        <span class="text-xs font-bold uppercase opacity-90">11.4k kg</span>
+                    </div>
+                    <span class="text-sm font-bold mt-2 truncate w-full text-center">Marcus J.</span>
+                </div>
+                <!-- 3rd Place -->
+                <div class="flex flex-col items-center flex-1 max-w-[120px]">
+                    <div class="w-12 h-12 md:w-16 md:h-16 rounded-full border-2 border-white/20 mb-3 overflow-hidden crystal-card">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Liam" alt="Liam" class="w-full h-full object-cover">
+                    </div>
+                    <div class="podium-gradient-3 w-full h-16 rounded-t-xl flex flex-col items-center justify-center shadow-lg">
+                        <span class="text-xl font-bold">3</span>
+                        <span class="text-[10px] font-bold uppercase opacity-80">9.1k kg</span>
+                    </div>
+                    <span class="text-xs font-semibold mt-2 truncate w-full text-center">Liam W.</span>
+                </div>
+            </div>
+
+            <!-- Leaderboard Table -->
+            <div class="crystal-card overflow-hidden">
+                <div class="grid grid-cols-[60px_1fr_100px] gap-4 p-4 border-b border-white/5 text-[10px] uppercase tracking-widest font-bold text-neutral-500">
+                    <div class="text-center">Rank</div>
+                    <div>Athlete</div>
+                    <div class="text-right">Volume</div>
+                </div>
+                
+                <div class="max-h-[500px] overflow-y-auto">
+                    <!-- High density list -->
+                    <div class="grid grid-cols-[60px_1fr_100px] gap-4 p-4 items-center border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <div class="text-center mono font-bold text-neutral-400">4</div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-neutral-800"></div>
+                            <span class="font-medium text-sm">Elena Rodriguez</span>
+                        </div>
+                        <div class="text-right mono font-bold text-sm">8,920<span class="text-[10px] opacity-50 ml-1">kg</span></div>
+                    </div>
+                    <div class="grid grid-cols-[60px_1fr_100px] gap-4 p-4 items-center border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <div class="text-center mono font-bold text-neutral-400">5</div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-neutral-800"></div>
+                            <span class="font-medium text-sm">Tom Harrison</span>
+                        </div>
+                        <div class="text-right mono font-bold text-sm">8,850<span class="text-[10px] opacity-50 ml-1">kg</span></div>
+                    </div>
+                    
+                    <!-- CURRENT USER ROW -->
+                    <div class="grid grid-cols-[60px_1fr_100px] gap-4 p-4 items-center rank-highlight relative kinetic-shimmer">
+                        <div class="text-center mono font-bold text-blue-400">12</div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-500 border border-white/20 overflow-hidden">
+                                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt="Me" class="w-full h-full object-cover">
+                            </div>
+                            <span class="font-bold text-sm">Alex Thompson (You)</span>
+                        </div>
+                        <div class="text-right mono font-bold text-sm text-blue-400">8,450<span class="text-[10px] opacity-50 ml-1">kg</span></div>
+                    </div>
+
+                    <!-- Continued... -->
+                    <div class="grid grid-cols-[60px_1fr_100px] gap-4 p-4 items-center border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <div class="text-center mono font-bold text-neutral-400">13</div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-neutral-800"></div>
+                            <span class="font-medium text-sm">Jessica V.</span>
+                        </div>
+                        <div class="text-right mono font-bold text-sm">8,210<span class="text-[10px] opacity-50 ml-1">kg</span></div>
+                    </div>
+                </div>
+                
+                <button class="w-full p-4 text-center text-sm font-bold text-neutral-500 hover:text-white transition-colors border-t border-white/5">
+                    View full leaderboard (145 athletes)
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Sticky Call to Action -->
+    <div class="btn-action-sticky max-w-4xl mx-auto">
+        <button class="btn-primary w-full rounded-2xl flex items-center justify-center gap-3 text-lg font-bold">
+            <i data-lucide="dumbbell" class="w-6 h-6"></i>
+            Log Squat Workout
+        </button>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Accordion Toggle
+        function toggleAccordion() {
+            const acc = document.getElementById('rulesAccordion');
+            acc.classList.toggle('accordion-active');
+        }
+
+        // Mock Countdown Timer
+        function updateCountdown() {
+            const display = document.getElementById('countdown');
+            // Simplified logic for demo
+            let now = new Date().getTime();
+            let target = now + (3 * 24 * 60 * 60 * 1000) + (14 * 60 * 60 * 1000); // 3d 14h from now
+            
+            setInterval(() => {
+                let current = new Date().getTime();
+                let diff = target - current;
+                
+                let d = Math.floor(diff / (1000 * 60 * 60 * 24));
+                let h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                let m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                let s = Math.floor((diff % (1000 * 60)) / 1000);
+                
+                display.innerText = `${d}d ${h}h ${m}m ${s}s`;
+            }, 1000);
+        }
+
+        // Entry Animations
+        document.addEventListener('DOMContentLoaded', () => {
+            updateCountdown();
+            
+            const cards = document.querySelectorAll('.crystal-card, section h3, .podium-gradient-1, .podium-gradient-2, .podium-gradient-3');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+
+        // Haptic Feedback Simulation
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(15);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

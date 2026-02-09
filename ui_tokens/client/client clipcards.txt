@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clipcards | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Obsidian Refraction Card */
+        .clipcard {
+            background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            overflow: hidden;
+        }
+
+        .clipcard:hover {
+            transform: translateY(-8px) scale(1.01);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .clipcard::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(125deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%);
+            background-size: 200% 200%;
+            transition: background-position 0.8s ease;
+            pointer-events: none;
+        }
+
+        .clipcard:hover::after {
+            background-position: 100% 100%;
+        }
+
+        /* Status Glows */
+        .status-active { color: var(--accent); background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); }
+        .status-low { color: #F59E0B; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); }
+        .status-used { color: var(--primary); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); }
+
+        .progress-bar-bg { background: rgba(255, 255, 255, 0.05); border-radius: 99px; height: 8px; width: 100%; }
+        .progress-bar-fill { height: 100%; border-radius: 99px; transition: width 1.5s cubic-bezier(0.65, 0, 0.35, 1); }
+
+        /* Filter Pills */
+        .filter-pill {
+            padding: 8px 20px;
+            border-radius: 99px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: 1px solid var(--glass-border);
+            background: var(--glass);
+            white-space: nowrap;
+        }
+
+        .filter-pill.active {
+            background: #FFFFFF;
+            color: #000000;
+            border-color: #FFFFFF;
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        @keyframes reveal {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .reveal { animation: reveal 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body class="p-6 md:p-12 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header & Summary Stats -->
+    <header class="max-w-7xl mx-auto mb-12 reveal">
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+            <div>
+                <nav class="flex items-center gap-2 text-sm text-neutral-500 mb-4">
+                    <span>Account</span>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    <span class="text-white">Clipcards</span>
+                </nav>
+                <h1 class="text-4xl md:text-5xl font-bold tracking-tight mb-2">Session Packages</h1>
+                <p class="text-neutral-400 text-lg">Manage and track your prepaid training credits.</p>
+            </div>
+            
+            <div class="flex gap-4">
+                <div class="clipcard p-5 flex items-center gap-4 min-w-[180px]">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                        <i data-lucide="layers" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-widest text-neutral-500 mono font-bold">Total Available</div>
+                        <div class="text-2xl font-bold mono tracking-tighter">24</div>
+                    </div>
+                </div>
+                <div class="clipcard p-5 flex items-center gap-4 min-w-[180px]">
+                    <div class="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent">
+                        <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-widest text-neutral-500 mono font-bold">Active Plans</div>
+                        <div class="text-2xl font-bold mono tracking-tighter">03</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Controls Area -->
+    <div class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6 reveal" style="animation-delay: 0.1s;">
+        <div class="flex items-center gap-3 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+            <button class="filter-pill active">All Packages</button>
+            <button class="filter-pill">Active</button>
+            <button class="filter-pill">Low Sessions</button>
+            <button class="filter-pill">Used Up</button>
+            <button class="filter-pill">Expired</button>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <span class="text-sm text-neutral-500 hidden md:block">Sort by:</span>
+            <button class="btn-secondary px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium">
+                Expiry Date
+                <i data-lucide="arrow-down-narrow-wide" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Clipcards Grid -->
+    <main class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        
+        <!-- Card 1: Active & Healthy -->
+        <article class="clipcard p-8 flex flex-col h-full reveal" style="animation-delay: 0.2s;">
+            <div class="flex justify-between items-start mb-10">
+                <div>
+                    <span class="status-active px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase mb-3 inline-block">Active</span>
+                    <h3 class="text-2xl font-bold leading-tight">Elite Performance<br>Personal Training</h3>
+                </div>
+                <div class="p-3 bg-white/5 rounded-2xl">
+                    <i data-lucide="dumbbell" class="text-neutral-400"></i>
+                </div>
+            </div>
+
+            <div class="flex items-baseline gap-2 mb-2">
+                <span class="text-6xl font-bold mono tracking-tighter">12</span>
+                <span class="text-neutral-500 text-lg mono">/ 20</span>
+            </div>
+            <p class="text-neutral-400 text-sm mb-8">Sessions remaining in this cycle</p>
+
+            <div class="mt-auto space-y-6">
+                <div>
+                    <div class="flex justify-between text-xs mb-2">
+                        <span class="text-neutral-500 font-medium">USAGE PROGRESS</span>
+                        <span class="text-white font-bold">60%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill bg-blue-500" style="width: 60%"></div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-6 border-t border-white/5">
+                    <div class="flex items-center gap-2 text-neutral-400">
+                        <i data-lucide="calendar" class="w-4 h-4"></i>
+                        <span class="text-xs">Valid until May 24, 2025</span>
+                    </div>
+                    <button class="text-white hover:text-blue-400 transition-colors">
+                        <i data-lucide="more-horizontal" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </article>
+
+        <!-- Card 2: Low Sessions Warning -->
+        <article class="clipcard p-8 flex flex-col h-full reveal" style="animation-delay: 0.3s;">
+            <div class="flex justify-between items-start mb-10">
+                <div>
+                    <span class="status-low px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase mb-3 inline-block">Low Balance</span>
+                    <h3 class="text-2xl font-bold leading-tight">Post-Injury Rehab<br>Specialist Bundle</h3>
+                </div>
+                <div class="p-3 bg-white/5 rounded-2xl">
+                    <i data-lucide="activity" class="text-neutral-400"></i>
+                </div>
+            </div>
+
+            <div class="flex items-baseline gap-2 mb-2">
+                <span class="text-6xl font-bold mono tracking-tighter text-amber-400">02</span>
+                <span class="text-neutral-500 text-lg mono">/ 10</span>
+            </div>
+            <p class="text-neutral-400 text-sm mb-8">Schedule your next renewal soon</p>
+
+            <div class="mt-auto space-y-6">
+                <div>
+                    <div class="flex justify-between text-xs mb-2">
+                        <span class="text-neutral-500 font-medium">USAGE PROGRESS</span>
+                        <span class="text-white font-bold">80%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill bg-amber-500" style="width: 80%"></div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-6 border-t border-white/5">
+                    <div class="flex items-center gap-2 text-neutral-400">
+                        <i data-lucide="calendar" class="w-4 h-4"></i>
+                        <span class="text-xs">Valid until Mar 12, 2025</span>
+                    </div>
+                    <button class="bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[10px] font-bold py-1 px-3 rounded-lg transition-colors tracking-wide uppercase">
+                        Renew
+                    </button>
+                </div>
+            </div>
+        </article>
+
+        <!-- Card 3: Used Up -->
+        <article class="clipcard p-8 flex flex-col h-full opacity-60 grayscale-[0.5] reveal" style="animation-delay: 0.4s;">
+            <div class="flex justify-between items-start mb-10">
+                <div>
+                    <span class="status-used px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase mb-3 inline-block">Used Up</span>
+                    <h3 class="text-2xl font-bold leading-tight">Kickoff Jumpstart<br>Package</h3>
+                </div>
+                <div class="p-3 bg-white/5 rounded-2xl">
+                    <i data-lucide="zap" class="text-neutral-400"></i>
+                </div>
+            </div>
+
+            <div class="flex items-baseline gap-2 mb-2">
+                <span class="text-6xl font-bold mono tracking-tighter">00</span>
+                <span class="text-neutral-500 text-lg mono">/ 05</span>
+            </div>
+            <p class="text-neutral-400 text-sm mb-8">Completed on Jan 02, 2025</p>
+
+            <div class="mt-auto space-y-6">
+                <div>
+                    <div class="flex justify-between text-xs mb-2">
+                        <span class="text-neutral-500 font-medium">USAGE PROGRESS</span>
+                        <span class="text-white font-bold">100%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill bg-primary" style="width: 100%"></div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-6 border-t border-white/5">
+                    <div class="flex items-center gap-2 text-neutral-400">
+                        <i data-lucide="history" class="w-4 h-4"></i>
+                        <span class="text-xs">Archived</span>
+                    </div>
+                    <button class="text-neutral-500 hover:text-white transition-colors">
+                        <i data-lucide="external-link" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </article>
+    </main>
+
+    <!-- Contextual Actions Bar (Floating Mobile Friendly) -->
+    <div class="fixed bottom-8 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-lg z-50">
+        <div class="clipcard p-4 flex items-center justify-between shadow-2xl bg-black/80">
+            <div class="flex items-center gap-3 pl-2">
+                <div class="w-2 h-2 rounded-full bg-accent animate-pulse"></div>
+                <span class="text-sm font-medium">Need more sessions?</span>
+            </div>
+            <button class="bg-primary hover:bg-red-600 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 active:scale-95 shadow-lg shadow-red-500/20">
+                <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+                Purchase New Pack
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Staggered reveal animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.reveal');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.animationDelay = `${index * 0.1}s`;
+            });
+        });
+
+        // Toggle Filter Pills
+        const pills = document.querySelectorAll('.filter-pill');
+        pills.forEach(pill => {
+            pill.addEventListener('click', () => {
+                pills.forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+            });
+        });
+
+        // Haptic feedback simulation on primary button
+        const buyBtn = document.querySelector('.bg-primary');
+        buyBtn.addEventListener('click', () => {
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(15);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -52,15 +52,19 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.635 0.177 258.32); /* #3B82F6 Action Blue */
+  --primary: oklch(0.635 0.177 258.32);
+  /* #3B82F6 Action Blue */
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.925 0.025 258.32); /* slate-200 equivalent */
+  --secondary: oklch(0.925 0.025 258.32);
+  /* slate-200 equivalent */
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.776 0.177 70.08); /* #F59E0B Celebration Gold */
+  --accent: oklch(0.776 0.177 70.08);
+  /* #F59E0B Celebration Gold */
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.628 0.224 25.331); /* #EF4444 */
+  --destructive: oklch(0.628 0.224 25.331);
+  /* #EF4444 */
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -77,26 +81,36 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  
+
   /* Typography Scale System */
-  --font-hero: 3rem; /* 48px */
-  --font-hero-lg: 4rem; /* 64px */
-  --font-h1: 2rem; /* 32px */
-  --font-h2: 1.5rem; /* 24px */
-  --font-h3: 1.25rem; /* 20px */
-  --font-body: 1rem; /* 16px */
-  --font-body-lg: 1.0625rem; /* 17px */
-  --font-caption: 0.875rem; /* 14px */
-  --font-label: 0.8125rem; /* 13px */
-  --font-small: 0.75rem; /* 12px */
-  
+  --font-hero: 3rem;
+  /* 48px */
+  --font-hero-lg: 4rem;
+  /* 64px */
+  --font-h1: 2rem;
+  /* 32px */
+  --font-h2: 1.5rem;
+  /* 24px */
+  --font-h3: 1.25rem;
+  /* 20px */
+  --font-body: 1rem;
+  /* 16px */
+  --font-body-lg: 1.0625rem;
+  /* 17px */
+  --font-caption: 0.875rem;
+  /* 14px */
+  --font-label: 0.8125rem;
+  /* 13px */
+  --font-small: 0.75rem;
+  /* 12px */
+
   /* Font weights */
   --font-weight-heavy: 800;
   --font-weight-bold: 700;
   --font-weight-semibold: 600;
   --font-weight-medium: 500;
   --font-weight-regular: 400;
-  
+
   /* Font stacks */
   --font-number: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
@@ -109,15 +123,18 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.635 0.177 258.32); /* #3B82F6 Action Blue */
+  --primary: oklch(0.635 0.177 258.32);
+  /* #3B82F6 Action Blue */
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.776 0.177 70.08); /* #F59E0B Celebration Gold */
+  --accent: oklch(0.776 0.177 70.08);
+  /* #F59E0B Celebration Gold */
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.628 0.224 25.331); /* #EF4444 */
+  --destructive: oklch(0.628 0.224 25.331);
+  /* #EF4444 */
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -136,13 +153,13 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* Bottom nav: always viewport-fixed, no override (device/browser agnostic) */
+/* Bottom nav: floating pill style, viewport-fixed */
 [data-fc-bottom-nav] {
   position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  width: 100% !important;
+  bottom: 12px !important;
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
   z-index: 10000 !important;
   transform: none !important;
 }
@@ -151,129 +168,144 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
-  
+
   /* Enhanced shadows for modern design */
   .shadow-xs {
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   }
-  
+
   .shadow-sm {
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   }
-  
+
   .shadow-md {
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   }
-  
+
   .shadow-lg {
     box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
-  
+
   .shadow-xl {
     box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   }
-  
+
   .shadow-2xl {
     box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
   }
-  
+
   /* Dark mode shadows */
   .dark .shadow-xs {
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3);
   }
-  
+
   .dark .shadow-sm {
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
   }
-  
+
   .dark .shadow-md {
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
   }
-  
+
   .dark .shadow-lg {
     box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
   }
-  
+
   .dark .shadow-xl {
     box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.4);
   }
-  
+
   .dark .shadow-2xl {
     box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5);
   }
-  
+
   /* Card component soft shadows - remove borders, add modern shadows */
-  .card, [data-card], .bg-card {
+  .card,
+  [data-card],
+  .bg-card {
     @apply shadow-md;
     border: none !important;
   }
 
-  /* Programs & Workouts page tabs active state */
+  /* Programs & Workouts page tabs active state (Design System v2 tokens) */
   button[data-state="active"][role="tab"] {
-    background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%) !important;
+    background: linear-gradient(135deg, var(--fc-accent-indigo) 0%, var(--fc-accent-violet) 100%) !important;
     color: #FFFFFF !important;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
   }
-  
+
   /* Animation Keyframes */
   @keyframes shimmer {
     0% {
       background-position: -200% 0;
     }
+
     100% {
       background-position: 200% 0;
     }
   }
-  
+
   @keyframes float {
     0% {
       transform: translateY(100vh) translateX(0);
       opacity: 0;
     }
+
     10% {
       opacity: 0.3;
     }
+
     90% {
       opacity: 0.3;
     }
+
     100% {
       transform: translateY(-10vh) translateX(10vw);
       opacity: 0;
     }
   }
-  
+
   @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
       opacity: 0.3;
       transform: scale(1);
     }
+
     50% {
       opacity: 0.6;
       transform: scale(1.02);
     }
   }
-  
+
   @keyframes gradientShift {
-    0%, 100% {
+
+    0%,
+    100% {
       background-position: 0% 50%;
     }
+
     50% {
       background-position: 0% 100%;
     }
   }
-  
+
   @keyframes celebrate {
     0% {
       transform: translateY(0) scale(0);
       opacity: 0;
     }
+
     50% {
       transform: translateY(-50px) scale(1.2);
       opacity: 1;
     }
+
     100% {
       transform: translateY(-100px) scale(1);
       opacity: 0;
@@ -284,16 +316,20 @@
     0% {
       transform: translate(-30%, -30%);
     }
+
     100% {
       transform: translate(30%, 30%);
     }
   }
 
   @keyframes pulse-fire {
-    0%, 100% {
+
+    0%,
+    100% {
       transform: scale(1);
       filter: brightness(1);
     }
+
     50% {
       transform: scale(1.05);
       filter: brightness(1.2);
@@ -301,18 +337,32 @@
   }
 
   @keyframes rotate-shimmer {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+      transform: rotate(0deg);
+    }
+
+    100% {
+      transform: rotate(360deg);
+    }
   }
 
   @keyframes pulse-red {
-    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-    70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    0% {
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+
+    70% {
+      box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    }
+
+    100% {
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
   }
-  
+
   /* Reduced motion support */
   @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {
@@ -320,6 +370,22 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+/* Page transition: subtle fade-in on content changes */
+.fc-page-transition {
+  animation: fc-page-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fc-page-enter {
+  from {
+    opacity: 0.85;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

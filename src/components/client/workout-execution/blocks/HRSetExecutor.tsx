@@ -11,7 +11,6 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 
 export function HRSetExecutor({
@@ -369,7 +368,8 @@ export function HRSetExecutor({
     <Button
       onClick={handleLogSet}
       disabled={isLoggingSet || (!currentHRZone && !currentHRPercentage)}
-      className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white py-6 text-lg font-semibold"
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {isLoggingSet ? (
         "Logging..."

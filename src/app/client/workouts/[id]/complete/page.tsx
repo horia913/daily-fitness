@@ -5,24 +5,20 @@ import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
-import { GlassCard } from "@/components/ui/GlassCard";
 import {
   ArrowLeft,
   CheckCircle,
   Clock,
   ChevronDown,
-  ChevronUp,
-  BarChart3,
-  Calendar as CalendarIcon,
-  TrendingUp,
   Star,
-  Home,
-  Share2,
+  Trophy,
+  LayoutDashboard,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationTriggers from "@/lib/notificationTriggers";
 import { PersonalRecordsService } from "@/lib/progressTrackingService";
 import { fetchApi } from "@/lib/apiClient";
+import { withTimeout } from "@/lib/withTimeout";
 
 interface WorkoutAssignment {
   id: string;
@@ -144,6 +140,7 @@ export default function WorkoutComplete() {
   >(null);
   const [personalRecords, setPersonalRecords] = useState<any[]>([]);
   const [nextWorkout, setNextWorkout] = useState<any | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (assignmentId) {
@@ -675,36 +672,48 @@ export default function WorkoutComplete() {
 
   const loadAssignment = async (): Promise<WorkoutAssignment | null> => {
     try {
+      setLoadError(null);
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const actualAssignmentId = await resolveWorkoutAssignmentId(
-        assignmentId,
-        user.id
-      );
-
-      if (!actualAssignmentId) {
-        throw new Error("Workout assignment not found");
+      if (!user) {
+        setLoading(false);
+        return null;
       }
 
-      setResolvedAssignmentId(actualAssignmentId);
+      const result = await withTimeout(
+        (async (): Promise<WorkoutAssignment> => {
+          const actualAssignmentId = await resolveWorkoutAssignmentId(
+            assignmentId,
+            user.id
+          );
 
-      const { data: assignmentData, error: assignmentError } = await supabase
-        .from("workout_assignments")
-        .select("*")
-        .eq("id", actualAssignmentId)
-        .eq("client_id", user.id)
-        .maybeSingle();
+          if (!actualAssignmentId) {
+            throw new Error("Workout assignment not found");
+          }
 
-      if (assignmentError) throw assignmentError;
-      if (!assignmentData) throw new Error("Workout assignment not found");
+          setResolvedAssignmentId(actualAssignmentId);
 
-      setAssignment(assignmentData as WorkoutAssignment);
-      return assignmentData as WorkoutAssignment;
-    } catch (error) {
+          const { data: assignmentData, error: assignmentError } = await supabase
+            .from("workout_assignments")
+            .select("*")
+            .eq("id", actualAssignmentId)
+            .eq("client_id", user.id)
+            .maybeSingle();
+
+          if (assignmentError) throw assignmentError;
+          if (!assignmentData) throw new Error("Workout assignment not found");
+
+          setAssignment(assignmentData as WorkoutAssignment);
+          return assignmentData as WorkoutAssignment;
+        })(),
+        30000,
+        "timeout"
+      );
+      return result;
+    } catch (error: any) {
       console.error("Error loading assignment:", error);
+      setLoadError(error?.message === "timeout" ? "Loading took too long. Please try again." : (error?.message || "Failed to load workout"));
       return null;
     } finally {
       setLoading(false);
@@ -739,46 +748,9 @@ export default function WorkoutComplete() {
         throw assignmentUpdateError;
       }
 
-      // TASK C: If workout came from program_day_assignments, update it
-      // Find program_day_assignments that references this workout_assignment_id
-      const { data: programDayAssignment, error: programDayError } = await supabase
-        .from("program_day_assignments")
-        .select("id, program_assignment_id")
-        .eq("workout_assignment_id", targetAssignmentId)
-        .maybeSingle();
-
-      if (programDayError) {
-        console.warn("Error checking program_day_assignments:", programDayError);
-      } else if (programDayAssignment) {
-        // Verify this program_assignment belongs to the current user
-        const { data: programAssignment, error: programAssignmentError } = await supabase
-          .from("program_assignments")
-          .select("id, client_id")
-          .eq("id", programDayAssignment.program_assignment_id)
-          .eq("client_id", user.id)
-          .maybeSingle();
-
-        if (programAssignmentError) {
-          console.warn("Error verifying program_assignment ownership:", programAssignmentError);
-        } else if (programAssignment) {
-          // Update program_day_assignments.is_completed and completed_date
-          const today = new Date().toISOString().split("T")[0]; // Date only, not timestamp
-          const { error: programDayUpdateError } = await supabase
-            .from("program_day_assignments")
-            .update({
-              is_completed: true,
-              completed_date: today,
-            })
-            .eq("id", programDayAssignment.id);
-
-          if (programDayUpdateError) {
-            console.error("❌ Error updating program_day_assignments:", programDayUpdateError);
-            // Don't throw - workout_assignments is already updated, this is secondary
-          } else {
-            console.log("✅ Updated program_day_assignments completion:", programDayAssignment.id);
-          }
-        }
-      }
+      // REMOVED: Legacy program_day_assignments.is_completed update.
+      // Program completion is now handled entirely by the /api/complete-workout
+      // unified pipeline which writes to the canonical program_day_completions ledger.
 
       if (assignment.name) {
         await NotificationTriggers.triggerWorkoutCompleted(
@@ -1311,15 +1283,68 @@ export default function WorkoutComplete() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-4xl">
-              <GlassCard elevation={1} className="fc-glass fc-card p-6 sm:p-10">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-10 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
-                  <div className="h-4 w-3/4 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+          <div className="relative z-10 min-h-screen fc-page" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
+            <div className="mx-auto w-full max-w-2xl pt-12 space-y-6">
+              <div className="text-center space-y-4">
+                <div className="fc-skeleton w-20 h-20 rounded-full mx-auto" />
+                <div className="fc-skeleton h-8 w-64 rounded mx-auto" />
+                <div className="fc-skeleton h-4 w-40 rounded mx-auto" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map(i => <div key={i} className="fc-skeleton h-28 rounded-2xl" />)}
+              </div>
+              <div className="fc-skeleton h-24 rounded-2xl" />
+            </div>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <AnimatedBackground>
+          <div className="relative z-10 min-h-screen fc-page" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
+            <div className="mx-auto w-full max-w-2xl flex items-center justify-center min-h-[60vh]">
+              <div className="fc-surface rounded-2xl p-8 text-center border border-[color:var(--fc-surface-card-border)]">
+                <p className="fc-text-dim mb-4">{loadError}</p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setLoadError(null);
+                      setLoading(true);
+                      loadAssignment()
+                        .then(async (assignmentData: WorkoutAssignment | null) => {
+                          if (assignmentData) {
+                            await updateWorkoutTotals(
+                              assignmentData.workout_template_id,
+                              assignmentData.id
+                            );
+                          }
+                        })
+                        .catch((err) => {
+                          console.error("Error loading assignment:", err);
+                          setLoadError(err?.message === "timeout" ? "Loading took too long. Please try again." : (err?.message || "Failed to load workout"));
+                        });
+                    }}
+                    variant="fc-primary"
+                    className="fc-btn"
+                  >
+                    Retry
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => router.push("/client/workouts")}
+                    variant="fc-secondary"
+                    className="fc-btn"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to Workouts
+                  </Button>
                 </div>
-              </GlassCard>
+              </div>
             </div>
           </div>
         </AnimatedBackground>
@@ -1331,29 +1356,26 @@ export default function WorkoutComplete() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
-            <div className="mx-auto w-full max-w-4xl">
-              <GlassCard
-                elevation={1}
-                className="fc-glass fc-card p-10 text-center"
-              >
-                <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
+          <div className="relative z-10 min-h-screen fc-page" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
+            <div className="mx-auto w-full max-w-2xl flex items-center justify-center min-h-[60vh]">
+              <div className="fc-surface rounded-2xl p-8 text-center border border-[color:var(--fc-surface-card-border)]">
+                <h3 className="text-xl font-semibold fc-text-primary">
                   Workout not found
                 </h3>
-                <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
+                <p className="mt-2 text-sm fc-text-dim">
                   This workout does not exist or you do not have access to it.
                 </p>
                 <div className="mt-6 flex justify-center">
                   <Button
                     onClick={() => router.push("/client/workouts")}
-                    variant="outline"
-                    className="fc-btn fc-btn-secondary"
+                    variant="fc-secondary"
+                    className="fc-btn"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back to Workouts
                   </Button>
                 </div>
-              </GlassCard>
+              </div>
             </div>
           </div>
         </AnimatedBackground>
@@ -1385,178 +1407,141 @@ export default function WorkoutComplete() {
     });
   };
 
+  const totalExercises = blockGroups.reduce((s, g) => s + g.exerciseNames.size, 0);
+
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
-        <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
-            <GlassCard elevation={2} className="fc-glass fc-card fc-card-hero p-6 sm:p-10">
-              <div className="flex flex-col items-center text-center gap-4">
-                <span className="fc-badge fc-glass-soft px-3 py-1 text-[color:var(--fc-text-primary)]">
-                  Session verified
-                </span>
-                <h1 className="text-4xl sm:text-6xl font-black tracking-tight bg-[linear-gradient(180deg,var(--fc-text-primary),var(--fc-text-subtle))] text-transparent bg-clip-text">
-                  {assignment.name || "Workout"}
-                  <br />
-                  Complete
-                </h1>
-                <div className="flex flex-wrap items-center justify-center gap-4 text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                  <span className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-[color:var(--fc-status-success)]" />
-                    Session complete
-                  </span>
-                  {completedDate && (
-                    <span className="flex items-center gap-2">
-                      <CalendarIcon className="h-4 w-4 text-[color:var(--fc-text-dim)]" />
-                      {formatDate(completedDate)}
-                    </span>
-                  )}
-                  <span className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
-                    {workoutStats.totalReps} reps
-                  </span>
+        <div className="relative z-10 min-h-screen pb-40 fc-page">
+          <div className="mx-auto w-full max-w-2xl flex flex-col gap-6" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
+            {/* Celebration Hero */}
+            <header className="text-center pt-10 pb-6">
+              <div className="mb-5 relative inline-block">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto" style={{ background: "color-mix(in srgb, var(--fc-status-success) 15%, transparent)" }}>
+                  <Trophy className="w-10 h-10" style={{ color: "var(--fc-status-success)" }} />
+                </div>
+                <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "var(--fc-status-success)" }}>
+                  <CheckCircle className="w-3.5 h-3.5 text-black" />
                 </div>
               </div>
-
-              <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
-                <GlassCard elevation={1} className="fc-glass fc-card p-4 sm:p-6">
-                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                    <span>Duration</span>
-                    <Clock className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
-                  </div>
-                  <div className="mt-3 text-3xl font-semibold text-[color:var(--fc-accent-cyan)] font-mono">
-                    {formatDuration(workoutStats.duration)}
-                  </div>
-                </GlassCard>
-                <GlassCard elevation={1} className="fc-glass fc-card p-4 sm:p-6">
-                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                    <span>Sets crushed</span>
-                    <CheckCircle className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
-                  </div>
-                  <div className="mt-3 text-3xl font-semibold text-[color:var(--fc-accent-cyan)] font-mono">
-                    {workoutStats.totalSets}
-                  </div>
-                </GlassCard>
-                <GlassCard elevation={1} className="fc-glass fc-card p-4 sm:p-6">
-                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[color:var(--fc-text-subtle)]">
-                    <span>Volume lifted</span>
-                    <BarChart3 className="h-4 w-4 text-[color:var(--fc-domain-workouts)]" />
-                  </div>
-                  <div className="mt-3 text-3xl font-semibold text-[color:var(--fc-accent-cyan)] font-mono">
-                    {formatVolume(workoutStats.totalWeight)}
-                    <span className="ml-2 text-sm text-[color:var(--fc-text-dim)]">KG</span>
-                  </div>
-                </GlassCard>
+              <h1 className="text-2xl font-extrabold tracking-tight fc-text-primary mb-1">Workout Complete</h1>
+              <div className="flex items-center justify-center gap-2 fc-text-dim font-mono text-sm">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{Math.floor(workoutStats.duration || 0)}m {(Math.round(((workoutStats.duration || 0) % 1) * 60))}s</span>
               </div>
-            </GlassCard>
+            </header>
+
+            {/* Stats Strip */}
+            <section>
+              <div className="fc-stats-strip">
+                <div className="fc-stats-strip-item">
+                  <span className="fc-stats-strip-value" style={{ color: "var(--fc-status-error)" }}>{personalRecords.length}</span>
+                  <span className="fc-stats-strip-label">PRs</span>
+                </div>
+                <div className="fc-stats-strip-item">
+                  <span className="fc-stats-strip-value" style={{ color: "var(--fc-accent-cyan)" }}>{formatVolume(workoutStats.totalWeight)}</span>
+                  <span className="fc-stats-strip-label">kg lifted</span>
+                </div>
+                <div className="fc-stats-strip-item">
+                  <span className="fc-stats-strip-value" style={{ color: "var(--fc-status-success)" }}>{workoutStats.totalSets}</span>
+                  <span className="fc-stats-strip-label">Sets</span>
+                </div>
+                <div className="fc-stats-strip-item">
+                  <span className="fc-stats-strip-value" style={{ color: "var(--fc-status-warning)" }}>{workoutStats.totalReps}</span>
+                  <span className="fc-stats-strip-label">Reps</span>
+                </div>
+              </div>
+            </section>
 
             {personalRecords.length > 0 && (
-              <GlassCard
-                elevation={2}
-                className="fc-glass fc-card p-6 sm:p-8 relative overflow-hidden"
-              >
-                <div
-                  className="pointer-events-none absolute -top-10 right-0 h-40 w-40 rounded-full opacity-50 blur-3xl"
-                  style={{
-                    background:
-                      "radial-gradient(circle at top right, rgba(255, 61, 252, 0.25), transparent 65%)",
-                  }}
-                />
-                <div className="relative z-10">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-purple)] text-black shadow-[0_0_24px_rgba(124,58,237,0.45)]">
-                      <Star className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                        Personal records achieved
-                      </h2>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        You are stronger than you were {workoutStats.duration} minutes ago.
-                      </p>
-                    </div>
+              <section className="fc-surface rounded-2xl p-5 border border-[color:var(--fc-surface-card-border)]">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--fc-accent-purple) 20%, transparent)" }}>
+                    <Star className="h-4 w-4" style={{ color: "var(--fc-accent-purple)" }} />
                   </div>
-
-                  <div className="mt-6 space-y-3">
-                    {personalRecords.slice(0, 5).map((pr: any) => {
-                      const exerciseName =
-                        pr.exercise?.name || pr.exerciseName || "Exercise";
-                      const recordType =
-                        pr.record_type === "max_weight"
-                          ? "1RM Strength Bloom"
-                          : pr.record_type === "max_reps"
-                          ? "Peak Volume Capacity"
-                          : "Record";
-                      const deltaValue =
-                        pr.record_type === "max_weight"
-                          ? `+${pr.weight_kg || pr.value || 0} kg`
-                          : pr.record_type === "max_reps"
-                          ? `+${pr.reps || pr.value || 0} Reps`
-                          : `+${pr.value || 0}`;
-
-                      return (
-                        <div
-                          key={pr.id}
-                          className="fc-list-row flex items-center justify-between gap-4 px-4 py-3"
-                        >
-                          <div>
-                            <h4 className="text-base font-semibold text-[color:var(--fc-text-primary)]">
-                              {exerciseName}
-                            </h4>
-                            <p className="text-sm text-[color:var(--fc-text-dim)]">
-                              {recordType}
-                            </p>
-                          </div>
-                          <div className="font-mono text-sm font-semibold text-[color:var(--fc-accent-cyan)]">
-                            {deltaValue}
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div>
+                    <h2 className="text-base font-bold fc-text-primary">
+                      Personal Records
+                    </h2>
+                    <p className="text-xs fc-text-dim">
+                      {personalRecords.length} new {personalRecords.length === 1 ? "PR" : "PRs"} this session
+                    </p>
                   </div>
                 </div>
-              </GlassCard>
+
+                <div className="space-y-2">
+                  {personalRecords.slice(0, 5).map((pr: any) => {
+                    const exerciseName =
+                      pr.exercise?.name || pr.exerciseName || "Exercise";
+                    const recordType =
+                      pr.record_type === "max_weight"
+                        ? "Strength"
+                        : pr.record_type === "max_reps"
+                        ? "Volume"
+                        : "Record";
+                    const deltaValue =
+                      pr.record_type === "max_weight"
+                        ? `+${pr.weight_kg || pr.value || 0} kg`
+                        : pr.record_type === "max_reps"
+                        ? `+${pr.reps || pr.value || 0} reps`
+                        : `+${pr.value || 0}`;
+
+                    return (
+                      <div
+                        key={pr.id}
+                        className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl"
+                        style={{ background: "var(--fc-surface-sunken)" }}
+                      >
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-semibold fc-text-primary truncate">
+                            {exerciseName}
+                          </h4>
+                          <p className="text-xs fc-text-dim">
+                            {recordType}
+                          </p>
+                        </div>
+                        <div className="font-mono text-sm font-bold flex-shrink-0" style={{ color: "var(--fc-status-success)" }}>
+                          {deltaValue}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             )}
 
             {nextWorkout && (
-              <GlassCard elevation={2} className="fc-glass fc-card p-6">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Up next in schedule
+              <div className="fc-surface rounded-2xl p-4 border border-[color:var(--fc-surface-card-border)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold mb-1">
+                      Up Next
                     </p>
-                    <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
+                    <h3 className="text-sm font-semibold fc-text-primary truncate">
                       {nextWorkout.name ||
                         (nextWorkout.template as any)?.name ||
                         "Workout"}
                     </h3>
                   </div>
                   {nextWorkout.scheduled_date && (
-                    <div className="font-mono text-xs uppercase tracking-[0.2em] text-[color:var(--fc-accent-cyan)]">
-                      Scheduled for {formatScheduledDate(nextWorkout.scheduled_date)}
+                    <div className="font-mono text-xs flex-shrink-0" style={{ color: "var(--fc-accent-cyan)" }}>
+                      {formatScheduledDate(nextWorkout.scheduled_date)}
                     </div>
                   )}
                 </div>
-              </GlassCard>
+              </div>
             )}
 
             {blockGroups.length > 0 && (
-              <section className="space-y-4">
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                      Workout breakdown
-                    </h2>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Review every block and logged set from today.
-                    </p>
-                  </div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    {blockGroups.length} blocks
-                  </span>
+              <section className="space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] fc-text-dim">
+                    Workout Summary
+                  </h3>
+                  <span className="text-xs font-mono fc-text-dim">{totalExercises} exercises</span>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {blockGroups.map((block) => {
                     const isExpanded = expandedBlocks.has(block.block_id);
                     const setCount = block.sets.length;
@@ -1571,38 +1556,40 @@ export default function WorkoutComplete() {
                         : "Exercise";
 
                     return (
-                      <GlassCard
+                      <div
                         key={block.block_id}
-                        elevation={2}
-                        className="fc-glass fc-card overflow-hidden"
+                        className="fc-surface rounded-2xl overflow-hidden border border-[color:var(--fc-surface-card-border)]"
                       >
                         <button
                           type="button"
                           onClick={() => toggleBlock(block.block_id)}
-                          className="w-full p-5 text-left sm:p-6"
+                          className="w-full p-4 text-left"
                         >
-                          <div className="flex items-start gap-3">
-                            {isExpanded ? (
-                              <ChevronDown className="mt-1 h-5 w-5 text-[color:var(--fc-text-dim)]" />
-                            ) : (
-                              <ChevronUp className="mt-1 h-5 w-5 rotate-180 text-[color:var(--fc-text-dim)]" />
-                            )}
-                            <div className="flex-1">
-                              <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                                Block {block.block_order} •{" "}
-                                {formatBlockType(block.block_type).toUpperCase()}
-                                {setCount > 0 &&
-                                  ` (${setCount} ${setCount === 1 ? "set" : "sets"})`}
-                              </h3>
-                              <p className="text-sm text-[color:var(--fc-text-dim)]">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-xs font-bold fc-text-dim" style={{ background: "var(--fc-surface-sunken)" }}>
+                              {String(block.block_order).padStart(2, "0")}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-semibold fc-text-primary truncate">
+                                  {formatBlockType(block.block_type)}
+                                </h3>
+                                {setCount > 0 && (
+                                  <span className="text-xs fc-text-dim font-mono flex-shrink-0">
+                                    {setCount} {setCount === 1 ? "set" : "sets"}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs fc-text-dim truncate">
                                 {exerciseNamesDisplay}
                               </p>
                             </div>
+                            <ChevronDown className={`w-4 h-4 fc-text-dim transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                           </div>
                         </button>
                         {isExpanded && (
-                          <div className="border-t border-[color:var(--fc-glass-border)] px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
-                            <div className="flex flex-col gap-3">
+                          <div className="border-t border-[color:var(--fc-surface-card-border)] px-4 pb-4 pt-3">
+                            <div className="flex flex-col gap-2">
                               {block.sets.length === 0 ? (
                                 renderTemplateExercises(block, block.exerciseNames)
                               ) : (
@@ -1621,7 +1608,7 @@ export default function WorkoutComplete() {
                                   .map((set) => (
                                     <div
                                       key={set.id}
-                                      className="border-l-2 border-[color:var(--fc-glass-border)] pl-4"
+                                      className="border-l-2 pl-3" style={{ borderColor: "var(--fc-surface-card-border)" }}
                                     >
                                       {renderSetDisplay(
                                         set,
@@ -1634,29 +1621,29 @@ export default function WorkoutComplete() {
                             </div>
                           </div>
                         )}
-                      </GlassCard>
+                      </div>
                     );
                   })}
                 </div>
               </section>
             )}
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                onClick={() => router.push("/client")}
-                className="fc-btn fc-btn-primary flex w-full items-center justify-center gap-3 px-6 py-4 text-sm uppercase tracking-[0.2em] sm:w-auto"
-                disabled={completing}
-              >
-                Return to Dashboard
-                <Home className="h-4 w-4" />
-              </button>
-              <button
-                className="fc-btn fc-btn-secondary flex items-center justify-center gap-2 px-5 py-3 text-sm"
-                type="button"
-              >
-                <Share2 className="h-4 w-4" />
-                Share recap
-              </button>
+            {/* Spacer for floating button */}
+            <div className="h-20" />
+
+            {/* Floating Bottom Action */}
+            <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
+              <div className="max-w-2xl mx-auto">
+                <Button
+                  onClick={() => router.push("/client")}
+                  disabled={completing}
+                  variant="fc-primary"
+                  className="w-full h-14 rounded-2xl gap-3 font-bold text-base uppercase tracking-wider shadow-lg"
+                >
+                  <LayoutDashboard className="w-5 h-5" />
+                  Back to Dashboard
+                </Button>
+              </div>
             </div>
           </div>
         </div>

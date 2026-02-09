@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule | Tensioned Obsidian Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --obsidian: #121212;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Tensioned Obsidian Surfaces */
+        .crystal-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+            backdrop-filter: blur(24px) saturate(200%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-20%, -20%); }
+            100% { transform: translate(20%, 20%); }
+        }
+
+        .btn-primary {
+            height: 48px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4); }
+
+        .btn-secondary {
+            height: 48px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1.5px solid var(--glass-border);
+            color: #FFFFFF;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); border-color: #FFFFFF; }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: var(--glass-border);
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            background: var(--bg-dark);
+            padding: 12px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .calendar-day:hover { background: rgba(255,255,255,0.05); }
+        .calendar-day.active { background: rgba(59, 130, 246, 0.15); }
+        .calendar-day.today { border: 2px solid var(--primary); }
+        .calendar-day.dimmed { opacity: 0.3; cursor: default; }
+
+        .participant-pip {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+        }
+        .participant-pip.filled { background: var(--secondary); box-shadow: 0 0 8px var(--secondary); }
+        
+        .session-indicator {
+            height: 4px;
+            border-radius: 2px;
+            margin-top: 4px;
+            background: var(--secondary);
+            width: 80%;
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .bottom-nav {
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .text-h1 { font-size: 30px; line-height: 1.25; font-weight: 700; letter-spacing: -0.025em; }
+        .text-h2 { font-size: 20px; line-height: 1.25; font-weight: 600; }
+        .capacity-pill {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: var(--secondary);
+            padding: 2px 8px;
+            border-radius: 99px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10 pb-36">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Section -->
+    <header class="max-w-6xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+        <div>
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <i data-lucide="calendar" class="w-6 h-6"></i>
+                </div>
+                <span class="text-sm font-bold uppercase tracking-[0.2em] text-neutral-500">Coach Portal</span>
+            </div>
+            <h1 class="text-h1">Schedule & Capacity</h1>
+        </div>
+        <div class="flex gap-3">
+            <button class="btn-secondary px-6 rounded-xl flex items-center gap-2 font-medium">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+                Availability Settings
+            </button>
+            <button class="btn-primary px-8 rounded-xl flex items-center gap-2 font-bold">
+                <i data-lucide="plus" class="w-5 h-5"></i>
+                Quick Block
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left: Calendar Grid -->
+        <section class="lg:col-span-8">
+            <div class="crystal-card p-6 mb-6">
+                <div class="flex items-center justify-between mb-8">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-2xl font-bold">October 2024</h2>
+                        <div class="flex gap-1">
+                            <button class="p-2 hover:bg-white/5 rounded-lg transition-colors"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                            <button class="p-2 hover:bg-white/5 rounded-lg transition-colors"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                        </div>
+                    </div>
+                    <div class="flex bg-white/5 p-1 rounded-xl border border-white/10">
+                        <button class="px-4 py-1.5 rounded-lg bg-white/10 text-sm font-semibold">Month</button>
+                        <button class="px-4 py-1.5 rounded-lg hover:bg-white/5 text-sm font-medium text-neutral-400">Week</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-7 gap-1 mb-2">
+                    <div class="text-center text-[11px] font-bold uppercase tracking-widest text-neutral-500 py-2">Mon</div>
+                    <div class="text-center text-[11px] font-bold uppercase tracking-widest text-neutral-500 py-2">Tue</div>
+                    <div class="text-center text-[11px] font-bold uppercase tracking-widest text-neutral-500 py-2">Wed</div>
+                    <div class="text-center text-[11px] font-bold uppercase tracking-widest text-neutral-500 py-2">Thu</div>
+                    <div class="text-center text-[11px] font-bold uppercase tracking-widest text-neutral-500 py-2">Fri</div>
+                    <div class="text-center text-[11px] font-bold uppercase tracking-widest text-neutral-500 py-2">Sat</div>
+                    <div class="text-center text-[11px] font-bold uppercase tracking-widest text-neutral-500 py-2">Sun</div>
+                </div>
+
+                <div class="calendar-grid">
+                    <!-- Week 1 (Sample) -->
+                    <div class="calendar-day dimmed"><span class="mono text-xs">28</span></div>
+                    <div class="calendar-day dimmed"><span class="mono text-xs">29</span></div>
+                    <div class="calendar-day dimmed"><span class="mono text-xs">30</span></div>
+                    <div class="calendar-day"><span class="mono text-xs">01</span><div class="session-indicator"></div></div>
+                    <div class="calendar-day"><span class="mono text-xs">02</span><div class="session-indicator"></div><div class="session-indicator opacity-50"></div></div>
+                    <div class="calendar-day"><span class="mono text-xs">03</span></div>
+                    <div class="calendar-day"><span class="mono text-xs">04</span></div>
+                    <!-- Week 2 -->
+                    <div class="calendar-day"><span class="mono text-xs">05</span></div>
+                    <div class="calendar-day"><span class="mono text-xs">06</span><div class="session-indicator"></div></div>
+                    <div class="calendar-day active kinetic-shimmer"><span class="mono text-xs font-bold">07</span><div class="session-indicator"></div><div class="session-indicator"></div></div>
+                    <div class="calendar-day"><span class="mono text-xs">08</span></div>
+                    <div class="calendar-day"><span class="mono text-xs">09</span><div class="session-indicator"></div></div>
+                    <div class="calendar-day today"><span class="mono text-xs font-bold">10</span><div class="session-indicator"></div></div>
+                    <div class="calendar-day"><span class="mono text-xs">11</span></div>
+                    <!-- Remaining days... -->
+                    <script>
+                        // Fill rest of dummy calendar
+                        const grid = document.querySelector('.calendar-grid');
+                        for(let i=12; i<=35; i++) {
+                            const day = document.createElement('div');
+                            day.className = 'calendar-day';
+                            day.innerHTML = `<span class="mono text-xs">${i > 31 ? i-31 : i}</span>`;
+                            if(i > 31) day.classList.add('dimmed');
+                            grid.appendChild(day);
+                        }
+                    </script>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right: Day Details / Slots -->
+        <aside class="lg:col-span-4 space-y-6">
+            <div class="crystal-card p-6 border-l-4 border-l-secondary">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h3 class="text-xl font-bold">Monday, Oct 07</h3>
+                        <p class="text-sm text-neutral-400">3 Sessions Scheduled</p>
+                    </div>
+                    <span class="bg-secondary/20 text-secondary text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tighter">Day View</span>
+                </div>
+
+                <!-- Session Slot 1 -->
+                <div class="group p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-secondary/50 transition-all mb-4">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="mono text-xs text-secondary font-bold">09:00 — 10:00</span>
+                            <h4 class="font-bold text-lg">Hypertrophy A</h4>
+                        </div>
+                        <div class="capacity-pill">3/4 Filled</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="flex -space-x-2 mr-2">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=1" class="w-6 h-6 rounded-full border border-black">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=2" class="w-6 h-6 rounded-full border border-black">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=3" class="w-6 h-6 rounded-full border border-black">
+                        </div>
+                        <div class="flex gap-1 ml-auto">
+                            <div class="participant-pip filled"></div>
+                            <div class="participant-pip filled"></div>
+                            <div class="participant-pip filled"></div>
+                            <div class="participant-pip"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Slot 2 -->
+                <div class="group p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-secondary/50 transition-all mb-4">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="mono text-xs text-secondary font-bold">11:30 — 12:30</span>
+                            <h4 class="font-bold text-lg">Foundation Strength</h4>
+                        </div>
+                        <div class="capacity-pill">4/4 Full</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="flex -space-x-2 mr-2">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=4" class="w-6 h-6 rounded-full border border-black">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=5" class="w-6 h-6 rounded-full border border-black">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=6" class="w-6 h-6 rounded-full border border-black">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=7" class="w-6 h-6 rounded-full border border-black">
+                        </div>
+                        <div class="flex gap-1 ml-auto">
+                            <div class="participant-pip filled"></div>
+                            <div class="participant-pip filled"></div>
+                            <div class="participant-pip filled"></div>
+                            <div class="participant-pip filled"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Blocked Time Example -->
+                <div class="p-4 rounded-2xl bg-neutral-800/30 border border-dashed border-white/10 opacity-60">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="mono text-xs text-neutral-400 font-bold">14:00 — 16:00</span>
+                            <h4 class="font-bold text-neutral-300">Blocked: Personal Prep</h4>
+                        </div>
+                        <i data-lucide="lock" class="w-4 h-4 text-neutral-500"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Capacity Overview -->
+            <div class="crystal-card p-6">
+                <h3 class="font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4 text-accent"></i>
+                    Weekly Utilization
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-neutral-400">Overall Capacity</span>
+                            <span class="mono text-accent">82%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <div class="h-full bg-accent" style="width: 82%"></div>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-neutral-500 leading-relaxed italic">
+                        * Most sessions are hitting the 4-participant threshold. Consider opening an overflow slot on Wednesdays.
+                    </p>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Bottom Action Zone (Floating Nav) -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 bottom-nav z-50">
+        <div class="max-w-screen-xl mx-auto flex items-center gap-4">
+            <div class="flex flex-1 justify-around md:justify-start md:gap-12">
+                <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                    <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Dash</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-primary">
+                    <i data-lucide="calendar" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Schedule</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                    <i data-lucide="users" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Clients</span>
+                </button>
+            </div>
+            <button class="btn-primary flex-none w-14 h-14 md:w-auto md:px-8 rounded-2xl flex items-center justify-center gap-2 shadow-2xl">
+                <i data-lucide="plus-circle" class="w-6 h-6"></i>
+                <span class="hidden md:block font-bold">New Session</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        lucide.createIcons();
+
+        // Subtle animation for cards on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.crystal-card, .calendar-day');
+            elements.forEach((el, index) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(10px)';
+                setTimeout(() => {
+                    el.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                }, index * 20);
+            });
+        });
+
+        // Haptic feedback simulation
+        document.querySelectorAll('button, .calendar-day').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) window.navigator.vibrate(8);
+            });
+        });
+
+        // Day Selection Logic
+        document.querySelectorAll('.calendar-day:not(.dimmed)').forEach(day => {
+            day.addEventListener('click', function() {
+                document.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

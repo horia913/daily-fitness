@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
@@ -63,14 +63,18 @@ import { useTheme } from '@/contexts/ThemeContext'
 export default function ClientProfilePage() {
   const { user, signOut } = useAuth()
   const router = useRouter()
-  const { isDark, performanceSettings } = useTheme()
+  const { isDark, performanceSettings, toggleTheme } = useTheme()
   // Check if we're viewing as another user (for coach view)
   const [viewAsUserId, setViewAsUserId] = useState<string | null>(null)
+  const PROFILE_LOAD_TIMEOUT_MS = 30000
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [avatarUrlKey, setAvatarUrlKey] = useState(0)
+  const profileUserIdRef = useRef<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [passwordData, setPasswordData] = useState({
@@ -124,18 +128,23 @@ export default function ClientProfilePage() {
     }
   }, [])
 
-  useEffect(() => {
-    const userId = viewAsUserId || user?.id
-    if (userId) {
-      loadProfile(userId)
+  const loadProfile = useCallback(async (userId: string | undefined) => {
+    if (!userId) {
+      setLoadError('Session expired. Please sign in again.')
+      setLoading(false)
+      return
     }
-  }, [user, viewAsUserId])
-
-  const loadProfile = async (userId: string) => {
+    profileUserIdRef.current = userId
+    setLoadError(null)
+    setLoading(true)
     try {
-      setLoading(true)
-      const data = await DatabaseService.getProfile(userId)
-      
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), PROFILE_LOAD_TIMEOUT_MS)
+      )
+      const data = await Promise.race([
+        DatabaseService.getProfile(userId),
+        timeoutPromise
+      ])
       if (data) {
         setProfile(data)
         const profileData = data as any
@@ -157,10 +166,20 @@ export default function ClientProfilePage() {
       }
     } catch (error) {
       console.error('Error loading profile:', error)
+      setLoadError(error instanceof Error && error.message === 'timeout'
+        ? 'Loading took too long. Check your connection.'
+        : 'Could not load profile.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    const userId = viewAsUserId || user?.id
+    if (userId) {
+      loadProfile(userId)
+    }
+  }, [user?.id, viewAsUserId, loadProfile])
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -191,45 +210,47 @@ export default function ClientProfilePage() {
         .upload(fileName, file)
 
       if (uploadError) {
-        console.error('Upload error:', uploadError)
-        console.error('Error details:', {
-          message: uploadError.message,
-          statusCode: (uploadError as any).statusCode,
-          error: (uploadError as any).error
-        })
-        
-        if (uploadError.message.includes('row-level security policy')) {
-          alert('Storage bucket not configured. Please contact administrator to set up avatar storage.')
-        } else {
-          alert(`Error uploading image: ${uploadError.message}`)
-        }
+        console.error('Profile picture upload error:', uploadError)
+        const msg = uploadError.message || ''
+        const friendlyMessage = msg.includes('row-level security policy')
+          ? 'Storage is not set up for profile photos yet. Your coach can configure it.'
+          : msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('network')
+            ? "Couldn't upload photo. Check your connection and try again. If it keeps failing, ask your coach to check storage setup."
+            : `Upload failed: ${msg}`
+        alert(friendlyMessage)
+        setUploadingImage(false)
         return
       }
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName)
 
-      // Update profile with new avatar URL
-      const { error: updateError } = await supabase
+      const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
         .eq('id', user?.id)
+        .select()
+        .single()
 
       if (updateError) {
-        console.error('Update error:', updateError)
-        alert('Error updating profile. Please try again.')
+        console.error('Profile picture update error:', updateError)
+        alert('Photo uploaded but profile could not be updated. Please try again.')
+        setUploadingImage(false)
         return
       }
 
-      // Update local state
-      setProfile({ ...profile, avatar_url: publicUrl })
+      if (updatedProfile) {
+        setProfile((prev: any) => (prev ? { ...prev, avatar_url: updatedProfile.avatar_url } : updatedProfile))
+      } else {
+        setProfile((prev: any) => (prev ? { ...prev, avatar_url: publicUrl } : prev))
+      }
+      setAvatarUrlKey(Date.now())
       alert('Profile picture updated successfully!')
       
     } catch (error) {
-      console.error('Error uploading image:', error)
-      alert('Error uploading image. Please try again.')
+      console.error('Profile picture upload exception:', error)
+      alert("Couldn't upload photo. Check your connection and try again.")
     } finally {
       setUploadingImage(false)
     }
@@ -343,12 +364,38 @@ export default function ClientProfilePage() {
     }
   }
 
+  if (loadError && !loading) {
+    const retryUserId = profileUserIdRef.current || viewAsUserId || user?.id
+    return (
+      <ProtectedRoute requiredRole="client">
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page flex items-center justify-center min-h-[60vh]">
+            <div className="fc-glass fc-card p-8 max-w-md w-full text-center space-y-4">
+              <p className="fc-text-primary font-medium">{loadError}</p>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (retryUserId) loadProfile(retryUserId)
+                  else loadProfile(user?.id)
+                }}
+                className="fc-btn fc-btn-primary"
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    )
+  }
+
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page">
             <div className="fc-glass fc-card p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -362,257 +409,214 @@ export default function ClientProfilePage() {
     )
   }
 
+  const displayName = [formData.first_name, formData.last_name].filter(Boolean).join(' ') || user?.email?.split('@')[0] || 'Profile'
+  const joinedDate = profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : null
+
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-white" />
+        <div className="relative z-10 mx-auto w-full max-w-4xl fc-page pb-24" style={{ gap: 'var(--fc-gap-sections)' }}>
+          {/* Header: avatar + name + email + joined (mockup layout) */}
+          <header className="flex flex-col md:flex-row items-center gap-8 mb-8 mt-4">
+            <div className="relative group">
+              <div className="w-32 h-32 rounded-full border-4 border-[color:var(--fc-glass-border)] overflow-hidden fc-glass p-1 group-hover:border-[color:var(--fc-domain-workouts)] transition-colors duration-300">
+                {profile?.avatar_url ? (
+                  <img
+                    key={`${profile.avatar_url}-${avatarUrlKey}`}
+                    src={`${profile.avatar_url}${profile.avatar_url.includes('?') ? '&' : '?'}t=${avatarUrlKey || 0}`}
+                    alt=""
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-[color:var(--fc-glass-soft)] flex items-center justify-center">
+                    <User className="w-16 h-16 fc-text-subtle" />
                   </div>
-                  <div>
-                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                      Profile & Settings
+                )}
+              </div>
+              {!viewAsUserId && (
+                <label className="absolute bottom-1 right-1 w-10 h-10 rounded-full bg-[color:var(--fc-domain-workouts)] flex items-center justify-center border-4 border-[color:var(--fc-bg-deep)] shadow-lg hover:scale-110 active:scale-95 transition-transform cursor-pointer">
+                  <Camera className="w-5 h-5 text-white" />
+                  <input id="avatar-upload" type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploadingImage} />
+                </label>
+              )}
+            </div>
+            <div className="text-center md:text-left flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-4xl font-bold tracking-tight fc-text-primary mb-2">{displayName}</h1>
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
+                    <span className="flex items-center gap-2 text-sm fc-text-dim">
+                      <MailIcon className="w-4 h-4" />
+                      {formData.email || user?.email || '—'}
                     </span>
-                    <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                      My Profile
-                    </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Manage your personal information and app preferences.
-                    </p>
+                    {joinedDate && (
+                      <span className="flex items-center gap-2 text-sm fc-glass-soft px-3 py-1 rounded-full border border-[color:var(--fc-glass-border)] font-mono fc-text-dim">
+                        <Calendar className="w-4 h-4" />
+                        {joinedDate}
+                      </span>
+                    )}
                   </div>
                 </div>
-              </div>
-              <div className="flex gap-3">
                 {!viewAsUserId && (
-                  editing ? (
-                    <>
-                      <Button variant="outline" onClick={handleCancel} className="fc-btn fc-btn-secondary">
-                        <X className="w-4 h-4 mr-2" />
-                        Cancel
+                  <div className="flex gap-3 justify-center sm:justify-end">
+                    {editing ? (
+                      <>
+                        <Button variant="outline" onClick={handleCancel} className="fc-btn fc-btn-secondary">
+                          <X className="w-4 h-4 mr-2" />
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSave} disabled={saving} className="fc-btn fc-btn-primary">
+                          <Save className="w-4 h-4 mr-2" />
+                          {saving ? 'Saving...' : 'Save'}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button onClick={() => setEditing(true)} className="fc-btn fc-btn-primary">
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit
                       </Button>
-                      <Button onClick={handleSave} disabled={saving} className="fc-btn fc-btn-primary">
-                        <Save className="w-4 h-4 mr-2" />
-                        {saving ? 'Saving...' : 'Save Changes'}
-                      </Button>
-                    </>
-                  ) : (
-                    <Button onClick={() => setEditing(true)} className="fc-btn fc-btn-primary">
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit Profile
-                    </Button>
-                  )
+                    )}
+                  </div>
                 )}
               </div>
             </div>
-          </GlassCard>
+          </header>
 
-            {/* Enhanced Profile Picture Section */}
-            <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-              <CardHeader className="p-6 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                    <Camera className="w-5 h-5 text-white" />
+          <div className="grid grid-cols-1 gap-8">
+            {/* Personal Information — full width, first */}
+            <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-lg bg-[color:var(--fc-domain-workouts)]/10 flex items-center justify-center border border-[color:var(--fc-domain-workouts)]/20">
+                  <User className="w-5 h-5 fc-text-workouts" />
+                </div>
+                <h2 className="text-xl font-semibold fc-text-primary">Personal Information</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="first_name" className="text-sm font-medium fc-text-dim ml-1">First Name</Label>
+                  <Input id="first_name" value={formData.first_name} onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))} disabled={!editing} className="fc-input rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last_name" className="text-sm font-medium fc-text-dim ml-1">Last Name</Label>
+                  <Input id="last_name" value={formData.last_name} onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))} disabled={!editing} className="fc-input rounded-xl" />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="email" className="text-sm font-medium fc-text-dim ml-1">Email Address</Label>
+                  <Input id="email" type="email" value={formData.email} disabled className="fc-input rounded-xl opacity-70 cursor-not-allowed" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-sm font-medium fc-text-dim ml-1">Phone Number</Label>
+                  <Input id="phone" value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} disabled={!editing} placeholder="+1 (555) 000-0000" className="fc-input rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="date_of_birth" className="text-sm font-medium fc-text-dim ml-1">Date of Birth</Label>
+                  <Input id="date_of_birth" type="date" value={formData.date_of_birth} onChange={(e) => setFormData(prev => ({ ...prev, date_of_birth: e.target.value }))} disabled={!editing} className="fc-input rounded-xl" />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="bio" className="text-sm font-medium fc-text-dim ml-1">About Me</Label>
+                  <Textarea id="bio" value={formData.bio} onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))} disabled={!editing} rows={3} className="fc-input rounded-xl resize-none" />
+                </div>
+              </div>
+            </GlassCard>
+
+            {/* Preferences | Notifications — two columns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 rounded-lg bg-[color:var(--fc-status-success)]/10 flex items-center justify-center border border-[color:var(--fc-status-success)]/20">
+                    <Settings className="w-5 h-5 fc-text-success" />
                   </div>
-                  <div>
-                    <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Profile Picture</CardTitle>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">Your personal photo for your fitness journey</p>
+                  <h2 className="text-xl font-semibold fc-text-primary">Preferences</h2>
+                </div>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium fc-text-primary">Units</div>
+                      <div className="text-xs fc-text-subtle">Metric (kg) or Imperial (lbs)</div>
+                    </div>
+                    <div className="flex fc-glass-soft p-1 rounded-xl border border-[color:var(--fc-glass-border)]">
+                      <button type="button" onClick={() => setAppSettings(prev => ({ ...prev, units: 'metric' }))} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${appSettings.units === 'metric' ? 'fc-glass border border-[color:var(--fc-glass-border)]' : 'fc-text-dim hover:fc-text-primary'}`}>KG</button>
+                      <button type="button" onClick={() => setAppSettings(prev => ({ ...prev, units: 'imperial' }))} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${appSettings.units === 'imperial' ? 'fc-glass border border-[color:var(--fc-glass-border)]' : 'fc-text-dim hover:fc-text-primary'}`}>LB</button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium fc-text-primary">Theme</div>
+                      <div className="text-xs fc-text-subtle">{isDark ? 'Dark' : 'Light'}</div>
+                    </div>
+                    <div className="flex fc-glass-soft p-1 rounded-xl border border-[color:var(--fc-glass-border)]">
+                      <button type="button" onClick={() => !isDark || toggleTheme()} className={`px-3 py-1.5 rounded-lg transition-colors ${!isDark ? 'fc-text-primary fc-glass border border-[color:var(--fc-glass-border)]' : 'fc-text-dim hover:fc-text-primary'}`}><Sun className="w-4 h-4" /></button>
+                      <button type="button" onClick={() => isDark || toggleTheme()} className={`px-3 py-1.5 rounded-lg transition-colors ${isDark ? 'fc-text-primary fc-glass border border-[color:var(--fc-glass-border)]' : 'fc-text-dim hover:fc-text-primary'}`}><Moon className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold fc-text-subtle uppercase tracking-widest">Language</Label>
+                    <Select value={appSettings.language} onValueChange={(v) => setAppSettings(prev => ({ ...prev, language: v }))}>
+                      <SelectTrigger className="fc-input rounded-xl py-3"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="es">Spanish</SelectItem>
+                        <SelectItem value="fr">French</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
-                <div className="flex items-center gap-8">
-                  <div className="relative">
-                    {profile?.avatar_url ? (
-                      <img
-                        src={profile.avatar_url}
-                        alt="Profile"
-                        className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
-                      />
-                    ) : (
-                      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center border-4 border-white shadow-lg">
-                        <User className="w-16 h-16 text-slate-500" />
-                      </div>
-                    )}
-                    <div className="absolute -bottom-2 -right-2">
-                      <label htmlFor="avatar-upload" className="cursor-pointer">
-                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-all duration-300 shadow-lg hover:scale-110">
-                          <Camera className="w-5 h-5 text-white" />
-                        </div>
-                        <input
-                          id="avatar-upload"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="hidden"
-                          disabled={uploadingImage}
-                        />
+              </GlassCard>
+
+              <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 rounded-lg bg-[color:var(--fc-status-error)]/10 flex items-center justify-center border border-[color:var(--fc-status-error)]/20">
+                    <Bell className="w-5 h-5 fc-text-error" />
+                  </div>
+                  <h2 className="text-xl font-semibold fc-text-primary">Notifications</h2>
+                </div>
+                <div className="space-y-5">
+                  {[
+                    { key: 'workoutReminders', label: 'Workout reminders', icon: Dumbbell },
+                    { key: 'coachMessages', label: 'Coach messages', icon: MessageCircle },
+                    { key: 'progressUpdates', label: 'Progress updates', icon: BarChart3 },
+                    { key: 'motivationalTips', label: 'Motivational tips', icon: Star }
+                  ].map(({ key, label, icon: Icon }) => (
+                    <div key={key} className="flex items-center justify-between">
+                      <span className="fc-text-primary flex items-center gap-2"><Icon className="w-4 h-4 fc-text-subtle" />{label}</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" checked={(notifications as any)[key]} onChange={(e) => setNotifications(prev => ({ ...prev, [key]: e.target.checked }))} className="sr-only peer" />
+                        <div className="relative w-12 h-6 rounded-full bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)] peer-checked:bg-[color:var(--fc-status-success)] peer-checked:border-[color:var(--fc-status-success)] transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-white after:border after:border-[color:var(--fc-glass-border)] after:transition-transform peer-checked:after:translate-x-6" />
                       </label>
                     </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg mb-2 text-[color:var(--fc-text-primary)]">Update Profile Picture</h3>
-                    <p className="mb-3 text-[color:var(--fc-text-dim)]">
-                      Upload a photo that represents your fitness journey. 
-                      This helps your coach connect with you on a personal level.
-                    </p>
-                    <div className="flex items-center gap-2 text-sm text-[color:var(--fc-text-subtle)]">
-                      <Info className="w-4 h-4" />
-                      <span>Max size: 5MB • JPG, PNG supported</span>
-                    </div>
-                    {uploadingImage && (
-                      <div className="flex items-center gap-2 mt-3 text-blue-600">
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-sm font-medium">Uploading...</span>
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
+              </GlassCard>
+            </div>
 
-          {/* Notification Preferences */}
-          <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-            <CardHeader className="p-6 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center">
-                  <Bell className="w-5 h-5 text-white" />
+            {/* Account & Privacy — toggles + action buttons */}
+            <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-lg fc-glass-soft flex items-center justify-center border border-[color:var(--fc-glass-border)]">
+                  <Shield className="w-5 h-5 fc-text-subtle" />
                 </div>
-                <div>
-                  <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Notification Preferences</CardTitle>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">Control how and when you receive notifications</p>
-                </div>
+                <h2 className="text-xl font-semibold fc-text-primary">Account & Privacy</h2>
               </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
-                  <div className="flex items-center gap-3">
-                    <Dumbbell className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="font-medium text-[color:var(--fc-text-primary)]">Workout Reminders</p>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">Get reminded about scheduled workouts</p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifications.workoutReminders}
-                      onChange={(e) => setNotifications(prev => ({ ...prev, workoutReminders: e.target.checked }))}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
-                  <div className="flex items-center gap-3">
-                    <MessageCircle className="w-5 h-5 text-green-600" />
-                    <div>
-                      <p className="font-medium text-[color:var(--fc-text-primary)]">Coach Messages</p>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">Notifications when your coach sends messages</p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifications.coachMessages}
-                      onChange={(e) => setNotifications(prev => ({ ...prev, coachMessages: e.target.checked }))}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
-                  <div className="flex items-center gap-3">
-                    <BarChart3 className="w-5 h-5 text-purple-600" />
-                    <div>
-                      <p className="font-medium text-[color:var(--fc-text-primary)]">Progress Updates</p>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">Celebrate your achievements and milestones</p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifications.progressUpdates}
-                      onChange={(e) => setNotifications(prev => ({ ...prev, progressUpdates: e.target.checked }))}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
-                  <div className="flex items-center gap-3">
-                    <Star className="w-5 h-5 text-yellow-600" />
-                    <div>
-                      <p className="font-medium text-[color:var(--fc-text-primary)]">Motivational Tips</p>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">Daily motivation and fitness tips</p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifications.motivationalTips}
-                      onChange={(e) => setNotifications(prev => ({ ...prev, motivationalTips: e.target.checked }))}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-center gap-2" onClick={() => setShowPasswordModal(true)}>
+                  <Lock className="w-4 h-4" />
+                  Password
+                </Button>
+                <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  Export Data
+                </Button>
+                <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-center gap-2" onClick={handleSignOut}>
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </Button>
+                <Button variant="outline" className="h-12 rounded-xl justify-center gap-2 border-[color:var(--fc-status-error)] fc-text-error hover:bg-[color:var(--fc-status-error)]/10" onClick={() => setShowDeleteConfirm(true)}>
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* App Preferences */}
-          <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-            <CardHeader className="p-6 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center">
-                  <Palette className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">App Preferences</CardTitle>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">Customize your app experience</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Theme</Label>
-                  <Select value={appSettings.theme} onValueChange={(value) => setAppSettings(prev => ({ ...prev, theme: value }))}>
-                    <SelectTrigger className="fc-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light Mode</SelectItem>
-                      <SelectItem value="dark">Dark Mode</SelectItem>
-                      <SelectItem value="auto">Auto (System)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Units</Label>
-                  <Select value={appSettings.units} onValueChange={(value) => setAppSettings(prev => ({ ...prev, units: value }))}>
-                    <SelectTrigger className="fc-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="metric">Metric (kg, cm)</SelectItem>
-                      <SelectItem value="imperial">Imperial (lbs, ft)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            </GlassCard>
 
           {/* Goals & Preferences */}
           <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
@@ -659,95 +663,6 @@ export default function ClientProfilePage() {
                   </Select>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Enhanced Personal Information */}
-          <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-            <CardHeader className="p-6 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Personal Information</CardTitle>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">Your basic personal details</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-0 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="first_name" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">First Name</Label>
-                    <Input
-                      id="first_name"
-                      value={formData.first_name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
-                      disabled={!editing}
-                      className="fc-input"
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="last_name" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Last Name</Label>
-                    <Input
-                      id="last_name"
-                      value={formData.last_name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
-                      disabled={!editing}
-                      className="fc-input"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="email" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    disabled={!editing}
-                    className="fc-input"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="phone" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                      disabled={!editing}
-                      placeholder="+1 (555) 123-4567"
-                      className="fc-input"
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="date_of_birth" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">Date of Birth</Label>
-                    <Input
-                      id="date_of_birth"
-                      type="date"
-                      value={formData.date_of_birth}
-                      onChange={(e) => setFormData(prev => ({ ...prev, date_of_birth: e.target.value }))}
-                      disabled={!editing}
-                      className="fc-input"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="bio" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">About Me</Label>
-                  <Textarea
-                    id="bio"
-                    value={formData.bio}
-                    onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-                    disabled={!editing}
-                    rows={4}
-                    placeholder="Tell us about yourself, your fitness journey, and what motivates you..."
-                    className="fc-textarea resize-none"
-                  />
-                </div>
             </CardContent>
           </Card>
 
@@ -943,96 +858,7 @@ export default function ClientProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Privacy & Security */}
-          <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-            <CardHeader className="p-6 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Privacy & Security</CardTitle>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">Manage your account security and privacy</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Lock className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <p className="font-semibold text-[color:var(--fc-text-primary)]">Change Password</p>
-                        <p className="text-sm text-[color:var(--fc-text-dim)]">Update your account password</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      className="rounded-2xl"
-                      onClick={() => setShowPasswordModal(true)}
-                    >
-                      <Lock className="w-4 h-4 mr-2" />
-                      Change
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Globe className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-semibold text-[color:var(--fc-text-primary)]">Privacy Policy</p>
-                        <p className="text-sm text-[color:var(--fc-text-dim)]">Read our privacy policy and terms</p>
-                      </div>
-                    </div>
-                    <Button variant="outline" className="rounded-2xl">
-                      <Globe className="w-4 h-4 mr-2" />
-                      View
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-[color:var(--fc-border-subtle)] bg-[color:var(--fc-surface)]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Trash2 className="w-5 h-5 text-red-600" />
-                      <div>
-                        <p className="font-semibold text-[color:var(--fc-text-primary)]">Delete Account</p>
-                        <p className="text-sm text-[color:var(--fc-text-dim)]">Permanently delete your account</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      className="rounded-2xl border-red-200 text-red-600 hover:bg-red-50"
-                      onClick={() => setShowDeleteConfirm(true)}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Logout Section */}
-          <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-            <CardContent className="p-6">
-              <div className="text-center">
-                <Button 
-                  variant="outline" 
-                  className="fc-btn fc-btn-ghost w-full"
-                  onClick={handleSignOut}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
+          </div>
         </div>
 
         {/* Password Change Modal */}
@@ -1113,6 +939,24 @@ export default function ClientProfilePage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Delete account confirmation */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="fc-glass fc-card rounded-2xl p-8 w-full max-w-sm border-[color:var(--fc-status-error)]/30">
+              <h3 className="text-xl font-bold fc-text-primary mb-4">Delete account?</h3>
+              <p className="text-sm fc-text-dim mb-6">This cannot be undone. Your data will be permanently removed.</p>
+              <div className="flex flex-col gap-3">
+                <Button className="fc-btn fc-btn-primary w-full" onClick={() => setShowDeleteConfirm(false)}>
+                  Keep account
+                </Button>
+                <Button variant="outline" className="w-full fc-text-error border-[color:var(--fc-status-error)] hover:bg-[color:var(--fc-status-error)]/10" onClick={() => setShowDeleteConfirm(false)}>
+                  Delete forever
+                </Button>
+              </div>
             </div>
           </div>
         )}

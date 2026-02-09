@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Settings | Obsidian Lattice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #070707;
+            --lattice-line: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            background-image: 
+                linear-gradient(var(--lattice-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--lattice-line) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .obsidian-panel {
+            background: linear-gradient(165deg, rgba(15, 15, 15, 0.8) 0%, rgba(5, 5, 5, 0.95) 100%);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .obsidian-panel:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
+        }
+
+        .input-lattice {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            width: 100%;
+            color: white;
+            transition: all 0.2s ease;
+        }
+
+        .input-lattice:focus {
+            outline: none;
+            border-color: var(--secondary);
+            background: rgba(59, 130, 246, 0.05);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .toggle-switch {
+            width: 48px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-switch.active { background: var(--accent); }
+
+        .toggle-knob {
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .active .toggle-knob { transform: translateX(24px); }
+
+        .btn-action {
+            height: 52px;
+            border-radius: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #EF4444;
+        }
+
+        .btn-danger:hover {
+            background: #EF4444;
+            color: white;
+        }
+
+        .btn-ghost {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            color: #A3A3A3;
+        }
+
+        .btn-ghost:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+        }
+
+        .refraction-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 20% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 50%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .profile-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .profile-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -150%;
+            left: -150%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255, 255, 255, 0.03) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .section-reveal {
+            animation: slideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            opacity: 0;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 max-w-4xl mx-auto pb-24">
+    <div class="refraction-overlay"></div>
+
+    <!-- Header Section -->
+    <header class="flex flex-col md:flex-row items-center gap-8 mb-12 mt-8 section-reveal" style="animation-delay: 0.1s;">
+        <div class="relative group">
+            <div class="w-32 h-32 rounded-full border-4 border-white/10 overflow-hidden obsidian-panel p-1 group-hover:border-secondary transition-colors duration-500">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt="Avatar" class="w-full h-full object-cover rounded-full">
+            </div>
+            <button class="absolute bottom-1 right-1 w-10 h-10 bg-secondary rounded-full flex items-center justify-center border-4 border-bg-dark shadow-xl hover:scale-110 active:scale-90 transition-transform">
+                <i data-lucide="camera" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="text-center md:text-left">
+            <h1 class="text-4xl font-bold tracking-tight mb-2">Alex Sterling</h1>
+            <div class="flex flex-wrap items-center justify-center md:justify-start gap-4">
+                <span class="flex items-center gap-2 text-neutral-400 text-sm">
+                    <i data-lucide="mail" class="w-4 h-4"></i>
+                    alex.sterling@example.com
+                </span>
+                <span class="flex items-center gap-2 text-neutral-400 text-sm mono bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                    <i data-lucide="calendar" class="w-4 h-4 text-secondary"></i>
+                    Joined Dec 2024
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 gap-8">
+        <!-- Personal Information -->
+        <section class="obsidian-panel p-8 profile-shimmer section-reveal" style="animation-delay: 0.2s;">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary border border-secondary/20">
+                    <i data-lucide="user" class="w-5 h-5"></i>
+                </div>
+                <h2 class="text-xl font-semibold">Personal Information</h2>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Full Name</label>
+                    <input type="text" value="Alex Sterling" class="input-lattice">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Email Address</label>
+                    <input type="email" value="alex.sterling@example.com" disabled class="input-lattice opacity-50 cursor-not-allowed">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Phone Number</label>
+                    <input type="tel" placeholder="+1 (555) 000-0000" class="input-lattice">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Date of Birth</label>
+                    <input type="date" class="input-lattice" style="color-scheme: dark;">
+                </div>
+                <div class="space-y-2 md:col-span-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Gender</label>
+                    <select class="input-lattice appearance-none">
+                        <option>Male</option>
+                        <option>Female</option>
+                        <option>Other</option>
+                        <option>Prefer not to say</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Preferences -->
+            <section class="obsidian-panel p-8 section-reveal" style="animation-delay: 0.3s;">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center text-accent border border-accent/20">
+                        <i data-lucide="settings-2" class="w-5 h-5"></i>
+                    </div>
+                    <h2 class="text-xl font-semibold">Preferences</h2>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="font-medium">Measurement Units</div>
+                            <div class="text-xs text-neutral-500">Metric (kg) vs Imperial (lbs)</div>
+                        </div>
+                        <div class="flex bg-white/5 p-1 rounded-xl border border-white/5">
+                            <button class="px-4 py-1.5 rounded-lg text-sm font-bold bg-secondary shadow-lg">KG</button>
+                            <button class="px-4 py-1.5 rounded-lg text-sm font-medium text-neutral-400 hover:text-white">LB</button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="font-medium">Interface Theme</div>
+                            <div class="text-xs text-neutral-500">Currently using Dark Mode</div>
+                        </div>
+                        <div class="flex bg-white/5 p-1 rounded-xl border border-white/5">
+                            <button class="px-3 py-1.5 rounded-lg text-neutral-400"><i data-lucide="sun" class="w-4 h-4"></i></button>
+                            <button class="px-3 py-1.5 rounded-lg bg-white/10 text-white shadow-sm"><i data-lucide="moon" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-neutral-500 uppercase tracking-widest">App Language</label>
+                        <select class="input-lattice py-3">
+                            <option>English (US)</option>
+                            <option>Spanish</option>
+                            <option>French</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Notifications -->
+            <section class="obsidian-panel p-8 section-reveal" style="animation-delay: 0.4s;">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                        <i data-lucide="bell" class="w-5 h-5"></i>
+                    </div>
+                    <h2 class="text-xl font-semibold">Notifications</h2>
+                </div>
+
+                <div class="space-y-5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-neutral-300">Push Notifications</span>
+                        <div class="toggle-switch active" onclick="this.classList.toggle('active')"><div class="toggle-knob"></div></div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-neutral-300">Email Updates</span>
+                        <div class="toggle-switch" onclick="this.classList.toggle('active')"><div class="toggle-knob"></div></div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-neutral-300">Workout Reminders</span>
+                        <div class="toggle-switch active" onclick="this.classList.toggle('active')"><div class="toggle-knob"></div></div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-neutral-300">Coach Messages</span>
+                        <div class="toggle-switch active" onclick="this.classList.toggle('active')"><div class="toggle-knob"></div></div>
+                    </div>
+                    
+                    <hr class="border-white/5 my-4">
+                    
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-neutral-500 uppercase tracking-widest">Quiet Hours</label>
+                        <div class="flex items-center gap-2">
+                            <input type="time" value="22:00" class="input-lattice text-sm py-2">
+                            <span class="text-neutral-600">to</span>
+                            <input type="time" value="07:00" class="input-lattice text-sm py-2">
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Danger Zone / Account Actions -->
+        <section class="obsidian-panel p-8 section-reveal" style="animation-delay: 0.5s;">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-neutral-400 border border-white/10">
+                    <i data-lucide="shield-check" class="w-5 h-5"></i>
+                </div>
+                <h2 class="text-xl font-semibold">Account & Privacy</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div class="flex items-center justify-between p-4 bg-white/3 rounded-xl border border-white/5">
+                    <div>
+                        <div class="font-medium">Leaderboard Visibility</div>
+                        <div class="text-xs text-neutral-500">Public profile status</div>
+                    </div>
+                    <div class="toggle-switch active" onclick="this.classList.toggle('active')"><div class="toggle-knob"></div></div>
+                </div>
+                <div class="flex items-center justify-between p-4 bg-white/3 rounded-xl border border-white/5">
+                    <div>
+                        <div class="font-medium">Data Sharing</div>
+                        <div class="text-xs text-neutral-500">Always visible to coach</div>
+                    </div>
+                    <div class="toggle-switch active opacity-50 pointer-events-none"><div class="toggle-knob"></div></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button class="btn-action btn-ghost">
+                    <i data-lucide="key-round" class="w-4 h-4"></i>
+                    Password
+                </button>
+                <button class="btn-action btn-ghost">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Export Data
+                </button>
+                <button class="btn-action btn-ghost">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    Log Out
+                </button>
+                <button class="btn-action btn-danger" onclick="confirmDelete()">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    Delete
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal Placeholder (Simplified logic) -->
+    <div id="deleteModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden">
+        <div class="obsidian-panel max-w-sm w-full p-8 border-primary/30">
+            <h3 class="text-2xl font-bold mb-4">Are you sure?</h3>
+            <p class="text-neutral-400 mb-8">This action is permanent and cannot be undone. All your workout logs, PRs, and history will be deleted.</p>
+            <div class="flex flex-col gap-3">
+                <button onclick="closeDelete()" class="btn-action bg-white text-black hover:bg-neutral-200">No, Keep Account</button>
+                <button class="btn-action text-primary hover:underline">Yes, Delete Forever</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide
+        lucide.createIcons();
+
+        function confirmDelete() {
+            document.getElementById('deleteModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeDelete() {
+            document.getElementById('deleteModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Vibrate on interaction (Mobile haptics)
+        document.querySelectorAll('button, .toggle-switch').forEach(el => {
+            el.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

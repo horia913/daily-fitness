@@ -320,24 +320,30 @@ export default function CoachNutritionPage() {
     );
   }, [mealPlans, searchQuery]);
 
+  const ADD_FOOD_TIMEOUT_MS = 25000;
+
   const handleAddFood = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     setLoading(true);
     try {
-      const { error } = await supabase.from("foods").insert({
+      const insertPromise = supabase.from("foods").insert({
         name: foodForm.name,
         brand: foodForm.brand || null,
-        serving_size: parseFloat(foodForm.serving_size),
+        serving_size: parseFloat(String(foodForm.serving_size)) || 0,
         serving_unit: foodForm.serving_unit,
-        calories_per_serving: parseFloat(foodForm.calories_per_serving),
-        protein: parseFloat(foodForm.protein || "0"),
-        carbs: parseFloat(foodForm.carbs || "0"),
-        fat: parseFloat(foodForm.fat || "0"),
-        fiber: parseFloat(foodForm.fiber || "0"),
+        calories_per_serving: parseFloat(String(foodForm.calories_per_serving)) || 0,
+        protein: parseFloat(String(foodForm.protein)) || 0,
+        carbs: parseFloat(String(foodForm.carbs)) || 0,
+        fat: parseFloat(String(foodForm.fat)) || 0,
+        fiber: parseFloat(String(foodForm.fiber)) || 0,
         category: foodForm.category,
       });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), ADD_FOOD_TIMEOUT_MS)
+      );
+      const { error } = await Promise.race([insertPromise, timeoutPromise]);
 
       if (error) throw error;
 
@@ -355,8 +361,13 @@ export default function CoachNutritionPage() {
         category: "General",
       });
       loadData();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error adding food:", error);
+      if (error instanceof Error && error.message === "timeout") {
+        alert("Request took too long. Check your connection and try again.");
+      } else {
+        alert("Could not add food. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -461,35 +472,29 @@ export default function CoachNutritionPage() {
           <div className="max-w-7xl mx-auto p-6">
             <GlassCard elevation={2} className="fc-glass fc-card mb-6">
               <div className="p-6 sm:p-10">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-[color:var(--fc-aurora-green)]/20">
-                    <Apple className="w-8 h-8 text-[color:var(--fc-accent-green)]" />
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-xl bg-[color:var(--fc-aurora-green)]/20">
+                      <Apple className="w-8 h-8 text-[color:var(--fc-accent-green)]" />
+                    </div>
+                    <div>
+                      <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                        Nutrition
+                      </h1>
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
+                        Client compliance overview.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                      Nutrition Hub
-                    </span>
-                    <h1 className="mt-3 text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                      Nutrition Planning
-                    </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Create meal plans, manage foods, and assign nutrition programs.
-                    </p>
+                  <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[color:var(--fc-text-dim)] w-5 h-5" />
+                    <Input
+                      placeholder="Search…"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className={`pl-10 ${theme.border} ${theme.text} bg-transparent rounded-xl w-full`}
+                    />
                   </div>
-                </div>
-              </div>
-            </GlassCard>
-
-            <GlassCard elevation={1} className="fc-glass fc-card mb-6">
-              <div className="p-6">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <Input
-                    placeholder="Search meal plans, foods, and clients..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`pl-10 ${theme.border} ${theme.text} bg-transparent rounded-xl`}
-                  />
                 </div>
               </div>
             </GlassCard>
@@ -556,36 +561,38 @@ export default function CoachNutritionPage() {
             {/* Tab Content */}
             {activeTab === "meal-plans" && (
               <div className="space-y-6">
-                {/* Actions */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <GlassCard elevation={1} className="flex-1">
+                <div>
+                  <h2 className="text-xl font-bold fc-text-primary mb-1">Meal Plan Templates</h2>
+                  <p className="text-sm fc-text-dim">Create and manage reusable meal plan templates.</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                  <div className="sticky top-0 z-10 flex-1 fc-glass fc-card p-2 rounded-xl border border-[color:var(--fc-glass-border)]">
                     <div className="relative">
                       <Search
-                        className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5"
-                        style={{ color: isDark ? "#A1A1AA" : "#9CA3AF" }}
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 fc-text-dim"
                       />
                       <Input
-                        placeholder="Search meal plans..."
+                        placeholder="Search by plan name…"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 rounded-xl bg-transparent border-0"
+                        className="pl-10 rounded-xl bg-transparent border-0 w-full fc-input"
                         style={{
                           color: isDark ? "#fff" : "#1A1A1A",
                         }}
                       />
                     </div>
-                  </GlassCard>
+                  </div>
                   <Button
                     onClick={loadMealPlans}
                     variant="ghost"
-                    className="rounded-xl"
+                    className="rounded-xl shrink-0"
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Refresh
                   </Button>
                   <Button
                     onClick={() => router.push("/coach/nutrition/meal-plans/create")}
-                    className="rounded-xl"
+                    className="rounded-xl shrink-0"
                     style={{
                       background: getSemanticColor("success").gradient,
                       boxShadow: `0 4px 12px ${

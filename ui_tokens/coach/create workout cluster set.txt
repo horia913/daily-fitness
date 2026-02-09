@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluster Set Configurator | Kinetic Glass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --cluster-base: #8B5CF6; /* Purple for Cluster Blocks */
+            --bg-dark: #060606;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Surfaces */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .monolith-cluster {
+            background: linear-gradient(160deg, rgba(139, 92, 246, 0.15) 0%, rgba(10, 10, 10, 0.8) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 0 20px rgba(139, 92, 246, 0.1);
+        }
+
+        .spectral-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.03) 50%, transparent 55%);
+            animation: shine 12s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        /* Input Highlighting */
+        .input-group label {
+            transition: color 0.3s ease;
+        }
+
+        .input-group:focus-within label {
+            color: var(--secondary);
+        }
+
+        input, select, textarea {
+            background: rgba(255,255,255,0.03) !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            color: white !important;
+            height: 56px;
+            border-radius: 16px;
+            padding: 0 16px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        input:focus {
+            border-color: var(--secondary) !important;
+            background: rgba(255,255,255,0.07) !important;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+            outline: none;
+        }
+
+        .btn-primary {
+            height: 56px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4); }
+        .btn-primary:active { transform: scale(0.96); }
+
+        .cluster-visualizer {
+            display: flex;
+            gap: 4px;
+        }
+
+        .cluster-dot {
+            width: 12px;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(139, 92, 246, 0.2);
+            transition: all 0.4s ease;
+        }
+
+        .cluster-dot.active {
+            background: var(--cluster-base);
+            box-shadow: 0 0 10px var(--cluster-base);
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .sticky-nav {
+            background: rgba(6, 6, 6, 0.8);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .touch-target { min-height: 48px; min-width: 48px; }
+    </style>
+</head>
+<body class="pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Navigation -->
+    <nav class="sticky-nav sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-5xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <button class="touch-target w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-neutral-400 hover:text-white transition-all active:scale-90">
+                    <i data-lucide="arrow-left" class="w-6 h-6"></i>
+                </button>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Create Workout Template</h1>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
+                        <p class="text-[10px] text-neutral-400 uppercase tracking-widest mono">Protocol: Cluster Set</p>
+                    </div>
+                </div>
+            </div>
+            <button class="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm font-medium hover:bg-white/10 transition-colors">
+                <i data-lucide="help-circle" class="w-4 h-4"></i>
+                Guide
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto p-6 space-y-8 mt-4">
+        
+        <!-- Block Strategy Header -->
+        <header class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div class="max-w-xl">
+                <h2 class="text-3xl font-bold mb-2">Block Configuration</h2>
+                <p class="text-neutral-400 text-sm leading-relaxed">Cluster sets involve breaking down a single set into several mini-sets with short rest intervals, allowing for higher power output and total volume.</p>
+            </div>
+            <div class="flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 px-4 py-2 rounded-2xl">
+                <i data-lucide="info" class="w-4 h-4 text-purple-400"></i>
+                <span class="text-xs font-bold text-purple-400 uppercase tracking-wider mono">Advanced Strategy</span>
+            </div>
+        </header>
+
+        <!-- Main Configuration Monolith -->
+        <section class="crystal-card monolith-cluster p-8 spectral-shimmer">
+            <form class="space-y-8">
+                
+                <!-- Primary Selectors -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="input-group space-y-2">
+                        <label class="text-xs font-bold text-neutral-500 uppercase tracking-widest mono flex items-center gap-2">
+                            <i data-lucide="layers-2" class="w-3 h-3"></i> Protocol Type
+                        </label>
+                        <select class="w-full">
+                            <option>Straight Set</option>
+                            <option>Superset</option>
+                            <option selected>Cluster Set</option>
+                            <option>Drop Set</option>
+                        </select>
+                    </div>
+                    <div class="input-group space-y-2">
+                        <label class="text-xs font-bold text-neutral-500 uppercase tracking-widest mono flex items-center gap-2">
+                            <i data-lucide="search" class="w-3 h-3"></i> Select Exercise
+                        </label>
+                        <div class="relative">
+                            <input type="text" placeholder="Search movements..." class="w-full pl-12">
+                            <i data-lucide="dumbbell" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cluster Specific Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="input-group space-y-2">
+                        <label class="text-xs font-bold text-neutral-500 uppercase tracking-widest mono">Total Sets</label>
+                        <input type="number" name="sets" value="3" min="1" class="w-full text-center text-xl font-bold mono">
+                    </div>
+                    <div class="input-group space-y-2">
+                        <label class="text-xs font-bold text-neutral-500 uppercase tracking-widest mono">Clusters / Set</label>
+                        <input type="number" name="clusters_per_set" value="4" min="1" class="w-full text-center text-xl font-bold mono">
+                    </div>
+                    <div class="input-group space-y-2">
+                        <label class="text-xs font-bold text-neutral-500 uppercase tracking-widest mono">Reps / Cluster</label>
+                        <input type="number" name="cluster_reps" value="2" min="1" class="w-full text-center text-xl font-bold mono">
+                    </div>
+                    <div class="input-group space-y-2">
+                        <label class="text-xs font-bold text-neutral-500 uppercase tracking-widest mono">Intra-Cluster Rest (s)</label>
+                        <div class="relative">
+                            <input type="number" name="intra_cluster_rest" value="20" min="0" class="w-full text-center text-xl font-bold mono pr-12">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 text-xs font-bold">SEC</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cluster Visualization Tool -->
+                <div class="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-sm font-semibold text-neutral-300">Visual Structure</h4>
+                        <span class="text-[10px] text-neutral-500 uppercase mono">Total Reps: 8 per set</span>
+                    </div>
+                    <div class="flex flex-wrap gap-6 items-center">
+                        <div class="flex gap-1.5 p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div class="cluster-dot active"></div>
+                            <div class="cluster-dot active"></div>
+                        </div>
+                        <i data-lucide="clock" class="w-4 h-4 text-neutral-600"></i>
+                        <div class="flex gap-1.5 p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div class="cluster-dot active"></div>
+                            <div class="cluster-dot active"></div>
+                        </div>
+                        <i data-lucide="clock" class="w-4 h-4 text-neutral-600"></i>
+                        <div class="flex gap-1.5 p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div class="cluster-dot active"></div>
+                            <div class="cluster-dot active"></div>
+                        </div>
+                        <i data-lucide="clock" class="w-4 h-4 text-neutral-600"></i>
+                        <div class="flex gap-1.5 p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div class="cluster-dot active"></div>
+                            <div class="cluster-dot active"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Secondary Parameters -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-1 input-group space-y-2">
+                        <label class="text-xs font-bold text-neutral-500 uppercase tracking-widest mono">Load (% of 1RM)</label>
+                        <div class="relative">
+                            <input type="number" placeholder="85" class="w-full text-center font-bold text-lg mono">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 text-xs font-bold">%</span>
+                        </div>
+                    </div>
+                    <div class="md:col-span-2 input-group space-y-2">
+                        <label class="text-xs font-bold text-neutral-500 uppercase tracking-widest mono">Coach Notes</label>
+                        <textarea placeholder="e.g. Focus on explosive concentric, use 85% of 1RM..." class="w-full min-h-[56px] py-4 resize-none"></textarea>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <!-- Summary & Preview Section -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="crystal-card p-6 flex items-center gap-6 border-l-4 border-l-blue-500">
+                <div class="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 flex-none">
+                    <i data-lucide="timer" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg">Estimated Time</h3>
+                    <p class="text-neutral-400 text-sm">~14 minutes (including 3 min rest between sets)</p>
+                </div>
+            </div>
+            <div class="crystal-card p-6 flex items-center gap-6 border-l-4 border-l-accent">
+                <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 flex-none">
+                    <i data-lucide="zap" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg">Intensity Profile</h3>
+                    <p class="text-neutral-400 text-sm">High CNS fatigue. Recommended for primary lifts only.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Actions -->
+    <footer class="fixed bottom-0 left-0 right-0 p-4 bg-black/60 backdrop-blur-2xl border-t border-white/10 z-50">
+        <div class="max-w-5xl mx-auto flex gap-4">
+            <button class="flex-1 md:flex-none px-8 py-4 rounded-2xl bg-white/5 border border-white/10 font-bold uppercase tracking-widest text-xs hover:bg-white/10 transition-all text-neutral-400">
+                Cancel
+            </button>
+            <div class="hidden md:block flex-1"></div>
+            <button class="flex-[2] md:flex-none px-12 py-4 rounded-2xl btn-primary font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                Save Exercise
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Subtle Scroll Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.crystal-card, header, .input-group');
+            elements.forEach((el, i) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(15px)';
+                setTimeout(() => {
+                    el.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                }, i * 60);
+            });
+        });
+
+        // Haptic Feedback for Save Button
+        document.querySelector('.btn-primary').addEventListener('click', () => {
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(20);
+            }
+        });
+
+        // Reactive Cluster Visualizer (Simulation)
+        const inputs = document.querySelectorAll('input[type="number"]');
+        inputs.forEach(input => {
+            input.addEventListener('input', () => {
+                // Here we would typically re-render the visualizer dots based on clusters_per_set and reps_per_cluster
+                console.log('Parameters updated: triggering visual refresh');
+            });
+        });
+    </script>
+</body>
+</html>

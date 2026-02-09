@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Management | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255,255,255,0.2);
+            transform: translateY(-4px);
+            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 64px;
+            height: 64px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 8px 32px rgba(239, 68, 68, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .btn-fab:active { transform: scale(0.9); }
+
+        .view-toggle {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            padding: 4px;
+            border-radius: 14px;
+        }
+
+        .view-toggle button {
+            padding: 8px 16px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .view-toggle button.active {
+            background: rgba(255,255,255,0.1);
+            color: #FFF;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .filter-chip {
+            padding: 8px 16px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--glass-border);
+            white-space: nowrap;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .filter-chip.active {
+            background: #FFF;
+            color: #000;
+            border-color: #FFF;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 8px;
+        }
+
+        .avatar-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .avatar-group img {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            border: 3px solid #0A0A0A;
+            margin-left: -12px;
+            background: #1A1A1A;
+        }
+
+        .avatar-group img:first-child { margin-left: 0; }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.07) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--glass-border);
+            font-size: 14px;
+            position: relative;
+        }
+
+        .calendar-day.active { background: rgba(59, 130, 246, 0.1); border-color: var(--secondary); }
+        .calendar-day.today { border-color: var(--primary); color: var(--primary); font-weight: 700; }
+
+        .session-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            margin-top: 4px;
+        }
+
+        .animate-in {
+            animation: slideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            opacity: 0;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Section -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+        <div>
+            <h1 class="text-3xl md:text-4xl font-bold tracking-tight">Session Management</h1>
+            <p class="text-neutral-400 mt-1">Manage your small group training schedule.</p>
+        </div>
+
+        <div class="view-toggle flex items-center self-start">
+            <button class="active flex items-center gap-2 text-sm font-semibold text-neutral-400 transition-all" id="listViewBtn">
+                <i data-lucide="list" class="w-4 h-4"></i> List View
+            </button>
+            <button class="flex items-center gap-2 text-sm font-semibold text-neutral-400 transition-all" id="calendarViewBtn">
+                <i data-lucide="calendar" class="w-4 h-4"></i> Calendar
+            </button>
+        </div>
+    </header>
+
+    <!-- Filter Bar -->
+    <section class="mb-8 space-y-4">
+        <div class="flex items-center justify-between">
+            <div class="flex gap-2 overflow-x-auto scroll-hide pb-2">
+                <button class="filter-chip active">All Sessions</button>
+                <button class="filter-chip">Upcoming</button>
+                <button class="filter-chip">Completed</button>
+                <button class="filter-chip">Cancelled</button>
+            </div>
+            <div class="hidden md:flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
+                <i data-lucide="calendar-range" class="w-4 h-4 text-neutral-400"></i>
+                <span class="text-sm font-medium">This Week</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-400"></i>
+            </div>
+        </div>
+    </section>
+
+    <!-- List View Content -->
+    <main id="listView" class="space-y-4 max-w-4xl">
+        <!-- Session Card 1 -->
+        <div class="crystal-card kinetic-shimmer p-5 md:p-6 animate-in" style="animation-delay: 0.1s;">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div class="flex items-start gap-5">
+                    <div class="flex flex-col items-center justify-center bg-blue-500/10 border border-blue-500/20 rounded-2xl w-16 h-16 shrink-0">
+                        <span class="text-xs uppercase font-bold text-blue-400 mono">Oct</span>
+                        <span class="text-2xl font-bold text-white">24</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-3 mb-1">
+                            <h3 class="text-xl font-bold">Hypertrophy A</h3>
+                            <span class="status-badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Confirmed</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-400">
+                            <span class="flex items-center gap-1.5 mono"><i data-lucide="clock" class="w-4 h-4"></i> 09:00 - 10:00</span>
+                            <span class="flex items-center gap-1.5"><i data-lucide="map-pin" class="w-4 h-4"></i> Main Studio</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-white/5 pt-4 md:pt-0">
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="text-[10px] uppercase font-bold tracking-widest text-neutral-500">Participants (4/4)</span>
+                        <div class="avatar-group">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=James" alt="Client">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="Client">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Mike" alt="Client">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Anna" alt="Client">
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-neutral-400 hover:text-white hover:bg-white/10 transition-all">
+                            <i data-lucide="check" class="w-5 h-5"></i>
+                        </button>
+                        <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-neutral-400 hover:text-white hover:bg-white/10 transition-all">
+                            <i data-lucide="more-vertical" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Card 2 -->
+        <div class="crystal-card kinetic-shimmer p-5 md:p-6 animate-in" style="animation-delay: 0.2s;">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div class="flex items-start gap-5">
+                    <div class="flex flex-col items-center justify-center bg-white/5 border border-white/10 rounded-2xl w-16 h-16 shrink-0">
+                        <span class="text-xs uppercase font-bold text-neutral-400 mono">Oct</span>
+                        <span class="text-2xl font-bold text-white">24</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-3 mb-1">
+                            <h3 class="text-xl font-bold">Olympic Lifting</h3>
+                            <span class="status-badge bg-amber-500/10 text-amber-400 border border-amber-500/20">Pending</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-400">
+                            <span class="flex items-center gap-1.5 mono"><i data-lucide="clock" class="w-4 h-4"></i> 11:30 - 12:30</span>
+                            <span class="flex items-center gap-1.5"><i data-lucide="map-pin" class="w-4 h-4"></i> Platform Zone</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-white/5 pt-4 md:pt-0">
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="text-[10px] uppercase font-bold tracking-widest text-neutral-500">Participants (2/4)</span>
+                        <div class="avatar-group">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Leon" alt="Client">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Chloe" alt="Client">
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-neutral-400 hover:text-white hover:bg-white/10 transition-all">
+                            <i data-lucide="check" class="w-5 h-5"></i>
+                        </button>
+                        <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-neutral-400 hover:text-white hover:bg-white/10 transition-all">
+                            <i data-lucide="more-vertical" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Card 3 (Cancelled) -->
+        <div class="crystal-card kinetic-shimmer p-5 md:p-6 animate-in opacity-60" style="animation-delay: 0.3s;">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div class="flex items-start gap-5">
+                    <div class="flex flex-col items-center justify-center bg-red-500/10 border border-red-500/20 rounded-2xl w-16 h-16 shrink-0">
+                        <span class="text-xs uppercase font-bold text-red-400 mono">Oct</span>
+                        <span class="text-24 font-bold text-white">25</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-3 mb-1">
+                            <h3 class="text-xl font-bold line-through text-neutral-500">Endurance Circuit</h3>
+                            <span class="status-badge bg-red-500/10 text-red-400 border border-red-500/20">Cancelled</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-600">
+                            <span class="flex items-center gap-1.5 mono"><i data-lucide="clock" class="w-4 h-4"></i> 07:00 - 08:00</span>
+                            <span class="flex items-center gap-1.5"><i data-lucide="map-pin" class="w-4 h-4"></i> Online / Zoom</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-white/5 pt-4 md:pt-0">
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="text-[10px] uppercase font-bold tracking-widest text-neutral-600">Refunded</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-neutral-400 hover:text-white hover:bg-white/10 transition-all">
+                            <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Calendar View (Hidden by default) -->
+    <main id="calendarView" class="hidden animate-in">
+        <div class="crystal-card p-6">
+            <div class="flex items-center justify-between mb-8">
+                <h3 class="text-xl font-bold">October 2024</h3>
+                <div class="flex gap-2">
+                    <button class="p-2 hover:bg-white/5 rounded-lg border border-white/10"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                    <button class="p-2 hover:bg-white/5 rounded-lg border border-white/10"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                </div>
+            </div>
+            
+            <div class="calendar-grid mb-2">
+                <div class="text-center text-[10px] uppercase font-bold text-neutral-500">Mon</div>
+                <div class="text-center text-[10px] uppercase font-bold text-neutral-500">Tue</div>
+                <div class="text-center text-[10px] uppercase font-bold text-neutral-500">Wed</div>
+                <div class="text-center text-[10px] uppercase font-bold text-neutral-500">Thu</div>
+                <div class="text-center text-[10px] uppercase font-bold text-neutral-500">Fri</div>
+                <div class="text-center text-[10px] uppercase font-bold text-neutral-500">Sat</div>
+                <div class="text-center text-[10px] uppercase font-bold text-neutral-500">Sun</div>
+            </div>
+            
+            <div class="calendar-grid">
+                <!-- Day cells (Simulation) -->
+                <div class="calendar-day opacity-20">26</div>
+                <div class="calendar-day opacity-20">27</div>
+                <div class="calendar-day opacity-20">28</div>
+                <div class="calendar-day opacity-20">29</div>
+                <div class="calendar-day opacity-20">30</div>
+                <div class="calendar-day">1</div>
+                <div class="calendar-day">2</div>
+                <!-- ... skip to 24th ... -->
+                <div class="calendar-day">...</div>
+                <div class="calendar-day">22</div>
+                <div class="calendar-day active today">
+                    24
+                    <div class="flex gap-1">
+                        <div class="session-dot bg-secondary"></div>
+                        <div class="session-dot bg-secondary"></div>
+                    </div>
+                </div>
+                <div class="calendar-day">25 <div class="session-dot bg-primary"></div></div>
+                <div class="calendar-day">26</div>
+                <div class="calendar-day">27</div>
+                <div class="calendar-day">28</div>
+                <div class="calendar-day">29</div>
+                <div class="calendar-day">30</div>
+                <div class="calendar-day">31</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Floating Action Button -->
+    <button class="btn-fab group">
+        <i data-lucide="plus" class="w-8 h-8 text-white group-hover:rotate-90 transition-transform duration-300"></i>
+    </button>
+
+    <script>
+        lucide.createIcons();
+
+        // View Toggling Logic
+        const listViewBtn = document.getElementById('listViewBtn');
+        const calendarViewBtn = document.getElementById('calendarViewBtn');
+        const listView = document.getElementById('listView');
+        const calendarView = document.getElementById('calendarView');
+
+        listViewBtn.addEventListener('click', () => {
+            listViewBtn.classList.add('active');
+            calendarViewBtn.classList.remove('active');
+            listView.classList.remove('hidden');
+            calendarView.classList.add('hidden');
+        });
+
+        calendarViewBtn.addEventListener('click', () => {
+            calendarViewBtn.classList.add('active');
+            listViewBtn.classList.remove('active');
+            calendarView.classList.remove('hidden');
+            listView.classList.add('hidden');
+            // Re-render icons in new view
+            lucide.createIcons();
+        });
+
+        // Filter chip interaction
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+            });
+        });
+
+        // Haptic feedback simulation
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

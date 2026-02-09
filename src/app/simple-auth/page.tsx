@@ -77,15 +77,15 @@ export default function SimpleAuthPage() {
         <Card className="bg-white/80 backdrop-blur-sm shadow-2xl border-0 rounded-3xl">
           <CardHeader className="text-center pb-8 pt-8">
             <div className="flex items-center justify-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg">
-                <Dumbbell className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+                <Dumbbell className="w-6 h-6" />
               </div>
-              <h1 className="text-3xl font-bold text-slate-800">DailyFitness</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">DailyFitness</h1>
             </div>
-            <CardTitle className="text-2xl font-bold text-slate-800 mb-2">
+            <CardTitle className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-2">
               {isLogin ? 'Welcome Back!' : 'Start Your Journey'}
             </CardTitle>
-            <CardDescription className="text-slate-600 text-base">
+            <CardDescription className="text-[color:var(--fc-text-dim)] text-base">
               {isLogin ? 'Sign in to continue your fitness journey' : 'Create your account and begin transforming your health'}
             </CardDescription>
           </CardHeader>

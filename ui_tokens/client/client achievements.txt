@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Achievements | Kinetic Flux</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --flux-glow: rgba(239, 68, 68, 0.2);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Kinetic Refraction Card */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        /* Badge Tier Gradients */
+        .tier-gold { background: linear-gradient(135deg, #F59E0B 0%, #B45309 100%); box-shadow: 0 0 20px rgba(245, 158, 11, 0.2); }
+        .tier-silver { background: linear-gradient(135deg, #94A3B8 0%, #475569 100%); box-shadow: 0 0 20px rgba(148, 163, 184, 0.2); }
+        .tier-bronze { background: linear-gradient(135deg, #B45309 0%, #78350F 100%); box-shadow: 0 0 20px rgba(180, 83, 9, 0.2); }
+        .tier-locked { background: rgba(255,255,255,0.05); filter: grayscale(1); opacity: 0.5; }
+
+        /* Progress Bar Kinetic Animation */
+        .progress-bar-inner {
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            box-shadow: 0 0 15px var(--flux-glow);
+            transition: width 1.5s cubic-bezier(0.65, 0, 0.35, 1);
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .achievement-float {
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .btn-tab {
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .btn-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 8px var(--primary);
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .badge-grid-item:active { transform: scale(0.92); }
+    </style>
+</head>
+<body class="p-6 md:p-10 pb-32 max-w-2xl mx-auto">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Section -->
+    <header class="mb-10 flex justify-between items-end">
+        <div>
+            <h1 class="text-4xl font-extrabold tracking-tight mb-2">Achievements</h1>
+            <p class="text-neutral-400 font-medium">Kinetic Tier: <span class="text-white">Elite Striver</span></p>
+        </div>
+        <div class="text-right">
+            <div class="mono text-2xl font-bold text-primary">1,240 XP</div>
+            <div class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Total Power</div>
+        </div>
+    </header>
+
+    <!-- Achievement Summary Hero -->
+    <section class="mb-10">
+        <div class="crystal-card kinetic-shimmer p-6 border-l-4 border-primary">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <div class="text-3xl font-bold mb-1">23 <span class="text-lg text-neutral-500">/ 50</span></div>
+                    <div class="text-sm font-semibold text-neutral-400 uppercase tracking-wider">Unlocks Completed</div>
+                </div>
+                <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center border border-white/10 achievement-float">
+                    <i data-lucide="award" class="text-primary w-8 h-8"></i>
+                </div>
+            </div>
+            
+            <div class="relative h-3 w-full bg-white/5 rounded-full overflow-hidden mb-2">
+                <div class="progress-bar-inner h-full rounded-full" style="width: 46%"></div>
+            </div>
+            <div class="flex justify-between text-[11px] mono text-neutral-500 font-bold">
+                <span>PROGRESS: 46%</span>
+                <span>NEXT: LEGENDARY TITLE</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recent Unlocks Horizontal Scroll -->
+    <section class="mb-12">
+        <div class="flex items-center justify-between mb-4 px-1">
+            <h2 class="text-lg font-bold">Recent Pulsations</h2>
+            <button class="text-xs font-bold text-secondary uppercase tracking-widest">View History</button>
+        </div>
+        <div class="flex gap-4 overflow-x-auto hide-scrollbar snap-x py-2">
+            <!-- Recent Card 1 -->
+            <div class="snap-start flex-none w-64 crystal-card p-4 flex items-center gap-4 bg-white/[0.02]">
+                <div class="w-12 h-12 rounded-xl tier-gold flex items-center justify-center shrink-0">
+                    <i data-lucide="zap" class="w-6 h-6 text-white fill-white/20"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-sm leading-tight">Lightning Reflex</h4>
+                    <p class="text-[10px] text-neutral-400 mt-1 uppercase mono">2 hours ago</p>
+                </div>
+            </div>
+            <!-- Recent Card 2 -->
+            <div class="snap-start flex-none w-64 crystal-card p-4 flex items-center gap-4 bg-white/[0.02]">
+                <div class="w-12 h-12 rounded-xl tier-silver flex items-center justify-center shrink-0">
+                    <i data-lucide="flame" class="w-6 h-6 text-white fill-white/20"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-sm leading-tight">Consistency King</h4>
+                    <p class="text-[10px] text-neutral-400 mt-1 uppercase mono">Yesterday</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Filter Tabs -->
+    <nav class="flex gap-8 border-b border-white/10 mb-8 px-2 overflow-x-auto hide-scrollbar">
+        <button class="btn-tab active pb-4 text-sm font-bold uppercase tracking-widest whitespace-nowrap">All</button>
+        <button class="btn-tab text-neutral-500 pb-4 text-sm font-bold uppercase tracking-widest whitespace-nowrap">Performance</button>
+        <button class="btn-tab text-neutral-500 pb-4 text-sm font-bold uppercase tracking-widest whitespace-nowrap">Volume</button>
+        <button class="btn-tab text-neutral-500 pb-4 text-sm font-bold uppercase tracking-widest whitespace-nowrap">Social</button>
+    </nav>
+
+    <!-- Earned Badges Grid -->
+    <section class="mb-12">
+        <div class="grid grid-cols-3 gap-4">
+            <!-- Badge 1 -->
+            <div class="badge-grid-item flex flex-col items-center group cursor-pointer" onclick="openModal('Power Lifter', 'Gold Tier', 'Reached 10,000kg cumulative volume in a single session.')">
+                <div class="w-full aspect-square crystal-card tier-gold flex items-center justify-center mb-3">
+                    <i data-lucide="dumbbell" class="w-10 h-10 text-white transition-transform group-hover:scale-110"></i>
+                </div>
+                <span class="text-[11px] font-bold text-center leading-tight">Power Lifter</span>
+                <span class="text-[9px] mono text-neutral-500 uppercase mt-1">Jan 12</span>
+            </div>
+            <!-- Badge 2 -->
+            <div class="badge-grid-item flex flex-col items-center group cursor-pointer" onclick="openModal('Iron Cardio', 'Silver Tier', 'Completed 30 minutes of high-intensity functional training.')">
+                <div class="w-full aspect-square crystal-card tier-silver flex items-center justify-center mb-3">
+                    <i data-lucide="heart-pulse" class="w-10 h-10 text-white transition-transform group-hover:scale-110"></i>
+                </div>
+                <span class="text-[11px] font-bold text-center leading-tight">Iron Cardio</span>
+                <span class="text-[9px] mono text-neutral-500 uppercase mt-1">Feb 04</span>
+            </div>
+            <!-- Badge 3 -->
+            <div class="badge-grid-item flex flex-col items-center group cursor-pointer" onclick="openModal('Early Bird', 'Bronze Tier', 'Finished 5 workouts before 7:00 AM.')">
+                <div class="w-full aspect-square crystal-card tier-bronze flex items-center justify-center mb-3">
+                    <i data-lucide="sun" class="w-10 h-10 text-white transition-transform group-hover:scale-110"></i>
+                </div>
+                <span class="text-[11px] font-bold text-center leading-tight">Early Bird</span>
+                <span class="text-[9px] mono text-neutral-500 uppercase mt-1">Feb 15</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Locked Badges (Collapsible) -->
+    <section>
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-bold opacity-50">Locked Potential</h2>
+            <i data-lucide="chevron-down" class="w-5 h-5 text-neutral-600"></i>
+        </div>
+        <div class="grid grid-cols-3 gap-4 opacity-40">
+            <div class="flex flex-col items-center">
+                <div class="w-full aspect-square crystal-card flex items-center justify-center mb-3 border-dashed border-2 border-white/10">
+                    <i data-lucide="lock" class="w-8 h-8 text-neutral-600"></i>
+                </div>
+                <span class="text-[11px] font-bold text-neutral-500">Century Club</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="w-full aspect-square crystal-card flex items-center justify-center mb-3 border-dashed border-2 border-white/10">
+                    <i data-lucide="lock" class="w-8 h-8 text-neutral-600"></i>
+                </div>
+                <span class="text-[11px] font-bold text-neutral-500">Plate Master</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="w-full aspect-square crystal-card flex items-center justify-center mb-3 border-dashed border-2 border-white/10">
+                    <i data-lucide="lock" class="w-8 h-8 text-neutral-600"></i>
+                </div>
+                <span class="text-[11px] font-bold text-neutral-500">God Speed</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Badge Detail Modal (Hidden by default) -->
+    <div id="badge-modal" class="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-xl hidden">
+        <div class="crystal-card w-full max-w-sm p-8 text-center animate-in fade-in zoom-in duration-300">
+            <div id="modal-icon-container" class="w-24 h-24 mx-auto mb-6 rounded-3xl flex items-center justify-center shadow-2xl achievement-float">
+                <i id="modal-icon" data-lucide="award" class="w-12 h-12 text-white"></i>
+            </div>
+            <h3 id="modal-title" class="text-2xl font-bold mb-1">Badge Title</h3>
+            <p id="modal-tier" class="text-xs mono text-primary uppercase font-bold tracking-tighter mb-4">Tier Status</p>
+            <p id="modal-desc" class="text-neutral-400 text-sm leading-relaxed mb-8">Detailed unlock criteria description goes here.</p>
+            
+            <div class="flex flex-col gap-3">
+                <button class="h-12 w-full bg-white text-black font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-neutral-200 transition-colors">
+                    <i data-lucide="share-2" class="w-4 h-4"></i>
+                    Share Achievement
+                </button>
+                <button onclick="closeModal()" class="h-12 w-full bg-white/5 border border-white/10 text-white font-bold rounded-xl">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide
+        lucide.createIcons();
+
+        function openModal(title, tier, desc) {
+            const modal = document.getElementById('badge-modal');
+            const iconCont = document.getElementById('modal-icon-container');
+            
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-tier').innerText = tier;
+            document.getElementById('modal-desc').innerText = desc;
+
+            // Simple Tier coloring for modal icon background
+            if(tier.includes('Gold')) {
+                iconCont.className = "w-24 h-24 mx-auto mb-6 rounded-3xl flex items-center justify-center shadow-2xl tier-gold achievement-float";
+            } else if(tier.includes('Silver')) {
+                iconCont.className = "w-24 h-24 mx-auto mb-6 rounded-3xl flex items-center justify-center shadow-2xl tier-silver achievement-float";
+            } else {
+                iconCont.className = "w-24 h-24 mx-auto mb-6 rounded-3xl flex items-center justify-center shadow-2xl tier-bronze achievement-float";
+            }
+
+            modal.classList.remove('hidden');
+            if (window.navigator.vibrate) window.navigator.vibrate(20);
+        }
+
+        function closeModal() {
+            document.getElementById('badge-modal').classList.add('hidden');
+        }
+
+        // Animated Entry Logic
+        document.addEventListener('DOMContentLoaded', () => {
+            const gridItems = document.querySelectorAll('.badge-grid-item');
+            gridItems.forEach((item, index) => {
+                item.style.opacity = '0';
+                item.style.transform = 'translateY(20px) scale(0.9)';
+                setTimeout(() => {
+                    item.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    item.style.opacity = '1';
+                    item.style.transform = 'translateY(0) scale(1)';
+                }, index * 80);
+            });
+        });
+    </script>
+</body>
+</html>

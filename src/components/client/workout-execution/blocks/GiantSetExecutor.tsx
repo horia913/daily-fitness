@@ -13,9 +13,9 @@ import { LargeInput } from "../ui/LargeInput";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
-import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
+import { getWeightDefaultAndSuggestion, getCoachSuggestedWeight } from "@/lib/weightDefaultService";
+import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 
 export function GiantSetExecutor({
   block,
@@ -39,6 +39,7 @@ export function GiantSetExecutor({
   onAlternativesClick,
   onRestTimerClick,
   onSetComplete,
+  onLastSetLoggedForRest,
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const exercises = block.block.exercises || [];
@@ -232,8 +233,19 @@ export function GiantSetExecutor({
           duration: 2000,
         });
 
-        // Update parent with new completed sets count
         const newCompletedSets = completedSets + 1;
+        const setNumber = completedSets + 1;
+        if (newCompletedSets < totalSets) {
+          const firstWeight = parseFloat(weights[0] || "0");
+          const firstReps = parseInt(reps[0] || "0", 10);
+          onLastSetLoggedForRest?.({
+            weight: firstWeight,
+            reps: firstReps,
+            setNumber,
+            totalSets,
+            isPr: result.isNewPR,
+          });
+        }
         onSetComplete?.(newCompletedSets);
 
         // Complete block if last set
@@ -258,13 +270,13 @@ export function GiantSetExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {exercises.map((exercise, idx) => (
-        <GlassCard
+        <div
           key={exercise.id || idx}
-          elevation={1}
-          className="p-4"
+          className="p-4 rounded-xl"
+          style={{ background: "var(--fc-surface-sunken)" }}
         >
           <div className="mb-4">
-            <h4 className="font-semibold text-slate-800 dark:text-white text-lg">
+            <h4 className="font-semibold fc-text-primary text-lg">
               {idx + 1}. {exercise.exercise?.name || `Exercise ${idx + 1}`}
               {exercise.exercise_letter && ` (${exercise.exercise_letter})`}
             </h4>
@@ -295,24 +307,24 @@ export function GiantSetExecutor({
                 showStepper
                 stepAmount={2.5}
               />
-              {results[idx]?.suggested_weight != null && results[idx].suggested_weight! > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWeightsPristine((prev) => {
-                      const next = [...(prev.length ? prev : new Array(exercises.length).fill(true))];
-                      next[idx] = false;
-                      return next;
-                    });
-                    const newWeights = [...weights];
-                    newWeights[idx] = String(results[idx].suggested_weight);
-                    setWeights(newWeights);
-                  }}
-                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  {exercise.load_percentage != null ? `${exercise.load_percentage}% → ${results[idx].suggested_weight} kg` : `Suggested: ${results[idx].suggested_weight} kg`} (tap to apply)
-                </button>
-              )}
+              {(() => {
+                const coachSuggested = getCoachSuggestedWeight(exercise.load_percentage, exercise.exercise_id ? (e1rmMap[exercise.exercise_id] ?? null) : null);
+                return coachSuggested != null && coachSuggested > 0 ? (
+                  <ApplySuggestedWeightButton
+                    suggestedKg={coachSuggested}
+                    onApply={() => {
+                      setWeightsPristine((prev) => {
+                        const next = [...(prev.length ? prev : new Array(exercises.length).fill(true))];
+                        next[idx] = false;
+                        return next;
+                      });
+                      const newWeights = [...weights];
+                      newWeights[idx] = String(coachSuggested);
+                      setWeights(newWeights);
+                    }}
+                  />
+                ) : null;
+              })()}
             </div>
             <LargeInput
               label="Reps"
@@ -328,7 +340,7 @@ export function GiantSetExecutor({
               stepAmount={1}
             />
           </div>
-        </GlassCard>
+        </div>
       ))}
     </div>
   );
@@ -337,7 +349,8 @@ export function GiantSetExecutor({
     <Button
       onClick={handleLog}
       disabled={isLoggingSet}
-      className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white text-lg py-4"
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <Flame className="w-5 h-5 mr-2" />
       {isLoggingSet ? "Logging..." : "LOG GIANT SET"}

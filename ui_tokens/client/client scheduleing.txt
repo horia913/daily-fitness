@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .day-cell {
+            aspect-ratio: 1/1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .day-cell:hover:not(.empty) {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.05);
+        }
+
+        .day-cell.active {
+            background: var(--secondary);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+            color: white;
+        }
+
+        .day-cell.booked {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+
+        .day-cell.unavailable {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            height: 56px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(239, 68, 68, 0.4); }
+
+        .btn-secondary {
+            height: 48px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1.5px solid rgba(59, 130, 246, 0.3);
+            color: #3B82F6;
+            transition: all 0.3s ease;
+        }
+
+        .time-chip {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            padding: 12px 16px;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .time-chip:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--secondary);
+        }
+
+        .time-chip.selected {
+            background: var(--secondary);
+            border-color: var(--secondary);
+            color: white;
+        }
+
+        .bottom-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #111;
+            border-top: 1px solid var(--glass-border);
+            border-radius: 32px 32px 0 0;
+            z-index: 100;
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .bottom-sheet.open { transform: translateY(0); }
+
+        .sheet-handle {
+            width: 40px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            margin: 12px auto;
+        }
+
+        .limit-warning {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #FCA5A5;
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 20% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 50%);
+            z-index: -1;
+        }
+    </style>
+</head>
+<body class="p-6 pb-40 max-w-2xl mx-auto">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Area -->
+    <header class="mb-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight">Scheduling</h1>
+            <p class="text-sm text-neutral-400 mt-1">Book your session with Coach Marcus</p>
+        </div>
+        <button class="w-12 h-12 rounded-2xl crystal-card flex items-center justify-center text-neutral-400">
+            <i data-lucide="help-circle" class="w-6 h-6"></i>
+        </button>
+    </header>
+
+    <!-- Upcoming Session Card -->
+    <section class="mb-8">
+        <div class="crystal-card kinetic-shimmer p-6 border-l-4 border-l-blue-500">
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                        <i data-lucide="calendar-check" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <div class="text-caption text-neutral-400 text-sm">Next Session</div>
+                        <div class="font-bold text-lg">Jan 5 • 10:00 AM</div>
+                    </div>
+                </div>
+                <div class="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-xs font-bold mono">IN 2 DAYS</div>
+            </div>
+            <div class="flex gap-3">
+                <button class="btn-secondary flex-1 rounded-xl text-sm font-semibold">Reschedule</button>
+                <button class="px-4 text-neutral-400 hover:text-white transition-colors"><i data-lucide="more-horizontal"></i></button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Calendar Section -->
+    <section class="mb-8">
+        <div class="crystal-card p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold">January 2025</h2>
+                <div class="flex gap-2">
+                    <button class="p-2 hover:bg-white/5 rounded-lg transition-colors"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                    <button class="p-2 hover:bg-white/5 rounded-lg transition-colors"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                </div>
+            </div>
+
+            <!-- Days Legend -->
+            <div class="calendar-grid mb-4">
+                <div class="text-center text-xs font-bold text-neutral-500 mono">MO</div>
+                <div class="text-center text-xs font-bold text-neutral-500 mono">TU</div>
+                <div class="text-center text-xs font-bold text-neutral-500 mono">WE</div>
+                <div class="text-center text-xs font-bold text-neutral-500 mono">TH</div>
+                <div class="text-center text-xs font-bold text-neutral-500 mono">FR</div>
+                <div class="text-center text-xs font-bold text-neutral-500 mono">SA</div>
+                <div class="text-center text-xs font-bold text-neutral-500 mono">SU</div>
+            </div>
+
+            <!-- Calendar Days -->
+            <div class="calendar-grid">
+                <!-- Row 1 -->
+                <div class="day-cell empty"></div>
+                <div class="day-cell empty"></div>
+                <div class="day-cell unavailable">1</div>
+                <div class="day-cell unavailable">2</div>
+                <div class="day-cell unavailable">3</div>
+                <div class="day-cell unavailable">4</div>
+                <div class="day-cell booked kinetic-shimmer">5</div>
+                <!-- Row 2 -->
+                <div class="day-cell" onclick="selectDate(this)">6</div>
+                <div class="day-cell" onclick="selectDate(this)">7</div>
+                <div class="day-cell" onclick="selectDate(this)">8</div>
+                <div class="day-cell unavailable">9</div>
+                <div class="day-cell" onclick="selectDate(this)">10</div>
+                <div class="day-cell" onclick="selectDate(this)">11</div>
+                <div class="day-cell" onclick="selectDate(this)">12</div>
+                <!-- Row 3 -->
+                <div class="day-cell" onclick="selectDate(this)">13</div>
+                <div class="day-cell" onclick="selectDate(this)">14</div>
+                <div class="day-cell" onclick="selectDate(this)">15</div>
+                <div class="day-cell" onclick="selectDate(this)">16</div>
+                <div class="day-cell" onclick="selectDate(this)">17</div>
+                <div class="day-cell" onclick="selectDate(this)">18</div>
+                <div class="day-cell" onclick="selectDate(this)">19</div>
+                <!-- Row 4 -->
+                <div class="day-cell" onclick="selectDate(this)">20</div>
+                <div class="day-cell active" onclick="selectDate(this)">21</div>
+                <div class="day-cell" onclick="selectDate(this)">22</div>
+                <div class="day-cell" onclick="selectDate(this)">23</div>
+                <div class="day-cell" onclick="selectDate(this)">24</div>
+                <div class="day-cell" onclick="selectDate(this)">25</div>
+                <div class="day-cell" onclick="selectDate(this)">26</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Daily Limit Alert (Conditional) -->
+    <div id="limit-alert" class="hidden limit-warning p-4 rounded-2xl flex items-center gap-3 mb-8">
+        <i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
+        <p class="text-sm font-medium">You already have a session booked for Jan 5th. You can only book one session per day.</p>
+    </div>
+
+    <!-- Selection Bottom Sheet (Mocking functionality) -->
+    <div id="time-sheet" class="bottom-sheet p-8 pb-12 open">
+        <div class="sheet-handle"></div>
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h3 class="text-xl font-bold">Tuesday, Jan 21</h3>
+                <p class="text-sm text-neutral-400">Select an available time slot</p>
+            </div>
+            <button onclick="toggleSheet()" class="p-2 bg-white/5 rounded-full"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-8">
+            <div class="time-chip" onclick="selectTime(this)">
+                <span class="block font-bold">09:00 AM</span>
+                <span class="text-[10px] text-neutral-400 uppercase tracking-widest mono">1 Hour</span>
+            </div>
+            <div class="time-chip selected" onclick="selectTime(this)">
+                <span class="block font-bold">10:00 AM</span>
+                <span class="text-[10px] text-neutral-100 uppercase tracking-widest mono">1 Hour</span>
+            </div>
+            <div class="time-chip" onclick="selectTime(this)">
+                <span class="block font-bold">02:30 PM</span>
+                <span class="text-[10px] text-neutral-400 uppercase tracking-widest mono">1 Hour</span>
+            </div>
+            <div class="time-chip opacity-40 cursor-not-allowed">
+                <span class="block font-bold">04:00 PM</span>
+                <span class="text-[10px] text-neutral-500 uppercase tracking-widest mono">Taken</span>
+            </div>
+        </div>
+
+        <button class="btn-primary w-full rounded-2xl font-bold flex items-center justify-center gap-2" onclick="confirmBooking()">
+            Book Session
+            <i data-lucide="chevron-right" class="w-5 h-5"></i>
+        </button>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 bg-neutral-950/80 backdrop-blur-xl border-t border-white/10 z-50">
+        <div class="max-w-md mx-auto flex justify-around">
+            <button class="flex flex-col items-center gap-1 text-neutral-500">
+                <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase">Dash</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-primary">
+                <i data-lucide="calendar" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase">Schedule</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-neutral-500">
+                <i data-lucide="bar-chart-2" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase">Stats</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-neutral-500">
+                <i data-lucide="user" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase">Profile</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        lucide.createIcons();
+
+        function toggleSheet() {
+            document.getElementById('time-sheet').classList.toggle('open');
+        }
+
+        function selectDate(element) {
+            // Check if day is Jan 5 (which is already booked)
+            if(element.innerText === '5') {
+                document.getElementById('limit-alert').classList.remove('hidden');
+                setTimeout(() => {
+                    document.getElementById('limit-alert').classList.add('hidden');
+                }, 4000);
+                return;
+            }
+
+            // UI feedback
+            document.querySelectorAll('.day-cell').forEach(d => d.classList.remove('active'));
+            element.classList.add('active');
+            
+            // Open sheet
+            document.getElementById('time-sheet').classList.add('open');
+        }
+
+        function selectTime(element) {
+            document.querySelectorAll('.time-chip').forEach(t => {
+                t.classList.remove('selected');
+                t.querySelector('.text-neutral-100')?.classList.replace('text-neutral-100', 'text-neutral-400');
+            });
+            element.classList.add('selected');
+        }
+
+        function confirmBooking() {
+            const btn = document.querySelector('.btn-primary');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> Processing...`;
+            lucide.createIcons();
+
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate([20, 50, 20]);
+            }
+
+            setTimeout(() => {
+                btn.innerHTML = `<i data-lucide="check" class="w-6 h-6"></i> Confirmed!`;
+                btn.style.background = 'linear-gradient(135deg, #10B981 0%, #059669 100%)';
+                btn.style.boxShadow = '0 8px 24px rgba(16, 185, 129, 0.3)';
+                lucide.createIcons();
+                
+                setTimeout(() => {
+                    toggleSheet();
+                    // Reset button for demo
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.style.background = '';
+                        btn.style.boxShadow = '';
+                        lucide.createIcons();
+                    }, 1000);
+                }, 1500);
+            }, 2000);
+        }
+
+        // Animation entry
+        document.addEventListener('DOMContentLoaded', () => {
+            const sections = document.querySelectorAll('section, header');
+            sections.forEach((s, i) => {
+                s.style.opacity = '0';
+                s.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    s.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    s.style.opacity = '1';
+                    s.style.transform = 'translateY(0)';
+                }, i * 150);
+            });
+        });
+    </script>
+</body>
+</html>

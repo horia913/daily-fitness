@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Meal Plan | Vitreous Flux</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #050505;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Vitreous Chromatic Flux Background */
+        .flux-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at 20% 30%, rgba(239, 68, 68, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 70%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+            z-index: -1;
+            filter: blur(80px);
+            animation: flux-shift 20s infinite alternate ease-in-out;
+        }
+
+        @keyframes flux-shift {
+            0% { transform: scale(1) translate(0, 0); }
+            100% { transform: scale(1.1) translate(2%, 2%); }
+        }
+
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+
+        .glass-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            color: white;
+            padding: 12px 16px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .macro-slider {
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+        }
+
+        .macro-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            border: 2px solid var(--secondary);
+        }
+
+        .btn-primary {
+            height: 56px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 700;
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(16, 185, 129, 0.3); }
+
+        .btn-secondary {
+            height: 56px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: #9CA3AF;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); color: white; }
+
+        .day-scroll::-webkit-scrollbar { display: none; }
+        .day-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .meal-slot {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .meal-slot:hover {
+            background: rgba(255,255,255,0.03);
+            border-left-color: var(--secondary);
+        }
+
+        .text-h1 { font-size: 30px; font-weight: 700; line-height: 1.2; }
+        .text-h2 { font-size: 20px; font-weight: 600; }
+        .text-caption { font-size: 14px; color: #9CA3AF; }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%; left: -100%;
+            width: 300%; height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+        }
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .macro-bar-fill {
+            height: 100%;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 pb-32">
+    <div class="flux-bg"></div>
+
+    <!-- Header Navigation -->
+    <header class="flex items-center justify-between mb-8 max-w-4xl mx-auto">
+        <button class="w-10 h-10 flex items-center justify-center rounded-full crystal-card hover:bg-white/10 transition-colors">
+            <i data-lucide="chevron-left" class="w-5 h-5"></i>
+        </button>
+        <div class="text-center">
+            <h1 class="text-h1 tracking-tight">Create Meal Plan</h1>
+            <p class="text-caption">Design a bespoke nutrition protocol</p>
+        </div>
+        <button class="w-10 h-10 flex items-center justify-center rounded-full crystal-card text-neutral-400">
+            <i data-lucide="more-horizontal" class="w-5 h-5"></i>
+        </button>
+    </header>
+
+    <main class="max-w-4xl mx-auto space-y-6">
+        
+        <!-- Section: Plan Info -->
+        <section class="crystal-card p-6 kinetic-shimmer">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="md:col-span-2">
+                    <label class="block text-caption font-medium mb-2 uppercase tracking-wider">Plan Name</label>
+                    <input type="text" placeholder="e.g. Lean Gains Hypertrophy V1" class="glass-input w-full text-lg">
+                </div>
+                <div>
+                    <label class="block text-caption font-medium mb-2 uppercase tracking-wider">Duration</label>
+                    <select class="glass-input w-full appearance-none">
+                        <option>7 Days</option>
+                        <option>14 Days</option>
+                        <option selected>30 Days</option>
+                        <option>90 Days</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section: Macro Dynamics -->
+        <section class="crystal-card p-6">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-h2">Target Nutrients</h2>
+                <div class="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10">
+                    <i data-lucide="flame" class="w-4 h-4 text-orange-500"></i>
+                    <input type="number" value="2400" class="bg-transparent w-16 mono text-lg font-bold outline-none text-right">
+                    <span class="text-caption font-bold">KCAL</span>
+                </div>
+            </div>
+
+            <!-- Macro Visualizer Bar -->
+            <div class="h-4 w-full bg-white/5 rounded-full overflow-hidden flex mb-8">
+                <div class="macro-bar-fill bg-red-500" style="width: 40%"></div>
+                <div class="macro-bar-fill bg-blue-500" style="width: 35%"></div>
+                <div class="macro-bar-fill bg-emerald-500" style="width: 25%"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-caption uppercase font-bold text-red-400">Protein</span>
+                        <span class="mono">40%</span>
+                    </div>
+                    <input type="range" class="macro-slider w-full" value="40">
+                </div>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-caption uppercase font-bold text-blue-400">Carbs</span>
+                        <span class="mono">35%</span>
+                    </div>
+                    <input type="range" class="macro-slider w-full" value="35">
+                </div>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-caption uppercase font-bold text-emerald-400">Fats</span>
+                        <span class="mono">25%</span>
+                    </div>
+                    <input type="range" class="macro-slider w-full" value="25">
+                </div>
+            </div>
+        </section>
+
+        <!-- Section: Daily Meal Builder -->
+        <section class="space-y-4">
+            <!-- Day Selector -->
+            <div class="day-scroll flex gap-3 overflow-x-auto pb-2 scroll-smooth">
+                <button class="flex-none px-6 py-3 rounded-2xl bg-secondary text-white font-bold shadow-lg shadow-blue-500/20">Day 1</button>
+                <button class="flex-none px-6 py-3 rounded-2xl crystal-card text-neutral-400 hover:text-white transition-colors">Day 2</button>
+                <button class="flex-none px-6 py-3 rounded-2xl crystal-card text-neutral-400 hover:text-white transition-colors">Day 3</button>
+                <button class="flex-none px-6 py-3 rounded-2xl crystal-card text-neutral-400 hover:text-white transition-colors">Day 4</button>
+                <button class="flex-none px-6 py-3 rounded-2xl crystal-card text-neutral-400 hover:text-white transition-colors">Day 5</button>
+                <button class="flex-none px-6 py-3 rounded-2xl crystal-card text-neutral-400 hover:text-white transition-colors">Day 6</button>
+                <button class="flex-none px-6 py-3 rounded-2xl crystal-card text-neutral-400 hover:text-white transition-colors">Day 7</button>
+            </div>
+
+            <!-- Meal Slots Container -->
+            <div class="crystal-card overflow-hidden">
+                <!-- Breakfast -->
+                <div class="meal-slot p-6 border-b border-white/5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
+                                <i data-lucide="coffee" class="w-5 h-5"></i>
+                            </div>
+                            <h3 class="text-h3 font-semibold">Breakfast</h3>
+                        </div>
+                        <button class="text-secondary text-sm font-bold flex items-center gap-1 hover:opacity-80 transition-opacity">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Food
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-white/5 group">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2 h-2 rounded-full bg-red-400"></div>
+                                <div>
+                                    <div class="text-sm font-medium">Greek Yogurt with Berries</div>
+                                    <div class="text-[10px] text-neutral-500 mono uppercase tracking-widest">250g • 32g Protein</div>
+                                </div>
+                            </div>
+                            <button class="opacity-0 group-hover:opacity-100 p-2 text-neutral-500 hover:text-red-500 transition-all">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lunch -->
+                <div class="meal-slot p-6 border-b border-white/5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                                <i data-lucide="sun" class="w-5 h-5"></i>
+                            </div>
+                            <h3 class="text-h3 font-semibold">Lunch</h3>
+                        </div>
+                        <button class="text-secondary text-sm font-bold flex items-center gap-1">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Food
+                        </button>
+                    </div>
+                    <div class="flex flex-col items-center justify-center py-8 text-neutral-600 border-2 border-dashed border-white/5 rounded-2xl">
+                        <i data-lucide="utensils" class="w-8 h-8 mb-2 opacity-20"></i>
+                        <span class="text-sm font-medium">No items added yet</span>
+                    </div>
+                </div>
+
+                <!-- Dinner -->
+                <div class="meal-slot p-6 border-b border-white/5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                                <i data-lucide="moon" class="w-5 h-5"></i>
+                            </div>
+                            <h3 class="text-h3 font-semibold">Dinner</h3>
+                        </div>
+                        <button class="text-secondary text-sm font-bold flex items-center gap-1">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Food
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-white/5">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+                                <div>
+                                    <div class="text-sm font-medium">Grilled Salmon & Asparagus</div>
+                                    <div class="text-[10px] text-neutral-500 mono uppercase tracking-widest">150g • 25g Fats</div>
+                                </div>
+                            </div>
+                            <i data-lucide="grip-vertical" class="w-4 h-4 text-neutral-700"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Repeat Option -->
+                <div class="p-6 bg-white/[0.02]">
+                    <label class="flex items-center gap-3 cursor-pointer group">
+                        <div class="relative w-6 h-6 flex items-center justify-center border-2 border-white/10 rounded-lg group-hover:border-secondary transition-colors">
+                            <input type="checkbox" class="absolute inset-0 opacity-0 cursor-pointer peer">
+                            <i data-lucide="check" class="w-4 h-4 text-secondary scale-0 peer-checked:scale-100 transition-transform"></i>
+                        </div>
+                        <span class="text-sm font-medium text-neutral-400 group-hover:text-white transition-colors">Repeat this pattern for the remaining 29 days</span>
+                    </label>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Action Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 p-6 bg-black/80 backdrop-blur-xl border-t border-white/10 z-50">
+        <div class="max-w-4xl mx-auto flex gap-4">
+            <button class="btn-secondary flex-1 rounded-2xl flex items-center justify-center gap-2 font-bold">
+                Cancel
+            </button>
+            <button class="btn-primary flex-[2] rounded-2xl flex items-center justify-center gap-3 text-white">
+                <i data-lucide="save" class="w-5 h-5"></i>
+                Save & Publish Plan
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Interaction Feedback
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) window.navigator.vibrate(10);
+            });
+        });
+
+        // Entry Reveal Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const sections = document.querySelectorAll('section');
+            sections.forEach((s, i) => {
+                s.style.opacity = '0';
+                s.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    s.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    s.style.opacity = '1';
+                    s.style.transform = 'translateY(0)';
+                }, i * 150);
+            });
+        });
+
+        // Simple Range Sync Simulation
+        const sliders = document.querySelectorAll('.macro-slider');
+        sliders.forEach(slider => {
+            slider.addEventListener('input', (e) => {
+                const val = e.target.value;
+                const display = e.target.previousElementSibling.querySelector('.mono');
+                if (display) display.textContent = val + '%';
+            });
+        });
+    </script>
+</body>
+</html>

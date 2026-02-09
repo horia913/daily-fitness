@@ -118,9 +118,9 @@ export default function WorkoutTemplateSidebar({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-y-0 right-0 w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-xl z-50 flex flex-col">
+    <div className="fixed inset-y-0 right-0 w-80 fc-surface border-l border-[color:var(--fc-surface-card-border)] shadow-xl z-50 flex flex-col">
       {/* Sidebar Header */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+      <div className="p-4 border-b border-[color:var(--fc-surface-card-border)]">
         <div className="flex items-center justify-between mb-4">
           <h3 className={`text-lg font-semibold ${theme.text}`}>Workout Templates</h3>
           <Button
@@ -135,7 +135,7 @@ export default function WorkoutTemplateSidebar({
 
         {/* Search */}
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 fc-text-dim w-4 h-4" />
           <Input
             placeholder="Search templates..."
             value={searchTerm}
@@ -149,7 +149,7 @@ export default function WorkoutTemplateSidebar({
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+            className="w-full px-3 py-2 border border-[color:var(--fc-surface-card-border)] rounded-lg text-sm"
           >
             <option value="all">All Categories</option>
             {Object.keys(groupedTemplates).map(category => (
@@ -162,7 +162,7 @@ export default function WorkoutTemplateSidebar({
           <select
             value={selectedDifficulty}
             onChange={(e) => setSelectedDifficulty(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+            className="w-full px-3 py-2 border border-[color:var(--fc-surface-card-border)] rounded-lg text-sm"
           >
             <option value="all">All Difficulties</option>
             <option value="beginner">Beginner</option>
@@ -224,7 +224,7 @@ export default function WorkoutTemplateSidebar({
         {/* Empty State */}
         {filteredTemplates.length === 0 && (
           <div className="text-center py-8">
-            <Dumbbell className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+            <Dumbbell className="w-12 h-12 fc-text-dim mx-auto mb-3" />
             <h4 className={`text-sm font-medium ${theme.text} mb-1`}>No templates found</h4>
             <p className={`text-xs ${theme.textSecondary}`}>
               Try adjusting your search or filters
@@ -273,8 +273,8 @@ function TemplateCard({ template, onSelect, onDrag, difficultyColors, difficulty
       <CardContent className="p-3">
         <div className="flex items-center gap-3">
           {/* Template Icon */}
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800">
-            <CategoryIcon className="w-5 h-5 text-slate-500" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg" style={{ background: "var(--fc-surface-sunken)" }}>
+            <CategoryIcon className="w-5 h-5 fc-text-dim" />
           </div>
 
           {/* Template Info */}
@@ -286,7 +286,7 @@ function TemplateCard({ template, onSelect, onDrag, difficultyColors, difficulty
               <Badge className={`${difficultyColors[template.difficulty_level]} border-0 text-xs`}>
                 {difficultyLabels[template.difficulty_level]}
               </Badge>
-              <div className="flex items-center gap-1 text-xs text-slate-500">
+              <div className="flex items-center gap-1 text-xs fc-text-dim">
                 <Clock className="w-3 h-3" />
                 <span>{template.estimated_duration}m</span>
               </div>
@@ -294,8 +294,8 @@ function TemplateCard({ template, onSelect, onDrag, difficultyColors, difficulty
           </div>
 
           {/* Drag Handle */}
-          <div className="flex items-center justify-center w-6 h-6 rounded hover:bg-slate-100 dark:hover:bg-slate-800">
-            <GripVertical className="w-4 h-4 text-slate-400" />
+          <div className="flex items-center justify-center w-6 h-6 rounded">
+            <GripVertical className="w-4 h-4 fc-text-dim" />
           </div>
         </div>
 
@@ -307,7 +307,7 @@ function TemplateCard({ template, onSelect, onDrag, difficultyColors, difficulty
         )}
 
         {/* Template Stats */}
-        <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
+        <div className="flex items-center justify-between mt-2 text-xs fc-text-dim">
           <div className="flex items-center gap-1">
             <Users className="w-3 h-3" />
             <span>{template.usage_count || 0}</span>

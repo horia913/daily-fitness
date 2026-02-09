@@ -12,9 +12,9 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
-import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
+import { getWeightDefaultAndSuggestion, getCoachSuggestedWeight } from "@/lib/weightDefaultService";
+import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 
 export function ClusterSetExecutor({
   block,
@@ -38,6 +38,7 @@ export function ClusterSetExecutor({
   onAlternativesClick,
   onRestTimerClick,
   onSetComplete,
+  onLastSetLoggedForRest,
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
@@ -66,6 +67,7 @@ export function ClusterSetExecutor({
     loadPercentage,
     e1rm: e1rm ?? null,
   });
+  const coachSuggestedWeight = getCoachSuggestedWeight(loadPercentage, e1rm);
 
   useEffect(() => {
     setIsWeightPristine(true);
@@ -178,8 +180,17 @@ export function ClusterSetExecutor({
           duration: 2000,
         });
 
-        // Update parent with new completed sets count
         const newCompletedSets = completedSets + 1;
+        const setNumber = completedSets + 1;
+        if (newCompletedSets < totalSets) {
+          onLastSetLoggedForRest?.({
+            weight: weightNum,
+            reps: totalReps,
+            setNumber,
+            totalSets,
+            isPr: result.isNewPR,
+          });
+        }
         onSetComplete?.(newCompletedSets);
 
         // Complete block if last set
@@ -211,8 +222,8 @@ export function ClusterSetExecutor({
 
   const loggingInputs = (
     <div className="space-y-4">
-      <GlassCard elevation={1} className="p-4">
-        <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">
+      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
+        <div className="text-sm font-semibold fc-text-dim mb-4">
           Cluster 1 of {clustersPerSet} (Set {currentSet + 1} of {totalSets})
         </div>
         <div className="space-y-4">
@@ -227,22 +238,23 @@ export function ClusterSetExecutor({
               showStepper
               stepAmount={2.5}
             />
-            {suggested_weight != null && suggested_weight > 0 && (
-              <button type="button" onClick={() => { setWeight(String(suggested_weight)); setIsWeightPristine(false); }} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                {loadPercentage != null ? `${loadPercentage}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
-              </button>
+            {coachSuggestedWeight != null && coachSuggestedWeight > 0 && (
+              <ApplySuggestedWeightButton
+                suggestedKg={coachSuggestedWeight}
+                onApply={() => { setWeight(String(coachSuggestedWeight)); setIsWeightPristine(false); }}
+              />
             )}
           </div>
-          <div className="text-sm text-slate-600 dark:text-slate-400">
+          <div className="text-sm fc-text-dim">
             Reps per cluster: {repsPerCluster} | Total reps:{" "}
             {repsPerCluster * clustersPerSet}
           </div>
-          <div className="text-xs text-slate-500 dark:text-slate-500">
+          <div className="text-xs fc-text-dim">
             Rest {intraClusterRest}s between clusters, {restBetweenSets}s after
             set
           </div>
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 
@@ -250,7 +262,8 @@ export function ClusterSetExecutor({
     <Button
       onClick={handleLog}
       disabled={isLoggingSet}
-      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-lg py-4"
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <Link className="w-5 h-5 mr-2" />
       {isLoggingSet ? "Logging..." : "LOG CLUSTER SET"}

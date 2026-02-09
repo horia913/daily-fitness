@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Categories Management | Obsidian Forge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Refractive Obsidian Forge Effects */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-primary {
+            height: 52px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .btn-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.2s ease;
+        }
+
+        .btn-icon:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-workout { background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-program { background: rgba(168, 85, 247, 0.15); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3); }
+        .badge-exercise { background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 0% 0%, rgba(239, 68, 68, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        /* Modal Blur */
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(12px);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        .modal-backdrop.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            transform: scale(0.95) translateY(20px);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .modal-backdrop.active .modal-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .input-forge {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 14px 18px;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .input-forge:focus {
+            outline: none;
+            border-color: var(--secondary);
+            background: rgba(255, 255, 255, 0.07);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .filter-tab {
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #9CA3AF;
+            transition: all 0.2s ease;
+        }
+
+        .filter-tab.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Section -->
+    <header class="max-w-5xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div>
+            <nav class="flex items-center gap-2 text-sm text-neutral-500 mb-4 mono uppercase tracking-widest">
+                <span>Coach</span>
+                <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                <span class="text-neutral-300">Management</span>
+            </nav>
+            <h1 class="text-4xl md:text-5xl font-bold tracking-tight mb-2">Categories</h1>
+            <p class="text-lg text-neutral-400">Organize your forge with custom tags and classifications.</p>
+        </div>
+        <button onclick="toggleModal()" class="btn-primary px-8 rounded-2xl flex items-center justify-center gap-3 font-bold group">
+            <i data-lucide="plus" class="w-6 h-6 transition-transform group-hover:rotate-90"></i>
+            New Category
+        </button>
+    </header>
+
+    <!-- Filters & Search -->
+    <div class="max-w-5xl mx-auto mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div class="flex items-center gap-2 bg-white/5 p-1.5 rounded-2xl border border-white/10">
+            <button class="filter-tab active">All</button>
+            <button class="filter-tab">Workouts</button>
+            <button class="filter-tab">Exercises</button>
+            <button class="filter-tab">Programs</button>
+        </div>
+        <div class="relative w-full md:w-72">
+            <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500"></i>
+            <input type="text" placeholder="Search categories..." class="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-white/30 transition-all">
+        </div>
+    </div>
+
+    <!-- Category Grid -->
+    <main class="max-w-5xl mx-auto grid grid-cols-1 gap-4">
+        
+        <!-- Category Item 1 -->
+        <div class="crystal-card kinetic-shimmer p-5 flex items-center gap-6">
+            <div class="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                <i data-lucide="flame" class="w-7 h-7"></i>
+            </div>
+            <div class="flex-1">
+                <div class="flex items-center gap-3 mb-1">
+                    <h3 class="text-xl font-semibold">High Intensity</h3>
+                    <span class="badge badge-workout">Workout</span>
+                </div>
+                <p class="text-sm text-neutral-400">Applied to <span class="mono text-neutral-200">24</span> items</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="btn-icon text-neutral-400 hover:text-white" aria-label="Edit">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                </button>
+                <button class="btn-icon text-red-500/70 hover:text-red-400 hover:bg-red-500/10" aria-label="Delete">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Category Item 2 -->
+        <div class="crystal-card kinetic-shimmer p-5 flex items-center gap-6">
+            <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                <i data-lucide="dumbbell" class="w-7 h-7"></i>
+            </div>
+            <div class="flex-1">
+                <div class="flex items-center gap-3 mb-1">
+                    <h3 class="text-xl font-semibold">Bodyweight Only</h3>
+                    <span class="badge badge-exercise">Exercise</span>
+                </div>
+                <p class="text-sm text-neutral-400">Applied to <span class="mono text-neutral-200">112</span> items</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="btn-icon text-neutral-400 hover:text-white">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                </button>
+                <button class="btn-icon text-red-500/70 hover:text-red-400 hover:bg-red-500/10">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Category Item 3 -->
+        <div class="crystal-card kinetic-shimmer p-5 flex items-center gap-6">
+            <div class="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 border border-purple-500/20">
+                <i data-lucide="calendar" class="w-7 h-7"></i>
+            </div>
+            <div class="flex-1">
+                <div class="flex items-center gap-3 mb-1">
+                    <h3 class="text-xl font-semibold">Hypertrophy Cycles</h3>
+                    <span class="badge badge-program">Program</span>
+                </div>
+                <p class="text-sm text-neutral-400">Applied to <span class="mono text-neutral-200">8</span> items</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="btn-icon text-neutral-400 hover:text-white">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                </button>
+                <button class="btn-icon text-red-500/70 hover:text-red-400 hover:bg-red-500/10">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Category Item 4 -->
+        <div class="crystal-card kinetic-shimmer p-5 flex items-center gap-6">
+            <div class="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                <i data-lucide="zap" class="w-7 h-7"></i>
+            </div>
+            <div class="flex-1">
+                <div class="flex items-center gap-3 mb-1">
+                    <h3 class="text-xl font-semibold">Powerlifting</h3>
+                    <span class="badge badge-workout">Workout</span>
+                </div>
+                <p class="text-sm text-neutral-400">Applied to <span class="mono text-neutral-200">42</span> items</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="btn-icon text-neutral-400 hover:text-white">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                </button>
+                <button class="btn-icon text-red-500/70 hover:text-red-400 hover:bg-red-500/10">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Add Category -->
+    <div id="categoryModal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-6">
+        <div class="modal-content crystal-card w-full max-w-lg p-8 bg-[#111] border-white/20 shadow-2xl">
+            <div class="flex justify-between items-start mb-8">
+                <div>
+                    <h2 class="text-2xl font-bold mb-1">Add New Category</h2>
+                    <p class="text-neutral-400 text-sm">Classify your workout assets.</p>
+                </div>
+                <button onclick="toggleModal()" class="text-neutral-500 hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <form class="space-y-6" onsubmit="event.preventDefault(); toggleModal();">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-300 block">Category Name</label>
+                    <input type="text" placeholder="e.g. Explosive Power" class="input-forge w-full">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-neutral-300 block">Type</label>
+                        <select class="input-forge w-full appearance-none">
+                            <option>Workout</option>
+                            <option>Exercise</option>
+                            <option>Program</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-neutral-300 block">Icon Pick</label>
+                        <div class="flex items-center gap-2">
+                            <button type="button" class="input-forge flex-1 flex items-center justify-between">
+                                <i data-lucide="smile" class="w-5 h-5"></i>
+                                <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4 flex gap-3">
+                    <button type="button" onclick="toggleModal()" class="flex-1 h-12 rounded-xl border border-white/10 hover:bg-white/5 transition-colors font-medium">Cancel</button>
+                    <button type="submit" class="btn-primary flex-1 rounded-xl font-bold">Create Category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mobile Floating Action (Duplicate for better thumb zone) -->
+    <button onclick="toggleModal()" class="md:hidden fixed bottom-8 right-8 w-16 h-16 btn-primary rounded-2xl flex items-center justify-center shadow-2xl z-40">
+        <i data-lucide="plus" class="w-8 h-8"></i>
+    </button>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Modal Logic
+        function toggleModal() {
+            const modal = document.getElementById('categoryModal');
+            modal.classList.toggle('active');
+            
+            // Haptic feedback simulation
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(15);
+            }
+        }
+
+        // Animation for cards on entrance
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px) scale(0.98)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.7s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0) scale(1)';
+                }, index * 80);
+            });
+        });
+
+        // Search highlight/filter simulation
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase();
+            document.querySelectorAll('.crystal-card').forEach(card => {
+                const title = card.querySelector('h3')?.innerText.toLowerCase() || '';
+                if (title.includes(val)) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

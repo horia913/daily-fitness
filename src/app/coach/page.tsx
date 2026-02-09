@@ -6,23 +6,23 @@ import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
-import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { AnimatedEntry } from "@/components/ui/AnimatedEntry";
+import { MetricGauge } from "@/components/ui/MetricGauge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
   Users,
   UserPlus,
   Dumbbell,
-  Apple,
   Calendar,
-  FileText,
+  CalendarDays,
   TrendingUp,
-  Clock,
-  CheckCircle,
-  AlertCircle,
+  AlertTriangle,
   MessageCircle,
-  Target,
+  Trophy,
+  Layers,
+  Send,
+  ChevronRight,
 } from "lucide-react";
 
 // API response types
@@ -51,14 +51,12 @@ interface DashboardData {
   }>;
 }
 
-// UI types (mapped from API response)
 interface Client {
   id: string;
   first_name?: string;
   last_name?: string;
   avatar_url?: string;
   status?: string;
-  last_active?: string;
 }
 
 interface DashboardStats {
@@ -70,6 +68,7 @@ interface DashboardStats {
 
 interface Session {
   id: string;
+  clientId?: string;
   clientName: string;
   time: string;
   type: string;
@@ -77,8 +76,8 @@ interface Session {
 }
 
 function CoachDashboardContent() {
-  const { user } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { user, profile } = useAuth();
+  const { performanceSettings } = useTheme();
 
   const [stats, setStats] = useState<DashboardStats>({
     totalClients: 0,
@@ -98,30 +97,23 @@ function CoachDashboardContent() {
       setLoading(true);
       setError(null);
 
-      // Single API call to get all dashboard data
       const response = await fetch('/api/coach/dashboard', {
         credentials: 'include'
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        
-        // Handle RPC not found - fall back gracefully
         if (errorData.code === 'RPC_NOT_FOUND') {
           console.warn('[CoachDashboard] RPC not found, migration needed');
           setError('Dashboard optimization pending. Please run database migrations.');
           return;
         }
-        
         throw new Error(errorData.error || 'Failed to fetch dashboard data');
       }
 
       const data: DashboardData = await response.json();
-
-      // Map stats
       setStats(data.stats);
 
-      // Map recent clients to UI format
       const mappedClients: Client[] = data.recentClients.map((c) => ({
         id: c.id,
         first_name: c.firstName || undefined,
@@ -131,18 +123,16 @@ function CoachDashboardContent() {
       }));
       setRecentClients(mappedClients);
 
-      // Map sessions to UI format
       const mappedSessions: Session[] = data.todaySessions.map((s) => {
-        // Parse scheduled time for display
         const scheduledDate = new Date(s.scheduledAt);
         const timeStr = scheduledDate.toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
           hour12: true
         });
-        
         return {
           id: s.id,
+          clientId: s.clientId,
           clientName: s.clientName || 'Unknown Client',
           time: timeStr,
           type: 'Training Session',
@@ -150,7 +140,6 @@ function CoachDashboardContent() {
         };
       });
       setTodaySessions(mappedSessions);
-
     } catch (err: any) {
       console.error("Error loading dashboard data:", err);
       setError(err.message || 'An error occurred');
@@ -170,505 +159,264 @@ function CoachDashboardContent() {
       ? Math.round((stats.activeClients / stats.totalClients) * 100)
       : 0;
 
+  const coachName = profile?.first_name ? `Coach ${profile.first_name}` : "Coach";
+  const dateStr = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-        {/* Header */}
-        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                Coach Hub
-              </span>
-              <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                Welcome back, Coach!
-              </h1>
-              <p className="text-sm text-[color:var(--fc-text-dim)]">
-                {new Date().toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-            </div>
-            {/* Pickup Mode Quick Access */}
-            <Link href="/coach/gym-console">
-              <Button className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg">
-                <Target className="w-4 h-4 mr-2" />
-                Pickup Mode
-              </Button>
-            </Link>
-          </div>
-        </GlassCard>
+      <div className="relative z-10 mx-auto w-full max-w-5xl fc-page">
 
-        {/* Error State */}
+        {/* ===== HEADER: Name + Date ===== */}
+        <AnimatedEntry delay={0} animation="fade-up">
+          <header className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-tight fc-text-primary leading-tight">
+                {coachName}
+              </h1>
+              <p className="text-[11px] fc-text-dim font-mono">{dateStr}</p>
+            </div>
+            <div className="w-10 h-10 rounded-full fc-surface-elevated border border-[color:var(--fc-glass-border)] flex items-center justify-center font-bold fc-text-primary text-sm">
+              {profile?.first_name?.[0] || user?.email?.[0] || "C"}
+            </div>
+          </header>
+        </AnimatedEntry>
+
+        {/* ===== ERROR STATE ===== */}
         {error && (
-          <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
-            <p>{error}</p>
+          <div className="fc-surface rounded-2xl p-4 mb-6 border-l-4 border-l-[color:var(--fc-status-error)]">
+            <p className="text-sm fc-text-error">{error}</p>
           </div>
         )}
 
-        {/* Hero Stats Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Total Clients */}
-          <GlassCard
-            elevation={2}
-            className="fc-glass fc-card p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
-          >
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
-              style={{
-                background: getSemanticColor("trust").gradient,
-                boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-              }}
-            >
-              <Users className="w-7 h-7 text-white" />
-            </div>
-            <AnimatedNumber
-              value={stats.totalClients}
-              size="heroLg"
-              weight="bold"
-              color={getSemanticColor("trust").primary}
-            />
-            <p className="text-sm font-medium mt-2 text-[color:var(--fc-text-dim)]">
-              Total Clients
-            </p>
-          </GlassCard>
-
-          {/* Active Clients */}
-          <GlassCard
-            elevation={2}
-            className="fc-glass fc-card p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
-          >
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
-              style={{
-                background: getSemanticColor("success").gradient,
-                boxShadow: `0 4px 12px ${
-                  getSemanticColor("success").primary
-                }30`,
-              }}
-            >
-              <CheckCircle className="w-7 h-7 text-white" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <AnimatedNumber
-                value={stats.activeClients}
-                size="heroLg"
-                weight="bold"
-                color={getSemanticColor("success").primary}
-              />
-              <span
-                className="text-lg font-semibold"
-                style={{ color: getSemanticColor("success").primary }}
-              >
-                {activePercentage}%
-              </span>
-            </div>
-            <p className="text-sm font-medium mt-2 text-[color:var(--fc-text-dim)]">
-              Active Clients
-            </p>
-          </GlassCard>
-
-          {/* Total Workouts */}
-          <GlassCard
-            elevation={2}
-            className="fc-glass fc-card p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
-          >
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
-              style={{
-                background: getSemanticColor("trust").gradient,
-                boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-              }}
-            >
-              <Dumbbell className="w-7 h-7 text-white" />
-            </div>
-            <AnimatedNumber
-              value={stats.totalWorkouts}
-              size="heroLg"
-              weight="bold"
-              color={getSemanticColor("trust").primary}
-            />
-            <p className="text-sm font-medium mt-2 text-[color:var(--fc-text-dim)]">
-              Workout Templates
-            </p>
-          </GlassCard>
-
-          {/* Total Meal Plans */}
-          <GlassCard
-            elevation={2}
-            className="fc-glass fc-card p-6 transition-all hover:scale-105 hover:shadow-2xl cursor-pointer"
-          >
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
-              style={{
-                background: getSemanticColor("energy").gradient,
-                boxShadow: `0 4px 12px ${getSemanticColor("energy").primary}30`,
-              }}
-            >
-              <Apple className="w-7 h-7 text-white" />
-            </div>
-            <AnimatedNumber
-              value={stats.totalMealPlans}
-              size="heroLg"
-              weight="bold"
-              color={getSemanticColor("energy").primary}
-            />
-            <p className="text-sm font-medium mt-2 text-[color:var(--fc-text-dim)]">
-              Meal Plans
-            </p>
-          </GlassCard>
-        </div>
-
-        {/* Quick Actions Grid */}
-        <div>
-          <h2 className="text-2xl font-bold mb-4 text-[color:var(--fc-text-primary)]">
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Link href="/coach/workouts/templates/create">
-              <GlassCard
-                elevation={2}
-                className="p-6 h-full transition-all hover:scale-105 hover:shadow-xl cursor-pointer"
-              >
-                <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center mb-4 mx-auto"
-                  style={{
-                    background: getSemanticColor("energy").gradient,
-                  }}
-                >
-                  <Dumbbell className="w-7 h-7 text-white" />
+        {/* ===== LOADING STATE ===== */}
+        {loading && (
+          <div className="space-y-4 mb-8">
+            <div className="flex justify-around py-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex flex-col items-center gap-2">
+                  <div className="fc-skeleton rounded-full" style={{ width: 90, height: 90 }} />
+                  <div className="fc-skeleton" style={{ width: 60, height: 10 }} />
                 </div>
-                <h3
-                  className="text-center font-semibold text-lg"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  Create Workout
-                </h3>
-                <p
-                  className="text-center text-sm mt-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  New template
-                </p>
-              </GlassCard>
-            </Link>
-
-            <Link href="/coach/clients/add">
-              <GlassCard
-                elevation={2}
-                className="p-6 h-full transition-all hover:scale-105 hover:shadow-xl cursor-pointer"
-              >
-                <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center mb-4 mx-auto"
-                  style={{
-                    background: getSemanticColor("trust").gradient,
-                  }}
-                >
-                  <UserPlus className="w-7 h-7 text-white" />
-                </div>
-                <h3
-                  className="text-center font-semibold text-lg"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  Add Client
-                </h3>
-                <p
-                  className="text-center text-sm mt-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  Grow your roster
-                </p>
-              </GlassCard>
-            </Link>
-
-            <Link href="/coach/meal-plans/create">
-              <GlassCard
-                elevation={2}
-                className="p-6 h-full transition-all hover:scale-105 hover:shadow-xl cursor-pointer"
-              >
-                <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center mb-4 mx-auto"
-                  style={{
-                    background: getSemanticColor("success").gradient,
-                  }}
-                >
-                  <Apple className="w-7 h-7 text-white" />
-                </div>
-                <h3
-                  className="text-center font-semibold text-lg"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  Create Meal Plan
-                </h3>
-                <p
-                  className="text-center text-sm mt-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  Nutrition guidance
-                </p>
-              </GlassCard>
-            </Link>
-
-            <Link href="/coach/reports">
-              <GlassCard
-                elevation={2}
-                className="p-6 h-full transition-all hover:scale-105 hover:shadow-xl cursor-pointer"
-              >
-                <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center mb-4 mx-auto"
-                  style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.15)"
-                      : "rgba(0,0,0,0.1)",
-                  }}
-                >
-                  <FileText
-                    className="w-7 h-7"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  />
-                </div>
-                <h3
-                  className="text-center font-semibold text-lg"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
-                  View Reports
-                </h3>
-                <p
-                  className="text-center text-sm mt-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  Analytics & insights
-                </p>
-              </GlassCard>
-            </Link>
+              ))}
+            </div>
+            <div className="fc-skeleton" style={{ height: 160, borderRadius: 'var(--fc-radius-xl)' }} />
+            <div className="fc-skeleton" style={{ height: 200, borderRadius: 'var(--fc-radius-xl)' }} />
           </div>
-        </div>
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Recent Clients */}
-          <GlassCard elevation={2} className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2
-                className="text-2xl font-bold"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
-                Recent Clients
-              </h2>
-              <Link href="/coach/clients">
-                <Button variant="ghost" size="sm">
-                  View All
-                </Button>
-              </Link>
-            </div>
+        {!loading && (
+          <>
+            {/* ===== METRIC GAUGES ===== */}
+            <AnimatedEntry delay={100} animation="fade-up">
+              <section className="flex justify-around items-start py-4 mb-6">
+                <MetricGauge
+                  value={activePercentage}
+                  displayValue={`${stats.activeClients}`}
+                  label="Active"
+                  size={90}
+                  strokeWidth={5}
+                  color="var(--fc-status-success)"
+                  suffix={`/${stats.totalClients}`}
+                />
+                <MetricGauge
+                  value={todaySessions.length}
+                  max={Math.max(todaySessions.length, 8)}
+                  displayValue={`${todaySessions.length}`}
+                  label="Today"
+                  size={90}
+                  strokeWidth={5}
+                  color="var(--fc-domain-workouts)"
+                />
+                <MetricGauge
+                  value={stats.totalWorkouts}
+                  max={Math.max(stats.totalWorkouts, 50)}
+                  displayValue={`${stats.totalWorkouts}`}
+                  label="Workouts"
+                  size={90}
+                  strokeWidth={5}
+                  gradient={["var(--fc-accent-cyan)", "var(--fc-accent-purple)"]}
+                />
+              </section>
+            </AnimatedEntry>
 
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin w-8 h-8 border-4 border-cyan-400 border-t-transparent rounded-full"></div>
-              </div>
-            ) : recentClients.length > 0 ? (
-              <div className="space-y-4">
-                {recentClients.map((client) => (
-                  <Link key={client.id} href={`/coach/clients/${client.id}`}>
-                    <div
-                      className="flex items-center gap-4 p-3 rounded-lg transition-all hover:scale-102 hover:shadow-md cursor-pointer"
-                      style={{
-                        background: isDark
-                          ? "rgba(255,255,255,0.05)"
-                          : "rgba(0,0,0,0.02)",
-                      }}
-                    >
-                      <div
-                        className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold"
-                        style={{
-                          background: getSemanticColor("trust").gradient,
-                          color: "#fff",
-                        }}
-                      >
-                        {client.first_name?.[0] || "C"}
-                      </div>
-                      <div className="flex-1">
-                        <h3
-                          className="font-semibold"
-                          style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                        >
-                          {client.first_name} {client.last_name}
-                        </h3>
-                        <div
-                          className="text-sm flex items-center gap-2"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.6)"
-                              : "rgba(0,0,0,0.6)",
-                          }}
-                        >
-                          <div
-                            className="w-2 h-2 rounded-full"
-                            style={{
-                              background: client.status === 'active' 
-                                ? getSemanticColor("success").primary 
-                                : 'rgba(128,128,128,0.5)',
-                            }}
-                          />
-                          {client.status === 'active' ? 'Active' : client.status || 'Pending'}
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm">
-                        <MessageCircle className="w-5 h-5" />
-                      </Button>
+            {/* ===== QUICK ACTIONS ===== */}
+            <AnimatedEntry delay={150} animation="fade-up">
+              <section className="mb-6">
+                <div className="fc-action-chips">
+                  <Link href="/coach/workouts/templates/create" className="fc-action-chip">
+                    <div className="fc-action-chip-icon fc-icon-workouts">
+                      <Dumbbell className="w-4 h-4" />
                     </div>
+                    Create Workout
                   </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Users
-                  className="w-16 h-16 mx-auto mb-4"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                  }}
-                />
-                <p
-                  className="text-lg font-semibold mb-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                  }}
-                >
-                  No clients yet
-                </p>
-                <p
-                  className="text-sm mb-4"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                  }}
-                >
-                  Start building your coaching roster
-                </p>
-                <Link href="/coach/clients/add">
-                  <Button
-                    variant="default"
-                    style={{
-                      background: getSemanticColor("trust").gradient,
-                      boxShadow: `0 4px 12px ${
-                        getSemanticColor("trust").primary
-                      }30`,
-                    }}
-                  >
-                    <UserPlus className="w-5 h-5 mr-2" />
-                    Add Your First Client
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </GlassCard>
-
-          {/* Today's Schedule */}
-          <GlassCard elevation={2} className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2
-                className="text-2xl font-bold"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
-                Today&apos;s Schedule
-              </h2>
-              <Link href="/coach/sessions">
-                <Button variant="ghost" size="sm">
-                  <Calendar className="w-5 h-5 mr-2" />
-                  Calendar
-                </Button>
-              </Link>
-            </div>
-
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin w-8 h-8 border-4 border-cyan-400 border-t-transparent rounded-full"></div>
-              </div>
-            ) : todaySessions.length > 0 ? (
-              <div className="space-y-3">
-                {todaySessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center gap-3 p-3 rounded-lg"
-                    style={{
-                      background: isDark
-                        ? "rgba(255,255,255,0.05)"
-                        : "rgba(0,0,0,0.02)",
-                    }}
-                  >
-                    <Clock
-                      className="w-5 h-5"
-                      style={{ color: getSemanticColor("trust").primary }}
-                    />
-                    <div className="flex-1">
-                      <p
-                        className="font-semibold"
-                        style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                      >
-                        {session.clientName}
-                      </p>
-                      <p
-                        className="text-sm"
-                        style={{
-                          color: isDark
-                            ? "rgba(255,255,255,0.6)"
-                            : "rgba(0,0,0,0.6)",
-                        }}
-                      >
-                        {session.type}
-                      </p>
+                  <Link href="/coach/programs" className="fc-action-chip">
+                    <div className="fc-action-chip-icon fc-icon-challenges">
+                      <Layers className="w-4 h-4" />
                     </div>
-                    <span
-                      className="text-sm font-medium"
-                      style={{
-                        color: isDark
-                          ? "rgba(255,255,255,0.8)"
-                          : "rgba(0,0,0,0.8)",
-                      }}
-                    >
-                      {session.time}
-                    </span>
+                    Programs
+                  </Link>
+                  <Link href="/coach/scheduling" className="fc-action-chip">
+                    <div className="fc-action-chip-icon fc-icon-neutral">
+                      <CalendarDays className="w-4 h-4" />
+                    </div>
+                    Schedule
+                  </Link>
+                  <Link href="/coach/clients/add" className="fc-action-chip">
+                    <div className="fc-action-chip-icon fc-icon-meals">
+                      <UserPlus className="w-4 h-4" />
+                    </div>
+                    Add Client
+                  </Link>
+                </div>
+              </section>
+            </AnimatedEntry>
+
+            {/* ===== TODAY'S SESSIONS ===== */}
+            <AnimatedEntry delay={200} animation="fade-up">
+              <section className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold uppercase tracking-widest fc-text-dim">
+                    Today&apos;s Schedule
+                  </h2>
+                  <Link href="/coach/sessions" className="text-xs font-semibold fc-text-dim flex items-center gap-1 hover:fc-text-primary transition-colors">
+                    View All <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+
+                {todaySessions.length > 0 ? (
+                  <div className="space-y-2">
+                    {todaySessions.map((session) => (
+                      <Link
+                        key={session.id}
+                        href={session.clientId ? `/coach/clients/${session.clientId}` : "/coach/clients"}
+                      >
+                        <div className="fc-surface rounded-2xl p-4 flex items-center gap-4 transition-all duration-200 hover:translate-y-[-1px] active:scale-[0.98] cursor-pointer">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm fc-surface-elevated border border-[color:var(--fc-glass-border)] fc-text-primary flex-shrink-0">
+                            {session.clientName?.[0] || "?"}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-bold fc-text-primary leading-tight">
+                              {session.clientName}
+                            </h4>
+                            <p className="text-[11px] fc-text-dim">{session.type}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <span className="text-sm font-bold font-mono fc-text-workouts">
+                              {session.time}
+                            </span>
+                            <p className="text-[10px] uppercase tracking-wider fc-text-dim font-semibold">
+                              {session.status === "completed" ? "Done" : "Upcoming"}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Calendar
-                  className="w-16 h-16 mx-auto mb-4"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                  }}
-                />
-                <p
-                  className="text-lg font-semibold mb-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                  }}
-                >
-                  No sessions scheduled today
-                </p>
-                <p
-                  className="text-sm"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-                  }}
-                >
-                  Enjoy your day off or schedule some sessions!
-                </p>
-              </div>
-            )}
-          </GlassCard>
-        </div>
+                ) : (
+                  <div className="fc-surface rounded-2xl p-8 text-center">
+                    <Calendar className="w-10 h-10 mx-auto mb-3 fc-text-dim opacity-50" />
+                    <p className="text-sm font-semibold fc-text-primary">No sessions today</p>
+                    <p className="text-xs fc-text-dim mt-1">View calendar to schedule</p>
+                  </div>
+                )}
+              </section>
+            </AnimatedEntry>
+
+            {/* ===== STATUS STRIP ===== */}
+            <AnimatedEntry delay={250} animation="fade-up">
+              <section className="mb-6">
+                <div className="fc-stats-strip">
+                  <div className="fc-stats-strip-item">
+                    <span className="fc-stats-strip-value fc-text-success">{stats.activeClients}</span>
+                    <span className="fc-stats-strip-label">Active</span>
+                  </div>
+                  <div className="fc-stats-strip-item">
+                    <span className="fc-stats-strip-value fc-text-warning">0</span>
+                    <span className="fc-stats-strip-label">At Risk</span>
+                  </div>
+                  <div className="fc-stats-strip-item">
+                    <span className="fc-stats-strip-value">{stats.totalWorkouts}</span>
+                    <span className="fc-stats-strip-label">Templates</span>
+                  </div>
+                  <div className="fc-stats-strip-item">
+                    <span className="fc-stats-strip-value">{stats.totalMealPlans}</span>
+                    <span className="fc-stats-strip-label">Meals</span>
+                  </div>
+                </div>
+              </section>
+            </AnimatedEntry>
+
+            {/* ===== RECENT CLIENTS ===== */}
+            <AnimatedEntry delay={300} animation="fade-up">
+              <section className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold uppercase tracking-widest fc-text-dim">
+                    Recent Clients
+                  </h2>
+                  <Link href="/coach/clients" className="text-xs font-semibold fc-text-dim flex items-center gap-1 hover:fc-text-primary transition-colors">
+                    View All <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+
+                {recentClients.length > 0 ? (
+                  <div className="space-y-2">
+                    {recentClients.map((client) => (
+                      <Link key={client.id} href={`/coach/clients/${client.id}`}>
+                        <div className="fc-surface rounded-2xl p-4 flex items-center gap-4 transition-all duration-200 hover:translate-y-[-1px] active:scale-[0.98] cursor-pointer">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm fc-text-primary flex-shrink-0"
+                            style={{
+                              background: "color-mix(in srgb, var(--fc-accent-cyan) 15%, transparent)",
+                              border: "1px solid color-mix(in srgb, var(--fc-accent-cyan) 25%, transparent)",
+                            }}
+                          >
+                            {client.first_name?.[0] || "C"}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-bold fc-text-primary leading-tight">
+                              {client.first_name} {client.last_name}
+                            </h4>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <div
+                                className="w-1.5 h-1.5 rounded-full"
+                                style={{
+                                  background: client.status === 'active'
+                                    ? 'var(--fc-status-success)'
+                                    : 'var(--fc-text-dim)',
+                                }}
+                              />
+                              <span className="text-[11px] fc-text-dim">
+                                {client.status === 'active' ? 'Active' : client.status || 'Pending'}
+                              </span>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 fc-text-subtle flex-shrink-0" />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="fc-surface rounded-2xl p-8 text-center">
+                    <Users className="w-10 h-10 mx-auto mb-3 fc-text-dim opacity-50" />
+                    <p className="text-sm font-semibold fc-text-primary mb-1">No clients yet</p>
+                    <p className="text-xs fc-text-dim mb-4">Start building your coaching roster</p>
+                    <Link href="/coach/clients/add">
+                      <button className="fc-btn fc-btn-primary fc-press h-10 px-6 text-sm">
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Add First Client
+                      </button>
+                    </Link>
+                  </div>
+                )}
+              </section>
+            </AnimatedEntry>
+          </>
+        )}
       </div>
     </AnimatedBackground>
   );

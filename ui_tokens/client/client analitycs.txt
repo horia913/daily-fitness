@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Analytics | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #070707;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --prism-1: rgba(239, 68, 68, 0.15);
+            --prism-2: rgba(59, 130, 246, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Vitreous Refraction Effect */
+        .vitreous-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(160%);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 28px;
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1);
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .prism-light {
+            position: absolute;
+            width: 150px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transform: rotate(-45deg);
+            filter: blur(2px);
+            animation: light-sweep 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes light-sweep {
+            0% { top: -100%; left: -100%; }
+            100% { top: 200%; left: 200%; }
+        }
+
+        .tab-active {
+            background: white;
+            color: black;
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+
+        .chart-grid line { stroke: rgba(255,255,255,0.05); }
+        
+        .glow-blue { filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5)); }
+        .glow-red { filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5)); }
+        .glow-green { filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5)); }
+
+        .stat-ring {
+            transform: rotate(-90deg);
+            stroke-dasharray: 251.2;
+            stroke-dashoffset: 251.2;
+            transition: stroke-dashoffset 2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .insight-pill {
+            border-left-width: 4px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+        }
+
+        .scroll-hide::-webkit-scrollbar { display: none; }
+
+        .floating-prism {
+            position: fixed;
+            z-index: -1;
+            filter: blur(80px);
+            border-radius: 50%;
+            opacity: 0.4;
+        }
+
+        /* Responsive Chart Aspect Ratio */
+        .chart-container {
+            aspect-ratio: 16 / 9;
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .chart-container { aspect-ratio: 4 / 3; }
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10 pb-20">
+    <!-- Atmospheric Background -->
+    <div class="floating-prism w-96 h-96 bg-blue-600 top-[-10%] left-[-10%]"></div>
+    <div class="floating-prism w-80 h-80 bg-red-600 bottom-[-5%] right-[-5%]"></div>
+
+    <!-- Header & Time Range -->
+    <header class="max-w-6xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div class="space-y-1">
+            <div class="flex items-center gap-2 text-blue-400 mb-2">
+                <i data-lucide="bar-chart-big" class="w-5 h-5"></i>
+                <span class="text-xs font-bold tracking-[0.2em] uppercase">Performance Engine</span>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-bold tracking-tight">Analytics <span class="text-neutral-500">Overview</span></h1>
+        </div>
+
+        <div class="flex bg-white/5 p-1 rounded-2xl backdrop-blur-md border border-white/10 w-full md:w-auto overflow-x-auto scroll-hide">
+            <button class="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all tab-active">7D</button>
+            <button class="px-6 py-2.5 rounded-xl text-sm font-medium text-neutral-400 hover:text-white transition-all">30D</button>
+            <button class="px-6 py-2.5 rounded-xl text-sm font-medium text-neutral-400 hover:text-white transition-all">90D</button>
+            <button class="px-6 py-2.5 rounded-xl text-sm font-medium text-neutral-400 hover:text-white transition-all">ALL</button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto space-y-8">
+        <!-- Key Metrics Grid -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            <!-- Metric: Volume -->
+            <div class="vitreous-card p-6 overflow-hidden">
+                <div class="prism-light"></div>
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500">
+                        <i data-lucide="weight" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-accent text-[10px] font-bold mono">+12.4%</span>
+                </div>
+                <div class="text-neutral-400 text-xs font-medium uppercase tracking-widest mb-1">Total Volume</div>
+                <div class="text-2xl md:text-3xl font-bold mono tracking-tighter">142.8<span class="text-sm text-neutral-500 ml-1">k</span></div>
+            </div>
+
+            <!-- Metric: Workouts -->
+            <div class="vitreous-card p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                        <i data-lucide="calendar-check" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-neutral-500 text-[10px] font-bold mono">STABLE</span>
+                </div>
+                <div class="text-neutral-400 text-xs font-medium uppercase tracking-widest mb-1">Workouts</div>
+                <div class="text-2xl md:text-3xl font-bold mono tracking-tighter">24</div>
+            </div>
+
+            <!-- Metric: Duration -->
+            <div class="vitreous-card p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
+                        <i data-lucide="timer" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-red-500 text-[10px] font-bold mono">-4m</span>
+                </div>
+                <div class="text-neutral-400 text-xs font-medium uppercase tracking-widest mb-1">Avg Duration</div>
+                <div class="text-2xl md:text-3xl font-bold mono tracking-tighter">52<span class="text-sm text-neutral-500 ml-1">m</span></div>
+            </div>
+
+            <!-- Metric: Consistency -->
+            <div class="vitreous-card p-6 flex flex-col items-center text-center">
+                <div class="relative w-16 h-16 mb-2">
+                    <svg class="w-full h-full" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" stroke-width="8" fill="none" />
+                        <circle cx="50" cy="50" r="40" stroke="url(#consistency-grad)" stroke-width="8" fill="none" class="stat-ring" style="stroke-dashoffset: 25;" />
+                        <defs>
+                            <linearGradient id="consistency-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#3B82F6" />
+                                <stop offset="100%" style="stop-color:#10B981" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-[10px] font-bold mono">92%</span>
+                    </div>
+                </div>
+                <div class="text-neutral-400 text-[10px] font-medium uppercase tracking-widest">Consistency</div>
+            </div>
+        </section>
+
+        <!-- Main Charts Section -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Volume Line Chart -->
+            <div class="lg:col-span-2 vitreous-card p-8">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h3 class="text-xl font-bold">Volume Evolution</h3>
+                        <p class="text-sm text-neutral-500">Progressive overload tracking</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-lg border border-white/10">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider">Squat</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chart-container relative">
+                    <svg class="w-full h-full" viewBox="0 0 800 300">
+                        <!-- Grid Lines -->
+                        <g class="chart-grid">
+                            <line x1="0" y1="50" x2="800" y2="50" />
+                            <line x1="0" y1="150" x2="800" y2="150" />
+                            <line x1="0" y1="250" x2="800" y2="250" />
+                        </g>
+                        <!-- Data Path -->
+                        <path d="M0,250 Q100,230 200,180 T400,120 T600,140 T800,40" 
+                              fill="none" 
+                              stroke="url(#line-grad)" 
+                              stroke-width="4" 
+                              class="glow-blue" />
+                        <!-- Tooltip Marker -->
+                        <circle cx="600" cy="140" r="6" fill="#3B82F6" class="glow-blue" />
+                        <defs>
+                            <linearGradient id="line-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#3B82F6" />
+                                <stop offset="100%" style="stop-color:#60A5FA" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="absolute bottom-[-20px] left-0 w-full flex justify-between text-[10px] mono text-neutral-600">
+                        <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Muscle Distribution -->
+            <div class="vitreous-card p-8">
+                <h3 class="text-xl font-bold mb-1">Target Areas</h3>
+                <p class="text-sm text-neutral-500 mb-8">Muscle group distribution</p>
+                
+                <div class="flex flex-col items-center gap-10">
+                    <div class="relative w-48 h-48">
+                        <svg class="w-full h-full" viewBox="0 0 100 100">
+                            <!-- Donut Segments -->
+                            <circle cx="50" cy="50" r="40" stroke="#EF4444" stroke-width="12" fill="none" stroke-dasharray="80 171.2" stroke-dashoffset="0" />
+                            <circle cx="50" cy="50" r="40" stroke="#3B82F6" stroke-width="12" fill="none" stroke-dasharray="60 191.2" stroke-dashoffset="-80" />
+                            <circle cx="50" cy="50" r="40" stroke="#10B981" stroke-width="12" fill="none" stroke-dasharray="40 211.2" stroke-dashoffset="-140" />
+                            <circle cx="50" cy="50" r="40" stroke="#F59E0B" stroke-width="12" fill="none" stroke-dasharray="71.2 180" stroke-dashoffset="-180" />
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-2xl font-bold mono tracking-tighter">12</span>
+                            <span class="text-[8px] uppercase tracking-widest text-neutral-500">Groups</span>
+                        </div>
+                    </div>
+
+                    <div class="w-full space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                                <span class="text-xs font-medium">Posterior Chain</span>
+                            </div>
+                            <span class="text-xs mono text-neutral-400">32%</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                <span class="text-xs font-medium">Chest/Shoulders</span>
+                            </div>
+                            <span class="text-xs mono text-neutral-400">24%</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-accent"></span>
+                                <span class="text-xs font-medium">Quads/Legs</span>
+                            </div>
+                            <span class="text-xs mono text-neutral-400">18%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Lower Section: Bar Charts & Insights -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Exercise Frequency -->
+            <div class="vitreous-card p-8">
+                <h3 class="text-xl font-bold mb-6">Top Performers</h3>
+                <div class="space-y-6">
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="font-medium">Back Squat</span>
+                            <span class="mono text-neutral-400">18 sets</span>
+                        </div>
+                        <div class="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                            <div class="h-full bg-red-500/50 rounded-full glow-red" style="width: 85%"></div>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="font-medium">Bench Press</span>
+                            <span class="mono text-neutral-400">14 sets</span>
+                        </div>
+                        <div class="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                            <div class="h-full bg-blue-500/50 rounded-full glow-blue" style="width: 65%"></div>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="font-medium">Deadlift</span>
+                            <span class="mono text-neutral-400">12 sets</span>
+                        </div>
+                        <div class="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                            <div class="h-full bg-accent/50 rounded-full glow-green" style="width: 50%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kinetic Insights -->
+            <div class="space-y-4">
+                <h3 class="text-sm font-bold uppercase tracking-[0.2em] text-neutral-500 px-2 mb-4">AI Kinetic Insights</h3>
+                
+                <div class="vitreous-card p-5 insight-pill border-l-accent">
+                    <div class="flex gap-4">
+                        <div class="mt-1"><i data-lucide="zap" class="w-5 h-5 text-accent"></i></div>
+                        <div>
+                            <h4 class="font-bold text-sm">Volume Surge Detected</h4>
+                            <p class="text-xs text-neutral-400 mt-1 leading-relaxed">Your squat volume increased 23% this month. Recovery time seems optimal based on heart rate variance.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="vitreous-card p-5 insight-pill border-l-blue-500">
+                    <div class="flex gap-4">
+                        <div class="mt-1"><i data-lucide="trending-up" class="w-5 h-5 text-blue-500"></i></div>
+                        <div>
+                            <h4 class="font-bold text-sm">Consistency Peak</h4>
+                            <p class="text-xs text-neutral-400 mt-1 leading-relaxed">Monday is your strongest day. 100% attendance rate for the last 8 weeks. Keep the momentum.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="vitreous-card p-5 insight-pill border-l-red-500">
+                    <div class="flex gap-4">
+                        <div class="mt-1"><i data-lucide="alert-circle" class="w-5 h-5 text-red-500"></i></div>
+                        <div>
+                            <h4 class="font-bold text-sm">Lagging Indicator: Shoulders</h4>
+                            <p class="text-xs text-neutral-400 mt-1 leading-relaxed">Direct shoulder volume is down 15% compared to other muscle groups. Suggest adding 2 extra sets of Lateral Raises.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Simple Bottom Navigation -->
+    <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg h-16 bg-black/80 backdrop-blur-xl border border-white/10 rounded-3xl flex items-center justify-around px-8 z-50">
+        <button class="text-neutral-500 hover:text-white transition-colors"><i data-lucide="home" class="w-6 h-6"></i></button>
+        <button class="text-neutral-500 hover:text-white transition-colors"><i data-lucide="calendar" class="w-6 h-6"></i></button>
+        <div class="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center -translate-y-4 shadow-xl shadow-red-900/40">
+            <i data-lucide="plus" class="w-6 h-6 text-white"></i>
+        </div>
+        <button class="text-blue-500"><i data-lucide="bar-chart-2" class="w-6 h-6"></i></button>
+        <button class="text-neutral-500 hover:text-white transition-colors"><i data-lucide="settings" class="w-6 h-6"></i></button>
+    </nav>
+
+    <script>
+        lucide.createIcons();
+
+        // Animate the progress rings on load
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                document.querySelectorAll('.stat-ring').forEach(ring => {
+                    const offset = ring.getAttribute('style').match(/dashoffset: (\d+)/)[1];
+                    ring.style.strokeDashoffset = offset;
+                });
+            }, 300);
+
+            // Subtle parallax on cards
+            document.addEventListener('mousemove', (e) => {
+                const cards = document.querySelectorAll('.vitreous-card');
+                const x = (e.clientX / window.innerWidth - 0.5) * 15;
+                const y = (e.clientY / window.innerHeight - 0.5) * 15;
+                
+                cards.forEach(card => {
+                    card.style.transform = `perspective(1000px) rotateX(${-y}deg) rotateY(${x}deg)`;
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Sessions | Vitreous Kinetic Pulse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        /* Buttons */
+        .btn-primary {
+            height: 48px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .btn-primary:active { transform: scale(0.95); }
+        .btn-primary:hover { box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5); }
+
+        .btn-secondary {
+            height: 48px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1.5px solid rgba(59, 130, 246, 0.4);
+            color: #3B82F6;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover { background: rgba(59, 130, 246, 0.2); transform: translateY(-1px); }
+
+        .btn-tertiary {
+            height: 44px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #9CA3AF;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-tertiary:hover { color: white; background: rgba(255, 255, 255, 0.1); }
+
+        /* Floating Action Button */
+        .fab-pulse {
+            position: fixed;
+            bottom: 100px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fab-float 3s infinite ease-in-out;
+            cursor: pointer;
+        }
+
+        @keyframes fab-float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Navigation Tabs */
+        .tab-switcher {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 4px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .tab-btn {
+            padding: 8px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tab-btn.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Status Badges */
+        .badge {
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .badge-confirmed { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge-completed { background: rgba(59, 130, 246, 0.15); color: #3B82F6; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-cancelled { background: rgba(156, 163, 175, 0.15); color: #9CA3AF; border: 1px solid rgba(156, 163, 175, 0.3); }
+        .badge-late { background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+        /* Typography */
+        .text-h1 { font-size: 32px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
+        .text-h2 { font-size: 20px; line-height: 1.25; font-weight: 600; }
+        .text-caption { font-size: 14px; color: #9CA3AF; }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .bottom-nav {
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--glass-border);
+        }
+        
+        /* List Animation */
+        .list-item {
+            animation: slideIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        @keyframes slideIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header -->
+    <header class="max-w-4xl mx-auto mb-10 flex justify-between items-end">
+        <div>
+            <h1 class="text-h1">Sessions</h1>
+            <p class="text-caption mt-1">Manage your training schedule and coach syncs.</p>
+        </div>
+        <div class="hidden md:block">
+            <div class="tab-switcher flex gap-1">
+                <button class="tab-btn active" onclick="switchTab(this, 'upcoming')">Upcoming</button>
+                <button class="tab-btn text-neutral-500" onclick="switchTab(this, 'past')">History</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto space-y-8">
+        
+        <!-- Hero: Next Session Card -->
+        <section>
+            <div class="crystal-card kinetic-shimmer p-8 border-l-4 border-l-blue-500">
+                <div class="flex flex-col md:flex-row gap-8 items-center">
+                    <!-- Coach Info -->
+                    <div class="flex flex-col items-center md:items-start text-center md:text-left">
+                        <div class="relative mb-4">
+                            <div class="w-20 h-20 rounded-full border-2 border-blue-500/30 p-1 bg-neutral-900">
+                                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" alt="Coach Marcus" class="w-full h-full rounded-full object-cover">
+                            </div>
+                            <div class="absolute -bottom-1 -right-1 bg-accent w-6 h-6 rounded-full border-4 border-black flex items-center justify-center">
+                                <div class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+                            </div>
+                        </div>
+                        <h2 class="text-h2">Coach Marcus</h2>
+                        <span class="text-caption mono text-blue-400">Next Session</span>
+                    </div>
+
+                    <!-- Session Details -->
+                    <div class="flex-1 space-y-4 w-full">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="flex items-center gap-3 bg-white/5 p-4 rounded-2xl">
+                                <div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                                    <i data-lucide="calendar" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <div class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Date</div>
+                                    <div class="font-semibold text-lg">Jan 15, 2025</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 bg-white/5 p-4 rounded-2xl">
+                                <div class="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400">
+                                    <i data-lucide="clock" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <div class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Time</div>
+                                    <div class="font-semibold text-lg">10:00 AM <span class="text-sm font-normal text-neutral-400">(60m)</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex flex-col md:flex-row gap-3">
+                            <div class="flex items-center gap-2 px-4 py-2 bg-accent/10 rounded-xl border border-accent/20 text-accent text-sm font-medium">
+                                <i data-lucide="map-pin" class="w-4 h-4"></i>
+                                Downtown Performance Lab
+                            </div>
+                            <div class="flex items-center gap-2 px-4 py-2 bg-blue-500/10 rounded-xl border border-blue-500/20 text-blue-400 text-sm font-medium">
+                                <i data-lucide="zap" class="w-4 h-4"></i>
+                                in 2 days
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex flex-row md:flex-col gap-3 w-full md:w-auto">
+                        <button class="btn-secondary flex-1 px-6 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm">
+                            <i data-lucide="calendar-range" class="w-4 h-4"></i>
+                            Reschedule
+                        </button>
+                        <button class="btn-tertiary px-6 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm text-red-400 hover:bg-red-500/10">
+                            <i data-lucide="x-circle" class="w-4 h-4"></i>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Mobile Tab Switcher (Visible only on mobile) -->
+        <div class="md:hidden">
+            <div class="tab-switcher flex gap-1">
+                <button class="tab-btn active flex-1" onclick="switchTab(this, 'upcoming')">Upcoming</button>
+                <button class="tab-btn text-neutral-500 flex-1" onclick="switchTab(this, 'past')">History</button>
+            </div>
+        </div>
+
+        <!-- Session List -->
+        <section id="session-list" class="space-y-4">
+            <!-- List Item 1: Upcoming -->
+            <div class="list-item crystal-card p-5 flex items-center gap-4 group cursor-pointer" style="animation-delay: 0.1s;">
+                <div class="flex-none w-14 h-14 rounded-2xl bg-white/5 flex flex-col items-center justify-center text-center">
+                    <span class="text-[10px] uppercase font-bold text-neutral-500 leading-none">Jan</span>
+                    <span class="text-xl font-bold leading-none mt-0.5">22</span>
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                        <h3 class="font-bold text-lg leading-none">Hypertrophy Check-in</h3>
+                        <span class="badge badge-confirmed">Confirmed</span>
+                    </div>
+                    <div class="flex items-center gap-4 text-caption mono">
+                        <div class="flex items-center gap-1.5"><i data-lucide="user" class="w-3 h-3"></i>Coach Marcus</div>
+                        <div class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3 h-3"></i>09:30 AM</div>
+                    </div>
+                </div>
+                <div class="text-neutral-600 group-hover:text-white transition-colors">
+                    <i data-lucide="chevron-right" class="w-6 h-6"></i>
+                </div>
+            </div>
+
+            <!-- List Item 2: Cancelled -->
+            <div class="list-item crystal-card p-5 flex items-center gap-4 group opacity-60 grayscale hover:grayscale-0 transition-all" style="animation-delay: 0.2s;">
+                <div class="flex-none w-14 h-14 rounded-2xl bg-white/5 flex flex-col items-center justify-center text-center">
+                    <span class="text-[10px] uppercase font-bold text-neutral-500 leading-none">Feb</span>
+                    <span class="text-xl font-bold leading-none mt-0.5">01</span>
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                        <h3 class="font-bold text-lg leading-none">Strength Assessment</h3>
+                        <span class="badge badge-cancelled">Cancelled</span>
+                    </div>
+                    <div class="flex items-center gap-4 text-caption mono">
+                        <div class="flex items-center gap-1.5"><i data-lucide="user" class="w-3 h-3"></i>Coach Marcus</div>
+                        <div class="flex items-center gap-1.5"><i data-lucide="video" class="w-3 h-3"></i>Remote</div>
+                    </div>
+                </div>
+                <div class="text-neutral-600">
+                    <i data-lucide="info" class="w-5 h-5"></i>
+                </div>
+            </div>
+
+            <!-- List Item 3: History (Initially hidden if strictly upcoming, but shown here for visualization) -->
+            <div id="past-sessions" class="space-y-4">
+                <div class="text-neutral-500 uppercase text-[10px] font-bold tracking-[0.2em] pt-4 pb-2 border-b border-white/5">Recently Completed</div>
+                
+                <div class="list-item crystal-card p-5 flex items-center gap-4 group" style="animation-delay: 0.3s;">
+                    <div class="flex-none w-14 h-14 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex flex-col items-center justify-center text-center">
+                        <span class="text-[10px] uppercase font-bold text-blue-500/50 leading-none">Dec</span>
+                        <span class="text-xl font-bold leading-none mt-0.5 text-blue-400">20</span>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <h3 class="font-bold text-lg leading-none">End-of-Year Review</h3>
+                            <span class="badge badge-completed">Completed</span>
+                        </div>
+                        <p class="text-xs text-neutral-500 italic mb-1">"Excellent focus on eccentric control today."</p>
+                    </div>
+                    <button class="p-3 bg-white/5 rounded-xl text-neutral-400 hover:text-white transition-colors">
+                        <i data-lucide="message-square" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- FAB: Book New Session -->
+    <div class="fab-pulse" title="Book New Session">
+        <i data-lucide="plus" class="w-8 h-8 text-white"></i>
+    </div>
+
+    <!-- Navigation Bar (Static/Floating) -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 bottom-nav z-50">
+        <div class="max-w-xl mx-auto flex items-center justify-between px-6">
+            <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-neutral-300 transition-colors">
+                <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Dash</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-primary">
+                <i data-lucide="calendar" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Sessions</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-neutral-300 transition-colors">
+                <i data-lucide="bar-chart-2" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Stats</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-neutral-300 transition-colors">
+                <i data-lucide="settings" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Profile</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Simple Tab Switcher
+        function switchTab(el, tabName) {
+            // Update UI
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => {
+                btn.classList.remove('active', 'text-white');
+                btn.classList.add('text-neutral-500');
+            });
+            el.classList.add('active', 'text-white');
+            el.classList.remove('text-neutral-500');
+
+            // Simulate content change
+            const list = document.getElementById('session-list');
+            list.style.opacity = '0';
+            list.style.transform = 'translateY(10px)';
+            
+            setTimeout(() => {
+                list.style.transition = 'all 0.5s ease';
+                list.style.opacity = '1';
+                list.style.transform = 'translateY(0)';
+                // In a real app, you would filter data here
+            }, 200);
+        }
+
+        // Haptic Feedback for primary actions
+        document.querySelectorAll('.btn-primary, .fab-pulse').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(15);
+                }
+            });
+        });
+
+        // Swipe handling placeholder (Mobile optimization)
+        let touchstartX = 0;
+        let touchendX = 0;
+        
+        function checkDirection() {
+          if (touchendX < touchstartX - 100) {
+            // Swiped left - go to history
+            console.log('Swiped Left');
+          }
+          if (touchendX > touchstartX + 100) {
+            // Swiped right - go to upcoming
+            console.log('Swiped Right');
+          }
+        }
+
+        document.addEventListener('touchstart', e => {
+          touchstartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', e => {
+          touchendX = e.changedTouches[0].screenX;
+          checkDirection();
+        });
+    </script>
+</body>
+</html>

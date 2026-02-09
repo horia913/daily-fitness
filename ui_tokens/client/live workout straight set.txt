@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Workout – Set Complete | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .crystal-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+            transform: rotate(30deg);
+            pointer-events: none;
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.1) 50%, transparent 55%);
+            animation: shine 6s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-primary {
+            height: 48px;
+            min-height: 48px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .btn-primary:active { transform: scale(0.95); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4); }
+
+        .btn-secondary {
+            height: 48px;
+            min-height: 48px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1.5px solid rgba(59, 130, 246, 0.4);
+            color: #3B82F6;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover { background: rgba(59, 130, 246, 0.2); transform: translateY(-2px); }
+        .btn-secondary:active { transform: scale(0.95); }
+
+        .progress-ring {
+            transition: stroke-dashoffset 1s linear;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        .text-h1 { font-size: 30px; line-height: 1.25; font-weight: 700; }
+        .text-h2 { font-size: 20px; line-height: 1.25; font-weight: 600; }
+        .text-h3 { font-size: 18px; line-height: 1.25; font-weight: 500; }
+        .text-body { font-size: 16px; line-height: 1.625; font-weight: 400; }
+        .text-caption { font-size: 14px; line-height: 1.4; font-weight: 400; }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background:
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.05) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .rest-timer-ring {
+            transition: stroke-dashoffset 1s linear;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-8 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Top bar: back + block context -->
+    <header class="flex items-center justify-between mb-6">
+        <button type="button" class="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors p-2 -ml-2 rounded-xl hover:bg-white/5" aria-label="Back">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+            <span class="text-caption font-medium">Workout</span>
+        </button>
+        <span class="text-caption text-neutral-500 mono">Block 1 of 4</span>
+    </header>
+
+    <!-- Exercise name (current block) -->
+    <div class="mb-6">
+        <span class="inline-block bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-xs font-semibold border border-blue-500/30 uppercase tracking-wide mb-2">Straight set</span>
+        <h1 class="text-h1 tracking-tight">Barbell Row</h1>
+        <p class="text-caption text-neutral-400 mt-1">8 reps · 60s rest</p>
+    </div>
+
+    <!-- Set completed confirmation -->
+    <section class="crystal-card kinetic-shimmer p-6 mb-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 rounded-2xl bg-accent/20 flex items-center justify-center text-accent border border-accent/30">
+                <i data-lucide="check-circle" class="w-7 h-7"></i>
+            </div>
+            <div>
+                <h2 class="text-h2">Set 2 of 4 completed</h2>
+                <p class="text-body font-semibold mono mt-0.5">80 kg × 8 reps</p>
+            </div>
+        </div>
+        <!-- Optional PR badge -->
+        <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-sm font-bold w-fit">
+            <i data-lucide="trophy" class="w-4 h-4"></i>
+            <span>Personal record!</span>
+        </div>
+    </section>
+
+    <!-- Rest timer -->
+    <section class="crystal-card p-8 mb-6">
+        <div class="text-center mb-2">
+            <span class="text-caption text-neutral-400 uppercase tracking-widest font-semibold">Rest</span>
+            <p class="text-caption text-neutral-500 mt-0.5">Next: Set 3 of 4</p>
+        </div>
+        <div class="flex flex-col items-center justify-center py-4">
+            <div class="relative w-48 h-48 flex items-center justify-center">
+            <svg viewBox="0 0 200 200" class="absolute inset-0 w-full h-full">
+                <circle cx="100" cy="100" r="90" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10"></circle>
+                <circle cx="100" cy="100" r="90" fill="none" stroke="url(#restGrad)" stroke-width="10" stroke-linecap="round" stroke-dasharray="565" stroke-dashoffset="212" class="rest-timer-ring"></circle>
+                <defs>
+                    <linearGradient id="restGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#10B981"></stop>
+                        <stop offset="100%" style="stop-color:#3B82F6"></stop>
+                    </linearGradient>
+                </defs>
+            </svg>
+            <div class="relative z-10 text-center">
+                <span class="text-5xl font-bold mono tracking-tight">01:15</span>
+                <p class="text-caption text-neutral-400 mt-2">Take a breather</p>
+            </div>
+            </div>
+            <div class="flex gap-3 mt-4 w-full max-w-xs mx-auto">
+                <button type="button" class="btn-secondary flex-1 rounded-xl flex items-center justify-center gap-2 font-semibold text-sm">
+                    <i data-lucide="plus" class="w-5 h-5"></i>
+                    +30s
+                </button>
+                <button type="button" class="btn-primary flex-1 rounded-xl flex items-center justify-center gap-2 font-semibold text-sm">
+                    Skip rest
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Set progress bubbles -->
+    <div class="flex justify-center gap-2 mb-8">
+        <span class="w-3 h-3 rounded-full bg-accent" aria-hidden="true"></span>
+        <span class="w-3 h-3 rounded-full bg-accent" aria-hidden="true"></span>
+        <span class="w-3 h-3 rounded-full bg-neutral-500 border-2 border-neutral-400" aria-hidden="true"></span>
+        <span class="w-3 h-3 rounded-full bg-white/10" aria-hidden="true"></span>
+    </div>
+
+    <!-- Next set preview -->
+    <section class="crystal-card p-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-caption text-neutral-400 uppercase tracking-wider font-medium">Next set</p>
+                <p class="text-body font-semibold">Set 3 of 4 · 80 kg × 8 reps (suggested)</p>
+            </div>
+            <i data-lucide="chevron-right" class="w-5 h-5 text-neutral-500"></i>
+        </div>
+    </section>
+
+    <script>
+        lucide.createIcons();
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var cards = document.querySelectorAll('.crystal-card');
+            cards.forEach(function(card, index) {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(function() {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+
+        document.querySelectorAll('.btn-primary, .btn-secondary').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,15 +1,23 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Scale, TrendingUp, TrendingDown, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  Scale,
+  TrendingUp,
+  TrendingDown,
+  Plus,
+  Activity,
+  Target,
+  ListFilter,
+  ChevronRight,
+} from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
@@ -21,6 +29,18 @@ interface BodyMetric {
   bodyFat?: number;
 }
 
+function formatTimeAgo(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffHours = Math.round((now.getTime() - d.getTime()) / (60 * 60 * 1000));
+  if (diffHours < 1) return "Just now";
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return "1 day ago";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function BodyMetricsPageContent() {
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
@@ -28,6 +48,7 @@ function BodyMetricsPageContent() {
   const [metrics, setMetrics] = useState<BodyMetric[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLogModal, setShowLogModal] = useState(false);
+  const [chartRange, setChartRange] = useState<"12M" | "6M" | "1M">("12M");
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -37,13 +58,10 @@ function BodyMetricsPageContent() {
 
   const loadMetricsData = async () => {
     if (!user?.id) return;
-
     setLoading(true);
     try {
-      // Get last 12 weeks of measurements
       const twelveWeeksAgo = new Date();
       twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84);
-
       const { data, error } = await supabase
         .from("body_metrics")
         .select("measured_date, weight_kg, waist_circumference, body_fat_percentage")
@@ -55,13 +73,14 @@ function BodyMetricsPageContent() {
         console.error("Error loading measurements:", error);
         setMetrics([]);
       } else {
-        const mappedMetrics: BodyMetric[] = (data || []).map((m) => ({
-          date: m.measured_date,
-          weight: m.weight_kg,
-          waist: m.waist_circumference || undefined,
-          bodyFat: m.body_fat_percentage || undefined,
-        }));
-        setMetrics(mappedMetrics);
+        setMetrics(
+          (data || []).map((m) => ({
+            date: m.measured_date,
+            weight: m.weight_kg,
+            waist: m.waist_circumference ?? undefined,
+            bodyFat: m.body_fat_percentage ?? undefined,
+          }))
+        );
       }
     } catch (error) {
       console.error("Error loading body metrics:", error);
@@ -71,71 +90,67 @@ function BodyMetricsPageContent() {
     }
   };
 
-  // Calculate current month and previous month values
-  const getCurrentAndPreviousMonth = () => {
+  const { current, previous } = useMemo(() => {
     if (metrics.length === 0) return { current: null, previous: null };
-
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    
     const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
     const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-    // Get most recent measurement from current month
     const currentMonthMetrics = metrics.filter((m) => {
       const d = new Date(m.date);
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
-
-    // Get most recent measurement from previous month
     const previousMonthMetrics = metrics.filter((m) => {
       const d = new Date(m.date);
       return d.getMonth() === previousMonth && d.getFullYear() === previousYear;
     });
-
     return {
-      current: currentMonthMetrics.length > 0 
-        ? currentMonthMetrics[currentMonthMetrics.length - 1] 
-        : metrics[metrics.length - 1], // Fall back to most recent
-      previous: previousMonthMetrics.length > 0 
-        ? previousMonthMetrics[previousMonthMetrics.length - 1] 
-        : null,
+      current:
+        currentMonthMetrics.length > 0
+          ? currentMonthMetrics[currentMonthMetrics.length - 1]
+          : metrics[metrics.length - 1],
+      previous:
+        previousMonthMetrics.length > 0
+          ? previousMonthMetrics[previousMonthMetrics.length - 1]
+          : null,
     };
-  };
+  }, [metrics]);
 
-  const { current, previous } = getCurrentAndPreviousMonth();
-  
-  const currentWeight = current?.weight || 0;
-  const currentWaist = current?.waist || 0;
-  const currentBodyFat = current?.bodyFat || 0;
-
+  const currentWeight = current?.weight ?? 0;
+  const currentWaist = current?.waist ?? 0;
+  const currentBodyFat = current?.bodyFat ?? 0;
   const weightChange = previous ? currentWeight - previous.weight : 0;
-  const waistChange = previous && currentWaist && previous.waist 
-    ? currentWaist - previous.waist 
-    : 0;
-  const bodyFatChange = previous && currentBodyFat && previous.bodyFat
-    ? currentBodyFat - previous.bodyFat 
-    : 0;
+  const waistChange =
+    previous && currentWaist != null && previous.waist != null
+      ? currentWaist - previous.waist
+      : null;
+  const bodyFatChange =
+    previous && currentBodyFat != null && previous.bodyFat != null
+      ? currentBodyFat - previous.bodyFat
+      : null;
+
+  const historyNewestFirst = useMemo(
+    () => [...metrics].reverse(),
+    [metrics]
+  );
+
+  const latestDate = metrics.length > 0 ? metrics[metrics.length - 1].date : null;
 
   if (authLoading || loading) {
     return (
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
-            <div className="fc-glass fc-card p-8">
+          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
+            <div className="fc-surface p-8 rounded-2xl">
               <div className="animate-pulse space-y-6">
-                <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div
-                      key={`metrics-skeleton-${index}`}
-                      className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]"
-                    ></div>
-                  ))}
+                <div className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="md:col-span-2 h-56 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-56 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
                 </div>
-                <div className="h-72 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
+                <div className="h-72 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
               </div>
             </div>
           </div>
@@ -147,253 +162,210 @@ function BodyMetricsPageContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
-        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+      <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
+        {/* Header */}
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <Link href="/client/progress">
-                <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
+                <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
               </Link>
-              <div>
-                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                  Progress Hub
-                </span>
-                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                  Body Metrics
-                </h1>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  Track weight, waist, and body fat changes over time.
-                </p>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+                  <Scale className="w-6 h-6" />
+                </div>
+                <div>
+                  <nav className="flex items-center gap-2 text-sm text-[color:var(--fc-text-dim)] mb-1">
+                    <Link href="/client/progress" className="hover:text-[color:var(--fc-text-primary)]">Progress</Link>
+                    <ChevronRight className="w-3 h-3 shrink-0" />
+                    <span className="text-[color:var(--fc-text-primary)]">Body Metrics</span>
+                  </nav>
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                    Body Metrics
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                    {latestDate ? (
+                      <>Updated {formatTimeAgo(latestDate)}</>
+                    ) : (
+                      <>Weight and measurements over time</>
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
-
-            <Button
-              variant="default"
-              onClick={() => setShowLogModal(true)}
-              className="fc-btn fc-btn-primary"
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              Log Measurement
-            </Button>
+            {latestDate && (
+              <div className="flex items-center gap-3 fc-glass-soft px-4 py-2 rounded-2xl border border-[color:var(--fc-glass-border)] shrink-0">
+                <div className="w-2 h-2 rounded-full bg-[color:var(--fc-status-success)] animate-pulse" />
+                <span className="text-sm fc-text-subtle">
+                  <span className="font-mono fc-text-primary">{formatTimeAgo(latestDate)}</span>
+                </span>
+              </div>
+            )}
           </div>
-        </GlassCard>
+        </div>
 
         {metrics.length === 0 ? (
-          <div className="mt-6 fc-glass fc-card p-10 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[color:var(--fc-glass-highlight)]">
-              <Scale className="h-10 w-10 text-[color:var(--fc-text-subtle)]" />
+          <div className="fc-surface p-10 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)]">
+              <Scale className="h-10 w-10 fc-text-subtle" />
             </div>
-            <h2 className="mt-6 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
-              No Measurements Yet
+            <h2 className="mt-6 text-2xl font-semibold fc-text-primary">
+              No measurements yet
             </h2>
-            <p className="mt-2 text-sm text-[color:var(--fc-text-dim)]">
-              Start tracking body metrics to see progress trends over time.
+            <p className="mt-2 text-sm fc-text-dim">
+              Log weight, waist, and body fat to see trends over time.
             </p>
-            <Button
-              variant="default"
-              size="lg"
+            <button
+              type="button"
               onClick={() => setShowLogModal(true)}
-              className="fc-btn fc-btn-primary mt-6"
+              className="fc-btn fc-btn-primary mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-xl"
             >
-              <Plus className="mr-2 h-5 w-5" />
-              Log First Measurement
-            </Button>
+              <Plus className="h-5 w-5" />
+              Log first measurement
+            </button>
           </div>
         ) : (
-          <>
-            {/* Current Stats */}
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-              {/* Current Weight */}
-              <GlassCard elevation={2} className="fc-glass fc-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-[0_8px_18px_rgba(16,185,129,0.35)]">
-                    <Scale className="h-6 w-6" />
-                  </div>
+          <main className="space-y-8">
+            {/* Hero: Current weight + Goal */}
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div
+                className="md:col-span-2 fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] min-h-[220px] flex flex-col justify-between"
+              >
+                <div className="flex justify-between items-start">
+                  <span className="text-xs font-semibold uppercase tracking-widest fc-text-subtle">
+                    Current body weight
+                  </span>
                   {weightChange !== 0 && (
-                    <div className="flex items-center gap-1 text-sm font-semibold">
+                    <div
+                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${
+                        weightChange < 0
+                          ? "bg-[color:var(--fc-status-success)]/10 text-[color:var(--fc-status-success)]"
+                          : "bg-[color:var(--fc-status-warning)]/10 fc-text-warning"
+                      }`}
+                    >
                       {weightChange < 0 ? (
-                        <TrendingDown className="h-5 w-5 text-[color:var(--fc-status-success)]" />
+                        <TrendingDown className="w-4 h-4" />
                       ) : (
-                        <TrendingUp className="h-5 w-5 text-[color:var(--fc-status-warning)]" />
+                        <TrendingUp className="w-4 h-4" />
                       )}
-                      <span
-                        className={
-                          weightChange < 0
-                            ? "text-[color:var(--fc-status-success)]"
-                            : "text-[color:var(--fc-status-warning)]"
-                        }
-                      >
-                        {weightChange > 0 ? "+" : ""}
-                        {weightChange.toFixed(1)} kg
-                      </span>
+                      {weightChange > 0 ? "+" : ""}
+                      {weightChange.toFixed(1)} kg
+                      <span className="text-[10px] ml-1 opacity-70">month</span>
                     </div>
                   )}
                 </div>
-
-                <h3 className="text-sm font-medium mb-2 text-[color:var(--fc-text-dim)]">
-                  Current Weight
-                </h3>
                 <div className="flex items-baseline gap-2">
                   <AnimatedNumber
                     value={currentWeight}
                     decimals={1}
-                    className="text-4xl font-bold"
-                    color="var(--fc-text-primary)"
+                    className="text-4xl sm:text-5xl font-bold font-mono tracking-tight fc-text-primary"
                   />
-                  <span className="text-xl font-medium text-[color:var(--fc-text-subtle)]">
-                    kg
-                  </span>
+                  <span className="text-2xl font-medium fc-text-subtle">kg</span>
                 </div>
-                {previous && (
-                  <p className="text-xs mt-2 text-[color:var(--fc-text-subtle)]">
-                    vs last month: {previous.weight.toFixed(1)} kg
-                  </p>
-                )}
-              </GlassCard>
-
-              {/* Waist */}
-              {currentWaist > 0 && (
-                <GlassCard elevation={2} className="fc-glass fc-card p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-white shadow-[0_8px_18px_rgba(59,130,246,0.35)]">
-                      <TrendingUp className="h-6 w-6" />
-                    </div>
-                    {waistChange !== 0 && (
-                      <div className="flex items-center gap-1 text-sm font-semibold">
-                        {waistChange < 0 ? (
-                          <TrendingDown className="h-5 w-5 text-[color:var(--fc-status-success)]" />
-                        ) : (
-                          <TrendingUp className="h-5 w-5 text-[color:var(--fc-status-warning)]" />
-                        )}
-                        <span
-                          className={
-                            waistChange < 0
-                              ? "text-[color:var(--fc-status-success)]"
-                              : "text-[color:var(--fc-status-warning)]"
-                          }
+                <div className="flex flex-wrap gap-6 sm:gap-8 mt-6">
+                  {currentWaist > 0 && (
+                    <div>
+                      <p className="text-xs fc-text-subtle uppercase mb-1">Waist</p>
+                      <p className="text-xl font-semibold font-mono fc-text-primary">
+                        {currentWaist}
+                        <span className="text-sm fc-text-subtle"> cm</span>
+                      </p>
+                      {waistChange !== null && waistChange !== 0 && (
+                        <p
+                          className={`text-[10px] font-bold ${
+                            waistChange < 0 ? "fc-text-success" : "fc-text-warning"
+                          }`}
                         >
                           {waistChange > 0 ? "+" : ""}
-                          {waistChange.toFixed(1)} cm
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <h3 className="text-sm font-medium mb-2 text-[color:var(--fc-text-dim)]">
-                    Waist (Iliac Crest)
-                  </h3>
-                  <div className="flex items-baseline gap-2">
-                    <AnimatedNumber
-                      value={currentWaist}
-                      decimals={1}
-                      className="text-4xl font-bold"
-                      color="var(--fc-text-primary)"
-                    />
-                    <span className="text-xl font-medium text-[color:var(--fc-text-subtle)]">
-                      cm
-                    </span>
-                  </div>
-                  {previous && previous.waist && (
-                    <p className="text-xs mt-2 text-[color:var(--fc-text-subtle)]">
-                      vs last month: {previous.waist.toFixed(1)} cm
-                    </p>
-                  )}
-                </GlassCard>
-              )}
-
-              {/* Body Fat */}
-              {currentBodyFat > 0 && (
-                <GlassCard elevation={2} className="fc-glass fc-card p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-rose-500 text-white shadow-[0_8px_18px_rgba(249,115,22,0.35)]">
-                      <TrendingDown className="h-6 w-6" />
+                          {waistChange} cm
+                        </p>
+                      )}
                     </div>
-                    {bodyFatChange !== 0 && (
-                      <div className="flex items-center gap-1 text-sm font-semibold">
-                        {bodyFatChange < 0 ? (
-                          <TrendingDown className="h-5 w-5 text-[color:var(--fc-status-success)]" />
-                        ) : (
-                          <TrendingUp className="h-5 w-5 text-[color:var(--fc-status-warning)]" />
-                        )}
-                        <span
-                          className={
-                            bodyFatChange < 0
-                              ? "text-[color:var(--fc-status-success)]"
-                              : "text-[color:var(--fc-status-warning)]"
-                          }
+                  )}
+                  {currentBodyFat > 0 && (
+                    <div>
+                      <p className="text-xs fc-text-subtle uppercase mb-1">Body fat</p>
+                      <p className="text-xl font-semibold font-mono fc-text-primary">
+                        {currentBodyFat}
+                        <span className="text-sm fc-text-subtle">%</span>
+                      </p>
+                      {bodyFatChange !== null && bodyFatChange !== 0 && (
+                        <p
+                          className={`text-[10px] font-bold ${
+                            bodyFatChange < 0 ? "fc-text-success" : "fc-text-warning"
+                          }`}
                         >
                           {bodyFatChange > 0 ? "+" : ""}
                           {bodyFatChange.toFixed(1)}%
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <h3 className="text-sm font-medium mb-2 text-[color:var(--fc-text-dim)]">
-                    Body Fat
-                  </h3>
-                  <div className="flex items-baseline gap-2">
-                    <AnimatedNumber
-                      value={currentBodyFat}
-                      decimals={1}
-                      className="text-4xl font-bold"
-                      color="var(--fc-text-primary)"
-                    />
-                    <span className="text-xl font-medium text-[color:var(--fc-text-subtle)]">
-                      %
-                    </span>
-                  </div>
-                  {previous && previous.bodyFat && (
-                    <p className="text-xs mt-2 text-[color:var(--fc-text-subtle)]">
-                      vs last month: {previous.bodyFat.toFixed(1)}%
-                    </p>
+                        </p>
+                      )}
+                    </div>
                   )}
-                </GlassCard>
-              )}
-            </div>
-
-            {/* Weight Chart */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 mt-6">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                    Weight Trend
-                  </h3>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Last 12 weeks snapshot
-                  </p>
                 </div>
-                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                  {metrics.length} entries
-                </span>
               </div>
 
+              <div
+                className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)] flex flex-col items-center justify-center text-center"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-[color:var(--fc-status-error)]/10 flex items-center justify-center fc-text-error mb-4">
+                  <Target className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-semibold fc-text-primary mb-2">Goal target</h3>
+                <p className="text-2xl font-bold font-mono fc-text-primary">
+                  — <span className="text-lg fc-text-subtle">kg</span>
+                </p>
+                <p className="text-xs fc-text-subtle mt-3">Set a weight goal in Goals</p>
+              </div>
+            </section>
+
+            {/* Weight timeline */}
+            <div
+              className="fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)]"
+            >
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <h3 className="text-xl font-semibold fc-text-primary flex items-center gap-2">
+                  <Activity className="w-5 h-5 fc-text-workouts" />
+                  Weight timeline
+                </h3>
+                <div className="flex fc-glass-soft p-1 rounded-xl border border-[color:var(--fc-glass-border)]">
+                  {(["12M", "6M", "1M"] as const).map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      onClick={() => setChartRange(range)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        chartRange === range
+                          ? "fc-glass fc-text-primary"
+                          : "fc-text-subtle hover:fc-text-primary"
+                      }`}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {metrics.length > 0 ? (
-                <div className="flex items-end justify-between gap-2 h-64">
+                <div className="flex items-end justify-between gap-1 sm:gap-2 h-64">
                   {metrics.slice(-12).map((metric, index) => {
-                    const maxWeight = Math.max(...metrics.map((m) => m.weight));
-                    const minWeight = Math.min(...metrics.map((m) => m.weight));
-                    const range = maxWeight - minWeight || 1;
-                    const height = ((metric.weight - minWeight) / range) * 100;
-                    
+                    const maxW = Math.max(...metrics.map((m) => m.weight));
+                    const minW = Math.min(...metrics.map((m) => m.weight));
+                    const range = maxW - minW || 1;
+                    const height = ((metric.weight - minW) / range) * 100;
                     return (
-                      <div key={index} className="flex-1 flex flex-col items-center">
+                      <div key={`${metric.date}-${index}`} className="flex-1 flex flex-col items-center min-w-0">
                         <div
-                          className="w-full rounded-t-lg transition-all hover:opacity-80"
+                          className="w-full rounded-t-lg min-h-[20px] transition-opacity hover:opacity-90"
                           style={{
-                            height: `${Math.max(height, 10)}%`,
+                            height: `${Math.max(height, 8)}%`,
                             background:
-                              "linear-gradient(135deg, var(--fc-domain-meals) 0%, var(--fc-accent-cyan) 100%)",
-                            minHeight: "20px",
+                              "linear-gradient(135deg, var(--fc-status-error) 0%, var(--fc-accent-blue) 100%)",
                           }}
                         />
-                        <div className="mt-3 text-center">
-                          <p className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
+                        <div className="mt-2 text-center truncate w-full">
+                          <p className="text-xs font-semibold fc-text-primary truncate">
                             {metric.weight.toFixed(1)}
                           </p>
-                          <p className="text-xs text-[color:var(--fc-text-subtle)]">
+                          <p className="text-[10px] fc-text-subtle truncate">
                             {new Date(metric.date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
@@ -405,23 +377,92 @@ function BodyMetricsPageContent() {
                   })}
                 </div>
               ) : (
-                <p className="text-center py-12 text-sm text-[color:var(--fc-text-dim)]">
+                <p className="text-center py-12 text-sm fc-text-dim">
                   Not enough data to show chart
                 </p>
               )}
-            </GlassCard>
-          </>
+            </div>
+
+            {/* Log history */}
+            <div
+              className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)] flex flex-col"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-semibold fc-text-primary">Log history</h3>
+                <ListFilter className="w-5 h-5 fc-text-subtle" />
+              </div>
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                {historyNewestFirst.map((metric, index) => {
+                  const prev = historyNewestFirst[index + 1];
+                  const delta = prev ? metric.weight - prev.weight : null;
+                  const d = new Date(metric.date);
+                  return (
+                    <div
+                      key={metric.date}
+                      className="flex items-center justify-between p-4 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)] hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="w-12 h-12 rounded-xl fc-glass flex flex-col items-center justify-center flex-shrink-0">
+                          <span className="text-[10px] font-bold fc-text-subtle uppercase">
+                            {d.toLocaleDateString("en-US", { month: "short" })}
+                          </span>
+                          <span className="text-lg font-bold leading-none fc-text-primary">
+                            {d.getDate()}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold font-mono fc-text-primary">
+                            {metric.weight.toFixed(1)} kg
+                          </p>
+                          <p className="text-xs fc-text-subtle truncate">
+                            {[metric.bodyFat != null && `${metric.bodyFat}% BF`, metric.waist != null && `${metric.waist} cm waist`]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        {delta !== null && delta !== 0 && (
+                          <>
+                            <p
+                              className={`text-sm font-bold ${
+                                delta < 0 ? "fc-text-success" : "fc-text-warning"
+                              }`}
+                            >
+                              {delta > 0 ? "+" : ""}
+                              {delta.toFixed(1)} kg
+                            </p>
+                            <p className="text-[10px] fc-text-subtle uppercase">vs previous</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-sm font-semibold fc-text-subtle mt-6 pt-4 border-t border-[color:var(--fc-glass-border)] text-center">
+                {metrics.length} entr{metrics.length === 1 ? "y" : "ies"} total
+              </p>
+            </div>
+          </main>
         )}
+
+        {/* FAB */}
+        <button
+          type="button"
+          onClick={() => setShowLogModal(true)}
+          className="fixed bottom-24 right-6 z-40 w-14 h-14 rounded-2xl fc-btn fc-btn-primary flex items-center justify-center shadow-lg"
+          aria-label="Log metrics"
+        >
+          <Plus className="w-8 h-8" />
+        </button>
       </div>
 
-      {/* Log Measurement Modal */}
       {showLogModal && user && (
         <LogMeasurementModal
           clientId={user.id}
           onClose={() => setShowLogModal(false)}
-          onSuccess={() => {
-            loadMetricsData();
-          }}
+          onSuccess={() => loadMetricsData()}
         />
       )}
     </AnimatedBackground>

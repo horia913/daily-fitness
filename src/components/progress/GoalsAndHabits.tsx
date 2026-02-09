@@ -403,73 +403,62 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
   const completedGoals = goals.filter((g) => g.completedAt);
 
   return (
-    <div className="space-y-6">
-      {/* Header with Tabs */}
-      <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-[0_8px_18px_rgba(34,211,238,0.35)]">
-              <Target className="h-6 w-6" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
-                Goals & Habits
-              </h2>
-              <p className="text-sm text-[color:var(--fc-text-dim)]">
-                Track targets and daily wellness.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex w-full gap-3 sm:w-auto">
-            <Button
-              onClick={() => setActiveTab("goals")}
-              className={cn(
-                "fc-btn flex-1 sm:flex-none",
-                activeTab === "goals"
-                  ? "fc-btn-primary"
-                  : "fc-btn-secondary text-[color:var(--fc-text-primary)]"
-              )}
-            >
-              <Target className="w-4 h-4 mr-2" />
-              Goals
-            </Button>
-            <Button
-              onClick={() => setActiveTab("habits")}
-              className={cn(
-                "fc-btn flex-1 sm:flex-none",
-                activeTab === "habits"
-                  ? "fc-btn-primary"
-                  : "fc-btn-secondary text-[color:var(--fc-text-primary)]"
-              )}
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Habits
-            </Button>
-          </div>
-        </div>
-      </GlassCard>
+    <div className="space-y-8">
+      {/* Segmented control: Goals | Habits */}
+      <div className="relative grid grid-cols-2 p-1.5 fc-glass fc-card rounded-2xl max-w-[280px]">
+        <button
+          type="button"
+          onClick={() => setActiveTab("goals")}
+          className={cn(
+            "relative z-10 py-3 rounded-xl font-semibold transition-colors",
+            activeTab === "goals" ? "fc-text-primary" : "fc-text-dim"
+          )}
+        >
+          Goals
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("habits")}
+          className={cn(
+            "relative z-10 py-3 rounded-xl font-semibold transition-colors",
+            activeTab === "habits" ? "fc-text-primary" : "fc-text-dim"
+          )}
+        >
+          Habits
+        </button>
+        <div
+          className={cn(
+            "absolute bottom-1.5 top-1.5 rounded-xl bg-white/10 transition-all duration-300",
+            activeTab === "goals" ? "left-1.5 right-1/2" : "left-1/2 right-1.5"
+          )}
+        />
+      </div>
 
       {/* ========== GOALS TAB ========== */}
       {activeTab === "goals" && (
         <>
-          {/* Create Goal Button */}
-          <GlassCard elevation={1} className="fc-glass fc-card p-4">
+          {/* Goals section header + Add Goal */}
+          <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-2xl font-bold fc-text-primary">Active Goals</h2>
+              <p className="text-sm fc-text-dim mt-0.5">Track and update your targets.</p>
+            </div>
             <Button
               onClick={() => setShowCreateGoal(true)}
-              className="w-full fc-btn fc-btn-primary"
+              variant="outline"
+              className="fc-glass border border-[color:var(--fc-glass-border)] rounded-2xl gap-2 font-semibold"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Create New Goal
+              <Plus className="w-5 h-5" />
+              Add Goal
             </Button>
-          </GlassCard>
+          </div>
 
-          {/* Active Goals */}
+          {/* Active Goals list */}
           {activeGoals.length > 0 && (
             <GlassCard elevation={2} className="fc-glass fc-card p-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)]">
-                  Active Goals
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold fc-text-primary">
+                  Current targets
                 </h3>
                 <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
                   {activeGoals.length} active

@@ -1,43 +1,58 @@
 'use client'
 
+import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
-import { Badge } from '@/components/ui/badge'
-import { BarChart3 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Download } from 'lucide-react'
 import OptimizedAnalyticsReporting from '@/components/coach/OptimizedAnalyticsReporting'
+
+const TIME_RANGES = ['This Week', 'This Month', 'This Quarter', 'All Time'] as const
+type TimeRangeKey = (typeof TIME_RANGES)[number]
 
 export default function CoachAnalytics() {
   const { user } = useAuth()
   const { performanceSettings } = useTheme()
+  const [timeRange, setTimeRange] = useState<TimeRangeKey>('This Month')
 
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen">
-          <div className="relative px-4 sm:px-6 pb-16 pt-6 sm:pt-10 w-full">
-            <div className="w-full max-w-[100%] space-y-6">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-3">
-                  <Badge className="fc-badge fc-badge-strong w-fit">Analytics Hub</Badge>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white">
-                      <BarChart3 className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                        Coach Analytics
-                      </h1>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        Track client trends, performance signals, and coaching impact.
-                      </p>
-                    </div>
-                  </div>
+          <div className="relative w-full fc-page px-4 sm:px-6 pt-10 pb-12">
+            <div className="w-full max-w-7xl mx-auto space-y-6">
+              <header className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Coach Analytics</h1>
+                  <p className="text-sm fc-text-dim mt-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden />
+                    Live data
+                  </p>
                 </div>
-              </div>
+                <Button className="fc-btn fc-btn-primary w-full sm:w-auto shrink-0" onClick={() => { /* TODO: export report */ }}>
+                  <Download className="w-5 h-5 mr-2" />
+                  Export Report
+                </Button>
+              </header>
+
+              <section className="overflow-x-auto">
+                <div className="flex p-1.5 fc-glass rounded-2xl w-fit border border-[color:var(--fc-glass-border)]">
+                  {TIME_RANGES.map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      onClick={() => setTimeRange(range)}
+                      className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${timeRange === range ? 'fc-glass-soft fc-text-primary' : 'fc-text-dim hover:fc-text-primary'}`}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
+              </section>
 
               <div className="w-full">
                 <OptimizedAnalyticsReporting coachId={user?.id || ''} />

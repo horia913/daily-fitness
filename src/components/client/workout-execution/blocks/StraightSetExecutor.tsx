@@ -6,7 +6,6 @@ import { CheckCircle } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { LargeInput } from "../ui/LargeInput";
 import { useLoggingReset } from "../hooks/useLoggingReset";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import {
   BaseBlockExecutorLayout,
@@ -15,7 +14,8 @@ import {
 } from "../BaseBlockExecutor";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { RPEModal } from "@/components/client/RPEModal";
-import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
+import { getWeightDefaultAndSuggestion, getCoachSuggestedWeight } from "@/lib/weightDefaultService";
+import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 
 interface StraightSetExecutorProps extends BaseBlockExecutorProps {}
 
@@ -41,6 +41,7 @@ export function StraightSetExecutor({
   onAlternativesClick,
   onRestTimerClick,
   onSetComplete,
+  onLastSetLoggedForRest,
   progressionSuggestion,
 }: StraightSetExecutorProps) {
   const { addToast } = useToast();
@@ -78,6 +79,8 @@ export function StraightSetExecutor({
     loadPercentage,
     e1rm: e1rm ?? null,
   });
+  // Coach-prescribed weight (load % × e1RM): always show "Apply suggested" when coach set % and we have e1RM
+  const coachSuggestedWeight = getCoachSuggestedWeight(loadPercentage, e1rm);
 
   // Apply truth-based default only when entering new set/exercise and pristine; never autofill e1RM/%
   useEffect(() => {
@@ -246,6 +249,17 @@ export function StraightSetExecutor({
           duration: 2000,
         });
 
+        // When rest timer will show, pass last-set data for completion hero + next set preview
+        if (currentSetNumber < totalSets) {
+          onLastSetLoggedForRest?.({
+            weight: weightNum,
+            reps: repsNum,
+            setNumber: currentSetNumber,
+            totalSets,
+            isPr: result.isNewPR,
+          });
+        }
+
         // Update parent with new completed sets count
         const newCompletedSets = currentSetNumber;
         onSetComplete?.(newCompletedSets);
@@ -337,8 +351,8 @@ export function StraightSetExecutor({
   // Logging inputs - show only current set
   const loggingInputs = (
     <div className="space-y-4">
-      <GlassCard elevation={1} className="p-4 space-y-4">
-        <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+      <div className="p-4 space-y-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
+        <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
           Set {currentSetNumber} of {totalSets}
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -356,18 +370,14 @@ export function StraightSetExecutor({
               showStepper
               stepAmount={2.5}
             />
-            {/* Tap-to-apply suggestion only when no truth-based default (single weight source) */}
-            {suggested_weight != null && suggested_weight > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setWeight(String(suggested_weight));
+            {coachSuggestedWeight != null && coachSuggestedWeight > 0 && (
+              <ApplySuggestedWeightButton
+                suggestedKg={coachSuggestedWeight}
+                onApply={() => {
+                  setWeight(String(coachSuggestedWeight));
                   setIsWeightPristine(false);
                 }}
-                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                {loadPercentageDisplay != null ? `${loadPercentageDisplay}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
-              </button>
+              />
             )}
           </div>
           <LargeInput
@@ -380,7 +390,7 @@ export function StraightSetExecutor({
             stepAmount={1}
           />
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 
@@ -399,7 +409,8 @@ export function StraightSetExecutor({
         isNaN(parseInt(reps)) ||
         parseInt(reps) <= 0
       }
-      className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
     >
       <CheckCircle className="w-5 h-5 mr-2" />
       {isLoggingSet ? "Logging..." : "LOG SET"}

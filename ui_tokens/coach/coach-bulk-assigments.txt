@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Assignment | Crystalline Kinetic Coach</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+            line-height: 1.625;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Refractive Tectonic Glass */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s ease;
+        }
+
+        .crystal-card:focus-within {
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-assign {
+            height: 56px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-assign:active { transform: scale(0.96); }
+        .btn-assign:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(16, 185, 129, 0.35); }
+
+        .type-radio:checked + label {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: white;
+            color: white;
+        }
+
+        /* Hide Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .text-h1 { font-size: 30px; line-height: 1.25; font-weight: 700; }
+        .text-h2 { font-size: 20px; line-height: 1.25; font-weight: 600; }
+        .text-body { font-size: 16px; font-weight: 400; }
+        .text-caption { font-size: 14px; font-weight: 400; }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.07) 0%, transparent 50%),
+                radial-gradient(circle at 20% 80%, rgba(16, 185, 129, 0.07) 0%, transparent 50%);
+            z-index: -1;
+        }
+
+        .client-checkbox:checked ~ .check-indicator {
+            background-color: var(--secondary);
+            border-color: var(--secondary);
+        }
+        
+        .client-checkbox:checked ~ .check-indicator i {
+            opacity: 1;
+        }
+
+        .sticky-footer {
+            background: linear-gradient(to top, rgba(10,10,10,1) 70%, rgba(10,10,10,0));
+            padding-top: 40px;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12 pb-40">
+    <div class="refraction-bg"></div>
+
+    <header class="max-w-3xl mx-auto flex items-center gap-4 mb-10">
+        <button class="w-12 h-12 flex items-center justify-center crystal-card hover:bg-white/5 transition-colors" aria-label="Go back">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        <div>
+            <h1 class="text-h1 tracking-tight">Bulk Assignment</h1>
+            <p class="text-caption text-neutral-400">Scale your impact across multiple clients</p>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto space-y-10">
+        
+        <!-- Section 1: Assignment Type -->
+        <section>
+            <h2 class="text-h2 mb-4 flex items-center gap-2">
+                <i data-lucide="layers" class="w-5 h-5 text-secondary"></i>
+                1. Assignment Type
+            </h2>
+            <div class="grid grid-cols-3 gap-3">
+                <div class="relative">
+                    <input type="radio" name="assignment_type" id="type_workout" class="hidden type-radio" checked>
+                    <label for="type_workout" class="flex flex-col items-center justify-center p-4 crystal-card border-transparent cursor-pointer text-neutral-400 hover:text-white transition-all">
+                        <i data-lucide="dumbbell" class="w-6 h-6 mb-2"></i>
+                        <span class="text-sm font-medium">Workout</span>
+                    </label>
+                </div>
+                <div class="relative">
+                    <input type="radio" name="assignment_type" id="type_program" class="hidden type-radio">
+                    <label for="type_program" class="flex flex-col items-center justify-center p-4 crystal-card border-transparent cursor-pointer text-neutral-400 hover:text-white transition-all">
+                        <i data-lucide="calendar-range" class="w-6 h-6 mb-2"></i>
+                        <span class="text-sm font-medium">Program</span>
+                    </label>
+                </div>
+                <div class="relative">
+                    <input type="radio" name="assignment_type" id="type_meal" class="hidden type-radio">
+                    <label for="type_meal" class="flex flex-col items-center justify-center p-4 crystal-card border-transparent cursor-pointer text-neutral-400 hover:text-white transition-all">
+                        <i data-lucide="utensils" class="w-6 h-6 mb-2"></i>
+                        <span class="text-sm font-medium">Meal Plan</span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Template Selector -->
+        <section>
+            <h2 class="text-h2 mb-4 flex items-center gap-2">
+                <i data-lucide="file-text" class="w-5 h-5 text-secondary"></i>
+                2. Select Template
+            </h2>
+            <div class="crystal-card kinetic-shimmer p-1">
+                <select class="w-full bg-transparent p-5 outline-none appearance-none font-semibold text-lg cursor-pointer">
+                    <option class="bg-neutral-900">Push Day - Hypertrophy Focus</option>
+                    <option class="bg-neutral-900">Pull Day - Strength Focus</option>
+                    <option class="bg-neutral-900">Legs - Metabolic Conditioning</option>
+                    <option class="bg-neutral-900">Full Body - Mobility Primary</option>
+                </select>
+                <div class="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <i data-lucide="chevron-down" class="text-neutral-500"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Client Selector -->
+        <section class="flex flex-col h-[500px]">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-h2 flex items-center gap-2">
+                    <i data-lucide="users" class="w-5 h-5 text-secondary"></i>
+                    3. Target Clients
+                </h2>
+                <button id="select-all" class="text-sm font-semibold text-secondary hover:text-blue-300 transition-colors px-2 py-1">
+                    Select All
+                </button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="relative mb-4">
+                <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500"></i>
+                <input type="text" placeholder="Search by name or goal..." class="w-full h-14 bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 outline-none focus:border-secondary/50 transition-all text-body">
+            </div>
+
+            <!-- Client List Container -->
+            <div class="flex-1 crystal-card overflow-hidden flex flex-col">
+                <div id="client-list" class="flex-1 overflow-y-auto p-2 no-scrollbar space-y-1">
+                    <!-- Client Item -->
+                    <div class="client-item flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-colors cursor-pointer relative group">
+                        <input type="checkbox" class="client-checkbox absolute inset-0 opacity-0 cursor-pointer z-10">
+                        <div class="check-indicator w-6 h-6 rounded-md border-2 border-white/20 flex items-center justify-center transition-all">
+                            <i data-lucide="check" class="w-4 h-4 text-white opacity-0 transition-opacity"></i>
+                        </div>
+                        <div class="w-12 h-12 rounded-full overflow-hidden bg-neutral-800 flex-shrink-0 border border-white/10">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Client">
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-bold">Felix Anderson</p>
+                            <p class="text-sm text-neutral-400">Strength • Bulking</p>
+                        </div>
+                        <div class="hidden md:block">
+                            <span class="px-3 py-1 bg-accent/10 text-accent border border-accent/20 rounded-full text-xs font-bold uppercase tracking-wider">Active</span>
+                        </div>
+                    </div>
+
+                    <!-- Client Item -->
+                    <div class="client-item flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-colors cursor-pointer relative group">
+                        <input type="checkbox" class="client-checkbox absolute inset-0 opacity-0 cursor-pointer z-10">
+                        <div class="check-indicator w-6 h-6 rounded-md border-2 border-white/20 flex items-center justify-center transition-all">
+                            <i data-lucide="check" class="w-4 h-4 text-white opacity-0 transition-opacity"></i>
+                        </div>
+                        <div class="w-12 h-12 rounded-full overflow-hidden bg-neutral-800 flex-shrink-0 border border-white/10">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="Client">
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-bold">Sarah Chen</p>
+                            <p class="text-sm text-neutral-400">Fat Loss • Endurance</p>
+                        </div>
+                        <div class="hidden md:block">
+                            <span class="px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full text-xs font-bold uppercase tracking-wider">At Risk</span>
+                        </div>
+                    </div>
+
+                    <!-- Client Item -->
+                    <div class="client-item flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-colors cursor-pointer relative group">
+                        <input type="checkbox" class="client-checkbox absolute inset-0 opacity-0 cursor-pointer z-10">
+                        <div class="check-indicator w-6 h-6 rounded-md border-2 border-white/20 flex items-center justify-center transition-all">
+                            <i data-lucide="check" class="w-4 h-4 text-white opacity-0 transition-opacity"></i>
+                        </div>
+                        <div class="w-12 h-12 rounded-full overflow-hidden bg-neutral-800 flex-shrink-0 border border-white/10">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=James" alt="Client">
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-bold">James Wilson</p>
+                            <p class="text-sm text-neutral-400">Maintenance</p>
+                        </div>
+                        <div class="hidden md:block">
+                            <span class="px-3 py-1 bg-accent/10 text-accent border border-accent/20 rounded-full text-xs font-bold uppercase tracking-wider">Active</span>
+                        </div>
+                    </div>
+
+                    <!-- Repeat items to fill list -->
+                    <div class="client-item flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-colors cursor-pointer relative group">
+                        <input type="checkbox" class="client-checkbox absolute inset-0 opacity-0 cursor-pointer z-10">
+                        <div class="check-indicator w-6 h-6 rounded-md border-2 border-white/20 flex items-center justify-center transition-all">
+                            <i data-lucide="check" class="w-4 h-4 text-white opacity-0 transition-opacity"></i>
+                        </div>
+                        <div class="w-12 h-12 rounded-full overflow-hidden bg-neutral-800 flex-shrink-0 border border-white/10">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Maya" alt="Client">
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-bold">Maya Rodriguez</p>
+                            <p class="text-sm text-neutral-400">Strength Training</p>
+                        </div>
+                    </div>
+                    <!-- End items -->
+                </div>
+                <div class="p-4 bg-white/5 border-t border-white/10 flex justify-between items-center">
+                    <span id="selection-count" class="text-sm mono text-secondary">0 CLIENTS SELECTED</span>
+                    <i data-lucide="mouse-pointer-click" class="w-4 h-4 text-neutral-500"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Schedule Options -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <h2 class="text-h2 mb-4 flex items-center gap-2">
+                    <i data-lucide="calendar" class="w-5 h-5 text-secondary"></i>
+                    4. Start Date
+                </h2>
+                <div class="crystal-card p-1">
+                    <input type="date" class="w-full bg-transparent p-4 outline-none font-medium cursor-pointer [color-scheme:dark]" value="2024-05-20">
+                </div>
+            </div>
+            <div>
+                <h2 class="text-h2 mb-4 flex items-center gap-2">
+                    <i data-lucide="repeat" class="w-5 h-5 text-secondary"></i>
+                    5. Frequency
+                </h2>
+                <div class="crystal-card p-1">
+                    <select class="w-full bg-transparent p-4 outline-none appearance-none font-medium cursor-pointer">
+                        <option class="bg-neutral-900">Once</option>
+                        <option class="bg-neutral-900">Daily</option>
+                        <option class="bg-neutral-900">Weekly (Monday)</option>
+                        <option class="bg-neutral-900">Custom Cycle</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Sticky Assign Button -->
+    <div class="fixed bottom-0 left-0 right-0 z-50 sticky-footer px-6 pb-6 pointer-events-none">
+        <div class="max-w-3xl mx-auto pointer-events-auto">
+            <button id="assign-btn" class="btn-assign w-full rounded-2xl flex items-center justify-center gap-3 text-lg font-bold">
+                <i data-lucide="zap" class="w-6 h-6 fill-current"></i>
+                ASSIGN TO <span id="btn-count">0</span> CLIENTS
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // UI Logic
+        const checkboxes = document.querySelectorAll('.client-checkbox');
+        const countSpan = document.getElementById('selection-count');
+        const btnCount = document.getElementById('btn-count');
+        const selectAllBtn = document.getElementById('select-all');
+        const assignBtn = document.getElementById('assign-btn');
+
+        function updateCounts() {
+            const checkedCount = document.querySelectorAll('.client-checkbox:checked').length;
+            countSpan.textContent = `${checkedCount} CLIENTS SELECTED`;
+            btnCount.textContent = checkedCount;
+
+            // Haptic Feedback for Mobile
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(5);
+            }
+        }
+
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', updateCounts);
+        });
+
+        selectAllBtn.addEventListener('click', () => {
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            updateCounts();
+            selectAllBtn.textContent = !allChecked ? 'Deselect All' : 'Select All';
+        });
+
+        // Search filtering simulation
+        const searchInput = document.querySelector('input[type="text"]');
+        const clientItems = document.querySelectorAll('.client-item');
+
+        searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            clientItems.forEach(item => {
+                const name = item.querySelector('.font-bold').textContent.toLowerCase();
+                const visible = name.includes(term);
+                item.style.display = visible ? 'flex' : 'none';
+            });
+        });
+
+        // Assignment Celebration
+        assignBtn.addEventListener('click', () => {
+            const count = document.querySelectorAll('.client-checkbox:checked').length;
+            if(count === 0) {
+                alert('Please select at least one client.');
+                return;
+            }
+            
+            assignBtn.style.opacity = '0.7';
+            assignBtn.textContent = "ASSIGNING...";
+            
+            setTimeout(() => {
+                assignBtn.innerHTML = '<i data-lucide="check-circle" class="w-6 h-6"></i> SUCCESSFULLY ASSIGNED';
+                assignBtn.classList.remove('btn-assign');
+                assignBtn.style.background = '#10B981';
+                assignBtn.style.opacity = '1';
+                lucide.createIcons();
+            }, 1000);
+        });
+
+        // Animation on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const sections = document.querySelectorAll('section, header');
+            sections.forEach((s, i) => {
+                s.style.opacity = '0';
+                s.style.transform = 'translateY(15px)';
+                setTimeout(() => {
+                    s.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    s.style.opacity = '1';
+                    s.style.transform = 'translateY(0)';
+                }, i * 80);
+            });
+        });
+    </script>
+</body>
+</html>

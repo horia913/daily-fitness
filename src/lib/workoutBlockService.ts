@@ -130,30 +130,25 @@ export class WorkoutBlockService {
       return { data: allData, error: null }
     }
 
-    // Optimized: Select only needed columns to reduce query time and avoid timeouts
-    // Run queries sequentially to reduce database load (parallel was causing timeouts)
+    // Optimized: Select only needed columns. Run queries SEQUENTIALLY to avoid overloading
+    // the DB; parallel runs caused statement timeouts on drop_sets, time_protocols, etc.
     const exercisesRes = await queryTableInChunks(
       'workout_block_exercises',
       'id, block_id, exercise_id, exercise_order, sets, reps, weight_kg, rest_seconds, tempo, rir, notes, exercise_letter, load_percentage',
       blockIdsForExercises
     )
-    
     const timeProtocolsRes = needsTimeProtocols
       ? await queryTableInChunks('workout_time_protocols', 'id, block_id, exercise_id, exercise_order, protocol_type, set, rounds, work_seconds, rest_seconds, rest_after_set, total_duration_minutes, reps_per_round, target_reps, time_cap_minutes, emom_mode, weight_kg, load_percentage', blockIdsForTimeProtocols)
       : { data: [], error: null }
-    
     const dropRes = needsDropSets
       ? await queryTableInChunks('workout_drop_sets', 'id, block_id, exercise_id, exercise_order, drop_order, reps, weight_kg, load_percentage', blockIdsForDropSets)
       : { data: [], error: null }
-    
     const clusterRes = needsClusterSets
       ? await queryTableInChunks('workout_cluster_sets', 'id, block_id, exercise_id, exercise_order, reps_per_cluster, clusters_per_set, intra_cluster_rest, weight_kg, load_percentage', blockIdsForClusterSets)
       : { data: [], error: null }
-    
     const restPauseRes = needsRestPause
       ? await queryTableInChunks('workout_rest_pause_sets', 'id, block_id, exercise_id, exercise_order, rest_pause_duration, max_rest_pauses, weight_kg, load_percentage', blockIdsForRestPause)
       : { data: [], error: null }
-    
     const hrSetsRes = needsHRSets
       ? await queryTableInChunks('workout_hr_sets', 'id, block_id, exercise_id, exercise_order, target_hr_zone, work_duration_seconds, rest_duration_seconds, target_rounds', blockIdsForHRSets)
       : { data: [], error: null }
@@ -421,6 +416,26 @@ export class WorkoutBlockService {
     }
   }
 
+  /**
+   * Count total exercises across enriched blocks (for display when avoiding duplicate countExercisesForTemplate).
+   * Matches backend logic: block_exercises length, unique (exercise_id, exercise_order) for drop/time, etc.
+   */
+  static countExercisesFromBlocks(blocks: WorkoutBlock[]): number {
+    if (!blocks?.length) return 0
+    let n = 0
+    for (const b of blocks) {
+      n += (b.exercises?.length ?? 0)
+      if (b.drop_sets?.length) {
+        n += new Set(b.drop_sets.map((d: any) => `${d.exercise_id}:${d.exercise_order}`)).size
+      }
+      if (b.time_protocols?.length) {
+        n += new Set(b.time_protocols.map((t: any) => `${t.exercise_id}:${t.exercise_order}`)).size
+      }
+      n += (b.cluster_sets?.length ?? 0) + (b.rest_pause_sets?.length ?? 0) + (b.pyramid_sets?.length ?? 0) + (b.ladder_sets?.length ?? 0) + (b.hr_sets?.length ?? 0)
+    }
+    return n
+  }
+
   // Get all blocks for a workout template
   static async getWorkoutBlocks(templateId: string): Promise<WorkoutBlock[]> {
     try {
@@ -490,7 +505,9 @@ export class WorkoutBlockService {
       })
 
       uncachedTemplateIds.forEach((templateId) => {
-        const templateBlocks = blocksByTemplate.get(templateId) || []
+        const templateBlocks = (blocksByTemplate.get(templateId) || []).sort(
+          (a, b) => (a.block_order ?? 0) - (b.block_order ?? 0)
+        )
         this.setCachedBlocks(templateId, templateBlocks)
         result.set(templateId, templateBlocks)
       })

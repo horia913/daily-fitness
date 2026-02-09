@@ -46,8 +46,13 @@ export default function ProtectedRoute({ children, requiredRole, allowedRoles }:
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <div className="text-slate-500">Loading...</div>
+      <div className="min-h-screen fc-app-bg flex flex-col items-center justify-center gap-4">
+        <div
+          className="w-10 h-10 rounded-full animate-spin border-4 border-t-transparent"
+          style={{ borderColor: "color-mix(in srgb, var(--fc-accent-cyan) 30%, transparent)" }}
+          aria-hidden
+        />
+        <p className="fc-text-dim text-sm font-medium">Loading...</p>
       </div>
     )
   }

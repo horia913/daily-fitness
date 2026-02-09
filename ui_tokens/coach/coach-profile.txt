@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coach Profile | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .input-kinetic {
+            background: var(--input-bg);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            height: 52px;
+        }
+
+        .input-kinetic:focus {
+            border-color: var(--secondary);
+            background: rgba(59, 130, 246, 0.05);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        .btn-primary {
+            height: 52px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4); }
+
+        .btn-secondary {
+            height: 52px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-1px); }
+
+        .btn-ghost-red {
+            height: 52px;
+            color: #EF4444;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .btn-ghost-red:hover { background: rgba(239, 68, 68, 0.2); }
+
+        /* Custom Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 28px;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(255,255,255,0.1);
+            transition: .4s;
+            border-radius: 34px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px; width: 20px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: var(--secondary); }
+        input:checked + .slider:before { transform: translateX(24px); }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .section-header {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #888;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-header::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--glass-border);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 pb-32 max-w-3xl mx-auto">
+    <div class="refraction-bg"></div>
+
+    <!-- Navigation Header -->
+    <nav class="flex items-center justify-between mb-10">
+        <button class="w-12 h-12 rounded-2xl flex items-center justify-center crystal-card hover:bg-white/10 transition-colors">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        <h1 class="text-xl font-bold tracking-tight">Coach Profile</h1>
+        <button class="text-secondary font-semibold text-sm px-4 py-2 rounded-xl hover:bg-blue-500/10 transition-colors">
+            Save Changes
+        </button>
+    </nav>
+
+    <!-- Profile Section -->
+    <section class="mb-12 flex flex-col items-center">
+        <div class="relative group">
+            <div class="w-32 h-32 rounded-full p-1 border-2 border-dashed border-white/20 group-hover:border-secondary transition-colors">
+                <div class="w-full h-full rounded-full overflow-hidden crystal-card">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=CoachMarcus" alt="Avatar" class="w-full h-full object-cover">
+                </div>
+            </div>
+            <button class="absolute bottom-0 right-0 w-10 h-10 bg-secondary rounded-full flex items-center justify-center border-4 border-[#0A0A0A] shadow-xl hover:scale-110 transition-transform">
+                <i data-lucide="camera" class="w-5 h-5 text-white"></i>
+            </button>
+        </div>
+        <div class="text-center mt-4">
+            <h2 class="text-2xl font-bold">Coach Marcus</h2>
+            <p class="text-neutral-400 mono text-sm">Elite Strength Specialist</p>
+        </div>
+    </section>
+
+    <!-- Basic Information Form -->
+    <div class="space-y-10">
+        <section>
+            <div class="section-header">Personal Details</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Full Name</label>
+                    <input type="text" value="Marcus Aurelius" class="input-kinetic w-full px-4 rounded-xl text-body">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Email Address</label>
+                    <input type="email" value="marcus@kinetic-flow.com" class="input-kinetic w-full px-4 rounded-xl text-body">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Phone Number</label>
+                    <input type="tel" value="+1 (555) 0123-4567" class="input-kinetic w-full px-4 rounded-xl text-body">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Specialization</label>
+                    <select class="input-kinetic w-full px-4 rounded-xl text-body appearance-none">
+                        <option>Strength & Conditioning</option>
+                        <option>Bodybuilding</option>
+                        <option>Powerlifting</option>
+                        <option>Hypertrophy</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-6 space-y-2">
+                <label class="text-sm font-medium text-neutral-400 ml-1">Professional Bio</label>
+                <textarea class="input-kinetic w-full p-4 rounded-xl text-body h-32 resize-none">Passionate strength coach with 10+ years experience helping athletes reach peak performance through kinetic optimization and crystalline programming structures.</textarea>
+            </div>
+        </section>
+
+        <!-- Business & Presence -->
+        <section>
+            <div class="section-header">Business Information</div>
+            <div class="crystal-card p-6 space-y-6">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Business Name</label>
+                    <input type="text" placeholder="Kinetic Flow Coaching" class="input-kinetic w-full px-4 rounded-xl">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-neutral-400 ml-1">Website URL</label>
+                    <div class="relative">
+                        <i data-lucide="link" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500"></i>
+                        <input type="url" placeholder="https://yourwebsite.com" class="input-kinetic w-full pl-12 pr-4 rounded-xl">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <button class="btn-secondary rounded-xl flex items-center justify-center gap-2 text-sm font-semibold">
+                        <i data-lucide="instagram" class="w-4 h-4"></i> Instagram
+                    </button>
+                    <button class="btn-secondary rounded-xl flex items-center justify-center gap-2 text-sm font-semibold">
+                        <i data-lucide="twitter" class="w-4 h-4"></i> Twitter
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Preferences -->
+        <section>
+            <div class="section-header">Preferences & Settings</div>
+            <div class="space-y-4">
+                <div class="crystal-card p-5 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                            <i data-lucide="settings-2" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold">Metric System</div>
+                            <div class="text-xs text-neutral-500">Weight in kg, height in cm</div>
+                        </div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="crystal-card p-5 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                            <i data-lucide="bell" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold">Smart Notifications</div>
+                            <div class="text-xs text-neutral-500">Client PRs and log alerts</div>
+                        </div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="crystal-card p-5 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
+                            <i data-lucide="moon" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold">Kinetic Dark Mode</div>
+                            <div class="text-xs text-neutral-500">Refractive visual style</div>
+                        </div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Account Actions -->
+        <section class="pb-10">
+            <div class="section-header">Security & Data</div>
+            <div class="space-y-3">
+                <button class="btn-secondary w-full rounded-2xl flex items-center justify-between px-6">
+                    <span class="font-semibold">Change Security Password</span>
+                    <i data-lucide="lock" class="w-5 h-5 text-neutral-500"></i>
+                </button>
+                <button class="btn-secondary w-full rounded-2xl flex items-center justify-between px-6">
+                    <span class="font-semibold">Export All Client Data (CSV)</span>
+                    <i data-lucide="download" class="w-5 h-5 text-neutral-500"></i>
+                </button>
+                <button class="btn-ghost-red w-full rounded-2xl flex items-center justify-center gap-2 font-bold mt-4 kinetic-shimmer">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                    Log Out of Session
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Sticky Bottom Mobile Action Bar -->
+    <div class="fixed bottom-0 left-0 right-0 p-4 bg-black/60 backdrop-blur-xl border-t border-white/10 z-50 md:hidden">
+        <button class="btn-primary w-full rounded-2xl flex items-center justify-center gap-2 font-bold tracking-wide">
+            <i data-lucide="check-circle" class="w-5 h-5"></i>
+            SAVE ALL CHANGES
+        </button>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Reveal animations for sections
+        document.addEventListener('DOMContentLoaded', () => {
+            const sections = document.querySelectorAll('section');
+            sections.forEach((section, index) => {
+                section.style.opacity = '0';
+                section.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    section.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    section.style.opacity = '1';
+                    section.style.transform = 'translateY(0)';
+                }, index * 120);
+            });
+        });
+
+        // Haptic feedback simulation
+        document.querySelectorAll('button, input[type="checkbox"]').forEach(el => {
+            el.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(12);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

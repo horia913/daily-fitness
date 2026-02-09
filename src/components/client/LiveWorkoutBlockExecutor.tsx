@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -18,7 +18,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import VideoPlayerModal from "@/components/VideoPlayerModal";
 import ExerciseAlternativesModal from "@/components/coach/ExerciseAlternativesModal";
-import { RestTimerModal } from "./workout-execution/RestTimerModal";
+import { RestTimerModal, type RestTimerLastSet, type RestTimerNextSetPreview } from "./workout-execution/RestTimerModal";
 import { BaseBlockExecutorProps } from "./workout-execution/types";
 import {
   formatTime,
@@ -138,6 +138,10 @@ export default function LiveWorkoutBlockExecutor({
   const [pendingAction, setPendingAction] = useState<"set" | "exercise" | null>(
     null
   );
+  const [restModalData, setRestModalData] = useState<{
+    lastSet: RestTimerLastSet;
+    nextSetPreview: RestTimerNextSetPreview | null;
+  } | null>(null);
   const completedBlockRef = useRef<Set<string>>(new Set());
 
   // Load all exercises for alternatives modal
@@ -721,6 +725,7 @@ export default function LiveWorkoutBlockExecutor({
   // Handle rest timer completion
   const handleRestComplete = () => {
     setShowRestTimer(false);
+    setRestModalData(null);
 
     // Check what to advance to
     const exercises = block.block.exercises || [];
@@ -742,8 +747,46 @@ export default function LiveWorkoutBlockExecutor({
 
   const handleRestSkip = () => {
     setShowRestTimer(false);
+    setRestModalData(null);
     handleRestComplete();
   };
+
+  // Called by executor before onSetComplete when rest timer will show; provides completion hero + next set preview
+  const handleLastSetLoggedForRest = useCallback(
+    (data: { weight: number; reps: number; setNumber: number; totalSets: number; isPr?: boolean }) => {
+      const currentEx = block.block.exercises?.[currentExerciseIndex ?? 0];
+      const targetWeight =
+        currentEx?.exercise_id && lastPerformedWeightByExerciseId[currentEx.exercise_id] != null
+          ? lastPerformedWeightByExerciseId[currentEx.exercise_id]
+          : null;
+      const repsVal = currentEx?.reps ?? block.block.reps_per_set;
+      const targetReps = repsVal != null ? String(repsVal) : null;
+      setRestModalData({
+        lastSet: {
+          weight: data.weight,
+          reps: data.reps,
+          setNumber: data.setNumber,
+          totalSets: data.totalSets,
+          isPr: data.isPr,
+        },
+        nextSetPreview:
+          data.setNumber < data.totalSets
+            ? {
+                setNumber: data.setNumber + 1,
+                totalSets: data.totalSets,
+                targetWeight,
+                targetReps,
+              }
+            : null,
+      });
+    },
+    [
+      block.block.exercises,
+      block.block.reps_per_set,
+      currentExerciseIndex,
+      lastPerformedWeightByExerciseId,
+    ]
+  );
 
   // Get progression suggestion for current exercise
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
@@ -782,6 +825,7 @@ export default function LiveWorkoutBlockExecutor({
     },
     onRestTimerClick: handleRestTimerClick,
     onSetComplete: handleSetComplete,
+    onLastSetLoggedForRest: handleLastSetLoggedForRest,
     progressionSuggestion,
   };
 
@@ -942,6 +986,8 @@ export default function LiveWorkoutBlockExecutor({
         onComplete={handleRestComplete}
         onSkip={handleRestSkip}
         nextLabel={restLabel}
+        lastSet={restModalData?.lastSet ?? null}
+        nextSetPreview={restModalData?.nextSetPreview ?? null}
       />
     </>
   );

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Detail | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --warning: #F59E0B;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+            line-height: 1.625;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.3s ease;
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.03) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        /* Button System */
+        .btn-primary {
+            height: 48px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4); }
+
+        .btn-secondary {
+            height: 48px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-2px); }
+
+        .btn-danger {
+            height: 48px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #EF4444;
+            transition: all 0.3s ease;
+        }
+
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .block-tag {
+            font-size: 11px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-weight: 700;
+        }
+
+        .block-straight { border-left: 4px solid var(--secondary); }
+        .block-superset { border-left: 4px solid var(--warning); }
+        .block-amrap { border-left: 4px solid var(--accent); }
+
+        .set-row:not(:last-child) {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 max-w-5xl mx-auto pb-24">
+    <div class="refraction-bg"></div>
+
+    <!-- Navigation -->
+    <nav class="mb-8 flex items-center justify-between">
+        <button class="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors group">
+            <div class="p-2 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors">
+                <i data-lucide="chevron-left" class="w-5 h-5"></i>
+            </div>
+            <span class="font-medium">Back to Templates</span>
+        </button>
+        <div class="flex gap-3">
+            <button class="btn-secondary px-5 rounded-xl flex items-center gap-2 font-medium">
+                <i data-lucide="copy" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Duplicate</span>
+            </button>
+            <button class="btn-danger px-5 rounded-xl flex items-center gap-2 font-medium">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Delete</span>
+            </button>
+            <button class="btn-primary px-6 rounded-xl flex items-center gap-2 font-semibold">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                <span>Edit Template</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Header Section -->
+    <header class="mb-10">
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div class="space-y-4">
+                <div class="flex flex-wrap gap-2">
+                    <span class="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-sm font-semibold border border-blue-500/20 uppercase tracking-wider">Hypertrophy</span>
+                    <span class="bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full text-sm font-semibold border border-amber-500/20 uppercase tracking-wider">Advanced</span>
+                </div>
+                <h1 class="text-4xl md:text-5xl font-bold tracking-tight">V3: Posterior Chain Dominance</h1>
+                <p class="text-neutral-400 max-w-2xl leading-relaxed text-lg">
+                    A high-volume protocol focusing on the glutes, hamstrings, and lower back. Built for intermediate to advanced trainees utilizing progressive overload and mechanical drop sets.
+                </p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Quick Stats Grid -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+        <div class="crystal-card p-5 flex flex-col items-center justify-center text-center">
+            <i data-lucide="clock" class="w-6 h-6 text-blue-400 mb-2"></i>
+            <span class="text-neutral-400 text-sm uppercase tracking-widest font-bold">Duration</span>
+            <span class="text-2xl font-bold mono mt-1">~75m</span>
+        </div>
+        <div class="crystal-card p-5 flex flex-col items-center justify-center text-center">
+            <i data-lucide="dumbbell" class="w-6 h-6 text-red-400 mb-2"></i>
+            <span class="text-neutral-400 text-sm uppercase tracking-widest font-bold">Exercises</span>
+            <span class="text-2xl font-bold mono mt-1">9</span>
+        </div>
+        <div class="crystal-card p-5 flex flex-col items-center justify-center text-center">
+            <i data-lucide="users" class="w-6 h-6 text-emerald-400 mb-2"></i>
+            <span class="text-neutral-400 text-sm uppercase tracking-widest font-bold">Assignments</span>
+            <span class="text-2xl font-bold mono mt-1">14</span>
+        </div>
+        <div class="crystal-card p-5 flex flex-col items-center justify-center text-center">
+            <i data-lucide="star" class="w-6 h-6 text-amber-400 mb-2 fill-amber-400/20"></i>
+            <span class="text-neutral-400 text-sm uppercase tracking-widest font-bold">Avg Rating</span>
+            <span class="text-2xl font-bold mono mt-1">4.9</span>
+        </div>
+    </section>
+
+    <!-- Workout Flow Section -->
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold tracking-tight flex items-center gap-3">
+            <i data-lucide="layers" class="w-6 h-6 text-neutral-500"></i>
+            Workout Flow
+        </h2>
+        <span class="text-neutral-500 mono text-sm">24 SETS TOTAL</span>
+    </div>
+
+    <div class="space-y-6">
+        <!-- Block 1: Straight Set -->
+        <div class="crystal-card kinetic-shimmer p-6 block-straight animate-entry">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <span class="block-tag bg-blue-500/10 text-blue-400 border border-blue-500/20 mb-2 inline-block">Straight Set</span>
+                    <h3 class="text-xl font-bold">Barbell Conventional Deadlift</h3>
+                </div>
+                <div class="text-right">
+                    <span class="text-sm text-neutral-400 uppercase tracking-widest block mb-1">Rest Period</span>
+                    <span class="mono font-bold text-lg">180s</span>
+                </div>
+            </div>
+            
+            <div class="bg-black/40 rounded-xl overflow-hidden border border-white/5">
+                <table class="w-full text-left">
+                    <thead class="text-neutral-500 text-sm uppercase tracking-wider border-bottom border-white/5">
+                        <tr>
+                            <th class="px-6 py-3 font-medium">Set</th>
+                            <th class="px-6 py-3 font-medium">Target Load</th>
+                            <th class="px-6 py-3 font-medium">Reps</th>
+                            <th class="px-6 py-3 font-medium text-right">Intensity</th>
+                        </tr>
+                    </thead>
+                    <tbody class="mono">
+                        <tr class="set-row">
+                            <td class="px-6 py-4">1</td>
+                            <td class="px-6 py-4">100 kg</td>
+                            <td class="px-6 py-4">5</td>
+                            <td class="px-6 py-4 text-right text-neutral-400">RPE 7</td>
+                        </tr>
+                        <tr class="set-row">
+                            <td class="px-6 py-4">2</td>
+                            <td class="px-6 py-4">120 kg</td>
+                            <td class="px-6 py-4">5</td>
+                            <td class="px-6 py-4 text-right text-neutral-400">RPE 8</td>
+                        </tr>
+                        <tr class="set-row">
+                            <td class="px-6 py-4 text-primary font-bold">3</td>
+                            <td class="px-6 py-4 text-primary font-bold">140 kg</td>
+                            <td class="px-6 py-4 text-primary font-bold">5</td>
+                            <td class="px-6 py-4 text-right text-primary font-bold">RPE 9.5</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-4 flex items-start gap-2 text-neutral-400 text-sm">
+                <i data-lucide="info" class="w-4 h-4 mt-0.5 flex-none"></i>
+                <p>Focus on maintaining a neutral spine and explosive hip extension. Last set is a top set.</p>
+            </div>
+        </div>
+
+        <!-- Block 2: Superset -->
+        <div class="crystal-card kinetic-shimmer p-6 block-superset animate-entry">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <span class="block-tag bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-2 inline-block">Superset (A + B)</span>
+                    <h3 class="text-xl font-bold italic">Antagonistic Posterior Pair</h3>
+                </div>
+                <div class="text-right">
+                    <span class="text-sm text-neutral-400 uppercase tracking-widest block mb-1">Rest</span>
+                    <span class="mono font-bold text-lg">90s</span>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Sub-Exercise A -->
+                <div class="p-4 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xl">A</div>
+                        <div>
+                            <h4 class="font-bold">Lying Hamstring Curls</h4>
+                            <p class="text-sm text-neutral-400">3 Sets × 12 Reps</p>
+                        </div>
+                    </div>
+                    <div class="text-neutral-500"><i data-lucide="link" class="w-5 h-5"></i></div>
+                </div>
+                <!-- Sub-Exercise B -->
+                <div class="p-4 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xl">B</div>
+                        <div>
+                            <h4 class="font-bold">Leg Extensions (Toes In)</h4>
+                            <p class="text-sm text-neutral-400">3 Sets × 15 Reps</p>
+                        </div>
+                    </div>
+                    <div class="text-neutral-500"><i data-lucide="link" class="w-5 h-5"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Block 3: AMRAP / Finisher -->
+        <div class="crystal-card kinetic-shimmer p-6 block-amrap animate-entry">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <span class="block-tag bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2 inline-block">AMRAP Finisher</span>
+                    <h3 class="text-xl font-bold">Kettlebell Swings</h3>
+                </div>
+                <div class="flex items-center gap-2 bg-emerald-500/20 px-3 py-1 rounded-lg border border-emerald-500/30">
+                    <i data-lucide="timer" class="w-4 h-4 text-emerald-400"></i>
+                    <span class="mono font-bold text-emerald-400">5:00</span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="p-4 rounded-xl border border-white/5 bg-white/5 text-center">
+                    <div class="text-neutral-400 text-sm uppercase mb-1">Weight</div>
+                    <div class="mono font-bold text-lg">24 kg</div>
+                </div>
+                <div class="p-4 rounded-xl border border-white/5 bg-white/5 text-center">
+                    <div class="text-neutral-400 text-sm uppercase mb-1">Target</div>
+                    <div class="mono font-bold text-lg">MAX</div>
+                </div>
+                <div class="p-4 rounded-xl border border-white/5 bg-white/5 text-center">
+                    <div class="text-neutral-400 text-sm uppercase mb-1">Tempo</div>
+                    <div class="mono font-bold text-lg">X-0-X-0</div>
+                </div>
+                <div class="p-4 rounded-xl border border-white/5 bg-white/5 text-center">
+                    <div class="text-neutral-400 text-sm uppercase mb-1">Rest</div>
+                    <div class="mono font-bold text-lg">None</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sticky Bottom Mobile Action (Checklist Priority 19) -->
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-50 md:hidden">
+        <button class="btn-primary w-full rounded-2xl flex items-center justify-center gap-3 font-bold shadow-2xl">
+            <i data-lucide="zap" class="w-5 h-5 fill-current"></i>
+            Assign Template to Client
+        </button>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Staggered Entry Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.animate-entry');
+            elements.forEach((el, index) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(30px)';
+                setTimeout(() => {
+                    el.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                }, 100 * (index + 1));
+            });
+        });
+
+        // Haptic feedback simulation
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

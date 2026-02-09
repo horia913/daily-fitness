@@ -225,20 +225,8 @@ export default function MealCardWithOptions({
     })
   }
 
-  // Crystal card style
-  const crystalCardStyle: React.CSSProperties = {
-    background: isDark
-      ? 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%)'
-      : 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)',
-    backdropFilter: 'blur(20px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-    border: isDark
-      ? '1px solid rgba(255,255,255,0.1)'
-      : '1px solid rgba(0,0,0,0.1)',
-    borderRadius: '24px',
-    position: 'relative',
-    overflow: 'hidden'
-  }
+  // Surface card class
+  const surfaceCard = "fc-surface rounded-3xl border border-[color:var(--fc-surface-card-border)] relative overflow-hidden"
 
   // ============================================================================
   // Render
@@ -246,7 +234,7 @@ export default function MealCardWithOptions({
 
   return (
     <>
-      <div style={crystalCardStyle} className="flex flex-col h-full">
+      <div className={surfaceCard + " flex flex-col h-full"}>
         {meal.logged && meal.photoUrl ? (
           // ===== LOGGED MEAL =====
           <>
@@ -254,7 +242,7 @@ export default function MealCardWithOptions({
               <div className="flex justify-between items-start mb-1">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{meal.emoji}</span>
-                  <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <h3 className="text-lg font-bold fc-text-primary">
                     {meal.name}
                   </h3>
                 </div>
@@ -298,7 +286,7 @@ export default function MealCardWithOptions({
               <div className="flex justify-between items-start mb-1">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{meal.emoji}</span>
-                  <h3 className={`text-lg font-bold ${isDark ? 'text-neutral-100' : 'text-slate-900'}`}>
+                  <h3 className="text-lg font-bold fc-text-primary">
                     {meal.name}
                   </h3>
                 </div>
@@ -389,7 +377,8 @@ export default function MealCardWithOptions({
               <Button
                 onClick={handlePhotoSelect}
                 disabled={meal.logged}
-                className="w-full h-12 rounded-xl flex items-center justify-center gap-2 font-semibold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30 hover:shadow-green-500/40 transition-all"
+                variant="fc-primary"
+                className="w-full h-12 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all"
               >
                 <Camera className="w-5 h-5" />
                 Upload Photo
@@ -405,7 +394,7 @@ export default function MealCardWithOptions({
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
           onClick={(e) => e.target === e.currentTarget && !uploading && handleDiscardPhoto()}
         >
-          <div className={`${theme.card} fc-glass fc-card rounded-3xl border ${theme.border} max-w-lg w-full overflow-hidden`}>
+          <div className={`fc-surface rounded-3xl border border-[color:var(--fc-surface-card-border)] max-w-lg w-full overflow-hidden`}>
             {/* Preview Header */}
             <div className={`p-4 border-b ${theme.border} flex items-center justify-between`}>
               <div>

@@ -5,6 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -624,27 +625,26 @@ export default function CoachProgress() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-24 w-full">
-          <div className="px-4 sm:px-6 pt-6 sm:pt-10 w-full max-w-[100%]">
-            <div className="w-full space-y-6">
+        <div className="min-h-screen w-full">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24 space-y-6">
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 md:p-8">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-3">
-                  <Badge className="fc-badge fc-badge-strong w-fit">Progress Command</Badge>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white">
-                      <BarChart3 className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                        Progress Dashboard
-                      </h1>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        Monitor client momentum, streaks, and completion metrics.
-                      </p>
-                    </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+                    <BarChart3 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                      Progress Dashboard
+                    </h1>
+                    <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                      Monitor client momentum, streaks, and completion metrics.
+                    </p>
                   </div>
                 </div>
               </div>
+            </GlassCard>
+            <div className="space-y-6">
 
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
                   <div className="relative flex-1">

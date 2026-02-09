@@ -945,24 +945,21 @@ export default function CoachHabitsManagement() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen">
-        <div className="relative px-6 pb-16 pt-10">
+        <div className="relative px-4 sm:px-6 pb-24 pt-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            <GlassCard className="p-6 md:p-8">
+            <GlassCard elevation={2} className="fc-glass fc-card p-6 md:p-8">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-3">
-                  <Badge className="fc-badge fc-badge-strong w-fit">Habit Studio</Badge>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg">
-                      <Library className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                        Habits Management
-                      </h1>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        Build habit templates, assign routines, and track client consistency.
-                      </p>
-                    </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                      Habits Management
+                    </h1>
+                    <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                      Build habit templates, assign routines, and track client consistency.
+                    </p>
                   </div>
                 </div>
               </div>

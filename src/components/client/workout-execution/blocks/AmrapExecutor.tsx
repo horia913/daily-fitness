@@ -13,7 +13,6 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 
@@ -274,23 +273,20 @@ export function AmrapExecutor({
     <div className="space-y-4">
       {/* Inline Timer */}
       <div
-        className={`rounded-xl p-6 border-2 text-center ${
-          timerHasEnded
-            ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700"
-            : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700"
-        }`}
+        className="rounded-xl p-5 text-center"
+        style={timerHasEnded
+          ? { background: "color-mix(in srgb, var(--fc-status-success) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-status-success) 25%, transparent)" }
+          : { background: "color-mix(in srgb, var(--fc-accent-cyan) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-accent-cyan) 25%, transparent)" }
+        }
       >
         <div
-          className={`text-5xl font-bold mb-3 ${
-            timerHasEnded
-              ? "text-green-600 dark:text-green-400"
-              : "text-blue-600 dark:text-blue-400"
-          }`}
+          className="text-5xl font-bold mb-3"
+          style={{ color: timerHasEnded ? "var(--fc-status-success)" : "var(--fc-accent-cyan)" }}
         >
           {formatTime(timeRemaining)}
         </div>
         {timerHasEnded && (
-          <div className="text-lg font-semibold text-green-700 dark:text-green-300 mb-3">
+          <div className="text-lg font-semibold mb-3" style={{ color: "var(--fc-status-success)" }}>
             ⏱️ Time's Up!
           </div>
         )}
@@ -329,7 +325,7 @@ export function AmrapExecutor({
       </div>
 
       {/* Weight and Reps Input */}
-      <GlassCard elevation={1} className="p-4">
+      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <LargeInput
@@ -343,7 +339,7 @@ export function AmrapExecutor({
               stepAmount={2.5}
             />
             {suggested_weight != null && suggested_weight > 0 && (
-              <button type="button" onClick={() => { setWeight(String(suggested_weight)); setIsWeightPristine(false); }} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
+              <button type="button" onClick={() => { setWeight(String(suggested_weight)); setIsWeightPristine(false); }} className="text-xs font-medium hover:underline" style={{ color: "var(--fc-accent-cyan)" }}>
                 {loadPercentage != null ? `${loadPercentage}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
               </button>
             )}
@@ -358,7 +354,7 @@ export function AmrapExecutor({
             stepAmount={1}
           />
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 
@@ -393,7 +389,8 @@ export function AmrapExecutor({
     <Button
       onClick={handleLogSet}
       disabled={isButtonDisabled}
-      className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-indigo-600"
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <CheckCircle className="w-5 h-5 mr-2" />
       {isLoggingSet ? "Logging..." : "LOG SET"}

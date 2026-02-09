@@ -115,16 +115,13 @@ export function WorkoutCompletionModal({
 
       <GlassCard
         elevation={4}
-        className="max-w-2xl w-full max-h-[90vh] overflow-y-auto fc-glass fc-card"
+        className="fc-modal max-w-2xl w-full max-h-[90vh] overflow-y-auto fc-glass fc-card"
       >
         <div className="p-8">
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
-            style={{
-              color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-            }}
+            className="absolute top-4 right-4 p-2 rounded-full fc-text-dim hover:opacity-100 fc-glass-soft transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -143,18 +140,10 @@ export function WorkoutCompletionModal({
             >
               <Trophy className="w-12 h-12 text-white" />
             </div>
-            <h2
-              className="text-4xl font-bold mb-2 text-center"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
+            <h2 className="text-4xl font-bold mb-2 text-center fc-text-primary">
               Workout Complete!
             </h2>
-            <p
-              className="text-lg text-center"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-              }}
-            >
+            <p className="text-lg text-center fc-text-dim">
               {workoutName}
             </p>
           </div>

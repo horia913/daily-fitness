@@ -94,6 +94,7 @@ import {
   Pause,
   BarChart3,
   TrendingUp,
+  CheckCheck,
 } from "lucide-react";
 
 export default function CoachNotifications() {
@@ -109,6 +110,7 @@ export default function CoachNotifications() {
   const [priority, setPriority] = useState("normal");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("send");
+  const [notificationFilter, setNotificationFilter] = useState<"all" | "unread" | "sessions" | "workouts" | "messages">("all");
 
   // Enhanced notification preferences state
   const [notificationPreferences, setNotificationPreferences] = useState({
@@ -249,29 +251,36 @@ export default function CoachNotifications() {
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-green-500/5 rounded-full blur-3xl"></div>
           </div>
 
-          <div className="relative px-6 pb-16 pt-10">
-            <div className="max-w-6xl mx-auto space-y-6">
-              <GlassCard className="p-6 md:p-8">
-                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-3">
-                    <Badge className="fc-badge fc-badge-strong w-fit">Notification Hub</Badge>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white shadow-lg">
-                        <Bell className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                          Notification Management
-                        </h1>
-                        <p className="text-sm text-[color:var(--fc-text-dim)]">
-                          Send alerts, manage preferences, and review delivery history.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </GlassCard>
+          <div className="relative max-w-2xl mx-auto min-h-screen flex flex-col px-6 pb-24 pt-6">
+            <header className="sticky top-0 z-20 fc-glass/80 backdrop-blur-md py-6 pb-4 flex items-center justify-between -mx-6 px-6">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight fc-text-primary">Command Center</h1>
+                <p className="text-sm fc-text-dim mt-0.5">Manage your client velocity</p>
+              </div>
+              <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost flex items-center gap-2">
+                <CheckCheck className="w-4 h-4" />
+                Mark all read
+              </Button>
+            </header>
 
+            <div className="flex items-center gap-2 overflow-x-auto border-b border-[color:var(--fc-glass-border)] pb-2 mb-4 sticky top-[88px] z-20 fc-glass/60 backdrop-blur-md -mx-6 px-6">
+              {(["all", "unread", "sessions", "workouts", "messages"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setNotificationFilter(f)}
+                  className={`py-2 px-4 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+                    notificationFilter === f
+                      ? "fc-text-primary border-b-2 border-[color:var(--fc-accent-primary)]"
+                      : "fc-text-dim hover:fc-text-primary"
+                  }`}
+                >
+                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-6 flex-1">
               <Tabs
                 value={activeTab}
                 onValueChange={setActiveTab}

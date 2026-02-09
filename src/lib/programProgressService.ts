@@ -1,15 +1,18 @@
 /**
  * Program Progress Service
  * 
- * Shared logic for determining the current workout based on program_progress.
- * Used by BOTH client and coach flows to ensure consistency.
+ * REFACTORED: Now delegates to programStateService for all program state reads.
  * 
- * The key insight: current_week_index and current_day_index are INDICES into
- * sorted arrays, NOT the actual week_number/day_of_week values. This handles
- * gaps in the schedule (e.g., weeks 1, 3, 5 or days 1, 3, 5).
+ * Kept exports:
+ *   - buildScheduleStructure (utility — still used by some callers)
+ *   - getScheduleRow (utility — still used by some callers)
+ *   - getCurrentWorkoutFromProgress (now delegates to programStateService.getProgramState)
+ * 
+ * CurrentWorkoutInfo interface is preserved for backward compatibility.
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { getProgramState, ProgramScheduleSlot } from './programStateService'
 
 export interface ProgramScheduleRow {
   id: string
@@ -33,7 +36,7 @@ export interface CurrentWorkoutInfo {
   program_id?: string
   program_name?: string
   
-  // Progress indices (0-based)
+  // Progress indices (0-based — kept for backward compat, derived from 1-based)
   current_week_index?: number
   current_day_index?: number
   is_completed?: boolean
@@ -55,14 +58,13 @@ export interface CurrentWorkoutInfo {
 }
 
 /**
- * Builds a structure from program_schedule rows that handles gaps
+ * Builds a structure from program_schedule rows that handles gaps.
+ * Kept as utility for callers that still need this format.
  */
 export function buildScheduleStructure(rows: ProgramScheduleRow[]): ScheduleStructure {
-  // Get sorted distinct week numbers
   const weekNumbersSet = new Set(rows.map(r => r.week_number))
   const weekNumbers = Array.from(weekNumbersSet).sort((a, b) => a - b)
   
-  // Group and sort days by week
   const daysByWeek = new Map<number, ProgramScheduleRow[]>()
   for (const weekNum of weekNumbers) {
     const daysInWeek = rows
@@ -75,7 +77,8 @@ export function buildScheduleStructure(rows: ProgramScheduleRow[]): ScheduleStru
 }
 
 /**
- * Gets the schedule row for a given (week_index, day_index) using the structure
+ * Gets the schedule row for a given (week_index, day_index) using the structure.
+ * Kept as utility.
  */
 export function getScheduleRow(
   structure: ScheduleStructure, 
@@ -97,177 +100,103 @@ export function getScheduleRow(
 }
 
 /**
- * Gets the current workout info for a client based on program_progress.
- * This is the SINGLE SOURCE OF TRUTH for determining which workout to show.
+ * Gets the current workout info for a client.
  * 
- * @param supabase - Supabase client (can be auth or admin)
- * @param clientId - The client's UUID
- * @returns CurrentWorkoutInfo with all relevant workout selection data
+ * REFACTORED: Delegates to programStateService.getProgramState() and maps
+ * the result to the legacy CurrentWorkoutInfo shape for backward compatibility.
  */
 export async function getCurrentWorkoutFromProgress(
   supabase: SupabaseClient,
   clientId: string
 ): Promise<CurrentWorkoutInfo> {
-  // 1. Find active program assignment (most recent if multiple)
-  const { data: assignments, error: assignmentError } = await supabase
-    .from('program_assignments')
-    .select('id, program_id, name, status, duration_weeks, total_days, created_at')
-    .eq('client_id', clientId)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-  
-  if (assignmentError) {
-    console.error('[programProgressService] Error fetching assignments:', assignmentError)
-    return {
-      status: 'no_program',
-      message: 'Failed to fetch program assignments',
-    }
-  }
-  
-  if (!assignments || assignments.length === 0) {
+  const state = await getProgramState(supabase, clientId)
+
+  // No active assignment
+  if (!state.assignment) {
     return {
       status: 'no_program',
       message: 'No active program assignment',
     }
   }
-  
-  const assignment = assignments[0]
-  
-  // 2. Get or create program_progress
-  let { data: progress, error: progressError } = await supabase
-    .from('program_progress')
-    .select('*')
-    .eq('program_assignment_id', assignment.id)
-    .single()
-  
-  if (progressError && progressError.code === 'PGRST116') {
-    // Row not found - create it (starting at week 0, day 0)
-    const { data: newProgress, error: insertError } = await supabase
-      .from('program_progress')
-      .insert({
-        program_assignment_id: assignment.id,
-        current_week_index: 0,
-        current_day_index: 0,
-        is_completed: false,
-      })
-      .select()
-      .single()
-    
-    if (insertError) {
-      console.error('[programProgressService] Error creating progress:', insertError)
-      return {
-        status: 'no_program',
-        message: 'Failed to initialize program progress',
-        program_assignment_id: assignment.id,
-        program_id: assignment.program_id,
-        program_name: assignment.name || 'Program',
-      }
-    }
-    
-    progress = newProgress
-  } else if (progressError) {
-    console.error('[programProgressService] Error fetching progress:', progressError)
-    return {
-      status: 'no_program',
-      message: 'Failed to fetch program progress',
-      program_assignment_id: assignment.id,
-      program_id: assignment.program_id,
-      program_name: assignment.name || 'Program',
-    }
-  }
-  
-  // 3. Check if program is completed
-  if (progress.is_completed) {
-    return {
-      status: 'completed',
-      message: 'Program completed',
-      program_assignment_id: assignment.id,
-      program_id: assignment.program_id,
-      program_name: assignment.name || 'Program',
-      current_week_index: progress.current_week_index,
-      current_day_index: progress.current_day_index,
-      is_completed: true,
-    }
-  }
-  
-  // 4. Fetch program schedule
-  const { data: scheduleRows, error: scheduleError } = await supabase
-    .from('program_schedule')
-    .select('id, program_id, week_number, day_of_week, template_id')
-    .eq('program_id', assignment.program_id)
-  
-  if (scheduleError) {
-    console.error('[programProgressService] Error fetching schedule:', scheduleError)
-    return {
-      status: 'no_schedule',
-      message: 'Failed to fetch program schedule',
-      program_assignment_id: assignment.id,
-      program_id: assignment.program_id,
-      program_name: assignment.name || 'Program',
-    }
-  }
-  
-  if (!scheduleRows || scheduleRows.length === 0) {
+
+  // No schedule slots
+  if (state.slots.length === 0) {
     return {
       status: 'no_schedule',
       message: 'No training days configured in program schedule',
-      program_assignment_id: assignment.id,
-      program_id: assignment.program_id,
-      program_name: assignment.name || 'Program',
+      program_assignment_id: state.assignment.id,
+      program_id: state.assignment.program_id,
+      program_name: state.assignment.name || 'Program',
     }
   }
-  
-  // 5. Build schedule structure (handles gaps in week/day numbers)
-  const structure = buildScheduleStructure(scheduleRows as ProgramScheduleRow[])
-  
-  // 6. Get current day's schedule row using indices
-  const currentRow = getScheduleRow(
-    structure,
-    progress.current_week_index,
-    progress.current_day_index
-  )
-  
-  if (!currentRow) {
+
+  // Program completed
+  if (state.isCompleted) {
     return {
-      status: 'invalid_state',
-      message: `Invalid progress state: week_index=${progress.current_week_index}, day_index=${progress.current_day_index}`,
-      program_assignment_id: assignment.id,
-      program_id: assignment.program_id,
-      program_name: assignment.name || 'Program',
-      current_week_index: progress.current_week_index,
-      current_day_index: progress.current_day_index,
-      total_weeks: structure.weekNumbers.length,
+      status: 'completed',
+      message: 'Program completed',
+      program_assignment_id: state.assignment.id,
+      program_id: state.assignment.program_id,
+      program_name: state.assignment.name || 'Program',
+      is_completed: true,
+      current_week_index: computeWeekIndex(state.slots, state.currentWeekNumber),
+      current_day_index: computeDayIndex(state.slots, state.nextSlot ?? state.slots[state.slots.length - 1]),
     }
   }
-  
-  // 7. Compute human-readable labels
-  const weekLabel = `Week ${currentRow.week_number}`
-  const daysInWeek = structure.daysByWeek.get(currentRow.week_number) || []
-  const dayPosition = daysInWeek.findIndex(d => d.id === currentRow.id) + 1
-  const dayLabel = `Day ${dayPosition}`
-  
+
+  // Active — has a next slot
+  const nextSlot = state.nextSlot!
+  const weekIndex = computeWeekIndex(state.slots, nextSlot.week_number)
+  const slotsInWeek = state.slots.filter(s => s.week_number === nextSlot.week_number)
+  const dayIndex = slotsInWeek.findIndex(s => s.id === nextSlot.id)
+
+  // Compute unique week count
+  const uniqueWeeks = [...new Set(state.slots.map(s => s.week_number))].sort((a, b) => a - b)
+
   return {
     status: 'active',
     message: 'Workout ready',
     
-    program_assignment_id: assignment.id,
-    program_id: assignment.program_id,
-    program_name: assignment.name || 'Program',
+    program_assignment_id: state.assignment.id,
+    program_id: state.assignment.program_id,
+    program_name: state.assignment.name || 'Program',
     
-    current_week_index: progress.current_week_index,
-    current_day_index: progress.current_day_index,
+    current_week_index: weekIndex,
+    current_day_index: dayIndex >= 0 ? dayIndex : 0,
     is_completed: false,
     
-    week_label: weekLabel,
-    day_label: dayLabel,
-    position_label: `${weekLabel} • ${dayLabel}`,
+    week_label: state.weekLabel,
+    day_label: state.dayLabel,
+    position_label: state.positionLabel,
     
-    template_id: currentRow.template_id,
-    schedule_row_id: currentRow.id,
+    template_id: nextSlot.template_id,
+    schedule_row_id: nextSlot.id,
     
-    total_weeks: structure.weekNumbers.length,
-    days_in_current_week: daysInWeek.length,
-    actual_week_number: currentRow.week_number,
-    actual_day_of_week: currentRow.day_of_week,
+    total_weeks: uniqueWeeks.length,
+    days_in_current_week: slotsInWeek.length,
+    actual_week_number: nextSlot.week_number,
+    actual_day_of_week: nextSlot.day_of_week,
   }
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/**
+ * Compute 0-based week index from 1-based week_number and list of slots.
+ */
+function computeWeekIndex(slots: ProgramScheduleSlot[], weekNumber: number): number {
+  const uniqueWeeks = [...new Set(slots.map(s => s.week_number))].sort((a, b) => a - b)
+  const idx = uniqueWeeks.indexOf(weekNumber)
+  return idx >= 0 ? idx : 0
+}
+
+/**
+ * Compute 0-based day index within the week from a slot.
+ */
+function computeDayIndex(slots: ProgramScheduleSlot[], slot: ProgramScheduleSlot): number {
+  const slotsInWeek = slots.filter(s => s.week_number === slot.week_number)
+  const idx = slotsInWeek.findIndex(s => s.id === slot.id)
+  return idx >= 0 ? idx : 0
 }

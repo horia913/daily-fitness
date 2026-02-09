@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, Edit, Trash, Calendar, Clock, Target, RefreshCw } from "lucide-react";
+import { CheckCircle, Edit, Trash, Calendar, Clock, Target, RefreshCw, Scale, Dumbbell, Activity, ChevronDown } from "lucide-react";
 
 interface Goal {
   id: string;
@@ -38,9 +38,34 @@ interface GoalCardProps {
   onDelete?: (goalId: string) => void;
   onUpdate?: (goalId: string, newValue: number) => void;
   onEdit?: (goal: Goal) => void;
+  /** When true, render compact row for completed-goals list */
+  compact?: boolean;
 }
 
-export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: GoalCardProps) {
+function getCategoryIconTile(category: string) {
+  const map: Record<string, { Icon: typeof Scale; bg: string; text: string }> = {
+    weight_loss: { Icon: Scale, bg: "bg-blue-500/10", text: "text-blue-400" },
+    muscle_gain: { Icon: Dumbbell, bg: "bg-red-500/10", text: "text-red-400" },
+    body_composition: { Icon: Scale, bg: "bg-blue-500/10", text: "text-blue-400" },
+    strength: { Icon: Dumbbell, bg: "bg-red-500/10", text: "text-red-400" },
+    endurance: { Icon: Activity, bg: "bg-green-500/10", text: "text-green-400" },
+    performance: { Icon: Activity, bg: "bg-green-500/10", text: "text-green-400" },
+    mobility: { Icon: Activity, bg: "bg-indigo-500/10", text: "text-indigo-400" },
+    other: { Icon: Target, bg: "bg-slate-500/10", text: "text-slate-400" },
+  };
+  return map[category] || map.other;
+}
+
+function getTrajectoryStatusTag(goal: Goal): { label: string; className: string } {
+  if (goal.status === "completed") return { label: "Completed", className: "fc-text-success bg-[color:var(--fc-status-success)]/20 border-[color:var(--fc-status-success)]/30" };
+  if (goal.status === "cancelled") return { label: "Cancelled", className: "fc-text-error bg-[color:var(--fc-status-error)]/20 border-[color:var(--fc-status-error)]/30" };
+  if (goal.status === "paused") return { label: "Paused", className: "fc-text-warning bg-[color:var(--fc-status-warning)]/20 border-[color:var(--fc-status-warning)]/30" };
+  const statusLabel = goal.status === "in_progress" ? "Active" : "Active";
+  const priorityLabel = goal.priority.charAt(0).toUpperCase() + goal.priority.slice(1);
+  return { label: `${statusLabel} · ${priorityLabel}`, className: "fc-text-workouts bg-[color:var(--fc-domain-workouts)]/20 border-[color:var(--fc-domain-workouts)]/30" };
+}
+
+export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, compact = false }: GoalCardProps) {
   const [updateValue, setUpdateValue] = useState<string>(
     goal.current_value?.toString() || "0"
   );
@@ -106,148 +131,96 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit }: Go
     ? getDaysUntilDeadline(goal.target_date)
     : null;
 
-  return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 transition-all duration-300 fc-hover-rise">
-      {/* Header */}
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <h3 className="text-lg font-bold fc-text-primary truncate">
-              {goal.title}
-            </h3>
-            <span className={`fc-pill fc-pill-glass text-xs ${getPriorityColor(goal.priority)}`}>
-              {goal.priority}
-            </span>
-            <span className={`fc-pill fc-pill-glass text-xs capitalize ${getStatusColor(goal.status)}`}>
-              {goal.status.replace(/_/g, " ")}
-            </span>
-            {isCompleted && (
-              <span className="fc-pill fc-pill-glass text-xs fc-text-success">
-                ✓ Completed
-              </span>
-            )}
-            {isAutoTracked && (
-              <span className="fc-pill fc-pill-glass text-xs fc-text-workouts flex items-center gap-1">
-                <RefreshCw className="w-3 h-3" />
-                Auto
-              </span>
-            )}
+  const { Icon: CategoryIcon, bg: iconBg, text: iconText } = getCategoryIconTile(goal.category);
+  const trajectoryTag = getTrajectoryStatusTag(goal);
+
+  /* Compact row for completed-goals list */
+  if (compact && isCompleted) {
+    return (
+      <div className="flex items-center justify-between p-4 border border-[color:var(--fc-glass-border)] rounded-xl fc-glass-soft">
+        <div className="flex items-center gap-4">
+          <CheckCircle className="w-5 h-5 fc-text-success flex-shrink-0" />
+          <div>
+            <div className="font-semibold fc-text-primary">{goal.title}</div>
+            <div className="text-xs fc-text-subtle font-mono">
+              Final: {goal.current_value ?? goal.target_value ?? "—"} {goal.target_unit ?? ""} • Completed {goal.target_date ? new Date(goal.target_date).toLocaleDateString() : "—"}
+            </div>
           </div>
-          {goal.description && (
-            <p className="text-sm fc-text-dim mb-2">
-              {goal.description}
-            </p>
-          )}
         </div>
+        <span className="fc-pill fc-pill-glass text-xs fc-text-success border border-[color:var(--fc-status-success)]/30">Completed</span>
       </div>
+    );
+  }
 
-      {/* Progress Display */}
-      <div className="mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium fc-text-dim">
-            {goal.current_value || 0} / {goal.target_value || 0} {goal.target_unit || ""}
-          </span>
-          <span className="text-sm font-bold fc-text-primary">
-            {Math.round(progressPercent)}%
+  /* Trajectory card (mockup layout) */
+  return (
+    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 transition-all duration-300 fc-hover-rise flex flex-col justify-between">
+      <div>
+        <div className="flex justify-between items-start mb-6">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconBg} ${iconText}`}>
+            <CategoryIcon className="w-6 h-6" />
+          </div>
+          <span className={`status-tag text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border ${trajectoryTag.className}`}>
+            {trajectoryTag.label}
           </span>
         </div>
-        <div className="w-full rounded-full h-3 overflow-hidden fc-progress-track">
-          <div
-            className="h-3 rounded-full transition-all duration-500 fc-progress-fill"
-            style={{
-              width: `${Math.min(progressPercent, 100)}%`,
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Dates */}
-      <div className="flex flex-wrap items-center gap-4 text-xs fc-text-subtle mb-4">
-        <span className="flex items-center gap-1">
-          <Calendar className="w-3 h-3" />
-          Started: {new Date(goal.start_date).toLocaleDateString()}
-        </span>
-        {goal.target_date && (
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            Due: {new Date(goal.target_date).toLocaleDateString()}
-            {daysUntilDeadline !== null && daysUntilDeadline > 0 && (
-              <span className="ml-1 fc-text-warning">
-                ({daysUntilDeadline} days left)
-              </span>
-            )}
-          </span>
+        <h3 className="text-xl font-bold fc-text-primary mb-1">{goal.title}</h3>
+        {goal.description && (
+          <p className="text-sm fc-text-dim mb-6">{goal.description}</p>
         )}
       </div>
 
-      {/* Status Label */}
-      <div className="mb-4 p-3 rounded-lg fc-glass-soft border border-[color:var(--fc-glass-border)]">
-        <p className={`text-xs font-medium flex items-center gap-2 ${isAutoTracked ? "fc-text-workouts" : "fc-text-habits"}`}>
-          {isAutoTracked ? (
-            <>
-              <RefreshCw className="w-3 h-3" />
-              Auto-updated from your activities
-            </>
-          ) : (
-            <>
-              <Edit className="w-3 h-3" />
-              Manual tracking - Update progress below
-            </>
-          )}
-        </p>
+      <div className="space-y-4">
+        <div className="flex justify-between text-sm font-mono">
+          <span className="fc-text-dim">Current: {goal.current_value ?? 0}{goal.target_unit ? ` ${goal.target_unit}` : ""}</span>
+          <span className="fc-text-primary">Target: {goal.target_value ?? "—"}{goal.target_unit ? ` ${goal.target_unit}` : ""}</span>
+        </div>
+        <div className="w-full h-2 rounded-full overflow-hidden fc-progress-track border border-[color:var(--fc-glass-border)]">
+          <div
+            className="h-full rounded-full transition-all duration-500 fc-progress-fill"
+            style={{ width: `${Math.min(progressPercent, 100)}%` }}
+          />
+        </div>
+        <div className="flex justify-between items-center pt-2">
+          <div className="flex items-center gap-2 text-xs fc-text-subtle">
+            <Calendar className="w-3.5 h-3.5" />
+            <span>{goal.target_date ? `Deadline: ${new Date(goal.target_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "No deadline"}</span>
+          </div>
+          <span className="font-mono text-xs font-bold fc-text-error">{Math.round(progressPercent)}% DONE</span>
+        </div>
       </div>
 
-      {/* Update Section - ONLY for manual goals */}
-      {!isAutoTracked && !isCompleted && !isCancelled && (
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
-          <Input
-            type="number"
-            placeholder="Enter progress"
-            value={updateValue}
-            onChange={(e) => setUpdateValue(e.target.value)}
-            className="flex-1 fc-glass-soft border border-[color:var(--fc-glass-border)]"
-            min={0}
-            max={goal.target_value}
-          />
-          <Button
-            onClick={handleUpdate}
-            disabled={isUpdating}
-            className="px-4 py-2 fc-btn fc-btn-primary fc-press"
-          >
-            {isUpdating ? "Updating..." : "Update"}
-          </Button>
+      {/* Manual update + actions: compact row */}
+      {(!isAutoTracked || onEdit || onDelete) && !isCompleted && !isCancelled && (
+        <div className="mt-4 pt-4 border-t border-[color:var(--fc-glass-border)] flex flex-wrap items-center gap-2">
+          {!isAutoTracked && onUpdate && (
+            <>
+              <Input
+                type="number"
+                placeholder="Progress"
+                value={updateValue}
+                onChange={(e) => setUpdateValue(e.target.value)}
+                className="w-24 h-8 text-sm fc-glass-soft border border-[color:var(--fc-glass-border)]"
+                min={0}
+                max={goal.target_value}
+              />
+              <Button size="sm" onClick={handleUpdate} disabled={isUpdating} className="fc-btn fc-btn-primary fc-press h-8">
+                {isUpdating ? "…" : "Update"}
+              </Button>
+            </>
+          )}
+          {onEdit && (
+            <Button variant="outline" size="sm" onClick={() => onEdit(goal)} className="fc-btn fc-btn-secondary h-8">
+              <Edit className="w-3.5 h-3.5 mr-1" /> Edit
+            </Button>
+          )}
+          {onDelete && (
+            <Button variant="outline" size="sm" onClick={() => confirm(`Delete "${goal.title}"?`) && onDelete(goal.id)} className="fc-btn fc-btn-secondary fc-text-error h-8">
+              <Trash className="w-3.5 h-3.5 mr-1" /> Delete
+            </Button>
+          )}
         </div>
       )}
-
-      {/* Action Buttons */}
-      <div className="flex gap-2">
-        {onEdit && !isCompleted && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onEdit(goal)}
-            className="flex-1 fc-btn fc-btn-secondary"
-          >
-            <Edit className="w-4 h-4 mr-1" />
-            Edit
-          </Button>
-        )}
-        {onDelete && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (confirm(`Delete "${goal.title}"?`)) {
-                onDelete(goal.id);
-              }
-            }}
-            className="flex-1 fc-btn fc-btn-secondary fc-text-error"
-          >
-            <Trash className="w-4 h-4 mr-1" />
-            Delete
-          </Button>
-        )}
-      </div>
     </div>
   );
 }

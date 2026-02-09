@@ -56,6 +56,7 @@ import {
   BarChart3,
   Heart,
   Sparkles,
+  ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -385,56 +386,35 @@ export default function CoachProfilePage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div
-          style={{
-            minHeight: "100vh",
-            paddingBottom: "100px",
-            padding: "24px 20px",
-          }}
-        >
-          <div
-            className="max-w-5xl mx-auto"
-            style={{ display: "flex", flexDirection: "column", gap: "24px" }}
-          >
-            <GlassCard className="p-6 md:p-8">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex-1 space-y-3">
-                  <Badge className="fc-badge fc-badge-strong w-fit">Coach Profile</Badge>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white shadow-lg">
-                      <Sparkles className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                        Coach Profile & Settings
-                      </h1>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        Manage your professional information and app preferences.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  {editing ? (
-                    <>
-                      <Button variant="outline" onClick={handleCancel} className="fc-btn fc-btn-ghost">
-                        <X className="w-4 h-4 mr-2" />
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSave} disabled={saving} className="fc-btn fc-btn-primary">
-                        <Save className="w-4 h-4 mr-2" />
-                        {saving ? "Saving..." : "Save Changes"}
-                      </Button>
-                    </>
-                  ) : (
-                    <Button onClick={() => setEditing(true)} className="fc-btn fc-btn-primary">
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit Profile
+        <div className="min-h-screen pb-24">
+          <div className="max-w-3xl mx-auto fc-page px-4 sm:px-6 pt-10 flex flex-col gap-8">
+            <nav className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.history.back()}
+                className="w-12 h-12 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)] hover:bg-white/10"
+              >
+                <ArrowLeft className="w-6 h-6 fc-text-primary" />
+              </Button>
+              <h1 className="text-xl font-bold tracking-tight fc-text-primary">Coach Profile</h1>
+              <div className="flex items-center gap-2">
+                {editing ? (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={handleCancel} className="fc-btn fc-btn-ghost hidden sm:inline-flex">
+                      Cancel
                     </Button>
-                  )}
-                </div>
+                    <Button onClick={handleSave} disabled={saving} size="sm" className="fc-btn fc-btn-primary">
+                      {saving ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={() => setEditing(true)} size="sm" className="fc-btn fc-btn-primary">
+                    Edit
+                  </Button>
+                )}
               </div>
-            </GlassCard>
+            </nav>
 
             {/* Profile Picture Section */}
             <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
@@ -505,18 +485,11 @@ export default function CoachProfilePage() {
 
             {/* Personal Information */}
             <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
-              <CardHeader className="p-6 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
-                    <User className="w-7 h-7 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl text-[color:var(--fc-text-primary)]">Personal Information</CardTitle>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">Basic details about yourself</p>
-                  </div>
+              <CardContent className="p-6 space-y-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-sm font-semibold uppercase tracking-wider fc-text-dim">Personal Details</span>
+                  <span className="flex-1 h-px bg-[color:var(--fc-glass-border)]" />
                 </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="first_name" className="text-sm font-semibold text-[color:var(--fc-text-primary)]">

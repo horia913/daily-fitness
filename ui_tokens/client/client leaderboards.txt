@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .podium-gradient-1 { background: linear-gradient(180deg, rgba(245, 158, 11, 0.2) 0%, transparent 100%); border-top: 2px solid #F59E0B; }
+        .podium-gradient-2 { background: linear-gradient(180deg, rgba(148, 163, 184, 0.2) 0%, transparent 100%); border-top: 2px solid #94A3B8; }
+        .podium-gradient-3 { background: linear-gradient(180deg, rgba(180, 83, 9, 0.2) 0%, transparent 100%); border-top: 2px solid #B45309; }
+
+        .rank-glow {
+            filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.3));
+        }
+
+        .filter-chip {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid transparent;
+        }
+
+        .filter-chip.active {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.4);
+            color: var(--secondary);
+        }
+
+        .btn-toggle {
+            width: 48px;
+            height: 24px;
+            background: #1F2937;
+            border-radius: 100px;
+            position: relative;
+            transition: background 0.3s;
+        }
+
+        .btn-toggle-dot {
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.3s;
+        }
+
+        .toggle-active .btn-toggle { background: var(--accent); }
+        .toggle-active .btn-toggle-dot { transform: translateX(24px); }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.07) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .sticky-nav {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: rgba(10, 10, 10, 0.8);
+            backdrop-filter: blur(12px);
+            margin: -24px -24px 24px -24px;
+            padding: 24px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .me-row {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%);
+            border-left: 4px solid var(--secondary);
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
+    </style>
+</head>
+<body class="p-6 md:p-8 pb-12">
+    <div class="refraction-bg"></div>
+
+    <!-- Header & Anonymous Toggle -->
+    <header class="flex justify-between items-start mb-8">
+        <div>
+            <h1 class="text-[30px] font-bold tracking-tight leading-tight">Global Ranks</h1>
+            <p class="text-[14px] text-neutral-400 mt-1">Comparing with 1,204 athletes</p>
+        </div>
+        <div class="flex items-center gap-3 bg-white/5 p-2 px-4 rounded-2xl border border-white/10" id="anon-toggle">
+            <span class="text-[14px] font-medium text-neutral-400">Ghost Mode</span>
+            <div class="btn-toggle cursor-pointer">
+                <div class="btn-toggle-dot"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Your Position Hero Card -->
+    <section class="mb-10">
+        <div class="crystal-card kinetic-shimmer p-6 flex flex-col md:flex-row items-center gap-6 border-l-4 border-l-blue-500">
+            <div class="relative">
+                <div class="w-20 h-20 rounded-full border-4 border-blue-500/30 overflow-hidden rank-glow">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt="Me" class="w-full h-full object-cover">
+                </div>
+                <div class="absolute -bottom-1 -right-1 bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border-2 border-black">
+                    47
+                </div>
+            </div>
+            
+            <div class="flex-1 text-center md:text-left">
+                <h2 class="text-[20px] font-bold mb-1">You're #47 of 203 <span class="text-blue-400 ml-1">Top 25%</span></h2>
+                <p class="text-[14px] text-neutral-400 leading-relaxed mb-4">You've moved up <span class="text-accent font-bold">12 spots</span> this week. Keep pushing!</p>
+                <div class="flex flex-wrap justify-center md:justify-start gap-4">
+                    <div class="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+                        <i data-lucide="trending-up" class="w-4 h-4 text-accent"></i>
+                        <span class="text-[14px] mono font-bold">+25kg <span class="text-neutral-500 font-normal">to #46</span></span>
+                    </div>
+                    <div class="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+                        <i data-lucide="award" class="w-4 h-4 text-yellow-500"></i>
+                        <span class="text-[14px] mono font-bold">Gold Tier</span>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="h-12 px-6 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition-all flex items-center gap-2 shadow-lg shadow-blue-900/20 active:scale-95">
+                Share Rank
+                <i data-lucide="share-2" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </section>
+
+    <!-- Sticky Filters -->
+    <div class="sticky-nav">
+        <div class="max-w-screen-xl mx-auto flex flex-col md:flex-row gap-4 justify-between items-center">
+            <div class="flex gap-2 p-1 bg-white/5 rounded-2xl border border-white/10 w-full md:w-auto">
+                <button class="filter-chip active flex-1 md:flex-none px-4 py-2 rounded-xl text-[14px] font-semibold">This Week</button>
+                <button class="filter-chip text-neutral-400 flex-1 md:flex-none px-4 py-2 rounded-xl text-[14px] font-semibold">Month</button>
+                <button class="filter-chip text-neutral-400 flex-1 md:flex-none px-4 py-2 rounded-xl text-[14px] font-semibold">All Time</button>
+            </div>
+            
+            <div class="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+                <select class="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[14px] font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none pr-10 relative">
+                    <option>Total Volume</option>
+                    <option>Max Deadlift</option>
+                    <option>Max Squat</option>
+                    <option>Workout Count</option>
+                </select>
+                <div class="relative pointer-events-none -ml-8 flex items-center">
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- The Podium -->
+    <section class="grid grid-cols-3 items-end gap-2 md:gap-6 mb-12 max-w-2xl mx-auto px-2">
+        <!-- 2nd Place -->
+        <div class="flex flex-col items-center">
+            <div class="relative mb-4">
+                <div class="w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-slate-400/50 overflow-hidden ring-4 ring-slate-400/10">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jordan" alt="Rank 2" class="w-full h-full object-cover">
+                </div>
+                <div class="absolute -top-2 -right-1 bg-slate-400 text-black w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">2</div>
+            </div>
+            <div class="w-full h-24 md:h-32 podium-gradient-2 rounded-t-2xl flex flex-col items-center justify-center p-2 text-center">
+                <span class="text-[14px] font-bold truncate w-full">Jordan W.</span>
+                <span class="text-[12px] mono text-slate-400 font-bold uppercase tracking-widest mt-1">12.8k kg</span>
+            </div>
+        </div>
+
+        <!-- 1st Place -->
+        <div class="flex flex-col items-center">
+            <div class="relative mb-4 scale-110">
+                <div class="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-amber-400 overflow-hidden ring-8 ring-amber-400/10 shadow-[0_0_30px_rgba(245,158,11,0.3)]">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="Rank 1" class="w-full h-full object-cover">
+                </div>
+                <div class="absolute -top-3 -right-1 bg-amber-400 text-black w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-lg">1</div>
+            </div>
+            <div class="w-full h-32 md:h-44 podium-gradient-1 rounded-t-2xl flex flex-col items-center justify-center p-2 text-center shadow-[0_-10px_40px_rgba(245,158,11,0.1)]">
+                <i data-lucide="crown" class="w-5 h-5 text-amber-400 mb-2"></i>
+                <span class="text-[16px] font-bold truncate w-full">Sarah Kerr</span>
+                <span class="text-[14px] mono text-amber-400 font-bold uppercase tracking-widest mt-1">15.2k kg</span>
+            </div>
+        </div>
+
+        <!-- 3rd Place -->
+        <div class="flex flex-col items-center">
+            <div class="relative mb-4">
+                <div class="w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-amber-700/50 overflow-hidden ring-4 ring-amber-700/10">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Mike" alt="Rank 3" class="w-full h-full object-cover">
+                </div>
+                <div class="absolute -top-2 -right-1 bg-amber-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">3</div>
+            </div>
+            <div class="w-full h-20 md:h-28 podium-gradient-3 rounded-t-2xl flex flex-col items-center justify-center p-2 text-center">
+                <span class="text-[14px] font-bold truncate w-full">Mike Ross</span>
+                <span class="text-[12px] mono text-amber-600 font-bold uppercase tracking-widest mt-1">11.4k kg</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Leaderboard List -->
+    <section class="max-w-3xl mx-auto">
+        <div class="flex flex-col gap-3">
+            <!-- Header for list -->
+            <div class="flex items-center px-6 py-2 text-[12px] font-bold uppercase tracking-widest text-neutral-500 mono">
+                <span class="w-12">Rank</span>
+                <span class="flex-1">Athlete</span>
+                <span class="text-right">Score</span>
+            </div>
+
+            <!-- List Item: 4th -->
+            <div class="crystal-card p-4 px-6 flex items-center gap-4 hover:bg-white/5 transition-colors cursor-pointer group">
+                <span class="w-8 text-[16px] mono font-bold text-neutral-400 group-hover:text-white transition-colors">04</span>
+                <div class="w-10 h-10 rounded-full border border-white/10 overflow-hidden">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=John" alt="User" class="w-full h-full">
+                </div>
+                <div class="flex-1">
+                    <div class="text-[16px] font-semibold">Johnathan Doe</div>
+                    <div class="text-[12px] text-neutral-500 uppercase font-bold tracking-tighter">Elite Member</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[18px] mono font-bold">10,950</div>
+                    <div class="text-[12px] text-neutral-500 mono">KG</div>
+                </div>
+            </div>
+
+             <!-- List Item: 5th -->
+             <div class="crystal-card p-4 px-6 flex items-center gap-4 hover:bg-white/5 transition-colors cursor-pointer group">
+                <span class="w-8 text-[16px] mono font-bold text-neutral-400 group-hover:text-white transition-colors">05</span>
+                <div class="w-10 h-10 rounded-full border border-white/10 overflow-hidden">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Emma" alt="User" class="w-full h-full">
+                </div>
+                <div class="flex-1">
+                    <div class="text-[16px] font-semibold">Emma Woods</div>
+                    <div class="text-[12px] text-neutral-500 uppercase font-bold tracking-tighter">Consistent</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[18px] mono font-bold">10,420</div>
+                    <div class="text-[12px] text-neutral-500 mono">KG</div>
+                </div>
+            </div>
+
+            <!-- Spacer / Collapsed ranks -->
+            <div class="flex flex-col items-center py-4 gap-1 opacity-40">
+                <div class="w-1 h-1 bg-white rounded-full"></div>
+                <div class="w-1 h-1 bg-white rounded-full"></div>
+                <div class="w-1 h-1 bg-white rounded-full"></div>
+            </div>
+
+            <!-- ME RANK -->
+            <div class="crystal-card me-row p-4 px-6 flex items-center gap-4 cursor-pointer group shadow-[0_0_20px_rgba(59,130,246,0.15)]">
+                <span class="w-8 text-[16px] mono font-bold text-blue-400">47</span>
+                <div class="w-10 h-10 rounded-full border-2 border-blue-500/50 overflow-hidden shadow-lg shadow-blue-500/20">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt="Me" class="w-full h-full">
+                </div>
+                <div class="flex-1">
+                    <div class="text-[16px] font-bold">Alex Johnson <span class="text-[10px] ml-1 bg-blue-500 px-1 rounded text-black font-black uppercase">YOU</span></div>
+                    <div class="text-[12px] text-blue-400 uppercase font-bold tracking-tighter">PR Streak: 5 Days</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[18px] mono font-bold text-blue-400">8,250</div>
+                    <div class="text-[12px] text-neutral-400 mono">KG</div>
+                </div>
+            </div>
+
+             <!-- List Item: 48th -->
+             <div class="crystal-card p-4 px-6 flex items-center gap-4 hover:bg-white/5 transition-colors cursor-pointer group">
+                <span class="w-8 text-[16px] mono font-bold text-neutral-400 group-hover:text-white transition-colors">48</span>
+                <div class="w-10 h-10 rounded-full border border-white/10 overflow-hidden">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Chris" alt="User" class="w-full h-full">
+                </div>
+                <div class="flex-1">
+                    <div class="text-[16px] font-semibold">Chris P. Bacon</div>
+                    <div class="text-[12px] text-neutral-500 uppercase font-bold tracking-tighter">Trending Up</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[18px] mono font-bold">8,190</div>
+                    <div class="text-[12px] text-neutral-500 mono">KG</div>
+                </div>
+            </div>
+
+            <!-- View All Button -->
+            <button class="mt-4 w-full h-12 flex items-center justify-center gap-2 text-neutral-400 hover:text-white transition-all bg-white/5 border border-dashed border-white/20 rounded-2xl hover:bg-white/10 active:scale-95">
+                <span class="text-[14px] font-bold">Load More Rankings</span>
+                <i data-lucide="chevron-down" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </section>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Ghost Mode Toggle Logic
+        const anonToggle = document.getElementById('anon-toggle');
+        anonToggle.addEventListener('click', () => {
+            anonToggle.classList.toggle('toggle-active');
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(10);
+            }
+        });
+
+        // Filter Chip Interaction
+        const chips = document.querySelectorAll('.filter-chip');
+        chips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                chips.forEach(c => {
+                    c.classList.remove('active');
+                    c.classList.add('text-neutral-400');
+                });
+                chip.classList.add('active');
+                chip.classList.remove('text-neutral-400');
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(5);
+                }
+            });
+        });
+
+        // Entrance Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card, .podium-gradient-1, .podium-gradient-2, .podium-gradient-3');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+    </script>
+</body>
+</html>

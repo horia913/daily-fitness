@@ -13,9 +13,9 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
-import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
+import { getWeightDefaultAndSuggestion, getCoachSuggestedWeight } from "@/lib/weightDefaultService";
+import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 
 export function RestPauseExecutor({
   block,
@@ -39,6 +39,7 @@ export function RestPauseExecutor({
   onAlternativesClick,
   onRestTimerClick,
   onSetComplete,
+  onLastSetLoggedForRest,
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
@@ -71,6 +72,7 @@ export function RestPauseExecutor({
     loadPercentage,
     e1rm: e1rm ?? null,
   });
+  const coachSuggestedWeight = getCoachSuggestedWeight(loadPercentage, e1rm);
 
   useEffect(() => {
     setIsWeightPristine(true);
@@ -229,8 +231,16 @@ export function RestPauseExecutor({
           duration: 2000,
         });
 
-        // Update parent with new completed sets count
         const newCompletedSets = completedSets + 1;
+        if (newCompletedSets < totalSets) {
+          onLastSetLoggedForRest?.({
+            weight: weightNum,
+            reps: totalReps,
+            setNumber: newCompletedSets,
+            totalSets,
+            isPr: result.isNewPR,
+          });
+        }
         onSetComplete?.(newCompletedSets);
 
         // Complete block if last set
@@ -266,8 +276,8 @@ export function RestPauseExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {/* Initial Reps */}
-      <GlassCard elevation={1} className="p-4">
-        <h4 className="font-semibold text-slate-800 dark:text-white mb-4 text-lg">
+      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
+        <h4 className="font-semibold fc-text-primary mb-4 text-lg">
           Initial reps to failure
         </h4>
         <div className="grid grid-cols-2 gap-4">
@@ -282,10 +292,11 @@ export function RestPauseExecutor({
               showStepper
               stepAmount={2.5}
             />
-            {suggested_weight != null && suggested_weight > 0 && (
-              <button type="button" onClick={() => { setWeight(String(suggested_weight)); setIsWeightPristine(false); }} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                {loadPercentage != null ? `${loadPercentage}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
-              </button>
+            {coachSuggestedWeight != null && coachSuggestedWeight > 0 && (
+              <ApplySuggestedWeightButton
+                suggestedKg={coachSuggestedWeight}
+                onApply={() => { setWeight(String(coachSuggestedWeight)); setIsWeightPristine(false); }}
+              />
             )}
           </div>
           <LargeInput
@@ -298,15 +309,15 @@ export function RestPauseExecutor({
             stepAmount={1}
           />
         </div>
-      </GlassCard>
+      </div>
 
       {/* Timer */}
       {showTimer && (
-        <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-6 border border-orange-200 dark:border-orange-700 text-center">
-          <div className="text-4xl font-bold text-orange-600 dark:text-orange-400 mb-2">
+        <div className="rounded-xl p-5 text-center" style={{ background: "color-mix(in srgb, var(--fc-status-warning) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-status-warning) 25%, transparent)" }}>
+          <div className="text-4xl font-bold mb-2" style={{ color: "var(--fc-status-warning)" }}>
             {formatTime(timerSeconds)}
           </div>
-          <div className="text-sm text-orange-700 dark:text-orange-300">
+          <div className="text-sm fc-text-dim">
             Rest-Pause Timer
           </div>
         </div>
@@ -314,8 +325,8 @@ export function RestPauseExecutor({
 
       {/* Rest-Pause Attempts */}
       {restPauseAttempts.length > 0 && (
-        <GlassCard elevation={1} className="p-4">
-          <h4 className="font-semibold text-slate-800 dark:text-white mb-4 text-lg">
+        <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
+          <h4 className="font-semibold fc-text-primary mb-4 text-lg">
             Rest-Pause Attempts
           </h4>
           <div className="space-y-2">
@@ -347,7 +358,7 @@ export function RestPauseExecutor({
               </div>
             ))}
           </div>
-        </GlassCard>
+        </div>
       )}
 
       {/* Add Rest-Pause Button */}
@@ -368,7 +379,8 @@ export function RestPauseExecutor({
     <Button
       onClick={handleLog}
       disabled={isLoggingSet}
-      className="w-full bg-gradient-to-r from-slate-600 to-gray-600 hover:from-slate-700 hover:to-gray-700 text-white text-lg py-4"
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <PauseCircle className="w-5 h-5 mr-2" />
       {isLoggingSet ? "Logging..." : "LOG REST-PAUSE SET"}

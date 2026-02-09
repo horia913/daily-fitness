@@ -75,12 +75,8 @@ export function AchievementUnlockModal({
 
       {/* Modal content */}
       <div
-        className="relative max-w-md w-full rounded-3xl p-8 text-center fc-glass fc-card"
+        className="fc-modal relative max-w-md w-full rounded-3xl p-8 text-center fc-glass fc-card"
         style={{
-          background: isDark
-            ? "rgba(28, 28, 30, 0.95)"
-            : "rgba(255, 255, 255, 0.95)",
-          backdropFilter: "blur(20px)",
           boxShadow: `0 20px 60px ${rarity.glow}60`,
           border: `2px solid ${rarity.color}`,
         }}
@@ -125,11 +121,8 @@ export function AchievementUnlockModal({
 
         {/* Title */}
         <h2
-          className="text-3xl font-bold mb-2"
-          style={{
-            color: isDark ? "#fff" : "#1A1A1A",
-            animation: isAnimating ? "celebrate 0.8s ease-out" : "none",
-          }}
+          className="text-3xl font-bold mb-2 fc-text-primary"
+          style={{ animation: isAnimating ? "celebrate 0.8s ease-out" : "none" }}
         >
           Achievement Unlocked!
         </h2>

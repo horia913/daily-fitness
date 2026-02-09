@@ -1,36 +1,40 @@
 /**
  * POST /api/program-workouts/start-from-progress
  * 
- * IDEMPOTENT endpoint to start/resume the current program workout.
- * Idempotency is keyed by PROGRAM DAY (program_assignment_id + program_schedule_id),
- * NOT by template_id, because templates can repeat across weeks/days.
+ * IDEMPOTENT endpoint to start/resume a program workout.
+ * 
+ * REFACTORED: Now uses programStateService for canonical slot resolution.
  * 
  * Flow:
- * 1. Get current program day via program_progress + program_schedule
- * 2. Check for existing in-progress workout FOR THIS EXACT PROGRAM DAY:
+ * 1. Accept optional program_schedule_id (for user-selected slot).
+ *    If not provided, use programStateService.getNextSlot() as default.
+ * 2. Validate the chosen slot belongs to the program and is NOT already completed.
+ * 3. Check for existing in-progress workout FOR THIS EXACT PROGRAM DAY:
  *    - workout_sessions with status='in_progress' AND matching program day
  *    - workout_logs with completed_at IS NULL AND matching program day
- * 3. If found, return existing workout_assignment_id (REUSE)
- * 4. If not found, create new workout_assignment + workout_session (CREATE)
+ * 4. If found, return existing workout_assignment_id (REUSE)
+ * 5. If not found, create new workout_assignment + session + log (CREATE)
  *    and TAG them with program_assignment_id + program_schedule_id
  * 
- * Body: { client_id?: string } (optional - uses auth.uid() if not provided)
+ * Body: { client_id?: string, program_schedule_id?: string }
  * 
  * Returns: { workout_assignment_id, template_id, program_assignment_id, program_schedule_id, ... }
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiAuth, validateOwnership, createUnauthorizedResponse, createForbiddenResponse } from '@/lib/apiAuth'
-import { getCurrentWorkoutFromProgress } from '@/lib/programProgressService'
+import {
+  getProgramState,
+  getCompletedSlots,
+  ProgramScheduleSlot,
+} from '@/lib/programStateService'
 
 export async function POST(request: NextRequest) {
   try {
-    // supabaseAuth = session client (for reads with RLS)
-    // supabaseAdmin = service role (for inserts that bypass RLS - only after ownership validation)
     const { user, supabaseAuth, supabaseAdmin } = await validateApiAuth(request)
     
-    // Parse optional body
-    let body: { client_id?: string } = {}
+    // Parse body
+    let body: { client_id?: string; program_schedule_id?: string } = {}
     try {
       body = await request.json()
     } catch {
@@ -40,198 +44,169 @@ export async function POST(request: NextRequest) {
     const clientId = body.client_id || user.id
     
     // Security: Client can only start their own workout
-    // (Coach flow uses different endpoint)
     validateOwnership(user.id, clientId)
     
     console.log('[start-from-progress] Starting for client:', clientId)
     
     // ========================================================================
-    // STEP 1: Get current program day via program_progress + program_schedule
+    // STEP 1: Get program state from canonical resolver
     // ========================================================================
-    const workoutInfo = await getCurrentWorkoutFromProgress(supabaseAuth, clientId)
+    const state = await getProgramState(supabaseAuth, clientId)
     
-    console.log('[start-from-progress] Current program day:', {
-      status: workoutInfo.status,
-      program_assignment_id: workoutInfo.program_assignment_id,
-      program_schedule_id: workoutInfo.schedule_row_id,
-      template_id: workoutInfo.template_id,
-      week_index: workoutInfo.current_week_index,
-      day_index: workoutInfo.current_day_index,
-      position: workoutInfo.position_label,
-    })
-    
-    if (workoutInfo.status !== 'active') {
-      console.log('[start-from-progress] Program not active:', workoutInfo.status)
+    if (!state.assignment) {
       return NextResponse.json({
-        error: workoutInfo.status === 'completed' ? 'Program completed' : 'No active program',
-        message: workoutInfo.message,
-        status: workoutInfo.status,
-      }, { status: workoutInfo.status === 'completed' ? 409 : 404 })
+        error: 'No active program',
+        message: 'No active program assignment found',
+        status: 'no_program',
+      }, { status: 404 })
     }
     
-    if (!workoutInfo.template_id || !workoutInfo.schedule_row_id || !workoutInfo.program_assignment_id) {
-      console.log('[start-from-progress] Missing required info:', {
-        template_id: workoutInfo.template_id,
-        schedule_row_id: workoutInfo.schedule_row_id,
-        program_assignment_id: workoutInfo.program_assignment_id,
+    if (state.isCompleted) {
+      return NextResponse.json({
+        error: 'Program completed',
+        message: 'All program workouts have been completed',
+        status: 'completed',
+      }, { status: 409 })
+    }
+    
+    if (state.slots.length === 0) {
+      return NextResponse.json({
+        error: 'No schedule',
+        message: 'No training days configured in program schedule',
+        status: 'no_schedule',
+      }, { status: 404 })
+    }
+    
+    const programAssignmentId = state.assignment.id
+    
+    // ========================================================================
+    // STEP 2: Determine which slot to start
+    // ========================================================================
+    let chosenSlot: ProgramScheduleSlot | null = null
+    
+    if (body.program_schedule_id) {
+      // User selected a specific slot — validate it
+      const requestedSlot = state.slots.find(s => s.id === body.program_schedule_id)
+      
+      if (!requestedSlot) {
+        return NextResponse.json({
+          error: 'Invalid slot',
+          message: 'The selected schedule slot does not belong to this program',
+        }, { status: 400 })
+      }
+      
+      // Check if already completed
+      const completedScheduleIds = new Set(state.completedSlots.map(c => c.program_schedule_id))
+      if (completedScheduleIds.has(requestedSlot.id)) {
+        return NextResponse.json({
+          error: 'Slot already completed',
+          message: 'This program day has already been completed',
+        }, { status: 409 })
+      }
+      
+      chosenSlot = requestedSlot
+      console.log('[start-from-progress] User selected specific slot:', {
+        schedule_id: chosenSlot.id,
+        week: chosenSlot.week_number,
+        day: chosenSlot.day_number,
       })
-      return NextResponse.json({
-        error: 'Invalid program configuration',
-        message: 'Current workout is missing template or schedule configuration',
-      }, { status: 422 })
+    } else {
+      // Use next uncompleted slot (default)
+      chosenSlot = state.nextSlot
+      
+      if (!chosenSlot) {
+        return NextResponse.json({
+          error: 'Program completed',
+          message: 'All program workouts have been completed',
+          status: 'completed',
+        }, { status: 409 })
+      }
+      
+      console.log('[start-from-progress] Using next slot:', {
+        schedule_id: chosenSlot.id,
+        week: chosenSlot.week_number,
+        day: chosenSlot.day_number,
+      })
     }
     
-    const templateId = workoutInfo.template_id
-    const programAssignmentId = workoutInfo.program_assignment_id
-    const programScheduleId = workoutInfo.schedule_row_id
+    const templateId = chosenSlot.template_id
+    const programScheduleId = chosenSlot.id
+    
+    // Compute position label
+    const slotsInWeek = state.slots.filter(s => s.week_number === chosenSlot!.week_number)
+    const dayPosition = slotsInWeek.findIndex(s => s.id === chosenSlot!.id) + 1
+    const positionLabel = `Week ${chosenSlot.week_number} • Day ${dayPosition}`
     
     // ========================================================================
-    // STEP 2: Check for existing in-progress workout FOR THIS EXACT PROGRAM DAY
+    // STEP 3: Check for existing in-progress workout FOR THIS EXACT PROGRAM DAY
     // Keyed by (client_id, program_assignment_id, program_schedule_id)
-    // NOT by template_id (templates can repeat across days)
-    // 
-    // NOTE: If migration hasn't run yet (columns don't exist), fall back to
-    // template-based matching with a warning.
     // ========================================================================
     
-    let useProgramDayColumns = true
-    
-    // 2a. Check workout_sessions for in-progress session for this EXACT program day
+    // 3a. Check workout_sessions for in-progress session
     console.log('[start-from-progress] Checking for in-progress sessions by program day...')
-    try {
-      const { data: inProgressSession, error: sessionError } = await supabaseAuth
-        .from('workout_sessions')
-        .select('id, assignment_id, status, started_at, program_assignment_id, program_schedule_id')
-        .eq('client_id', clientId)
-        .eq('program_assignment_id', programAssignmentId)
-        .eq('program_schedule_id', programScheduleId)
-        .eq('status', 'in_progress')
-        .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+    const { data: inProgressSession, error: sessionError } = await supabaseAuth
+      .from('workout_sessions')
+      .select('id, assignment_id, status, started_at, program_assignment_id, program_schedule_id')
+      .eq('client_id', clientId)
+      .eq('program_assignment_id', programAssignmentId)
+      .eq('program_schedule_id', programScheduleId)
+      .eq('status', 'in_progress')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    
+    if (sessionError) {
+      console.error('[start-from-progress] Error checking sessions:', sessionError)
+    } else if (inProgressSession) {
+      console.log('[start-from-progress] REUSED existing in-progress session:', inProgressSession.id)
       
-      if (sessionError) {
-        // Column doesn't exist yet - migration not run
-        if (sessionError.message?.includes('program_assignment_id') || sessionError.message?.includes('program_schedule_id')) {
-          console.warn('[start-from-progress] ⚠️ program_day columns not found - migration not run yet. Falling back to template-based matching.')
-          useProgramDayColumns = false
-        } else {
-          console.error('[start-from-progress] Error checking sessions:', sessionError)
-        }
-      } else if (inProgressSession) {
-        console.log('[start-from-progress] ✅ REUSED existing in-progress session (by program day):', {
-          session_id: inProgressSession.id,
-          workout_assignment_id: inProgressSession.assignment_id,
-          started_at: inProgressSession.started_at,
-          program_assignment_id: inProgressSession.program_assignment_id,
-          program_schedule_id: inProgressSession.program_schedule_id,
-        })
-        
-        return NextResponse.json({
-          workout_assignment_id: inProgressSession.assignment_id,
-          template_id: templateId,
-          week_number: workoutInfo.actual_week_number,
-          day_position: (workoutInfo.current_day_index || 0) + 1,
-          position_label: workoutInfo.position_label,
-          program_assignment_id: programAssignmentId,
-          program_schedule_id: programScheduleId,
-          reused_existing: true,
-          reuse_reason: 'in_progress_session_by_program_day',
-          session_id: inProgressSession.id,
-        })
-      }
-    } catch (err) {
-      console.warn('[start-from-progress] ⚠️ Error checking sessions - columns may not exist:', err)
-      useProgramDayColumns = false
+      return NextResponse.json({
+        workout_assignment_id: inProgressSession.assignment_id,
+        template_id: templateId,
+        week_number: chosenSlot.week_number,
+        day_position: dayPosition,
+        position_label: positionLabel,
+        program_assignment_id: programAssignmentId,
+        program_schedule_id: programScheduleId,
+        reused_existing: true,
+        reuse_reason: 'in_progress_session_by_program_day',
+        session_id: inProgressSession.id,
+      })
     }
     
-    // 2b. Check workout_logs for incomplete log for this EXACT program day
-    if (useProgramDayColumns) {
-      console.log('[start-from-progress] Checking for incomplete workout_logs by program day...')
-      try {
-        const { data: incompleteLog, error: logError } = await supabaseAuth
-          .from('workout_logs')
-          .select('id, workout_assignment_id, started_at, program_assignment_id, program_schedule_id')
-          .eq('client_id', clientId)
-          .eq('program_assignment_id', programAssignmentId)
-          .eq('program_schedule_id', programScheduleId)
-          .is('completed_at', null)
-          .order('started_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        
-        if (logError) {
-          if (logError.message?.includes('program_assignment_id') || logError.message?.includes('program_schedule_id')) {
-            console.warn('[start-from-progress] ⚠️ program_day columns not found on workout_logs - migration not run yet.')
-            useProgramDayColumns = false
-          } else {
-            console.error('[start-from-progress] Error checking logs:', logError)
-          }
-        } else if (incompleteLog) {
-          console.log('[start-from-progress] ✅ REUSED existing incomplete log (by program day):', {
-            log_id: incompleteLog.id,
-            workout_assignment_id: incompleteLog.workout_assignment_id,
-            started_at: incompleteLog.started_at,
-            program_assignment_id: incompleteLog.program_assignment_id,
-            program_schedule_id: incompleteLog.program_schedule_id,
-          })
-          
-          return NextResponse.json({
-            workout_assignment_id: incompleteLog.workout_assignment_id,
-            template_id: templateId,
-            week_number: workoutInfo.actual_week_number,
-            day_position: (workoutInfo.current_day_index || 0) + 1,
-            position_label: workoutInfo.position_label,
-            program_assignment_id: programAssignmentId,
-            program_schedule_id: programScheduleId,
-            reused_existing: true,
-            reuse_reason: 'incomplete_log_by_program_day',
-          })
-        }
-      } catch (err) {
-        console.warn('[start-from-progress] ⚠️ Error checking logs - columns may not exist:', err)
-        useProgramDayColumns = false
-      }
-    }
+    // 3b. Check workout_logs for incomplete log
+    console.log('[start-from-progress] Checking for incomplete workout_logs by program day...')
+    const { data: incompleteLog, error: logError } = await supabaseAuth
+      .from('workout_logs')
+      .select('id, workout_assignment_id, started_at, program_assignment_id, program_schedule_id')
+      .eq('client_id', clientId)
+      .eq('program_assignment_id', programAssignmentId)
+      .eq('program_schedule_id', programScheduleId)
+      .is('completed_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
     
-    // 2c. FALLBACK: If columns don't exist, check by template_id (less precise but works)
-    if (!useProgramDayColumns) {
-      console.log('[start-from-progress] ⚠️ Using template-based fallback (run migration for program-day precision)')
+    if (logError) {
+      console.error('[start-from-progress] Error checking logs:', logError)
+    } else if (incompleteLog) {
+      console.log('[start-from-progress] REUSED existing incomplete log:', incompleteLog.id)
       
-      // Check for existing active assignment with same template
-      const { data: existingAssignment } = await supabaseAuth
-        .from('workout_assignments')
-        .select('id, status, created_at')
-        .eq('client_id', clientId)
-        .eq('workout_template_id', templateId)
-        .in('status', ['assigned', 'active'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      
-      if (existingAssignment) {
-        console.log('[start-from-progress] ✅ REUSED existing assignment (template-based fallback):', {
-          workout_assignment_id: existingAssignment.id,
-          status: existingAssignment.status,
-        })
-        
-        return NextResponse.json({
-          workout_assignment_id: existingAssignment.id,
-          template_id: templateId,
-          week_number: workoutInfo.actual_week_number,
-          day_position: (workoutInfo.current_day_index || 0) + 1,
-          position_label: workoutInfo.position_label,
-          program_assignment_id: programAssignmentId,
-          program_schedule_id: programScheduleId,
-          reused_existing: true,
-          reuse_reason: 'existing_assignment_template_fallback',
-          migration_needed: true,
-        })
-      }
+      return NextResponse.json({
+        workout_assignment_id: incompleteLog.workout_assignment_id,
+        template_id: templateId,
+        week_number: chosenSlot.week_number,
+        day_position: dayPosition,
+        position_label: positionLabel,
+        program_assignment_id: programAssignmentId,
+        program_schedule_id: programScheduleId,
+        reused_existing: true,
+        reuse_reason: 'incomplete_log_by_program_day',
+      })
     }
     
     // ========================================================================
-    // STEP 3: No existing workout for this program day - create new
+    // STEP 4: No existing workout for this program day — create new
     // ========================================================================
     console.log('[start-from-progress] No existing workout for this program day, creating new...')
     
@@ -250,13 +225,9 @@ export async function POST(request: NextRequest) {
       }, { status: 404 })
     }
     
-    // 3a. Create workout_assignment
-    // NOTE: Using supabaseAdmin because RLS on workout_assignments only allows coaches to INSERT.
-    // Ownership was already validated above (client_id === user.id).
+    // 4a. Create workout_assignment
     const today = new Date().toISOString().split('T')[0]
-    const workoutName = workoutInfo.position_label 
-      ? `${workoutInfo.position_label}: ${template.name}`
-      : template.name
+    const workoutName = `${positionLabel}: ${template.name}`
     
     const { data: newAssignment, error: assignmentError } = await supabaseAdmin
       .from('workout_assignments')
@@ -269,9 +240,9 @@ export async function POST(request: NextRequest) {
         estimated_duration: template.estimated_duration || 60,
         assigned_date: today,
         scheduled_date: today,
-        status: 'assigned',  // Valid values: 'assigned', 'in_progress', 'completed', 'skipped'
+        status: 'assigned',
         is_customized: false,
-        notes: `Program: ${workoutInfo.program_name || 'Program'} - ${workoutInfo.position_label || 'Workout'}`,
+        notes: `Program: ${state.assignment.name || 'Program'} - ${positionLabel}`,
       })
       .select()
       .single()
@@ -284,71 +255,49 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
     
-    console.log('[start-from-progress] Created workout_assignment:', newAssignment.id)
-    
-    // 3b. Create workout_session WITH program day tagging (if columns exist)
-    // Using supabaseAdmin to ensure consistent insert behavior
+    // 4b. Create workout_session WITH program day tagging
     let newSession: any = null
-    const sessionInsertData: any = {
-      assignment_id: newAssignment.id,
-      client_id: clientId,
-      status: 'in_progress',
-      started_at: new Date().toISOString(),
-    }
-    
-    // Only add program day columns if migration has been run
-    if (useProgramDayColumns) {
-      sessionInsertData.program_assignment_id = programAssignmentId
-      sessionInsertData.program_schedule_id = programScheduleId
-    }
-    
-    const { data: sessionData, error: sessionError } = await supabaseAdmin
+    const { data: sessionData, error: sessionCreateError } = await supabaseAdmin
       .from('workout_sessions')
-      .insert(sessionInsertData)
+      .insert({
+        assignment_id: newAssignment.id,
+        client_id: clientId,
+        status: 'in_progress',
+        started_at: new Date().toISOString(),
+        program_assignment_id: programAssignmentId,
+        program_schedule_id: programScheduleId,
+      })
       .select()
       .single()
     
-    if (sessionError) {
-      console.error('[start-from-progress] Error creating workout_session:', sessionError)
-      // Non-fatal - assignment was created, session creation is a secondary concern
-      console.warn('[start-from-progress] Proceeding without session - will be created on workout start page')
+    if (sessionCreateError) {
+      console.error('[start-from-progress] Error creating workout_session:', sessionCreateError)
     } else {
       newSession = sessionData
-      console.log('[start-from-progress] Created workout_session:', newSession.id)
     }
     
-    // 3c. Create workout_log WITH program day tagging (if columns exist)
-    // Using supabaseAdmin to ensure consistent insert behavior
+    // 4c. Create workout_log WITH program day tagging
     let newLog: any = null
-    const logInsertData: any = {
-      workout_assignment_id: newAssignment.id,
-      client_id: clientId,
-      started_at: new Date().toISOString(),
-      workout_session_id: newSession?.id || null,
-    }
-    
-    // Only add program day columns if migration has been run
-    if (useProgramDayColumns) {
-      logInsertData.program_assignment_id = programAssignmentId
-      logInsertData.program_schedule_id = programScheduleId
-    }
-    
-    const { data: logData, error: logError } = await supabaseAdmin
+    const { data: logData, error: logCreateError } = await supabaseAdmin
       .from('workout_logs')
-      .insert(logInsertData)
+      .insert({
+        workout_assignment_id: newAssignment.id,
+        client_id: clientId,
+        started_at: new Date().toISOString(),
+        workout_session_id: newSession?.id || null,
+        program_assignment_id: programAssignmentId,
+        program_schedule_id: programScheduleId,
+      })
       .select()
       .single()
     
-    if (logError) {
-      console.error('[start-from-progress] Error creating workout_log:', logError)
-      // Non-fatal - assignment was created, log creation is a secondary concern
-      console.warn('[start-from-progress] Proceeding without log - will be created on workout completion')
+    if (logCreateError) {
+      console.error('[start-from-progress] Error creating workout_log:', logCreateError)
     } else {
       newLog = logData
-      console.log('[start-from-progress] Created workout_log:', newLog.id)
     }
     
-    console.log('[start-from-progress] 🆕 CREATED new workout for program day:', {
+    console.log('[start-from-progress] CREATED new workout for program day:', {
       workout_assignment_id: newAssignment.id,
       workout_session_id: newSession?.id,
       workout_log_id: newLog?.id,
@@ -356,26 +305,23 @@ export async function POST(request: NextRequest) {
       program_assignment_id: programAssignmentId,
       program_schedule_id: programScheduleId,
       name: workoutName,
-      program_day_columns_used: useProgramDayColumns,
     })
     
     // ========================================================================
-    // STEP 4: Return the new assignment info
+    // STEP 5: Return the new assignment info
     // ========================================================================
     return NextResponse.json({
       workout_assignment_id: newAssignment.id,
       template_id: templateId,
-      week_number: workoutInfo.actual_week_number,
-      day_position: (workoutInfo.current_day_index || 0) + 1,
-      position_label: workoutInfo.position_label,
+      week_number: chosenSlot.week_number,
+      day_position: dayPosition,
+      position_label: positionLabel,
       program_assignment_id: programAssignmentId,
       program_schedule_id: programScheduleId,
       reused_existing: false,
       reuse_reason: null,
       session_id: newSession?.id || null,
       log_id: newLog?.id || null,
-      // Flag if migration needs to be run for full program-day idempotency
-      migration_needed: !useProgramDayColumns,
     })
     
   } catch (error: any) {

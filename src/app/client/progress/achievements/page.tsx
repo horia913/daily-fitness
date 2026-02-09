@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { AchievementCard } from "@/components/ui/AchievementCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Award, Filter } from "lucide-react";
@@ -168,29 +167,25 @@ function AchievementsPageContent() {
 
       <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
         <div className="space-y-8">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
             <div className="flex flex-wrap items-start justify-between gap-6">
-              <div className="flex items-start gap-4">
-                <Link href="/client/progress">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="fc-btn fc-btn-ghost h-10 w-10"
-                  >
-                    <ArrowLeft className="h-5 w-5" />
-                  </Button>
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
+                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                 </Link>
-                <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Progress Hub
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                    Achievements
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    {unlockedCount} unlocked · {inProgressCount} in progress ·{" "}
-                    {lockedCount} locked
-                  </p>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+                    <Award className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                      Achievements
+                    </h1>
+                    <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                      {unlockedCount} unlocked · {inProgressCount} in progress ·{" "}
+                      {lockedCount} locked
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -221,9 +216,9 @@ function AchievementsPageContent() {
                 </div>
               </div>
             </div>
-          </GlassCard>
+          </div>
 
-          <GlassCard elevation={1} className="fc-glass fc-card p-6">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--fc-glass-soft)]">
                 <Filter className="h-5 w-5 text-[color:var(--fc-text-dim)]" />
@@ -333,15 +328,15 @@ function AchievementsPageContent() {
                 </div>
               </div>
             </div>
-          </GlassCard>
+          </div>
 
           {loading ? (
-            <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12 text-center">
               <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[color:var(--fc-accent-purple)]" />
               <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
                 Loading achievements...
               </p>
-            </GlassCard>
+            </div>
           ) : (
             <>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -351,10 +346,7 @@ function AchievementsPageContent() {
               </div>
 
               {filteredAchievements.length === 0 && (
-                <GlassCard
-                  elevation={2}
-                  className="fc-glass fc-card p-12 text-center"
-                >
+                <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12 text-center">
                   <Award className="mx-auto mb-4 h-16 w-16 text-[color:var(--fc-text-subtle)]" />
                   <p className="mb-2 text-lg font-semibold text-[color:var(--fc-text-primary)]">
                     No achievements found
@@ -372,7 +364,7 @@ function AchievementsPageContent() {
                   >
                     Reset Filters
                   </Button>
-                </GlassCard>
+                </div>
               )}
             </>
           )}

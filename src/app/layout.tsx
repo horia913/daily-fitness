@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "../styles/mobile.css";
 import "../styles/android-fixes.css";
@@ -12,12 +12,12 @@ import { ToastProvider } from "@/components/ui/toast-provider";
 import { PrefetchProvider } from "@/components/PrefetchProvider";
 import MobileCompatibilityProvider from "@/components/MobileCompatibilityProvider";
 
-const geistSans = Geist({
+const fontSans = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
+const fontMono = JetBrains_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
@@ -44,7 +44,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${fontSans.variable} ${fontMono.variable} antialiased`}
       >
         <MobileCompatibilityProvider />
         <ServiceWorkerProvider />

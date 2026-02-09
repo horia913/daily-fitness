@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -328,65 +327,60 @@ function EditProgramContent() {
       const sched = await WorkoutTemplateService.getProgramSchedule(programId);
       setSchedule(sched || []);
 
-      // Load exercises and full block data for all templates in the schedule
+      // Load exercises and full block data for all templates in one batched call
       const templateIds = [
         ...new Set(sched?.map((s) => s.template_id).filter(Boolean) || []),
       ];
       const exercisesMap: Record<string, any[]> = {};
       const blocksMap: Record<string, any[]> = {};
 
-      for (const templateId of templateIds) {
+      if (templateIds.length > 0) {
         try {
-          // Get full block data with all related tables
           const { WorkoutBlockService } = await import(
             "@/lib/workoutBlockService"
           );
-          const blocks = await WorkoutBlockService.getWorkoutBlocks(templateId);
+          const blocksByTemplate =
+            await WorkoutBlockService.getWorkoutBlocksForTemplates(templateIds);
 
-          // Store full blocks for block-type-specific display
-          blocksMap[templateId] = blocks;
-
-          // Also create exercises map for matching
-          const exercises: any[] = [];
-          blocks.forEach((block) => {
-            if (block.exercises && block.exercises.length > 0) {
-              block.exercises.forEach((exercise) => {
-                exercises.push({
-                  id: exercise.id,
-                  exercise_id: exercise.exercise_id,
-                  exercise: exercise.exercise,
-                  template_id: templateId,
-                  block_id: block.id,
-                  block_type: block.block_type,
-                  block_name: block.block_name,
-                  block_order: block.block_order,
-                  exercise_letter: exercise.exercise_letter,
-                  exercise_order: exercise.exercise_order,
-                  // Store exercise-specific data
-                  sets: exercise.sets,
-                  reps: exercise.reps,
-                  weight_kg: exercise.weight_kg,
-                  tempo: exercise.tempo,
-                  rir: exercise.rir,
-                  rest_seconds: exercise.rest_seconds,
+          blocksByTemplate.forEach((blocks, templateId) => {
+            blocksMap[templateId] = blocks;
+            const exercises: any[] = [];
+            blocks.forEach((block) => {
+              if (block.exercises && block.exercises.length > 0) {
+                block.exercises.forEach((exercise) => {
+                  exercises.push({
+                    id: exercise.id,
+                    exercise_id: exercise.exercise_id,
+                    exercise: exercise.exercise,
+                    template_id: templateId,
+                    block_id: block.id,
+                    block_type: block.block_type,
+                    block_name: block.block_name,
+                    block_order: block.block_order,
+                    exercise_letter: exercise.exercise_letter,
+                    exercise_order: exercise.exercise_order,
+                    sets: exercise.sets,
+                    reps: exercise.reps,
+                    weight_kg: exercise.weight_kg,
+                    tempo: exercise.tempo,
+                    rir: exercise.rir,
+                    rest_seconds: exercise.rest_seconds,
+                  });
                 });
-              });
-            }
+              }
+            });
+            exercisesMap[templateId] = exercises;
           });
-
-          exercisesMap[templateId] = exercises;
         } catch (error) {
-          console.error(
-            `Error loading exercises for template ${templateId}:`,
-            error
-          );
-          exercisesMap[templateId] = [];
-          blocksMap[templateId] = [];
+          console.error("Error loading blocks for program templates:", error);
+          templateIds.forEach((id) => {
+            exercisesMap[id] = [];
+            blocksMap[id] = [];
+          });
         }
       }
 
       setTemplateExercises(exercisesMap);
-      // Store blocks separately for block-type summaries
       setTemplateBlocks(blocksMap);
     } finally {
       setLoading(false);
@@ -427,7 +421,7 @@ function EditProgramContent() {
     return (
       <AnimatedBackground>
         <div className="min-h-screen flex items-center justify-center p-4">
-          <GlassCard elevation={2} className="p-8 text-center">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
             <div
               className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
               style={{
@@ -442,7 +436,7 @@ function EditProgramContent() {
             >
               Loading program...
             </p>
-          </GlassCard>
+          </div>
         </div>
       </AnimatedBackground>
     );
@@ -464,7 +458,7 @@ function EditProgramContent() {
             Back to Program
           </Button>
 
-          <GlassCard elevation={3} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
             <div className="flex items-start gap-4">
               <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -489,9 +483,9 @@ function EditProgramContent() {
                 </p>
               </div>
             </div>
-          </GlassCard>
+          </div>
 
-          <GlassCard elevation={2} className="fc-glass fc-card p-2">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-2">
             <div className="flex gap-2">
               <Button
                 variant={activeTab === "basic" ? "default" : "ghost"}
@@ -548,11 +542,11 @@ function EditProgramContent() {
                 <span className="hidden sm:inline">Progression Rules</span>
               </Button>
             </div>
-          </GlassCard>
+          </div>
 
           {/* Tab Content */}
           {activeTab === "basic" && (
-            <GlassCard elevation={2} className="p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
               <div className="space-y-6">
                 {/* Program Name */}
                 <div>
@@ -701,7 +695,7 @@ function EditProgramContent() {
                     }}
                   >
                     Training Category
-                    <span className="text-xs text-slate-500 ml-2">
+                    <span className="text-xs fc-text-dim ml-2">
                       (optional - for volume calculator)
                     </span>
                   </label>
@@ -747,7 +741,7 @@ function EditProgramContent() {
                     </SelectContent>
                   </Select>
                   {categories.length === 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs fc-text-dim mt-1">
                       No categories available. Create categories in the Categories section.
                     </p>
                   )}
@@ -809,13 +803,31 @@ function EditProgramContent() {
                   {saving ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
-            </GlassCard>
+            </div>
           )}
 
           {activeTab === "schedule" && (
-            <div className="space-y-6">
+            <div className="space-y-6 max-w-6xl">
+              <header>
+                <h2 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">Weekly Schedule</h2>
+                <p className="fc-text-dim max-w-xl">
+                  Assign workout templates to each day. This schedule will serve as the foundation for the entire program duration.
+                </p>
+              </header>
+              {/* Info: Week 1 Auto-Apply */}
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 border-l-4 border-l-[color:var(--fc-accent)] flex items-start gap-5">
+                <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-aurora)]/20 flex items-center justify-center text-[color:var(--fc-accent)] shrink-0">
+                  <Info className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold fc-text-primary mb-1">Week {selectedWeek} schedule</h3>
+                  <p className="fc-text-dim leading-relaxed">
+                    Changes made to this week will apply to this week only. Use the week selector to edit other weeks.
+                  </p>
+                </div>
+              </div>
               {/* Week Selector */}
-              <GlassCard elevation={2} className="p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
                 <div className="flex items-center gap-4 mb-6">
                   <label
                     className="text-sm font-semibold"
@@ -858,7 +870,7 @@ function EditProgramContent() {
                 </div>
 
                 {/* Days Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {Array.from({ length: 7 }).map((_, di) => {
                     const day = di + 1;
                     const current = schedule.find(
@@ -872,15 +884,7 @@ function EditProgramContent() {
                     return (
                       <div
                         key={day}
-                        className="p-4 rounded-xl"
-                        style={{
-                          background: isDark
-                            ? "rgba(255,255,255,0.05)"
-                            : "rgba(0,0,0,0.03)",
-                          border: `1px solid ${
-                            isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                          }`,
-                        }}
+                        className="fc-glass fc-card p-5 rounded-2xl border border-[color:var(--fc-glass-border)] transition-all hover:border-[color:var(--fc-border-subtle)]"
                       >
                         <div className="flex items-center gap-2 mb-3">
                           {isRest ? (
@@ -1085,8 +1089,7 @@ function EditProgramContent() {
                                 }
                               }
 
-                              // Always reload progression rules and exercises after schedule change
-                              // Reload exercises and blocks for updated templates
+                              // Reload exercises and blocks for updated templates (batched)
                               const templateIds = [
                                 ...new Set(
                                   sched
@@ -1097,57 +1100,64 @@ function EditProgramContent() {
                               const exercisesMap: Record<string, any[]> = {};
                               const blocksMap: Record<string, any[]> = {};
 
-                              for (const templateId of templateIds) {
+                              if (templateIds.length > 0) {
                                 try {
                                   const { WorkoutBlockService } = await import(
                                     "@/lib/workoutBlockService"
                                   );
-                                  const blocks =
-                                    await WorkoutBlockService.getWorkoutBlocks(
-                                      templateId
+                                  const blocksByTemplate =
+                                    await WorkoutBlockService.getWorkoutBlocksForTemplates(
+                                      templateIds
                                     );
-
-                                  blocksMap[templateId] = blocks;
-
-                                  const exercises: any[] = [];
-                                  blocks.forEach((block) => {
-                                    if (
-                                      block.exercises &&
-                                      block.exercises.length > 0
-                                    ) {
-                                      block.exercises.forEach((exercise) => {
-                                        exercises.push({
-                                          id: exercise.id,
-                                          exercise_id: exercise.exercise_id,
-                                          exercise: exercise.exercise,
-                                          template_id: templateId,
-                                          block_id: block.id,
-                                          block_type: block.block_type,
-                                          block_name: block.block_name,
-                                          block_order: block.block_order,
-                                          exercise_letter:
-                                            exercise.exercise_letter,
-                                          exercise_order:
-                                            exercise.exercise_order,
-                                          sets: exercise.sets,
-                                          reps: exercise.reps,
-                                          weight_kg: exercise.weight_kg,
-                                          tempo: exercise.tempo,
-                                          rir: exercise.rir,
-                                          rest_seconds: exercise.rest_seconds,
-                                        });
+                                  blocksByTemplate.forEach(
+                                    (blocks, templateId) => {
+                                      blocksMap[templateId] = blocks;
+                                      const exercises: any[] = [];
+                                      blocks.forEach((block) => {
+                                        if (
+                                          block.exercises &&
+                                          block.exercises.length > 0
+                                        ) {
+                                          block.exercises.forEach(
+                                            (exercise) => {
+                                              exercises.push({
+                                                id: exercise.id,
+                                                exercise_id:
+                                                  exercise.exercise_id,
+                                                exercise: exercise.exercise,
+                                                template_id: templateId,
+                                                block_id: block.id,
+                                                block_type: block.block_type,
+                                                block_name: block.block_name,
+                                                block_order: block.block_order,
+                                                exercise_letter:
+                                                  exercise.exercise_letter,
+                                                exercise_order:
+                                                  exercise.exercise_order,
+                                                sets: exercise.sets,
+                                                reps: exercise.reps,
+                                                weight_kg: exercise.weight_kg,
+                                                tempo: exercise.tempo,
+                                                rir: exercise.rir,
+                                                rest_seconds:
+                                                  exercise.rest_seconds,
+                                              });
+                                            }
+                                          );
+                                        }
                                       });
+                                      exercisesMap[templateId] = exercises;
                                     }
-                                  });
-
-                                  exercisesMap[templateId] = exercises;
+                                  );
                                 } catch (error) {
                                   console.error(
-                                    `Error loading exercises for template ${templateId}:`,
+                                    "Error loading blocks after schedule change:",
                                     error
                                   );
-                                  exercisesMap[templateId] = [];
-                                  blocksMap[templateId] = [];
+                                  templateIds.forEach((id) => {
+                                    exercisesMap[id] = [];
+                                    blocksMap[id] = [];
+                                  });
                                 }
                               }
 
@@ -1184,10 +1194,10 @@ function EditProgramContent() {
                     );
                   })}
                 </div>
-              </GlassCard>
+              </div>
 
               {/* Info Card */}
-              <GlassCard elevation={1} className="p-4">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
                 <div className="flex items-start gap-3">
                   <Info
                     className="w-5 h-5 flex-shrink-0 mt-0.5"
@@ -1207,7 +1217,7 @@ function EditProgramContent() {
                     program. When you set workouts for <strong>Week 1</strong>, they will automatically be applied to all other weeks. You can then customize individual weeks later if needed. Select a workout template for each training day, or choose "Rest Day" for recovery. Changes are saved automatically when you make a selection.
                   </p>
                 </div>
-              </GlassCard>
+              </div>
 
               {/* Program Volume Calculator */}
               {form && form.category && (
@@ -1227,32 +1237,40 @@ function EditProgramContent() {
           )}
 
           {activeTab === "progression" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
+            <div className="space-y-6 max-w-4xl">
+              <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
-                  <h3 className="text-lg font-semibold mb-2">
+                  <h2 className="text-2xl md:text-3xl font-bold tracking-tight fc-text-primary mb-2">
                     Progression Rules
-                  </h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                    Edit workout parameters week by week. Changes apply only to
-                    this program.
+                  </h2>
+                  <p className="fc-text-dim">
+                    Fine-tune intensities and volume for the initial phase. Changes apply only to this program.
                   </p>
                 </div>
-                {form && form.category && (
+                <div className="flex items-center gap-2 shrink-0">
                   <Button
-                    onClick={() => setShowProgressionSuggestions(true)}
-                    variant="outline"
-                    className="rounded-xl"
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-lg fc-text-dim hover:fc-text-primary border border-[color:var(--fc-glass-border)]"
                   >
-                    <Target className="w-4 h-4 mr-2" />
-                    Get Progression Suggestions
+                    Skip for Now
                   </Button>
-                )}
-              </div>
+                  {form && form.category && (
+                    <Button
+                      onClick={() => setShowProgressionSuggestions(true)}
+                      variant="outline"
+                      className="rounded-xl"
+                    >
+                      <Target className="w-4 h-4 mr-2" />
+                      Get Progression Suggestions
+                    </Button>
+                  )}
+                </div>
+              </header>
 
               {schedule.filter((s) => (s.week_number || 1) === selectedWeek)
                 .length === 0 ? (
-                  <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                  <div className="text-center py-8 fc-text-dim">
                     <Calendar className="w-16 h-16 mx-auto mb-4" />
                     <h4 className="text-lg font-medium mb-2">
                       No Workouts Scheduled for Week {selectedWeek}
@@ -1342,7 +1360,7 @@ function EditProgramContent() {
                         }}
                       />
                     ) : (
-                      <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                      <div className="text-center py-8 fc-text-dim">
                         <p>Select a day above to edit progression rules.</p>
                       </div>
                     )}

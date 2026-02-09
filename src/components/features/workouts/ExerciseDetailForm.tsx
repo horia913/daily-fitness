@@ -171,9 +171,9 @@ export default function ExerciseDetailForm({
     };
 
     return (
-      <div className={className}>
-        <div className="flex items-center justify-between mb-2">
-          <Label className={`text-sm font-medium ${theme.text}`}>{label}</Label>
+      <div className={`mt-1 ${className || ""}`}>
+        <div className="flex items-center justify-between mb-2.5 gap-2">
+          <Label className={`text-sm font-medium ${theme.text} shrink-0`}>{label}</Label>
           <LoadPercentageWeightToggle
             value={toggleMode}
             onValueChange={handleToggle}
@@ -382,105 +382,111 @@ export default function ExerciseDetailForm({
 
       {/* Straight Set */}
       {exerciseType === "straight_set" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label className={`text-sm font-medium ${theme.text}`}>
-                Sets
-              </Label>
-              <Input
-                type="number"
-                value={exercise.sets === "" ? "" : exercise.sets || ""}
-                onChange={(e) =>
-                  updateExercise({
-                    sets: handleNumberChange(e.target.value, 0),
-                  })
-                }
-                min="1"
-                className="mt-2 rounded-xl"
-              />
+        <div className="space-y-5">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+            <h4 className={`font-semibold ${theme.text} mb-4 flex flex-wrap items-center gap-2`}>
+              <Dumbbell className="w-4 h-4 fc-text-workouts" />
+              Straight Set Configuration
+            </h4>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div>
+                <Label className={`text-sm font-medium ${theme.text}`}>
+                  Sets
+                </Label>
+                <Input
+                  type="number"
+                  value={exercise.sets === "" ? "" : exercise.sets || ""}
+                  onChange={(e) =>
+                    updateExercise({
+                      sets: handleNumberChange(e.target.value, 0),
+                    })
+                  }
+                  min="1"
+                  className="mt-2 rounded-xl"
+                />
+              </div>
+              <div>
+                <Label className={`text-sm font-medium ${theme.text}`}>
+                  Reps
+                </Label>
+                <Input
+                  value={exercise.reps || ""}
+                  onChange={(e) => updateExercise({ reps: e.target.value })}
+                  placeholder="e.g., 10-12"
+                  className="mt-2 rounded-xl"
+                />
+              </div>
             </div>
-            <div>
-              <Label className={`text-sm font-medium ${theme.text}`}>
-                Reps
-              </Label>
-              <Input
-                value={exercise.reps || ""}
-                onChange={(e) => updateExercise({ reps: e.target.value })}
-                placeholder="e.g., 10-12"
-                className="mt-2 rounded-xl"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label className={`text-sm font-medium ${theme.text}`}>
-                Rest (seconds)
-              </Label>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-5">
+              <div>
+                <Label className={`text-sm font-medium ${theme.text}`}>
+                  Rest (seconds)
+                </Label>
+                <Input
+                  type="number"
+                  value={
+                    exercise.rest_seconds === ""
+                      ? ""
+                      : exercise.rest_seconds || ""
+                  }
+                  onChange={(e) =>
+                    updateExercise({
+                      rest_seconds: handleNumberChange(e.target.value, 0),
+                    })
+                  }
+                  min="0"
+                  className="mt-2 rounded-xl"
+                />
+              </div>
+              <div>
+                <Label className={`text-sm font-medium ${theme.text}`}>
+                  RIR
+                </Label>
+                <Input
+                  type="number"
+                  value={exercise.rir === "" ? "" : exercise.rir || ""}
+                  onChange={(e) =>
+                    updateExercise({ rir: handleNumberChange(e.target.value, 0) })
+                  }
+                  min="0"
+                  className="mt-2 rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <Label className={`text-sm font-medium ${theme.text}`}>Tempo</Label>
               <Input
-                type="number"
-                value={
-                  exercise.rest_seconds === ""
-                    ? ""
-                    : exercise.rest_seconds || ""
-                }
-                onChange={(e) =>
-                  updateExercise({
-                    rest_seconds: handleNumberChange(e.target.value, 0),
-                  })
-                }
-                min="0"
+                value={exercise.tempo || ""}
+                onChange={(e) => updateExercise({ tempo: e.target.value })}
+                placeholder="e.g., 2-0-1-0"
                 className="mt-2 rounded-xl"
               />
+              <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                Format: eccentric-pause-concentric-pause
+              </p>
             </div>
-            <div>
-              <Label className={`text-sm font-medium ${theme.text}`}>
-                RIR (Reps in Reserve)
-              </Label>
-              <Input
-                type="number"
-                value={exercise.rir === "" ? "" : exercise.rir || ""}
-                onChange={(e) =>
-                  updateExercise({ rir: handleNumberChange(e.target.value, 0) })
-                }
-                min="0"
-                className="mt-2 rounded-xl"
-              />
-            </div>
-          </div>
 
-          <div>
-            <Label className={`text-sm font-medium ${theme.text}`}>Tempo</Label>
-            <Input
-              value={exercise.tempo || ""}
-              onChange={(e) => updateExercise({ tempo: e.target.value })}
-              placeholder="e.g., 2-0-1-0"
-              className="mt-2 rounded-xl"
-            />
-            <p className={`text-xs ${theme.textSecondary} mt-1`}>
-              Format: eccentric-pause-concentric-pause
-            </p>
+            {renderLoadWeightField(
+              exercise.load_percentage,
+              exercise.weight_kg,
+              (value) =>
+                updateExercise({ load_percentage: value, weight_kg: "" }),
+              (value) =>
+                updateExercise({ weight_kg: value, load_percentage: "" }),
+              mainToggleMode,
+              setMainToggleMode,
+              "Load % / Weight"
+            )}
           </div>
-
-          {renderLoadWeightField(
-            exercise.load_percentage,
-            exercise.weight_kg,
-            (value) =>
-              updateExercise({ load_percentage: value, weight_kg: "" }),
-            (value) =>
-              updateExercise({ weight_kg: value, load_percentage: "" }),
-            mainToggleMode,
-            setMainToggleMode,
-            "Load % / Weight"
-          )}
         </div>
       )}
 
       {/* Superset */}
       {exerciseType === "superset" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
@@ -509,7 +515,7 @@ export default function ExerciseDetailForm({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
                   Sets
@@ -548,7 +554,7 @@ export default function ExerciseDetailForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
                   First Exercise Reps
@@ -575,7 +581,7 @@ export default function ExerciseDetailForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
               {renderLoadWeightField(
                 exercise.load_percentage,
                 exercise.weight_kg,
@@ -612,7 +618,7 @@ export default function ExerciseDetailForm({
       {/* AMRAP */}
       {exerciseType === "amrap" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
@@ -661,7 +667,7 @@ export default function ExerciseDetailForm({
       {/* EMOM */}
       {exerciseType === "emom" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
@@ -801,7 +807,7 @@ export default function ExerciseDetailForm({
       {/* Tabata */}
       {exerciseType === "tabata" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
@@ -813,7 +819,7 @@ export default function ExerciseDetailForm({
               timing for all exercises
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
                   Work (seconds)
@@ -909,7 +915,7 @@ export default function ExerciseDetailForm({
                 (set: any, setIndex: number) => (
                   <div
                     key={setIndex}
-                    className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]"
+                    className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h5 className={`font-medium ${theme.text}`}>
@@ -941,15 +947,15 @@ export default function ExerciseDetailForm({
                       )}
                     </div>
 
-                    <div className="space-y-2 mb-3">
+                    <div className="space-y-3 mb-4">
                       {ensureArray(set?.exercises).map(
                         (setExercise: any, exerciseIndex: number) => (
                           <div
                             key={exerciseIndex}
-                            className="p-3 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)]"
+                            className="px-3 py-4 sm:p-4 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)]"
                           >
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <span className="text-xs fc-text-subtle w-6">
+                            <div className="flex flex-wrap items-center gap-2 mb-3">
+                              <span className="text-xs fc-text-subtle w-5 sm:w-6">
                                 {exerciseIndex + 1}.
                               </span>
                               <div className="flex-1">
@@ -1033,7 +1039,7 @@ export default function ExerciseDetailForm({
                               )}
                             </div>
                             {/* Individual exercise fields */}
-                            <div className="ml-6 grid grid-cols-2 gap-2 mt-2">
+                            <div className="mt-3 grid grid-cols-2 gap-3 sm:ml-6">
                               <div>
                                 <Label
                                   className={`text-xs font-medium ${theme.text}`}
@@ -1240,7 +1246,7 @@ export default function ExerciseDetailForm({
       {/* Drop Set */}
       {exerciseType === "drop_set" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
@@ -1335,7 +1341,7 @@ export default function ExerciseDetailForm({
       {/* Giant Set */}
       {exerciseType === "giant_set" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
@@ -1347,7 +1353,7 @@ export default function ExerciseDetailForm({
               them
             </p>
 
-            <div className="space-y-3 mb-4">
+            <div className="space-y-4 mb-5">
               <Label className={`text-sm font-medium ${theme.text}`}>
                 Exercises in Giant Set
               </Label>
@@ -1355,10 +1361,10 @@ export default function ExerciseDetailForm({
                 (gsExercise: any, index: number) => (
                   <div
                     key={index}
-                    className="p-3 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)]"
+                    className="px-3 py-4 sm:p-4 fc-glass-soft rounded-xl border border-[color:var(--fc-glass-border)]"
                   >
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <span className="text-sm font-medium fc-text-subtle w-8">
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <span className="text-sm font-medium fc-text-subtle w-6 sm:w-8">
                         {index + 1}.
                       </span>
                       <div className="flex-1">
@@ -1413,7 +1419,7 @@ export default function ExerciseDetailForm({
                         </Button>
                       )}
                     </div>
-                    <div className="ml-10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="mt-3 grid grid-cols-1 gap-4 sm:ml-8 sm:grid-cols-2">
                       <div>
                         <Label className={`text-xs font-medium ${theme.text}`}>
                           Reps
@@ -1583,7 +1589,7 @@ export default function ExerciseDetailForm({
       {/* Cluster Set */}
       {exerciseType === "cluster_set" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
@@ -1690,7 +1696,7 @@ export default function ExerciseDetailForm({
       {/* Rest-Pause */}
       {exerciseType === "rest_pause" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
@@ -1764,14 +1770,14 @@ export default function ExerciseDetailForm({
       {/* Pre-Exhaustion */}
       {exerciseType === "pre_exhaustion" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
               <Dumbbell className="w-4 h-4 fc-text-workouts" />
               Pre-Exhaustion Configuration
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
                   Isolation Exercise
@@ -1809,7 +1815,7 @@ export default function ExerciseDetailForm({
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mt-5">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
                   Sets
@@ -1852,7 +1858,7 @@ export default function ExerciseDetailForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
               {renderLoadWeightField(
                 exercise.load_percentage,
                 exercise.weight_kg,
@@ -1889,7 +1895,7 @@ export default function ExerciseDetailForm({
       {/* For Time */}
       {exerciseType === "for_time" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >
@@ -1899,7 +1905,7 @@ export default function ExerciseDetailForm({
             <p className={`text-sm ${theme.textSecondary} mb-4`}>
               Complete a set amount of work as fast as possible
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <Label className={`text-sm font-medium ${theme.text}`}>
                   Target Reps
@@ -1958,7 +1964,7 @@ export default function ExerciseDetailForm({
       {/* HR Sets */}
       {exerciseType === "hr_sets" && (
         <div className="space-y-4">
-          <div className="p-4 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
+          <div className="px-3 py-5 sm:p-5 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]">
             <h4
               className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
             >

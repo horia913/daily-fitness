@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Body Metrics | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #070708;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --filament: rgba(239, 68, 68, 0.4);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Filament Surface */
+        .crystal-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(160%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), border 0.3s ease;
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255,255,255,0.15);
+        }
+
+        .filament-line {
+            position: absolute;
+            background: linear-gradient(90deg, transparent, var(--filament), transparent);
+            height: 1px;
+            width: 100%;
+            bottom: 0;
+            left: 0;
+            opacity: 0.3;
+        }
+
+        /* Chart Animations */
+        @keyframes drawPath {
+            from { stroke-dashoffset: 1000; }
+            to { stroke-dashoffset: 0; }
+        }
+
+        .animate-draw {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: drawPath 2.5s ease-out forwards;
+        }
+
+        /* Photo Slider Customization */
+        .slider-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            border-radius: 20px;
+            overflow: hidden;
+            cursor: ew-resize;
+        }
+
+        .slider-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .slider-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            overflow: hidden;
+            border-right: 2px solid white;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+        }
+
+        .handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 44px;
+            height: 44px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: black;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* Typography Hierarchy */
+        .text-h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; }
+        .text-h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+        .text-metric { font-size: 42px; font-weight: 700; }
+
+        .btn-fab {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 8px 32px rgba(239, 68, 68, 0.4);
+            border-radius: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-fab:active { transform: scale(0.9) rotate(-5deg); }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 20% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 50%);
+            z-index: -1;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    </style>
+</head>
+<body class="p-4 md:p-8 pb-32 max-w-5xl mx-auto">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Navigation -->
+    <header class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+            <nav class="flex items-center gap-2 text-sm text-neutral-500 mb-2">
+                <span>Progress</span>
+                <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                <span class="text-neutral-200">Body Metrics</span>
+            </nav>
+            <h1 class="text-h1">Transformation Scan</h1>
+        </div>
+        <div class="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/5">
+            <div class="w-2 h-2 rounded-full bg-accent animate-pulse"></div>
+            <span class="text-caption text-neutral-400">Synced: <span class="mono text-neutral-200">2h ago</span></span>
+        </div>
+    </header>
+
+    <!-- Main Grid -->
+    <main class="space-y-8">
+        
+        <!-- Hero Metric Card -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="md:col-span-2 crystal-card p-8 flex flex-col justify-between min-h-[240px]">
+                <div class="flex justify-between items-start">
+                    <span class="text-sm font-semibold uppercase tracking-widest text-neutral-400">Current Body Weight</span>
+                    <div class="flex items-center gap-1 text-accent font-bold px-3 py-1 bg-accent/10 rounded-full text-sm">
+                        <i data-lucide="trending-down" class="w-4 h-4"></i>
+                        -2.1kg <span class="text-[10px] ml-1 opacity-60">MONTH</span>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-metric mono tracking-tighter">82.4</span>
+                    <span class="text-2xl font-medium text-neutral-500">kg</span>
+                </div>
+                <div class="flex gap-8 mt-6">
+                    <div>
+                        <p class="text-xs text-neutral-500 uppercase mb-1">Waist</p>
+                        <p class="text-xl font-semibold mono">86<span class="text-sm text-neutral-500">cm</span></p>
+                        <p class="text-[10px] text-accent font-bold">-3cm</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-neutral-500 uppercase mb-1">Body Fat</p>
+                        <p class="text-xl font-semibold mono">18.5<span class="text-sm text-neutral-500">%</span></p>
+                        <p class="text-[10px] text-accent font-bold">-0.8%</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-neutral-500 uppercase mb-1">Muscle Mass</p>
+                        <p class="text-xl font-semibold mono">64.2<span class="text-sm text-neutral-500">kg</span></p>
+                        <p class="text-[10px] text-blue-400 font-bold">+0.4kg</p>
+                    </div>
+                </div>
+                <div class="filament-line"></div>
+            </div>
+
+            <div class="crystal-card p-6 flex flex-col items-center justify-center text-center group">
+                <div class="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
+                    <i data-lucide="target" class="w-8 h-8"></i>
+                </div>
+                <h3 class="text-h2 mb-2">Goal Target</h3>
+                <p class="text-metric mono text-2xl">78.0<span class="text-lg text-neutral-500">kg</span></p>
+                <div class="w-full bg-white/5 h-2 rounded-full mt-6 overflow-hidden">
+                    <div class="bg-primary h-full w-[65%]" style="box-shadow: 0 0 15px var(--primary);"></div>
+                </div>
+                <p class="text-xs text-neutral-500 mt-3 font-medium">4.4kg remaining to reach milestone</p>
+            </div>
+        </section>
+
+        <!-- Precision Chart Section -->
+        <section class="crystal-card p-8">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <h3 class="text-h2 flex items-center gap-2">
+                    <i data-lucide="activity" class="text-secondary w-5 h-5"></i>
+                    Precision Weight Timeline
+                </h3>
+                <div class="flex bg-white/5 p-1 rounded-xl border border-white/10">
+                    <button class="px-4 py-1.5 rounded-lg text-sm font-medium bg-white/10">12M</button>
+                    <button class="px-4 py-1.5 rounded-lg text-sm font-medium text-neutral-500">6M</button>
+                    <button class="px-4 py-1.5 rounded-lg text-sm font-medium text-neutral-500">1M</button>
+                </div>
+            </div>
+            
+            <div class="h-[300px] w-full relative">
+                <!-- SVG Chart -->
+                <svg viewBox="0 0 1000 300" class="w-full h-full overflow-visible">
+                    <!-- Grid Lines -->
+                    <line x1="0" y1="50" x2="1000" y2="50" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
+                    <line x1="0" y1="150" x2="1000" y2="150" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
+                    <line x1="0" y1="250" x2="1000" y2="250" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
+                    
+                    <!-- Goal Line (Silica Filament) -->
+                    <line x1="0" y1="220" x2="1000" y2="220" stroke="var(--secondary)" stroke-width="1" stroke-dasharray="8 4" opacity="0.4" />
+                    <text x="940" y="210" fill="var(--secondary)" class="mono text-[10px] opacity-60">GOAL 78.0</text>
+
+                    <!-- Main Trend Path -->
+                    <path d="M0,80 Q100,60 200,100 T400,120 T600,160 T800,180 T1000,200" 
+                          fill="none" 
+                          stroke="url(#chartGradient)" 
+                          stroke-width="4" 
+                          stroke-linecap="round" 
+                          class="animate-draw" />
+                    
+                    <!-- Data Points -->
+                    <circle cx="200" cy="100" r="4" fill="white" />
+                    <circle cx="600" cy="160" r="4" fill="white" />
+                    <circle cx="1000" cy="200" r="6" fill="var(--primary)" />
+
+                    <defs>
+                        <linearGradient id="chartGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:var(--primary); stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:var(--secondary); stop-opacity:1" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                
+                <div class="flex justify-between mt-4 text-[10px] uppercase tracking-widest text-neutral-500 mono">
+                    <span>JAN 24</span>
+                    <span>APR 24</span>
+                    <span>JUL 24</span>
+                    <span>OCT 24</span>
+                    <span>JAN 25</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Visual Progress Slider -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="crystal-card p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-h2">Visual Drift</h3>
+                    <button class="text-sm font-semibold text-primary">Add New Photo</button>
+                </div>
+                <div class="slider-container" id="beforeAfterSlider">
+                    <img src="https://images.unsplash.com/photo-1583454110551-21f2fa2adfcd?auto=format&fit=crop&q=80&w=800" class="slider-image" alt="Before">
+                    <div class="slider-overlay" id="sliderOverlay">
+                        <img src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=800" class="slider-image" style="width: 200%; max-width: none;" alt="After">
+                    </div>
+                    <div class="handle" id="sliderHandle">
+                        <i data-lucide="move-horizontal"></i>
+                    </div>
+                    <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded text-xs mono">OCT 12, 2024</div>
+                    <div class="absolute bottom-4 right-4 bg-primary/80 backdrop-blur-md px-3 py-1 rounded text-xs mono">TODAY</div>
+                </div>
+            </div>
+
+            <!-- History List -->
+            <div class="crystal-card p-6 flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-h2">Log History</h3>
+                    <i data-lucide="list-filter" class="text-neutral-500 w-5 h-5 cursor-pointer"></i>
+                </div>
+                <div class="space-y-3 overflow-y-auto max-h-[400px] pr-2">
+                    <!-- Log Item -->
+                    <div class="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-neutral-800 rounded-xl flex flex-col items-center justify-center">
+                                <span class="text-[10px] text-neutral-400 font-bold">JAN</span>
+                                <span class="text-lg font-bold leading-none">18</span>
+                            </div>
+                            <div>
+                                <p class="font-semibold mono">82.4 kg</p>
+                                <p class="text-xs text-neutral-500">18.5% BF • 86cm Waist</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-bold text-accent">-0.4kg</p>
+                            <p class="text-[10px] text-neutral-500 uppercase">vs Last week</p>
+                        </div>
+                    </div>
+
+                    <!-- Log Item -->
+                    <div class="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-neutral-800 rounded-xl flex flex-col items-center justify-center">
+                                <span class="text-[10px] text-neutral-400 font-bold">JAN</span>
+                                <span class="text-lg font-bold leading-none">11</span>
+                            </div>
+                            <div>
+                                <p class="font-semibold mono">82.8 kg</p>
+                                <p class="text-xs text-neutral-500">18.7% BF • 87cm Waist</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-bold text-accent">-0.2kg</p>
+                            <p class="text-[10px] text-neutral-500 uppercase">vs Last week</p>
+                        </div>
+                    </div>
+
+                    <!-- Log Item -->
+                    <div class="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors opacity-70">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-neutral-800 rounded-xl flex flex-col items-center justify-center">
+                                <span class="text-[10px] text-neutral-400 font-bold">JAN</span>
+                                <span class="text-lg font-bold leading-none">04</span>
+                            </div>
+                            <div>
+                                <p class="font-semibold mono">83.0 kg</p>
+                                <p class="text-xs text-neutral-500">18.9% BF • 87.5cm Waist</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-bold text-primary">+0.1kg</p>
+                            <p class="text-[10px] text-neutral-500 uppercase">vs Last week</p>
+                        </div>
+                    </div>
+                </div>
+                <button class="mt-6 w-full py-4 text-sm font-semibold text-neutral-400 hover:text-white transition-colors border-t border-white/5">View Full Archive</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Floating Action Button -->
+    <button class="fixed bottom-8 right-8 btn-fab flex items-center justify-center text-white z-50 group" onclick="vibrateDevice()">
+        <i data-lucide="plus" class="w-8 h-8 group-hover:rotate-90 transition-transform"></i>
+        <span class="absolute right-20 bg-black/80 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+            Log Metrics
+        </span>
+    </button>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Device haptic feedback
+        function vibrateDevice() {
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(15);
+            }
+        }
+
+        // Before/After Slider Logic
+        const slider = document.getElementById('beforeAfterSlider');
+        const overlay = document.getElementById('sliderOverlay');
+        const handle = document.getElementById('sliderHandle');
+
+        const moveSlider = (e) => {
+            const rect = slider.getBoundingClientRect();
+            let x = (e.pageX || e.touches[0].pageX) - rect.left;
+            
+            // Boundary checks
+            if (x < 0) x = 0;
+            if (x > rect.width) x = rect.width;
+
+            const percentage = (x / rect.width) * 100;
+            overlay.style.width = percentage + '%';
+            handle.style.left = percentage + '%';
+        }
+
+        slider.addEventListener('mousemove', moveSlider);
+        slider.addEventListener('touchmove', moveSlider);
+
+        // Entry Animations for Cards
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 120);
+            });
+        });
+    </script>
+</body>
+</html>

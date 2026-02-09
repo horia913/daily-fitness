@@ -36,6 +36,14 @@ export interface BaseBlockExecutorProps {
   onAlternativesClick?: (exerciseId: string) => void;
   onRestTimerClick?: () => void;
   onSetComplete?: (completedSets: number) => void;
+  /** Called when a set is logged and rest timer will show; pass data for completion hero + next preview */
+  onLastSetLoggedForRest?: (data: {
+    weight: number;
+    reps: number;
+    setNumber: number;
+    totalSets: number;
+    isPr?: boolean;
+  }) => void;
   progressionSuggestion?: import("@/lib/clientProgressionService").ProgressionSuggestion | null;
 }
 

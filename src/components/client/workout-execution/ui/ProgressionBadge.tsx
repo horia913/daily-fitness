@@ -19,12 +19,15 @@ export function ProgressionBadge({
   }
 
   return (
-    <Badge
-      variant="outline"
-      className="mb-3 w-full justify-start bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100"
+    <div
+      className="mb-3 w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
+      style={{
+        background: "color-mix(in srgb, var(--fc-status-success) 10%, var(--fc-surface-card))",
+        border: "1px solid color-mix(in srgb, var(--fc-status-success) 25%, transparent)",
+      }}
     >
-      <TrendingUp className="w-3 h-3 mr-2" />
-      <span className="text-sm font-medium">{suggestion.message}</span>
-    </Badge>
+      <TrendingUp className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--fc-status-success)" }} />
+      <span className="text-xs font-medium fc-text-primary">{suggestion.message}</span>
+    </div>
   );
 }

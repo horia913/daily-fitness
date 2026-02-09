@@ -22,7 +22,7 @@ function Input({
       className={cn(
         baseClass,
         variant === "fc"
-          ? "focus-visible:border-[var(--fc-accent-cyan)] focus-visible:ring-2 focus-visible:ring-[rgba(0,242,255,0.2)]"
+          ? "focus-visible:border-[var(--fc-accent-cyan)] focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--fc-accent-cyan)_20%,transparent)]"
           : "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
         className
       )}

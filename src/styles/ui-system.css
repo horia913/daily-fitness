@@ -1,3 +1,8 @@
+/* -------------------------------------------------------------------
+   Design System v2 — Dual theme (light default)
+   Glass spec: light 0.55–0.75 opacity, border 0.10–0.18
+   Density: STANDARD (page/card/gap/section/list-row)
+   ------------------------------------------------------------------- */
 :root {
   --fc-bg-deep: #f6f2ec;
   --fc-bg-basalt: #e8e3db;
@@ -26,12 +31,26 @@
   --fc-domain-challenges: #be123c;
   --fc-domain-neutral: #475569;
 
+  /* Aurora alias tokens (used by coach screens; align to domain) */
+  --fc-aurora-blue: #0284c7;
+  --fc-aurora-green: #16a34a;
+
   --fc-radius-sm: 12px;
   --fc-radius-md: 16px;
   --fc-radius-lg: 20px;
   --fc-radius-xl: 24px;
   --fc-radius-2xl: 32px;
   --fc-radius-3xl: 40px;
+
+  /* Rulebook 1.2 type scale (px) */
+  --fc-type-hero: 48px;
+  --fc-type-h1: 32px;
+  --fc-type-h2: 24px;
+  --fc-type-h3: 20px;
+  --fc-type-body: 16px;
+  --fc-type-caption: 14px;
+  --fc-type-label: 12px;
+  --fc-type-micro: 10px;
 
   --fc-blur-card: 16px;
   --fc-blur-header: 20px;
@@ -47,6 +66,24 @@
   --fc-muted-overlay-start: #f6f2ec;
   --fc-muted-overlay-mid: #efe9e1;
   --fc-muted-overlay-end: #e6ded4;
+
+  /* Surface tokens: solid surfaces for content cards (reduce glass overuse) */
+  --fc-surface-card: rgba(255, 255, 255, 0.55);
+  --fc-surface-card-border: rgba(82, 74, 66, 0.10);
+  --fc-surface-elevated: rgba(255, 255, 255, 0.7);
+  --fc-surface-sunken: rgba(82, 74, 66, 0.04);
+
+  /* Density: STANDARD (mode-independent) */
+  --fc-page-px: 16px;
+  --fc-page-px-md: 24px;
+  --fc-page-pt: 16px;
+  --fc-page-pb: 120px;
+  --fc-card-padding: 24px;
+  --fc-gap-cards: 16px;
+  --fc-gap-sections: 24px;
+  --fc-list-row-min-height: 48px;
+  --fc-list-row-py: 12px;
+  --fc-list-row-px: 16px;
 }
 
 .dark {
@@ -54,7 +91,7 @@
   --fc-bg-basalt: #121824;
   --fc-text-primary: #ffffff;
   --fc-text-dim: #a0a6b0;
-  --fc-text-subtle: rgba(255, 255, 255, 0.45);
+  --fc-text-subtle: rgba(255, 255, 255, 0.55);
 
   --fc-glass-base: rgba(18, 23, 33, 0.7);
   --fc-glass-soft: rgba(255, 255, 255, 0.04);
@@ -77,6 +114,9 @@
   --fc-domain-challenges: #f43f5e;
   --fc-domain-neutral: #64748b;
 
+  --fc-aurora-blue: #38bdf8;
+  --fc-aurora-green: #4ade80;
+
   --fc-shadow-card: 0 12px 32px -12px rgba(0, 0, 0, 0.55);
   --fc-shadow-nav: 0 20px 44px rgba(0, 0, 0, 0.45);
   --fc-glow-cyan: 0 0 22px rgba(6, 182, 212, 0.28);
@@ -86,6 +126,37 @@
   --fc-muted-overlay-start: #0b0f14;
   --fc-muted-overlay-mid: #141a22;
   --fc-muted-overlay-end: #10161e;
+
+  /* Surface tokens: solid surfaces for content cards (dark mode) */
+  --fc-surface-card: rgba(18, 24, 36, 0.65);
+  --fc-surface-card-border: rgba(255, 255, 255, 0.06);
+  --fc-surface-elevated: rgba(18, 24, 36, 0.8);
+  --fc-surface-sunken: rgba(255, 255, 255, 0.03);
+}
+
+/* Page shell: STANDARD density (use on main content wrapper) */
+.fc-page {
+  padding-left: var(--fc-page-px);
+  padding-right: var(--fc-page-px);
+  padding-top: var(--fc-page-pt);
+  padding-bottom: var(--fc-page-pb);
+}
+
+@media (min-width: 768px) {
+  .fc-page {
+    padding-left: var(--fc-page-px-md);
+    padding-right: var(--fc-page-px-md);
+  }
+}
+
+/* Mono micro-labels: 10–11px uppercase, wide tracking */
+.fc-micro {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim);
+  font-family: var(--font-mono, ui-monospace, monospace);
 }
 
 .fc-aurora-layer {
@@ -125,12 +196,10 @@
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    var(--fc-muted-overlay-start) 0%,
-    var(--fc-muted-overlay-mid) 50%,
-    var(--fc-muted-overlay-end) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--fc-muted-overlay-start) 0%,
+      var(--fc-muted-overlay-mid) 50%,
+      var(--fc-muted-overlay-end) 100%);
   background-size: 100% 200%;
   z-index: 1;
 }
@@ -139,7 +208,16 @@
   animation: fc-gradient-shift 10s ease-in-out infinite;
 }
 
+/* Glass: lighter treatment for cards (reduced blur, more solid) */
 .fc-glass {
+  background: var(--fc-surface-card);
+  border: 1px solid var(--fc-surface-card-border);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--fc-shadow-card);
+}
+
+/* Glass Heavy: full blur for nav, overlays, modals */
+.fc-glass-heavy {
   background: var(--fc-glass-base);
   border: 1px solid var(--fc-glass-border);
   backdrop-filter: blur(var(--fc-blur-card));
@@ -183,8 +261,8 @@
 .fc-table thead {
   position: sticky;
   top: 0;
-  background: rgba(10, 12, 16, 0.8);
-  backdrop-filter: blur(10px);
+  background: var(--fc-glass-base);
+  backdrop-filter: blur(var(--fc-blur-card));
 }
 
 .fc-badge {
@@ -228,8 +306,8 @@
 .fc-input,
 .fc-select,
 .fc-textarea {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--fc-glass-soft);
+  border: 1px solid var(--fc-glass-border);
   color: var(--fc-text-primary);
   border-radius: var(--fc-radius-md);
 }
@@ -248,12 +326,35 @@
   backdrop-filter: blur(var(--fc-blur-nav));
 }
 
+/* Navigation: always uses heavy glass */
 .fc-nav {
   background: var(--fc-glass-base);
   border: 1px solid var(--fc-glass-border);
   border-radius: var(--fc-radius-2xl);
   backdrop-filter: blur(var(--fc-blur-nav));
+  -webkit-backdrop-filter: blur(var(--fc-blur-nav));
   box-shadow: var(--fc-shadow-nav);
+}
+
+.fc-nav-item-active {
+  background: var(--fc-glass-soft);
+  border: 1px solid var(--fc-glass-border);
+  color: var(--fc-text-primary);
+  transform: scale(1.05);
+  box-shadow: var(--fc-shadow-card);
+}
+
+.fc-nav-item-inactive {
+  color: var(--fc-text-dim);
+}
+
+.fc-nav-item-inactive:hover {
+  color: var(--fc-text-primary);
+  background: var(--fc-glass-soft);
+}
+
+.fc-nav-indicator {
+  background: var(--fc-accent-cyan);
 }
 
 .fc-app-bg {
@@ -267,6 +368,50 @@
 
 .fc-hover-rise:hover {
   transform: translateY(-2px);
+}
+
+/* Section heading with horizontal line (mockup: Active Trajectories) */
+.fc-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.fc-section-heading h2 {
+  font-size: var(--fc-type-h3);
+  font-weight: 600;
+  color: var(--fc-text-primary);
+  margin: 0;
+}
+.fc-section-heading .fc-line {
+  flex: 1;
+  height: 1px;
+  background: var(--fc-glass-border-strong);
+}
+
+/* Floating action button (goals / add primary action) */
+.fc-fab {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--fc-radius-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--fc-status-error) 0%, #b91c1c 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 12px 24px rgba(220, 38, 38, 0.35);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+.fc-fab:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(220, 38, 38, 0.4);
+}
+.dark .fc-fab {
+  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.4);
+}
+.dark .fc-fab:hover {
+  box-shadow: 0 16px 32px rgba(239, 68, 68, 0.5);
 }
 
 .fc-selected {
@@ -360,7 +505,7 @@
 }
 
 .fc-pill-glass {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--fc-text-primary) 6%, transparent);
   border: 1px solid var(--fc-glass-border);
 }
 
@@ -418,7 +563,7 @@
 }
 
 .fc-activity-off {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--fc-text-primary) 10%, transparent);
   opacity: 0.2;
 }
 
@@ -507,17 +652,20 @@
   0% {
     transform: translate(-30%, -30%);
   }
+
   100% {
     transform: translate(30%, 30%);
   }
 }
 
 @keyframes fc-pulse-fire {
+
   0%,
   100% {
     transform: scale(1);
     filter: brightness(1);
   }
+
   50% {
     transform: scale(1.05);
     filter: brightness(1.2);
@@ -531,12 +679,10 @@
   left: -100%;
   width: 300%;
   height: 300%;
-  background: linear-gradient(
-    45deg,
-    transparent 45%,
-    rgba(255, 255, 255, 0.1) 50%,
-    transparent 55%
-  );
+  background: linear-gradient(45deg,
+      transparent 45%,
+      var(--fc-glass-highlight) 50%,
+      transparent 55%);
   animation: fc-shine 6s infinite linear;
 }
 
@@ -553,17 +699,381 @@
   from {
     transform: translate(0, 0) scale(1);
   }
+
   to {
     transform: translate(10%, 15%) scale(1.1);
   }
 }
 
 @keyframes fc-gradient-shift {
+
   0%,
   100% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 0% 100%;
   }
+}
+
+/* ===================================================================
+   WHOOP-STYLE UPGRADES — Header, Bottom Nav, Surface Cards, Animations
+   =================================================================== */
+
+/* --- Minimal Header Bar --- */
+.fc-header-bar {
+  height: 52px;
+  position: relative;
+  z-index: 30;
+  background: transparent;
+}
+
+.fc-header-avatar {
+  background: var(--fc-surface-card);
+  border: 1px solid var(--fc-glass-border);
+  color: var(--fc-text-primary);
+}
+
+.fc-header-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fc-text-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.fc-header-icon-btn:hover {
+  color: var(--fc-text-primary);
+  background: var(--fc-surface-sunken);
+}
+
+.fc-header-icon-btn:active {
+  transform: scale(0.92);
+}
+
+/* --- Floating Bottom Nav --- */
+.fc-bottom-nav-float {
+  position: fixed !important;
+  bottom: 12px !important;
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
+  z-index: 10000 !important;
+  transform: none !important;
+  height: 64px;
+  background: var(--fc-glass-base);
+  border: 1px solid var(--fc-glass-border);
+  border-radius: var(--fc-radius-2xl);
+  backdrop-filter: blur(var(--fc-blur-nav));
+  -webkit-backdrop-filter: blur(var(--fc-blur-nav));
+  box-shadow: var(--fc-shadow-nav);
+}
+
+.fc-bottom-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: 100%;
+  padding: 0 4px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.fc-bottom-nav-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border-radius: var(--fc-radius-lg);
+  transition: all 0.2s ease;
+  min-width: 52px;
+  text-decoration: none;
+}
+
+.fc-bottom-nav-item:hover .fc-text-dim {
+  color: var(--fc-text-primary);
+}
+
+.fc-bottom-nav-pill {
+  position: absolute;
+  inset: 2px;
+  border-radius: var(--fc-radius-md);
+  background: var(--fc-surface-sunken);
+  border: 1px solid var(--fc-glass-border);
+}
+
+.fc-bottom-nav-item--active .fc-bottom-nav-pill {
+  background: color-mix(in srgb, var(--fc-accent-cyan) 12%, transparent);
+  border-color: color-mix(in srgb, var(--fc-accent-cyan) 20%, transparent);
+}
+
+/* --- Surface Card (non-glass, for content) --- */
+.fc-surface {
+  background: var(--fc-surface-card);
+  border: 1px solid var(--fc-surface-card-border);
+  border-radius: var(--fc-radius-xl);
+  position: relative;
+  overflow: hidden;
+}
+
+.fc-surface-elevated {
+  background: var(--fc-surface-elevated);
+  border: 1px solid var(--fc-glass-border);
+  border-radius: var(--fc-radius-xl);
+  box-shadow: var(--fc-shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+/* --- Metric Gauge Styles --- */
+.fc-gauge-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.fc-gauge-ring {
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+.fc-gauge-track {
+  fill: none;
+  stroke: var(--fc-surface-sunken);
+  stroke-width: 6;
+}
+
+.dark .fc-gauge-track {
+  stroke: rgba(255, 255, 255, 0.06);
+}
+
+.fc-gauge-fill {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.fc-gauge-value {
+  font-size: 28px;
+  font-weight: 800;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--fc-text-primary);
+  line-height: 1;
+}
+
+.fc-gauge-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim);
+}
+
+/* --- Quick Stats Strip --- */
+.fc-stats-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  background: var(--fc-glass-border);
+  border-radius: var(--fc-radius-lg);
+  overflow: hidden;
+}
+
+.fc-stats-strip-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  background: var(--fc-surface-card);
+}
+
+.fc-stats-strip-item:first-child {
+  border-radius: var(--fc-radius-lg) 0 0 var(--fc-radius-lg);
+}
+
+.fc-stats-strip-item:last-child {
+  border-radius: 0 var(--fc-radius-lg) var(--fc-radius-lg) 0;
+}
+
+.fc-stats-strip-value {
+  font-size: 20px;
+  font-weight: 800;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--fc-text-primary);
+  line-height: 1.2;
+}
+
+.fc-stats-strip-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fc-text-dim);
+  margin-top: 2px;
+}
+
+/* --- Horizontal Action Chips --- */
+.fc-action-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.fc-action-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.fc-action-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--fc-radius-xl);
+  background: var(--fc-surface-card);
+  border: 1px solid var(--fc-surface-card-border);
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fc-text-primary);
+  text-decoration: none;
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.fc-action-chip:hover {
+  background: var(--fc-surface-elevated);
+  border-color: var(--fc-glass-border);
+  transform: translateY(-1px);
+}
+
+.fc-action-chip:active {
+  transform: scale(0.97);
+}
+
+.fc-action-chip-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--fc-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* --- Entrance Animations --- */
+@keyframes fc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fc-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fc-ring-fill {
+  from {
+    stroke-dashoffset: var(--fc-ring-circumference, 283);
+  }
+  to {
+    stroke-dashoffset: var(--fc-ring-target, 0);
+  }
+}
+
+.fc-animate-in {
+  animation: fc-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fc-animate-scale {
+  animation: fc-scale-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* --- Skeleton Loading --- */
+.fc-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--fc-surface-sunken) 25%,
+    var(--fc-surface-card) 50%,
+    var(--fc-surface-sunken) 75%
+  );
+  background-size: 200% 100%;
+  animation: fc-skeleton-shimmer 1.8s ease-in-out infinite;
+  border-radius: var(--fc-radius-md);
+}
+
+@keyframes fc-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* --- Hero Card Upgrade --- */
+.fc-hero-card {
+  background: var(--fc-surface-elevated);
+  border: 1px solid var(--fc-glass-border);
+  border-radius: var(--fc-radius-xl);
+  position: relative;
+  overflow: hidden;
+}
+
+.fc-hero-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--fc-glass-highlight), transparent);
+}
+
+/* --- Weekly Activity Bar Upgrade --- */
+.fc-activity-bar {
+  height: 4px;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.fc-activity-bar--active {
+  background: linear-gradient(90deg, var(--fc-accent-cyan), var(--fc-status-success));
+}
+
+.fc-activity-bar--inactive {
+  background: var(--fc-surface-sunken);
+}
+
+.dark .fc-activity-bar--inactive {
+  background: rgba(255, 255, 255, 0.06);
 }

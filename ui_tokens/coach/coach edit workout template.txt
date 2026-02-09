@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Template | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --warning: #F59E0B;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --prism-1: rgba(239, 68, 68, 0.15);
+            --prism-2: rgba(59, 130, 246, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Prismatic Refraction Elements */
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 0% 0%, var(--prism-1) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, var(--prism-2) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02) 0%, transparent 50%);
+            z-index: -1;
+        }
+
+        .crystal-card {
+            background: linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .crystal-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.05) 50%, transparent 60%);
+            transform: translateX(-100%);
+            transition: transform 0.8s ease;
+            pointer-events: none;
+        }
+
+        .crystal-card:hover::after {
+            transform: translateX(100%);
+        }
+
+        /* Buttons & Interactions */
+        .btn-primary {
+            height: 52px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4); }
+        .btn-primary:active { transform: scale(0.96); }
+
+        .btn-secondary {
+            height: 52px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-1px); }
+
+        .btn-revert {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--warning);
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .btn-revert:hover { background: rgba(245, 158, 11, 0.2); }
+
+        /* Form Controls */
+        input, textarea, select {
+            background: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+            border-radius: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--secondary) !important;
+            background: rgba(255, 255, 255, 0.06) !important;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        /* Protocols / Block Types */
+        .protocol-chip {
+            padding: 10px 16px;
+            border-radius: 14px;
+            border: 1px solid var(--glass-border);
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        .protocol-chip.active {
+            border-color: var(--secondary);
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--secondary);
+        }
+
+        /* Change Indicators */
+        .is-dirty::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--warning);
+            border-radius: 4px 0 0 4px;
+        }
+
+        .change-badge {
+            background: var(--warning);
+            color: black;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+
+        /* Scrollbars */
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+        .sticky-nav {
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--glass-border);
+        }
+    </style>
+</head>
+<body class="pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Navigation -->
+    <nav class="sticky-nav sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <button class="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-neutral-400 hover:text-white transition-all">
+                    <i data-lucide="chevron-left" class="w-6 h-6"></i>
+                </button>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Edit Template</h1>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-neutral-400">Last edited: Oct 25, 2023</span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                        <span class="text-[11px] font-bold text-accent uppercase tracking-wider mono">Published</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hidden md:flex items-center gap-3">
+                <button class="btn-revert flex items-center gap-2">
+                    <i data-lucide="undo-2" class="w-4 h-4"></i>
+                    Revert to Original
+                </button>
+                <div class="h-6 w-px bg-white/10 mx-2"></div>
+                <button class="px-5 py-2.5 rounded-xl text-sm font-bold border border-white/10 hover:bg-white/5 transition-all">
+                    Preview
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 mt-4">
+        
+        <!-- Left Column: Template Builder -->
+        <div class="lg:col-span-8 space-y-8">
+            
+            <!-- Global Info (Editable) -->
+            <section class="crystal-card p-8">
+                <div class="space-y-6">
+                    <div class="relative">
+                        <label class="text-[11px] font-bold text-neutral-500 uppercase tracking-[2px] mb-2 block mono">Workout Title</label>
+                        <input type="text" value="Push Day: Hypertrophy & Stability" 
+                               class="w-full text-2xl font-bold bg-transparent border-none p-0 focus:ring-0 placeholder:text-neutral-800">
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="text-[11px] font-bold text-neutral-500 uppercase tracking-[2px] block mono">Session Focus</label>
+                        <textarea rows="2" class="w-full p-4 text-neutral-300 leading-relaxed">Focus on eccentric control (3s) for all compound movements. Keep RPE 8-9 for secondary isolation blocks.</textarea>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider">#UpperBody</span>
+                        <span class="bg-red-500/10 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider">#Push</span>
+                        <span class="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider">#Hypertrophy</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Protocol Switcher -->
+            <section class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-bold">Select Active Protocol</h2>
+                    <span class="text-xs text-neutral-500 mono uppercase tracking-widest">13 Styles</span>
+                </div>
+                <div class="flex gap-3 overflow-x-auto pb-4 custom-scrollbar">
+                    <div class="protocol-chip active">
+                        <i data-lucide="layers" class="w-4 h-4"></i>
+                        Straight
+                    </div>
+                    <div class="protocol-chip">
+                        <i data-lucide="git-merge" class="w-4 h-4 text-orange-400"></i>
+                        Superset
+                    </div>
+                    <div class="protocol-chip">
+                        <i data-lucide="trending-down" class="w-4 h-4 text-purple-400"></i>
+                        Drop Set
+                    </div>
+                    <div class="protocol-chip">
+                        <i data-lucide="zap" class="w-4 h-4 text-yellow-400"></i>
+                        AMRAP
+                    </div>
+                    <div class="protocol-chip">
+                        <i data-lucide="clock" class="w-4 h-4 text-teal-400"></i>
+                        EMOM
+                    </div>
+                    <div class="protocol-chip">
+                        <i data-lucide="triangle" class="w-4 h-4 text-pink-400"></i>
+                        Pyramid
+                    </div>
+                </div>
+            </section>
+
+            <!-- Exercise List (Pre-filled Data) -->
+            <div id="exercise-canvas" class="space-y-4">
+                
+                <!-- Exercise Card 1 -->
+                <div class="crystal-card p-6 border-l-4 border-l-secondary relative is-dirty">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="flex gap-4">
+                            <div class="cursor-grab text-neutral-600 hover:text-white mt-1">
+                                <i data-lucide="grip-vertical" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-lg font-bold">Incline Barbell Bench Press</h3>
+                                    <span class="change-badge">Edited</span>
+                                </div>
+                                <div class="flex items-center gap-3 mt-1">
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-secondary/10 text-secondary uppercase mono">Straight Set</span>
+                                    <span class="text-[10px] font-bold text-neutral-500 uppercase mono">Rest: 120s</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="p-2.5 rounded-xl hover:bg-white/5 text-neutral-500 transition-colors">
+                                <i data-lucide="settings-2" class="w-5 h-5"></i>
+                            </button>
+                            <button class="p-2.5 rounded-xl hover:bg-red-500/10 text-neutral-500 hover:text-red-500 transition-colors">
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mono">Sets</label>
+                            <input type="number" value="4" class="w-full p-3 font-bold text-center text-lg mono">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mono">Reps</label>
+                            <input type="text" value="8-10" class="w-full p-3 font-bold text-center text-lg mono border-warning/40 !border-2">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mono">Target RPE</label>
+                            <input type="number" value="9" class="w-full p-3 font-bold text-center text-lg mono">
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full h-[52px] rounded-2xl border border-dashed border-white/10 hover:bg-white/5 flex items-center justify-center gap-2 text-sm font-semibold text-neutral-400">
+                                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                                Advanced
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exercise Card 2 -->
+                <div class="crystal-card p-6 border-l-4 border-l-secondary relative">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="flex gap-4">
+                            <div class="cursor-grab text-neutral-600 hover:text-white mt-1">
+                                <i data-lucide="grip-vertical" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold">Dumbbell Lateral Raises</h3>
+                                <div class="flex items-center gap-3 mt-1">
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-secondary/10 text-secondary uppercase mono">Straight Set</span>
+                                    <span class="text-[10px] font-bold text-neutral-500 uppercase mono">Rest: 60s</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="p-2.5 rounded-xl hover:bg-white/5 text-neutral-500 transition-colors">
+                                <i data-lucide="settings-2" class="w-5 h-5"></i>
+                            </button>
+                            <button class="p-2.5 rounded-xl hover:bg-red-500/10 text-neutral-500 hover:text-red-500 transition-colors">
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mono">Sets</label>
+                            <input type="number" value="3" class="w-full p-3 font-bold text-center text-lg mono">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mono">Reps</label>
+                            <input type="text" value="15-20" class="w-full p-3 font-bold text-center text-lg mono">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mono">Target RPE</label>
+                            <input type="number" value="10" class="w-full p-3 font-bold text-center text-lg mono">
+                        </div>
+                        <div class="flex items-end">
+                            <button class="w-full h-[52px] rounded-2xl border border-dashed border-white/10 hover:bg-white/5 flex items-center justify-center gap-2 text-sm font-semibold text-neutral-400">
+                                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                                Advanced
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Block Button -->
+                <button class="w-full p-8 rounded-3xl border-2 border-dashed border-white/5 hover:border-white/20 hover:bg-white/5 transition-all flex flex-col items-center gap-3 text-neutral-500 group">
+                    <div class="w-12 h-12 rounded-full bg-neutral-900 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i data-lucide="plus" class="w-6 h-6"></i>
+                    </div>
+                    <span class="text-sm font-bold uppercase tracking-widest mono">Insert New Block</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Column: Library & Sidebar -->
+        <aside class="lg:col-span-4 space-y-6">
+            <div class="crystal-card flex flex-col h-[calc(100vh-140px)] sticky top-28">
+                <div class="p-6 border-b border-white/10 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-bold">Movement Library</h3>
+                        <i data-lucide="library" class="w-5 h-5 text-neutral-500"></i>
+                    </div>
+                    
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500"></i>
+                        <input type="text" placeholder="Search 500+ exercises..." class="w-full pl-11 pr-4 py-3 text-sm">
+                    </div>
+
+                    <div class="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                        <button class="px-4 py-1.5 rounded-lg bg-secondary/10 text-secondary border border-secondary/20 text-[11px] font-bold uppercase">All</button>
+                        <button class="px-4 py-1.5 rounded-lg bg-white/5 text-neutral-400 border border-white/10 text-[11px] font-bold uppercase hover:text-white">Chest</button>
+                        <button class="px-4 py-1.5 rounded-lg bg-white/5 text-neutral-400 border border-white/10 text-[11px] font-bold uppercase hover:text-white">Shoulders</button>
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                    <!-- Library Items -->
+                    <div class="group p-3 rounded-xl border border-transparent hover:border-white/10 hover:bg-white/5 transition-all flex items-center gap-4 cursor-pointer">
+                        <div class="w-14 h-14 rounded-lg bg-neutral-800 flex-none overflow-hidden relative">
+                            <div class="absolute inset-0 bg-gradient-to-tr from-secondary/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <img src="https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?q=80&w=100&h=100&auto=format&fit=crop" class="w-full h-full object-cover opacity-60">
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-bold group-hover:text-secondary transition-colors">Cable Crossovers (High)</div>
+                            <div class="text-[11px] text-neutral-500 uppercase mono">Lower Chest, Delts</div>
+                        </div>
+                        <button class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                            <i data-lucide="plus" class="w-5 h-5 text-secondary"></i>
+                        </button>
+                    </div>
+
+                    <div class="group p-3 rounded-xl border border-transparent hover:border-white/10 hover:bg-white/5 transition-all flex items-center gap-4 cursor-pointer">
+                        <div class="w-14 h-14 rounded-lg bg-neutral-800 flex-none overflow-hidden relative">
+                            <img src="https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=100&h=100&auto=format&fit=crop" class="w-full h-full object-cover opacity-60">
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-bold group-hover:text-secondary transition-colors">Arnold Press</div>
+                            <div class="text-[11px] text-neutral-500 uppercase mono">Anterior Delts</div>
+                        </div>
+                        <button class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                            <i data-lucide="plus" class="w-5 h-5 text-secondary"></i>
+                        </button>
+                    </div>
+
+                    <div class="group p-3 rounded-xl border border-transparent hover:border-white/10 hover:bg-white/5 transition-all flex items-center gap-4 cursor-pointer">
+                        <div class="w-14 h-14 rounded-lg bg-neutral-800 flex-none overflow-hidden relative">
+                            <img src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=100&h=100&auto=format&fit=crop" class="w-full h-full object-cover opacity-60">
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-bold group-hover:text-secondary transition-colors">Diamond Push-ups</div>
+                            <div class="text-[11px] text-neutral-500 uppercase mono">Triceps, Chest</div>
+                        </div>
+                        <button class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                            <i data-lucide="plus" class="w-5 h-5 text-secondary"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="p-6 bg-white/5 border-t border-white/10">
+                    <button class="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="external-link" class="w-4 h-4"></i>
+                        Custom Movement
+                    </button>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Bottom Action Bar -->
+    <footer class="fixed bottom-0 left-0 right-0 p-4 bg-[#0A0A0A]/90 backdrop-blur-2xl border-t border-white/10 z-[60]">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-4">
+            <div class="flex items-center gap-3 md:border-r border-white/10 pr-6 order-2 md:order-1">
+                <button class="w-full md:w-auto px-6 py-4 rounded-2xl btn-secondary text-neutral-400 font-bold uppercase tracking-widest text-xs">
+                    Cancel
+                </button>
+            </div>
+            <div class="hidden md:block flex-1">
+                <p class="text-sm text-neutral-500 font-medium">Auto-saving... <span class="text-accent ml-2 italic">Changes detected in Block 1</span></p>
+            </div>
+            <div class="flex w-full md:w-auto gap-4 order-1 md:order-2">
+                <button class="flex-1 md:flex-none px-8 py-4 rounded-2xl btn-secondary text-secondary font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2">
+                    <i data-lucide="archive" class="w-4 h-4"></i>
+                    Save as Draft
+                </button>
+                <button class="flex-1 md:flex-none px-12 py-4 rounded-2xl btn-primary text-white font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-2xl">
+                    <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Basic interactivity for Protocol Chips
+        document.querySelectorAll('.protocol-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.protocol-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                
+                // Haptic feedback
+                if (window.navigator.vibrate) window.navigator.vibrate(10);
+            });
+        });
+
+        // Animation for entrance
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+
+        // Highlight input changes
+        document.querySelectorAll('input, textarea').forEach(el => {
+            el.addEventListener('change', () => {
+                const card = el.closest('.crystal-card');
+                if (card) {
+                    card.classList.add('is-dirty');
+                    if (!card.querySelector('.change-badge')) {
+                        const title = card.querySelector('h3');
+                        const badge = document.createElement('span');
+                        badge.className = 'change-badge';
+                        badge.innerText = 'Edited';
+                        title.appendChild(badge);
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

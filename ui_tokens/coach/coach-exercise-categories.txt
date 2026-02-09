@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exercise Categories | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.05) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        .crystal-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+            transform: rotate(30deg);
+            pointer-events: none;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-primary {
+            height: 48px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .btn-primary:active { transform: scale(0.95); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4); }
+
+        .btn-ghost {
+            height: 48px;
+            width: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.2s ease;
+        }
+
+        .btn-ghost:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+
+        .category-icon-wrapper {
+            position: relative;
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 18px;
+        }
+
+        .category-icon-wrapper::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            filter: blur(12px);
+            opacity: 0.3;
+            z-index: -1;
+        }
+
+        /* Typography */
+        .text-h1 { font-size: 30px; line-height: 1.25; font-weight: 700; letter-spacing: -0.02em; }
+        .text-h2 { font-size: 20px; line-height: 1.25; font-weight: 600; }
+        .text-body { font-size: 16px; line-height: 1.625; font-weight: 400; }
+        .text-caption { font-size: 14px; line-height: 1.4; font-weight: 400; }
+
+        .fab-mobile {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 100;
+            width: 56px;
+            height: 56px;
+            border-radius: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .fab-mobile { display: none; }
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12 max-w-7xl mx-auto pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Section -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        <div class="space-y-1">
+            <div class="flex items-center gap-2 text-primary mb-1">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i>
+                <span class="text-sm font-bold tracking-widest uppercase mono">Library Management</span>
+            </div>
+            <h1 class="text-h1">Exercise Categories</h1>
+            <p class="text-body text-neutral-400">Organize your protocols with kinetic visual hierarchy.</p>
+        </div>
+        <button class="btn-primary hidden md:flex items-center gap-3 px-8 rounded-2xl font-bold">
+            <i data-lucide="plus" class="w-5 h-5"></i>
+            Create New Category
+        </button>
+    </header>
+
+    <!-- Categories Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <!-- Category Card 1 -->
+        <div class="crystal-card kinetic-shimmer p-6 group">
+            <div class="flex items-start justify-between mb-8">
+                <div class="category-icon-wrapper bg-red-500/10 text-red-500 after:bg-red-500">
+                    <i data-lucide="dumbbell" class="w-7 h-7"></i>
+                </div>
+                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button class="btn-ghost hover:text-blue-400" title="Edit">
+                        <i data-lucide="edit-3" class="w-5 h-5"></i>
+                    </button>
+                    <button class="btn-ghost hover:text-red-500" title="Delete">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-h2 mb-1">Strength Training</h3>
+                <div class="flex items-center gap-2 text-neutral-400">
+                    <span class="mono text-sm px-2 py-0.5 rounded bg-neutral-800/50 border border-white/5">24 Exercises</span>
+                    <span class="w-1 h-1 rounded-full bg-neutral-600"></span>
+                    <span class="text-caption">Heavy Resistance</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Card 2 -->
+        <div class="crystal-card kinetic-shimmer p-6 group">
+            <div class="flex items-start justify-between mb-8">
+                <div class="category-icon-wrapper bg-blue-500/10 text-blue-500 after:bg-blue-500">
+                    <i data-lucide="zap" class="w-7 h-7"></i>
+                </div>
+                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button class="btn-ghost hover:text-blue-400">
+                        <i data-lucide="edit-3" class="w-5 h-5"></i>
+                    </button>
+                    <button class="btn-ghost hover:text-red-500">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-h2 mb-1">Cardiovascular</h3>
+                <div class="flex items-center gap-2 text-neutral-400">
+                    <span class="mono text-sm px-2 py-0.5 rounded bg-neutral-800/50 border border-white/5">12 Exercises</span>
+                    <span class="w-1 h-1 rounded-full bg-neutral-600"></span>
+                    <span class="text-caption">Endurance & HIIT</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Card 3 -->
+        <div class="crystal-card kinetic-shimmer p-6 group">
+            <div class="flex items-start justify-between mb-8">
+                <div class="category-icon-wrapper bg-emerald-500/10 text-emerald-500 after:bg-emerald-500">
+                    <i data-lucide="refresh-cw" class="w-7 h-7"></i>
+                </div>
+                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button class="btn-ghost hover:text-blue-400">
+                        <i data-lucide="edit-3" class="w-5 h-5"></i>
+                    </button>
+                    <button class="btn-ghost hover:text-red-500">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-h2 mb-1">Mobility & Flow</h3>
+                <div class="flex items-center gap-2 text-neutral-400">
+                    <span class="mono text-sm px-2 py-0.5 rounded bg-neutral-800/50 border border-white/5">18 Exercises</span>
+                    <span class="w-1 h-1 rounded-full bg-neutral-600"></span>
+                    <span class="text-caption">Flexibility</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Card 4 -->
+        <div class="crystal-card kinetic-shimmer p-6 group">
+            <div class="flex items-start justify-between mb-8">
+                <div class="category-icon-wrapper bg-amber-500/10 text-amber-500 after:bg-amber-500">
+                    <i data-lucide="target" class="w-7 h-7"></i>
+                </div>
+                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button class="btn-ghost hover:text-blue-400">
+                        <i data-lucide="edit-3" class="w-5 h-5"></i>
+                    </button>
+                    <button class="btn-ghost hover:text-red-500">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-h2 mb-1">Sport Specific</h3>
+                <div class="flex items-center gap-2 text-neutral-400">
+                    <span class="mono text-sm px-2 py-0.5 rounded bg-neutral-800/50 border border-white/5">9 Exercises</span>
+                    <span class="w-1 h-1 rounded-full bg-neutral-600"></span>
+                    <span class="text-caption">Functional Skill</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Placeholder Card -->
+        <button class="border-2 border-dashed border-white/10 rounded-[24px] p-6 flex flex-col items-center justify-center gap-4 hover:border-white/30 hover:bg-white/5 transition-all group">
+            <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-neutral-500 group-hover:text-white group-hover:scale-110 transition-all">
+                <i data-lucide="plus" class="w-6 h-6"></i>
+            </div>
+            <span class="font-semibold text-neutral-400 group-hover:text-white">Add Category</span>
+        </button>
+
+    </div>
+
+    <!-- Mobile Floating Action Button -->
+    <button class="fab-mobile btn-primary flex items-center justify-center shadow-2xl">
+        <i data-lucide="plus" class="w-7 h-7"></i>
+    </button>
+
+    <!-- Contextual Information -->
+    <div class="mt-12 p-6 rounded-3xl bg-blue-500/5 border border-blue-500/20 flex items-start gap-4">
+        <i data-lucide="info" class="w-6 h-6 text-blue-400 shrink-0"></i>
+        <div class="space-y-1">
+            <p class="text-sm font-semibold text-blue-300">Organization Tip</p>
+            <p class="text-sm text-blue-200/70 leading-relaxed">Exercise categories help your clients find their specific drills faster. Each category is visually distinct to reduce cognitive load during high-intensity training sessions.</p>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Reveal animation for cards
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card, .border-dashed');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+
+        // Haptic feedback for primary actions
+        const buttons = document.querySelectorAll('.btn-primary, .fab-mobile');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+                console.log('Action: Create New Category Modal Triggered');
+            });
+        });
+
+        // Simulating edit/delete feedback
+        document.querySelectorAll('.btn-ghost').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.navigator.vibrate) window.navigator.vibrate(5);
+            });
+        });
+    </script>
+</body>
+</html>

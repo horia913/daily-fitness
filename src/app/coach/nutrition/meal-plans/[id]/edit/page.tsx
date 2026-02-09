@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MealPlanService, MealPlan } from "@/lib/mealPlanService";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChefHat } from "lucide-react";
 import Link from "next/link";
 
 export default function EditMealPlanPage() {
@@ -125,7 +125,7 @@ export default function EditMealPlanPage() {
                 <h2 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
                   Meal Plan Not Found
                 </h2>
-                <Link href="/coach/nutrition/meal-plans">
+                <Link href="/coach/nutrition">
                   <Button className="fc-btn fc-btn-primary">Back to Meal Plans</Button>
                 </Link>
               </GlassCard>
@@ -140,25 +140,25 @@ export default function EditMealPlanPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-6 pb-24">
           <div className="max-w-2xl mx-auto space-y-6">
             <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8">
               <div className="flex items-center gap-4">
-                <Link href={`/coach/nutrition/meal-plans/${mealPlan.id}`}>
-                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
-                    <ArrowLeft className="w-4 h-4" />
-                  </Button>
+                <Link href={`/coach/nutrition/meal-plans/${mealPlan.id}`} className="fc-glass fc-card w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
+                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
                 </Link>
-                <div className="flex-1">
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Meal Plan Editor
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                    Edit Meal Plan
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Update meal plan details.
-                  </p>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora-green)]/20 text-[color:var(--fc-accent-green)] shrink-0">
+                    <ChefHat className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                      Edit Meal Plan
+                    </h1>
+                    <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                      Update meal plan details.
+                    </p>
+                  </div>
                 </div>
               </div>
             </GlassCard>

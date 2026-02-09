@@ -116,7 +116,7 @@ export default function WorkoutTemplateFilters({
         <div className="space-y-6">
           {/* Search Bar */}
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 fc-text-dim w-5 h-5" />
             <Input
               placeholder="Search templates by name, description, or category..."
               value={searchTerm}
@@ -251,7 +251,7 @@ export default function WorkoutTemplateFilters({
 
             {/* Advanced Filters */}
             {showAdvancedFilters && (
-              <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div className="space-y-4 pt-4 border-t border-[color:var(--fc-surface-card-border)]">
                 {/* Sort Options */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -302,7 +302,7 @@ export default function WorkoutTemplateFilters({
           </div>
 
           {/* View Controls and Selection */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between pt-4 border-t border-[color:var(--fc-surface-card-border)]">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <span className={`text-sm ${theme.textSecondary}`}>View:</span>

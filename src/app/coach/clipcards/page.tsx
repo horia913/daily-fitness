@@ -39,7 +39,9 @@ import {
   Award,
   Eye,
   Settings,
-  X
+  X,
+  Download,
+  ChevronRight
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -99,6 +101,7 @@ export default function CoachClipCards() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
+  const [activeTab, setActiveTab] = useState<'types' | 'assignments'>('types')
 
   const [clipcardTypeForm, setClipcardTypeForm] = useState({
     name: '',
@@ -285,44 +288,48 @@ export default function CoachClipCards() {
         <div className="min-h-screen">
         <div className="relative px-6 pb-16 pt-10">
           <div className="max-w-7xl mx-auto space-y-6">
-            <GlassCard className="p-6 md:p-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-3">
-                  <Badge className="fc-badge fc-badge-strong w-fit">ClipCard Control</Badge>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg">
-                      <CreditCard className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                        ClipCard Management
-                      </h1>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        Package sessions, manage balances, and track client usage.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Dialog open={showCreateType} onOpenChange={setShowCreateType}>
-                    <DialogTrigger asChild>
-                      <Button className="fc-btn fc-btn-primary">
-                        <Plus className="w-5 h-5 mr-2" />
-                        Create Package
-                      </Button>
-                    </DialogTrigger>
-                  </Dialog>
-                  <Dialog open={showCreateClipCard} onOpenChange={setShowCreateClipCard}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="fc-btn fc-btn-ghost">
-                        <Users className="w-5 h-5 mr-2" />
-                        Assign ClipCard
-                      </Button>
-                    </DialogTrigger>
-                  </Dialog>
-                </div>
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+              <div>
+                <nav className="flex items-center gap-2 text-sm fc-text-dim mb-4 font-mono">
+                  <span>COACH</span>
+                  <ChevronRight className="w-3 h-3" />
+                  <span className="fc-text-primary">CLIPCARDS</span>
+                </nav>
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight fc-text-primary">Voucher Matrix</h1>
+                <p className="fc-text-dim mt-2">Manage session packages and client accessibility.</p>
               </div>
-            </GlassCard>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" className="fc-btn fc-btn-ghost">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+                <Dialog open={showCreateType} onOpenChange={setShowCreateType}>
+                  <DialogTrigger asChild>
+                    <Button className="fc-btn fc-btn-primary">
+                      <Plus className="w-5 h-5 mr-2" />
+                      New Package Type
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+              </div>
+            </header>
+
+            <div className="flex items-center gap-8 border-b border-[color:var(--fc-glass-border)] mb-6">
+              <button
+                type="button"
+                onClick={() => setActiveTab('types')}
+                className={`pb-3 text-lg font-semibold transition-all ${activeTab === 'types' ? 'fc-text-primary border-b-2 border-[color:var(--fc-accent-primary)]' : 'fc-text-dim hover:fc-text-primary'}`}
+              >
+                Package Types
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('assignments')}
+                className={`pb-3 text-lg font-semibold transition-all ${activeTab === 'assignments' ? 'fc-text-primary border-b-2 border-[color:var(--fc-accent-primary)]' : 'fc-text-dim hover:fc-text-primary'}`}
+              >
+                Active Assignments
+              </button>
+            </div>
 
             <GlassCard className="p-5">
               <div className="flex flex-col lg:flex-row gap-4">
@@ -389,59 +396,85 @@ export default function CoachClipCards() {
               </GlassCard>
             </div>
 
-            {/* Packages Section */}
+            {/* Content by tab */}
+            {activeTab === 'types' && (
             <div className="space-y-6">
-              <h2 className={`text-2xl font-bold ${theme.text} flex items-center gap-3`}>
-                <div className="p-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                  <Package className="w-6 h-6 text-white" />
-                </div>
-                ClipCard Packages
-              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {clipcardTypes.map(type => (
-                  <Card key={type.id} className={`${theme.card} ${theme.shadow} hover:scale-105 hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group`}>
-                    <CardContent className="p-6">
+                  <GlassCard key={type.id} className="fc-glass fc-card rounded-2xl overflow-hidden group p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
-                            <div className="p-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-                              <Package className="w-5 h-5 text-white" />
+                            <div className="p-2 rounded-xl fc-glass-soft shrink-0">
+                              <Package className="w-5 h-5 fc-text-primary" />
                             </div>
-                            <div className="flex-1">
-                              <CardTitle className={`text-xl font-bold ${theme.text} group-hover:text-purple-600 transition-colors`}>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-xl font-bold fc-text-primary truncate">
                                 {type.name}
-                              </CardTitle>
-                              <div className={`${theme.textSecondary} text-sm mt-1`}>
+                              </h3>
+                              <p className="text-sm fc-text-dim mt-1">
                                 {type.sessions_count} sessions • {type.validity_days} days
-                              </div>
+                              </p>
                             </div>
                           </div>
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className={`${theme.textSecondary} text-sm`}>Price</span>
-                              <span className={`font-semibold ${theme.text}`}>{type.price} RON</span>
+                              <span className="text-sm fc-text-dim">Price</span>
+                              <span className="font-semibold fc-text-primary">{type.price} RON</span>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className={`${theme.textSecondary} text-sm`}>Validity</span>
-                              <span className={`font-semibold ${theme.text}`}>{type.validity_days} days</span>
-                            </div>
+                              <span className="text-sm fc-text-dim">Validity</span>
+                              <span className="font-semibold fc-text-primary">{type.validity_days} days</span>
                             </div>
                           </div>
+                        </div>
                         <div className="flex gap-1">
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={() => deleteClipCardType(type.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"
+                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded-xl"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                  </GlassCard>
                 ))}
+              </div>
             </div>
+            )}
+            {activeTab === 'assignments' && (
+              <div className="space-y-4">
+                <p className="text-sm fc-text-dim">Active clipcard assignments. Assign from Package Types or use the Assign flow.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {clipcards.slice(0, 12).map(cc => (
+                    <GlassCard key={cc.id} className="fc-glass fc-card p-5 rounded-2xl">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold fc-text-primary">{cc.client?.first_name} {cc.client?.last_name}</p>
+                          <p className="text-sm fc-text-dim">{cc.clipcard_type?.name} • {cc.sessions_used}/{cc.sessions_total} used</p>
+                        </div>
+                      </div>
+                    </GlassCard>
+                  ))}
+                </div>
+                {clipcards.length === 0 && (
+                  <GlassCard className="fc-glass fc-card p-8 text-center rounded-2xl">
+                    <CreditCard className="w-12 h-12 fc-text-dim mx-auto mb-3" />
+                    <p className="fc-text-dim">No assignments yet.</p>
+                    <Dialog open={showCreateClipCard} onOpenChange={setShowCreateClipCard}>
+                      <DialogTrigger asChild>
+                        <Button className="fc-btn fc-btn-primary mt-4">
+                          <Users className="w-4 h-4 mr-2" />
+                          Assign ClipCard
+                        </Button>
+                      </DialogTrigger>
+                    </Dialog>
+                  </GlassCard>
+                )}
+              </div>
+            )}
           </div>
 
             {/* Create Package Modal */}
@@ -578,7 +611,6 @@ export default function CoachClipCards() {
               </div>
             </DialogContent>
           </Dialog>
-          </div>
         </div>
         </div>
       </AnimatedBackground>

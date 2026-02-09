@@ -10,7 +10,7 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import ClientGoalsView from "@/components/coach/client-views/ClientGoalsView";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Target } from "lucide-react";
 import Link from "next/link";
 
 export default function ClientGoalsPage() {
@@ -45,21 +45,21 @@ export default function ClientGoalsPage() {
         <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
           <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
             <div className="flex items-center gap-4">
-              <Link href={`/coach/clients/${clientId}`}>
-                <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
+              <Link href={`/coach/clients/${clientId}`} className="fc-glass fc-card w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
+                <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
               </Link>
-              <div>
-                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                  Client Goals
-                </span>
-                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                  Goals & Milestones
-                </h1>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  Track objectives and progress milestones.
-                </p>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+                  <Target className="w-6 h-6" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                    Goals & Milestones
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                    Track objectives and progress milestones.
+                  </p>
+                </div>
               </div>
             </div>
           </GlassCard>

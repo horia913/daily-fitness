@@ -118,7 +118,7 @@ export default function ExerciseCard({
     return (
       <Card 
         className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-lg transition-all duration-300 cursor-pointer ${
-          isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' : 'hover:border-slate-300 dark:hover:border-slate-600'
+          isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' : 'hover:border-[color:var(--fc-surface-card-border)]'
         }`}
         onClick={() => onSelect(exercise.id)}
         onMouseEnter={() => setShowActions(true)}
@@ -127,7 +127,7 @@ export default function ExerciseCard({
         <CardContent className="p-6">
           <div className="flex items-center gap-4">
             {/* Exercise Image */}
-            <div className="relative w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-xl overflow-hidden flex-shrink-0">
+            <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0" style={{ background: "var(--fc-surface-sunken)" }}>
               {exercise.image_url ? (
                 <img 
                   src={exercise.image_url} 
@@ -136,7 +136,7 @@ export default function ExerciseCard({
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <IconComponent className="w-8 h-8 text-slate-400" />
+                  <IconComponent className="w-8 h-8 fc-text-dim" />
                 </div>
               )}
               
@@ -167,7 +167,7 @@ export default function ExerciseCard({
                     {exercise.name}
                   </h3>
                   <div className="flex items-center gap-2 mb-2">
-                    <IconComponent className="w-4 h-4 text-slate-400" />
+                    <IconComponent className="w-4 h-4 fc-text-dim" />
                     <span className={`text-sm ${theme.textSecondary}`}>
                       {exercise.category}
                     </span>
@@ -189,7 +189,7 @@ export default function ExerciseCard({
                 </p>
               )}
 
-              <div className="flex items-center gap-4 text-xs text-slate-500">
+              <div className="flex items-center gap-4 text-xs fc-text-dim">
                 <span>Muscles: {exercise.muscle_groups.slice(0, 3).join(', ')}</span>
                 <span>Equipment: {exercise.equipment.join(', ')}</span>
                 <div className="flex items-center gap-1">
@@ -218,7 +218,7 @@ export default function ExerciseCard({
                 {exercise.is_public ? (
                   <Eye className="w-4 h-4 text-green-600" />
                 ) : (
-                  <EyeOff className="w-4 h-4 text-slate-400" />
+                  <EyeOff className="w-4 h-4 fc-text-dim" />
                 )}
               </Button>
               <Button
@@ -253,14 +253,14 @@ export default function ExerciseCard({
   return (
     <Card 
       className={`${theme.card} ${theme.shadow} rounded-2xl border-2 hover:shadow-lg transition-all duration-300 cursor-pointer ${
-        isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' : 'hover:border-slate-300 dark:hover:border-slate-600'
+        isSelected ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' : 'hover:border-[color:var(--fc-surface-card-border)]'
       }`}
       onClick={() => onSelect(exercise.id)}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
       {/* Exercise Image/Video */}
-      <div className="relative h-48 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-t-2xl overflow-hidden">
+      <div className="relative h-48 rounded-t-2xl overflow-hidden" style={{ background: "var(--fc-surface-sunken)" }}>
         {exercise.image_url ? (
           <img 
             src={exercise.image_url} 
@@ -269,7 +269,7 @@ export default function ExerciseCard({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <IconComponent className="w-16 h-16 text-slate-400" />
+            <IconComponent className="w-16 h-16 fc-text-dim" />
           </div>
         )}
         
@@ -314,12 +314,12 @@ export default function ExerciseCard({
               e.stopPropagation()
               onToggleVisibility(exercise.id, exercise.is_public)
             }}
-            className="p-2 bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800"
+            className="p-2 fc-surface opacity-80 hover:opacity-100"
           >
             {exercise.is_public ? (
               <Eye className="w-4 h-4 text-green-600" />
             ) : (
-              <EyeOff className="w-4 h-4 text-slate-400" />
+              <EyeOff className="w-4 h-4 fc-text-dim" />
             )}
           </Button>
         </div>
@@ -351,7 +351,7 @@ export default function ExerciseCard({
               {exercise.name}
             </h3>
             <div className="flex items-center gap-2">
-              <IconComponent className="w-4 h-4 text-slate-400" />
+              <IconComponent className="w-4 h-4 fc-text-dim" />
               <span className={`text-sm ${theme.textSecondary}`}>
                 {exercise.category}
               </span>
@@ -386,7 +386,7 @@ export default function ExerciseCard({
         </div>
 
         {/* Stats */}
-        <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="flex items-center justify-between text-xs fc-text-dim">
           <div className="flex items-center gap-1">
             <Users className="w-3 h-3" />
             <span>{exercise.usage_count || 0}</span>
@@ -402,7 +402,7 @@ export default function ExerciseCard({
         </div>
 
         {/* Quick Actions */}
-        <div className={`flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700 transition-opacity duration-200 ${
+        <div className={`flex items-center gap-2 pt-2 border-t border-[color:var(--fc-surface-card-border)] transition-opacity duration-200 ${
           showActions ? 'opacity-100' : 'opacity-0'
         }`}>
           <Button

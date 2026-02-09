@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
@@ -503,28 +504,31 @@ export default function CoachScheduling() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen">
-        <div className="relative px-6 pb-16 pt-10">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <GlassCard className="p-6 md:p-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-3">
-                  <Badge className="fc-badge fc-badge-strong w-fit">Scheduling Console</Badge>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg">
-                      <Calendar className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                        Session Scheduling
-                      </h1>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        Configure availability, session types, and calendar view.
-                      </p>
-                    </div>
+        <div className="relative px-6 md:px-10 pb-24 pt-10">
+          <div className="max-w-6xl mx-auto space-y-6">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-6">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center shrink-0">
+                    <CalendarIcon className="w-6 h-6 fc-text-primary" />
                   </div>
+                  <span className="text-sm font-bold uppercase tracking-widest fc-text-dim">Coach Portal</span>
                 </div>
+                <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Schedule & Capacity</h1>
               </div>
-            </GlassCard>
+              <div className="flex gap-3">
+                <Link href="/coach/availability">
+                  <Button variant="outline" className="fc-btn fc-btn-ghost rounded-xl">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Availability Settings
+                  </Button>
+                </Link>
+                <Button className="fc-btn fc-btn-primary rounded-xl">
+                  <Plus className="w-5 h-5 mr-2" />
+                  Quick Block
+                </Button>
+              </div>
+            </header>
 
             <GlassCard className="p-5">
               <div className="flex flex-col lg:flex-row gap-4">

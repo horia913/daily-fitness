@@ -23,9 +23,7 @@ export function LoadingSkeleton({
   const { isDark } = useTheme()
 
   const baseStyles = {
-    background: isDark
-      ? 'linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%)'
-      : 'linear-gradient(90deg, rgba(0,0,0,0.03) 25%, rgba(0,0,0,0.06) 50%, rgba(0,0,0,0.03) 75%)',
+    background: `linear-gradient(90deg, color-mix(in srgb, var(--fc-text-primary) 5%, transparent) 25%, color-mix(in srgb, var(--fc-text-primary) 12%, transparent) 50%, color-mix(in srgb, var(--fc-text-primary) 5%, transparent) 75%)`,
     backgroundSize: '200% 100%',
     animation: 'skeleton-loading 1.5s ease-in-out infinite',
     borderRadius: variant === 'circle' ? '50%' : variant === 'card' ? '12px' : '4px',

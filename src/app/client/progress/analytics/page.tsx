@@ -6,10 +6,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
+  BarChart3,
   TrendingUp,
   TrendingDown,
   Dumbbell,
@@ -50,7 +50,8 @@ function AnalyticsPageContent() {
   const [strengthData, setStrengthData] = useState<StrengthData[]>([]);
   const [bodyComposition, setBodyComposition] = useState<BodyCompositionData[]>([]);
   const [goalCompletion, setGoalCompletion] = useState({ completed: 0, total: 0 });
-  
+  const [timeRange, setTimeRange] = useState<"7D" | "30D" | "90D" | "ALL">("30D");
+
   // Modal state
   const [showStrengthModal, setShowStrengthModal] = useState(false);
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState("");
@@ -511,55 +512,70 @@ function AnalyticsPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
-        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <Link href="/client/progress">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-8 sm:px-6 lg:px-10 fc-page">
+        <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-10">
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
+                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
+                </Link>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-domain-workouts)]/20 text-[color:var(--fc-domain-workouts)] shrink-0">
+                    <BarChart3 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 text-[color:var(--fc-domain-workouts)] mb-1">
+                      <BarChart3 className="w-4 h-4" />
+                      <span className="text-xs font-bold tracking-[0.2em] uppercase">Performance</span>
+                    </div>
+                    <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                      Analytics <span className="text-[color:var(--fc-text-dim)]">Overview</span>
+                    </h1>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex bg-[color:var(--fc-glass-highlight)] p-1 rounded-2xl border border-[color:var(--fc-glass-border)] overflow-x-auto">
+                  {(["7D", "30D", "90D", "ALL"] as const).map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      onClick={() => setTimeRange(range)}
+                      className={`px-4 sm:px-6 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                        timeRange === range
+                          ? "fc-surface fc-text-primary shadow-sm"
+                          : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
+                      }`}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="fc-btn fc-btn-ghost h-10 w-10"
+                  className="fc-btn fc-btn-primary shrink-0"
+                  type="button"
+                  onClick={() => setShowStrengthModal(true)}
                 >
-                  <ArrowLeft className="h-5 w-5" />
+                  <Search className="mr-2 h-4 w-4" />
+                  Explore Exercises
                 </Button>
-              </Link>
-              <div>
-                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                  Analytics
-                </span>
-                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                  Progress Insights
-                </h1>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  Track your fitness progress with detailed trends.
-                </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                className="fc-btn fc-btn-primary"
-                type="button"
-                onClick={() => setShowStrengthModal(true)}
-              >
-                <Search className="mr-2 h-4 w-4" />
-                Explore Exercises
-              </Button>
-            </div>
           </div>
-        </GlassCard>
+        </div>
 
         {loading ? (
-          <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12 text-center">
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[color:var(--fc-accent-purple)]"></div>
             <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
               Loading analytics...
             </p>
-          </GlassCard>
+          </div>
         ) : (
           <div className="space-y-8">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
                 <div className="flex items-center justify-between">
                   <Calendar className="h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -572,8 +588,8 @@ function AnalyticsPageContent() {
                 <p className="text-sm text-[color:var(--fc-text-dim)]">
                   Workouts logged
                 </p>
-              </GlassCard>
-              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+              </div>
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
                 <div className="flex items-center justify-between">
                   <Target className="h-5 w-5 text-[color:var(--fc-status-success)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -586,8 +602,8 @@ function AnalyticsPageContent() {
                 <p className="text-sm text-[color:var(--fc-text-dim)]">
                   {goalCompletion.completed} of {goalCompletion.total} completed
                 </p>
-              </GlassCard>
-              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+              </div>
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
                 <div className="flex items-center justify-between">
                   <Scale className="h-5 w-5 text-[color:var(--fc-domain-meals)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -602,8 +618,8 @@ function AnalyticsPageContent() {
                     ? `${latestBodyFat}% body fat`
                     : "Body composition"}
                 </p>
-              </GlassCard>
-              <GlassCard elevation={1} className="fc-glass fc-card p-4">
+              </div>
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
                 <div className="flex items-center justify-between">
                   <Dumbbell className="h-5 w-5 text-[color:var(--fc-domain-workouts)]" />
                   <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
@@ -616,10 +632,10 @@ function AnalyticsPageContent() {
                 <p className="text-sm text-[color:var(--fc-text-dim)]">
                   Exercises tracked
                 </p>
-              </GlassCard>
+              </div>
             </div>
             {/* Workout Frequency Chart */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
               <div className="mb-6 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 shadow-[0_10px_20px_rgba(59,130,246,0.25)]">
                   <Calendar className="h-6 w-6 text-white" />
@@ -672,15 +688,13 @@ function AnalyticsPageContent() {
                   No workout data available
                 </p>
               )}
-            </GlassCard>
+            </div>
 
             {/* Strength Progress Charts */}
             {strengthByExercise.size > 0 && (
-              <GlassCard
-                elevation={2}
-                className="fc-glass fc-card p-6 transition-all hover:-translate-y-1 hover:shadow-2xl"
-                pressable={true}
-                onPress={() => setShowStrengthModal(true)}
+              <div
+                className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 transition-all hover:-translate-y-1 hover:shadow-2xl cursor-pointer"
+                onClick={() => setShowStrengthModal(true)}
               >
                 <div className="mb-6 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 shadow-[0_10px_20px_rgba(249,115,22,0.3)]">
@@ -752,12 +766,12 @@ function AnalyticsPageContent() {
                     );
                   })}
                 </div>
-              </GlassCard>
+              </div>
             )}
 
             {/* Body Composition Chart */}
             {bodyComposition.length > 0 ? (
-              <GlassCard elevation={2} className="fc-glass fc-card p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
                 <div className="mb-6 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_10px_20px_rgba(16,185,129,0.3)]">
                     <Scale className="h-6 w-6 text-white" />
@@ -829,9 +843,9 @@ function AnalyticsPageContent() {
                     </div>
                   </div>
                 )}
-              </GlassCard>
+              </div>
             ) : (
-              <GlassCard elevation={2} className="fc-glass fc-card p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
                 <div className="mb-6 flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_10px_20px_rgba(16,185,129,0.3)]">
                     <Scale className="h-6 w-6 text-white" />
@@ -848,11 +862,11 @@ function AnalyticsPageContent() {
                 <p className="py-12 text-center text-sm text-[color:var(--fc-text-dim)]">
                   No body metrics data available
                 </p>
-              </GlassCard>
+              </div>
             )}
 
             {/* Goal Completion */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
               <div className="mb-6 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-[0_10px_20px_rgba(124,58,237,0.3)]">
                   <Target className="h-6 w-6 text-white" />
@@ -887,7 +901,7 @@ function AnalyticsPageContent() {
                   />
                 </div>
               </div>
-            </GlassCard>
+            </div>
           </div>
         )}
       </div>
@@ -976,7 +990,7 @@ function AnalyticsPageContent() {
 
           {/* Selected Exercise Chart */}
           {selectedExercise && (
-            <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+            <div className="mt-8 pt-8 border-t border-[color:var(--fc-surface-card-border)]">
               {loadingExerciseData ? (
                 <div className="py-12 text-center">
                   <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-orange-500"></div>

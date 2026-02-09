@@ -8,8 +8,6 @@ import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { TabataCircuitTimerModal } from "../ui/TabataCircuitTimerModal";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { GlassCard } from "@/components/ui/GlassCard";
-
 export function TabataExecutor({
   block,
   onBlockComplete,
@@ -140,17 +138,17 @@ export function TabataExecutor({
       {tabataSets.length > 0 ? (
         <div className="space-y-4">
           {tabataSets.map((set: any, setIndex: number) => (
-            <GlassCard
+            <div
               key={setIndex}
-              elevation={1}
-              className="p-4"
+              className="p-4 rounded-xl"
+              style={{ background: "var(--fc-surface-sunken)" }}
             >
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                <h3 className="text-lg font-semibold fc-text-primary">
                   Set {setIndex + 1}
                 </h3>
                 {set.rest_between_sets && (
-                  <div className="text-sm text-slate-600 dark:text-slate-400">
+                  <div className="text-sm fc-text-dim">
                     Rest After: {set.rest_between_sets}s
                   </div>
                 )}
@@ -163,13 +161,14 @@ export function TabataExecutor({
                   return (
                   <div
                     key={exIndex}
-                    className="bg-white dark:bg-slate-700 rounded-lg p-3 border border-slate-200 dark:border-slate-600"
+                    className="rounded-lg p-3 border border-[color:var(--fc-surface-card-border)]"
+                    style={{ background: "var(--fc-surface-card)" }}
                   >
                     <div className="flex flex-col gap-2">
-                      <div className="font-medium text-slate-900 dark:text-slate-100">
+                      <div className="font-medium fc-text-primary">
                         {exerciseLookup[exercise.exercise_id]?.name || "Exercise"}
                       </div>
-                      <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                      <div className="flex flex-wrap gap-4 text-sm fc-text-dim">
                         {exercise.work_seconds && (
                           <span>Work: {exercise.work_seconds}s</span>
                         )}
@@ -192,11 +191,11 @@ export function TabataExecutor({
                 );
                 })}
               </div>
-            </GlassCard>
+            </div>
           ))}
         </div>
       ) : (
-        <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+        <div className="text-center py-8 fc-text-dim">
           No exercises configured for this Tabata block.
         </div>
       )}
@@ -205,7 +204,8 @@ export function TabataExecutor({
       {tabataSets.length > 0 && (
         <Button
           onClick={() => setShowTimerModal(true)}
-          className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white text-lg py-4"
+          variant="fc-primary"
+          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
         >
           <Play className="w-5 h-5 mr-2" />
           Open Timer
@@ -223,7 +223,8 @@ export function TabataExecutor({
         console.log("TabataExecutor: Complete Block button clicked");
         handleComplete();
       }}
-      className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-lg py-4"
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
     >
       <CheckCircle className="w-5 h-5 mr-2" />
       Complete Block

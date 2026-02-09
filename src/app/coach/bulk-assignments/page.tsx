@@ -7,7 +7,6 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Link from "next/link";
 import {
   Plus,
   Search,
@@ -195,7 +195,7 @@ export default function CoachBulkAssignmentsPage() {
       case "meal_plan":
         return "bg-gradient-to-r from-green-500 to-green-600";
       default:
-        return "bg-gradient-to-r from-slate-500 to-slate-600";
+        return "bg-gradient-to-r from-gray-500 to-gray-600";
     }
   };
 
@@ -346,9 +346,9 @@ export default function CoachBulkAssignmentsPage() {
       case "pending":
         return "bg-yellow-100 text-yellow-800";
       case "cancelled":
-        return "bg-slate-100 text-slate-800";
+        return "bg-[color:var(--fc-surface-sunken)] fc-text-primary";
       default:
-        return "bg-slate-100 text-slate-800";
+        return "bg-[color:var(--fc-surface-sunken)] fc-text-primary";
     }
   };
 
@@ -377,9 +377,9 @@ export default function CoachBulkAssignmentsPage() {
             <div className="max-w-7xl mx-auto space-y-8">
               <div className={`${theme.card} ${theme.shadow} rounded-2xl p-8`}>
                 <div className="animate-pulse">
-                  <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-xl mb-4"></div>
-                  <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-3/4 mb-2"></div>
-                  <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-1/2"></div>
+                  <div className="h-8 rounded-xl mb-4" style={{ background: "var(--fc-surface-sunken)" }}></div>
+                  <div className="h-4 rounded-lg w-3/4 mb-2" style={{ background: "var(--fc-surface-sunken)" }}></div>
+                  <div className="h-4 rounded-lg w-1/2" style={{ background: "var(--fc-surface-sunken)" }}></div>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -389,9 +389,9 @@ export default function CoachBulkAssignmentsPage() {
                     className={`h-32 ${theme.card} ${theme.shadow} rounded-2xl`}
                   >
                     <div className="animate-pulse p-6">
-                      <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg mb-3"></div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-3/4 mb-2"></div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-1/2"></div>
+                      <div className="h-6 rounded-lg mb-3" style={{ background: "var(--fc-surface-sunken)" }}></div>
+                      <div className="h-4 rounded-lg w-3/4 mb-2" style={{ background: "var(--fc-surface-sunken)" }}></div>
+                      <div className="h-4 rounded-lg w-1/2" style={{ background: "var(--fc-surface-sunken)" }}></div>
                     </div>
                   </div>
                 ))}
@@ -403,10 +403,10 @@ export default function CoachBulkAssignmentsPage() {
                     className={`h-48 ${theme.card} ${theme.shadow} rounded-2xl`}
                   >
                     <div className="animate-pulse p-6">
-                      <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg mb-3"></div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-3/4 mb-2"></div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-1/2 mb-4"></div>
-                      <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full w-full"></div>
+                      <div className="h-6 rounded-lg mb-3" style={{ background: "var(--fc-surface-sunken)" }}></div>
+                      <div className="h-4 rounded-lg w-3/4 mb-2" style={{ background: "var(--fc-surface-sunken)" }}></div>
+                      <div className="h-4 rounded-lg w-1/2 mb-4" style={{ background: "var(--fc-surface-sunken)" }}></div>
+                      <div className="h-2 rounded-full w-full" style={{ background: "var(--fc-surface-sunken)" }}></div>
                     </div>
                   </div>
                 ))}
@@ -423,32 +423,24 @@ export default function CoachBulkAssignmentsPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen">
-        <div className="relative px-6 pb-16 pt-10">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <GlassCard className="p-6 md:p-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-3">
-                  <Badge className="fc-badge fc-badge-strong w-fit">Bulk Ops</Badge>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg">
-                      <Users className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                        Bulk Assignment Tools
-                      </h1>
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        Assign workouts, programs, and meal plans at scale.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <Button onClick={handleCreateBulkAssignment} className="fc-btn fc-btn-primary">
-                  <Plus className="w-5 h-5 mr-2" />
-                  Create Bulk Assignment
-                </Button>
+        <div className="relative px-6 pb-24 pt-10">
+          <div className="max-w-3xl mx-auto space-y-10">
+            <header className="flex items-center gap-4 mb-6">
+              <Link href="/coach" className="fc-glass rounded-2xl border border-[color:var(--fc-glass-border)] p-3 hover:bg-white/5 transition-colors shrink-0">
+                <ChevronLeft className="w-6 h-6 fc-text-primary" />
+              </Link>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Bulk Assignment</h1>
+                <p className="text-sm fc-text-dim mt-0.5">Scale your impact across multiple clients</p>
               </div>
-            </GlassCard>
+            </header>
+
+            <div className="flex justify-end">
+              <Button onClick={handleCreateBulkAssignment} className="fc-btn fc-btn-primary rounded-xl">
+                <Plus className="w-5 h-5 mr-2" />
+                Create Bulk Assignment
+              </Button>
+            </div>
 
             {/* Enhanced Stats Overview */}
             {stats && (
@@ -633,7 +625,7 @@ export default function CoachBulkAssignmentsPage() {
                         onClick={() =>
                           setViewMode(viewMode === "grid" ? "list" : "grid")
                         }
-                        className={`${theme.border} ${theme.text} rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all`}
+                        className={`${theme.border} ${theme.text} rounded-xl hover:bg-[color:var(--fc-surface-sunken)] transition-all`}
                       >
                         {viewMode === "grid" ? (
                           <List className="w-4 h-4" />
@@ -748,7 +740,7 @@ export default function CoachBulkAssignmentsPage() {
                           {assignment.total_items} items
                         </span>
                       </div>
-                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3">
+                      <div className="w-full rounded-full h-3" style={{ background: "var(--fc-surface-sunken)" }}>
                         <div
                           className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500"
                           style={{
@@ -784,11 +776,11 @@ export default function CoachBulkAssignmentsPage() {
                           Failed
                         </div>
                       </div>
-                      <div className="text-center p-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900/20 dark:to-slate-800/20 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <div className="text-2xl font-bold text-slate-600 dark:text-slate-400">
+                      <div className="text-center p-4 rounded-xl border border-[color:var(--fc-surface-card-border)]" style={{ background: "var(--fc-surface-sunken)" }}>
+                        <div className="text-2xl font-bold fc-text-dim">
                           {assignment.total_items - assignment.processed_items}
                         </div>
-                        <div className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                        <div className="text-xs fc-text-dim font-medium">
                           Pending
                         </div>
                       </div>
@@ -804,7 +796,7 @@ export default function CoachBulkAssignmentsPage() {
                           {getSuccessRate(assignment).toFixed(1)}%
                         </span>
                       </div>
-                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                      <div className="w-full rounded-full h-2" style={{ background: "var(--fc-surface-sunken)" }}>
                         <div
                           className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-500"
                           style={{

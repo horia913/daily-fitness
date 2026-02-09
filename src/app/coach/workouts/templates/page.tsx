@@ -10,7 +10,7 @@ import WorkoutTemplateService, {
 } from "@/lib/workoutTemplateService";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
+
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +41,7 @@ import WorkoutTemplateCard from "@/components/features/workouts/WorkoutTemplateC
 
 export default function WorkoutTemplatesPage() {
   const { user } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { getSemanticColor, performanceSettings } = useTheme();
   const router = useRouter();
 
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
@@ -323,16 +323,11 @@ export default function WorkoutTemplatesPage() {
     return (
       <AnimatedBackground>
         <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
-          <GlassCard elevation={2} className="p-6 max-w-md">
-            <p
-              className="text-center"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-              }}
-            >
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 max-w-md">
+            <p className="text-center fc-text-dim">
               Please sign in to view workout templates.
             </p>
-          </GlassCard>
+          </div>
         </div>
       </AnimatedBackground>
     );
@@ -345,35 +340,29 @@ export default function WorkoutTemplatesPage() {
         <div className="relative z-10 min-h-screen p-4 sm:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="animate-pulse space-y-6">
-              <GlassCard elevation={1} className="p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
                 <div
                   className="h-8 rounded mb-4"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.1)",
+                    background: "var(--fc-surface-sunken)",
                   }}
                 ></div>
                 <div
                   className="h-4 rounded w-2/3"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.1)",
+                    background: "var(--fc-surface-sunken)",
                   }}
                 ></div>
-              </GlassCard>
+              </div>
               {[...Array(3)].map((_, i) => (
-                <GlassCard key={i} elevation={2} className="p-6">
+                <div key={i} className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
                   <div
                     className="h-24 rounded"
                     style={{
-                      background: isDark
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.1)",
+                      background: "var(--fc-surface-sunken)",
                     }}
                   ></div>
-                </GlassCard>
+                </div>
               ))}
             </div>
           </div>
@@ -387,10 +376,39 @@ export default function WorkoutTemplatesPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
 
-        <div className="relative z-10 min-h-screen p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+        <div className="relative z-10 min-h-screen pb-24">
+          {/* Sticky search bar */}
+          <nav className="sticky top-0 z-50 fc-glass border-b border-[color:var(--fc-glass-border)] backdrop-blur-md px-4 py-4 sm:px-6">
+            <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-4 items-center">
+              <div className="relative w-full md:flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 fc-text-dim pointer-events-none" />
+                <Input
+                  type="text"
+                  placeholder="Search templates..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full h-12 pl-12 pr-4 fc-glass border border-[color:var(--fc-glass-border)] rounded-xl fc-text-primary placeholder:fc-text-dim focus:ring-2 focus:ring-[color:var(--fc-domain-workouts)]/50"
+                />
+              </div>
+              <div className="flex gap-2 w-full md:w-auto overflow-x-auto scrollbar-hide">
+                <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
+                  <SelectTrigger className="h-12 fc-glass border border-[color:var(--fc-glass-border)] rounded-xl w-[180px]">
+                    <SelectValue placeholder="Difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="beginner">Beginner</SelectItem>
+                    <SelectItem value="intermediate">Intermediate</SelectItem>
+                    <SelectItem value="advanced">Advanced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </nav>
+
+          <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 space-y-6">
             {/* Header */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
                   <div
@@ -439,18 +457,16 @@ export default function WorkoutTemplatesPage() {
                   </Link>
                 </div>
               </div>
-            </GlassCard>
+            </div>
 
             {/* Stats Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <GlassCard elevation={2} className="fc-glass fc-card p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
                 <div className="flex items-center gap-4">
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center"
                     style={{
-                      background: isDark
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
+                      background: "var(--fc-surface-sunken)",
                     }}
                   >
                     <Dumbbell
@@ -462,23 +478,21 @@ export default function WorkoutTemplatesPage() {
                     <AnimatedNumber
                       value={templates.length}
                       className="text-2xl font-bold"
-                      color={isDark ? "#fff" : "#1A1A1A"}
+                      color="var(--fc-text-primary)"
                     />
                     <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Total Templates
                     </p>
                   </div>
                 </div>
-              </GlassCard>
+              </div>
 
-              <GlassCard elevation={2} className="fc-glass fc-card p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
                 <div className="flex items-center gap-4">
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center"
                     style={{
-                      background: isDark
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
+                      background: "var(--fc-surface-sunken)",
                     }}
                   >
                     <Users
@@ -493,23 +507,21 @@ export default function WorkoutTemplatesPage() {
                         0
                       )}
                       className="text-2xl font-bold"
-                      color={isDark ? "#fff" : "#1A1A1A"}
+                      color="var(--fc-text-primary)"
                     />
                     <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Active Assignments
                     </p>
                   </div>
                 </div>
-              </GlassCard>
+              </div>
 
-              <GlassCard elevation={2} className="fc-glass fc-card p-6">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
                 <div className="flex items-center gap-4">
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center"
                     style={{
-                      background: isDark
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
+                      background: "var(--fc-surface-sunken)",
                     }}
                   >
                     <BarChart3
@@ -521,27 +533,22 @@ export default function WorkoutTemplatesPage() {
                     <AnimatedNumber
                       value={filteredAndSortedTemplates.length}
                       className="text-2xl font-bold"
-                      color={isDark ? "#fff" : "#1A1A1A"}
+                      color="var(--fc-text-primary)"
                     />
                     <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Showing Now
                     </p>
                   </div>
                 </div>
-              </GlassCard>
+              </div>
             </div>
 
             {/* Filters and Search */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-4 sm:p-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1 relative">
                   <Search
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.5)"
-                        : "rgba(0,0,0,0.5)",
-                    }}
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 fc-text-dim"
                   />
                   <Input
                     placeholder="Search templates..."
@@ -609,16 +616,13 @@ export default function WorkoutTemplatesPage() {
                   </Button>
                 </div>
               </div>
-            </GlassCard>
+            </div>
 
             {/* Templates List */}
             {filteredAndSortedTemplates.length === 0 ? (
-              <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12 text-center">
                 <Dumbbell
-                  className="w-24 h-24 mx-auto mb-6"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                  }}
+                  className="w-24 h-24 mx-auto mb-6 fc-text-dim"
                 />
                 <h3 className="text-2xl font-bold mb-3 text-[color:var(--fc-text-primary)]">
                   {searchTerm ||
@@ -640,7 +644,7 @@ export default function WorkoutTemplatesPage() {
                     Create Your First Template
                   </Button>
                 </Link>
-              </GlassCard>
+              </div>
             ) : (
               <div
                 className={
@@ -699,20 +703,15 @@ export default function WorkoutTemplatesPage() {
             backdropFilter: "blur(4px)",
           }}
         >
-          <GlassCard elevation={3} className="max-w-lg w-full">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] max-w-lg w-full">
             <div
               className="p-6"
               style={{
-                borderBottom: `1px solid ${
-                  isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                }`,
+                borderBottom: "1px solid var(--fc-surface-card-border)",
               }}
             >
               <div className="flex items-center justify-between">
-                <h2
-                  className="text-xl font-bold"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
+                <h2 className="text-xl font-bold fc-text-primary">
                   Assign Workout Template
                 </h2>
                 <button
@@ -723,15 +722,10 @@ export default function WorkoutTemplatesPage() {
                   }}
                   className="p-2 rounded-lg transition-all hover:scale-110"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
+                    background: "var(--fc-surface-sunken)",
                   }}
                 >
-                  <X
-                    className="w-5 h-5"
-                    style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                  />
+                  <X className="w-5 h-5 fc-text-primary" />
                 </button>
               </div>
             </div>
@@ -741,12 +735,7 @@ export default function WorkoutTemplatesPage() {
               <div className="mb-4">
                 <div className="relative">
                   <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.5)"
-                        : "rgba(0,0,0,0.5)",
-                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 fc-text-dim"
                   />
                   <Input
                     type="text"
@@ -777,14 +766,7 @@ export default function WorkoutTemplatesPage() {
               {/* Scrollable client list */}
               <div className="space-y-3 max-h-[240px] overflow-y-auto mb-4">
                 {filteredClients.length === 0 ? (
-                  <div
-                    className="text-center py-8 text-sm"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.5)"
-                        : "rgba(0,0,0,0.5)",
-                    }}
-                  >
+                  <div className="text-center py-8 text-sm fc-text-dim">
                     {clientSearchQuery.trim()
                       ? "No clients found matching your search"
                       : "No active clients available"}
@@ -807,35 +789,21 @@ export default function WorkoutTemplatesPage() {
                         style={{
                           background: selected
                             ? `${getSemanticColor("success").primary}10`
-                            : isDark
-                            ? "rgba(255,255,255,0.05)"
-                            : "rgba(0,0,0,0.05)",
+                            : "var(--fc-surface-sunken)",
                           border: `2px solid ${
                             selected
                               ? getSemanticColor("success").primary
-                              : isDark
-                              ? "rgba(255,255,255,0.1)"
-                              : "rgba(0,0,0,0.1)"
+                              : "var(--fc-surface-card-border)"
                           }`,
                         }}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div
-                              className="font-semibold"
-                              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                            >
+                            <div className="font-semibold fc-text-primary">
                               {c.profiles?.first_name || ""}{" "}
                               {c.profiles?.last_name || ""}
                             </div>
-                            <div
-                              className="text-sm"
-                              style={{
-                                color: isDark
-                                  ? "rgba(255,255,255,0.6)"
-                                  : "rgba(0,0,0,0.6)",
-                              }}
-                            >
+                            <div className="text-sm fc-text-dim">
                               {c.profiles?.email || ""}
                             </div>
                           </div>
@@ -844,9 +812,7 @@ export default function WorkoutTemplatesPage() {
                             style={{
                               background: selected
                                 ? getSemanticColor("success").primary
-                                : isDark
-                                ? "rgba(255,255,255,0.2)"
-                                : "rgba(0,0,0,0.2)",
+                                : "var(--fc-surface-sunken)",
                             }}
                           >
                             {selected && (
@@ -871,10 +837,7 @@ export default function WorkoutTemplatesPage() {
               </div>
 
               <div className="flex items-center gap-3 mb-4">
-                <label
-                  className="text-sm font-medium"
-                  style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                >
+                <label className="text-sm font-medium fc-text-primary">
                   Start date:
                 </label>
                 <Input
@@ -888,9 +851,7 @@ export default function WorkoutTemplatesPage() {
             <div
               className="p-4 flex items-center justify-end gap-3"
               style={{
-                borderTop: `1px solid ${
-                  isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                }`,
+                borderTop: "1px solid var(--fc-surface-card-border)",
               }}
             >
               <Button
@@ -920,7 +881,7 @@ export default function WorkoutTemplatesPage() {
                 Assign
               </Button>
             </div>
-          </GlassCard>
+          </div>
         </div>
       )}
     </>

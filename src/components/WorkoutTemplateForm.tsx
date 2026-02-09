@@ -245,9 +245,9 @@ export default function WorkoutTemplateForm({
     };
 
     return (
-      <div className={className}>
-        <div className="flex items-center justify-between mb-2">
-          <Label className={`text-sm font-medium ${theme.text}`}>{label}</Label>
+      <div className={`mt-1 ${className || ""}`}>
+        <div className="flex items-center justify-between mb-2.5 gap-2">
+          <Label className={`text-sm font-medium ${theme.text} shrink-0`}>{label}</Label>
           <LoadPercentageWeightToggle
             value={currentMode}
             onValueChange={handleToggle}
@@ -2759,7 +2759,7 @@ export default function WorkoutTemplateForm({
               className={`p-2 rounded-xl transition-all duration-200 ${
                 theme.textSecondary
               } hover:${theme.text} hover:${
-                isDark ? "bg-slate-700" : "bg-slate-100"
+                isDark ? "bg-[color:var(--fc-surface-sunken)]" : "bg-[color:var(--fc-surface-sunken)]"
               }`}
               aria-label="Close modal"
             >
@@ -2777,7 +2777,7 @@ export default function WorkoutTemplateForm({
         >
           <form
             onSubmit={handleSubmit}
-            className={`space-y-2 sm:space-y-3 ${isPage ? "" : "pt-3"}`}
+            className={`space-y-4 sm:space-y-5 ${isPage ? "" : "pt-3"}`}
           >
             {/* Enhanced Schema Status Banner */}
             <div
@@ -2803,8 +2803,8 @@ export default function WorkoutTemplateForm({
             <Card
               className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}
             >
-              <CardHeader className="p-2">
-                <div className="flex items-center gap-2">
+              <CardHeader className="px-3 py-4 sm:p-6">
+                <div className="flex items-center gap-3">
                   <div
                     className={`p-2 rounded-xl bg-gradient-to-br from-purple-400 via-purple-500 to-purple-600 shadow-lg`}
                   >
@@ -2815,7 +2815,7 @@ export default function WorkoutTemplateForm({
                   </CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="p-2 pt-0 space-y-2">
+              <CardContent className="px-3 pb-4 pt-0 sm:px-6 sm:pb-6 space-y-4">
                 <div className="space-y-2">
                   <Label
                     htmlFor="name"
@@ -2916,7 +2916,7 @@ export default function WorkoutTemplateForm({
                           </SelectItem>
                         ))
                       ) : (
-                        <div className="px-2 py-1.5 text-sm text-slate-500">
+                        <div className="px-2 py-1.5 text-sm fc-text-dim">
                           No categories available. Create categories in the Categories page.
                         </div>
                       )}
@@ -3057,7 +3057,7 @@ export default function WorkoutTemplateForm({
                       className={`p-2 rounded-xl transition-all duration-200 ${
                         theme.textSecondary
                       } hover:${theme.text} hover:${
-                        isDark ? "bg-slate-700" : "bg-slate-100"
+                        isDark ? "bg-[color:var(--fc-surface-sunken)]" : "bg-[color:var(--fc-surface-sunken)]"
                       }`}
                     >
                       {showPreview ? (
@@ -3079,8 +3079,8 @@ export default function WorkoutTemplateForm({
                         <div
                           className={`p-6 border ${theme.border} rounded-2xl ${
                             isDark
-                              ? "bg-slate-800"
-                              : "bg-gradient-to-br from-slate-50 to-slate-100"
+                              ? "bg-[color:var(--fc-surface-sunken)]"
+                              : "bg-[color:var(--fc-surface-sunken)]"
                           }`}
                         >
                           <div className="space-y-4">
@@ -3100,7 +3100,7 @@ export default function WorkoutTemplateForm({
                               </div>
                               <div
                                 className={`flex items-center gap-1 px-3 py-1 rounded-xl ${
-                                  isDark ? "bg-slate-700" : "bg-white"
+                                  isDark ? "bg-[color:var(--fc-surface-card)]" : "bg-[color:var(--fc-surface-card)]"
                                 }`}
                               >
                                 <div
@@ -3131,7 +3131,7 @@ export default function WorkoutTemplateForm({
                             <div className="flex items-center gap-6">
                               <div
                                 className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
-                                  isDark ? "bg-slate-700" : "bg-white"
+                                  isDark ? "bg-[color:var(--fc-surface-card)]" : "bg-[color:var(--fc-surface-card)]"
                                 }`}
                               >
                                 <Clock
@@ -3145,7 +3145,7 @@ export default function WorkoutTemplateForm({
                               </div>
                               <div
                                 className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
-                                  isDark ? "bg-slate-700" : "bg-white"
+                                  isDark ? "bg-[color:var(--fc-surface-card)]" : "bg-[color:var(--fc-surface-card)]"
                                 }`}
                               >
                                 <Target
@@ -3161,7 +3161,7 @@ export default function WorkoutTemplateForm({
 
                             <div
                               className={`p-4 rounded-xl ${
-                                isDark ? "bg-slate-700" : "bg-white"
+                                isDark ? "bg-[color:var(--fc-surface-card)]" : "bg-[color:var(--fc-surface-card)]"
                               } border ${theme.border}`}
                             >
                               <div className="flex items-center gap-2 mb-2">
@@ -3186,7 +3186,7 @@ export default function WorkoutTemplateForm({
                                 return null;
                               })()}
                               {exercises.length > 0 ? (
-                                <div className="space-y-2">
+                                <div className="space-y-4">
                                   {exercises.map((exercise, index) => {
                                     console.log(
                                       "🔍 Rendering exercise:",
@@ -3201,8 +3201,8 @@ export default function WorkoutTemplateForm({
                                           theme.border
                                         } ${
                                           isDark
-                                            ? "bg-slate-600"
-                                            : "bg-slate-50"
+                                            ? "bg-[color:var(--fc-surface-sunken)]"
+                                            : "bg-[color:var(--fc-surface-sunken)]"
                                         }`}
                                       >
                                         <div className="flex items-center justify-between">
@@ -3423,7 +3423,7 @@ export default function WorkoutTemplateForm({
                                 >
                                   <div className="flex items-start gap-2">
                                     <div className="hidden sm:flex mt-4 cursor-grab active:cursor-grabbing flex-shrink-0">
-                                      <GripVertical className="w-5 h-5 text-slate-400" />
+                                      <GripVertical className="w-5 h-5 fc-text-dim" />
                                     </div>
                                     <div className="flex-1">
                                       <ExerciseBlockCard
@@ -3495,12 +3495,12 @@ export default function WorkoutTemplateForm({
               <Card
                 className={`${theme.card} fc-glass fc-card border ${theme.border} rounded-2xl`}
               >
-                <CardHeader className="p-6">
+                <CardHeader className="px-3 py-4 sm:p-6">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-3">
                       <div
                         className={`p-2 rounded-xl ${
-                          isDark ? "bg-slate-700" : "bg-green-100"
+                          isDark ? "bg-[color:var(--fc-surface-sunken)]" : "bg-green-100"
                         }`}
                       >
                         <Plus
@@ -3509,7 +3509,7 @@ export default function WorkoutTemplateForm({
                           }`}
                         />
                       </div>
-                      <CardTitle className={`text-xl font-bold ${theme.text}`}>
+                      <CardTitle className={`text-lg sm:text-xl font-bold ${theme.text}`}>
                         Add Exercise
                       </CardTitle>
                     </div>
@@ -3524,14 +3524,14 @@ export default function WorkoutTemplateForm({
                       className={`p-2 rounded-xl transition-all duration-200 ${
                         theme.textSecondary
                       } hover:${theme.text} hover:${
-                        isDark ? "bg-slate-700" : "bg-slate-100"
+                        isDark ? "bg-[color:var(--fc-surface-sunken)]" : "bg-[color:var(--fc-surface-sunken)]"
                       }`}
                     >
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="p-2 pt-0">
+                <CardContent className="px-3 pb-4 pt-0 sm:px-6 sm:pb-6">
                   <div className="space-y-6">
                     <div>
                       <div className="flex items-center justify-between mb-1">
@@ -3702,136 +3702,144 @@ export default function WorkoutTemplateForm({
 
                     {/* Dynamic form fields based on exercise type */}
                     {newExercise.exercise_type === "straight_set" && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label
-                              htmlFor="sets"
-                              className={`text-sm font-medium ${theme.text}`}
-                            >
-                              Sets
-                            </Label>
-                            <Input
-                              id="sets"
-                              type="number"
-                              value={
-                                newExercise.sets === "" ? "" : newExercise.sets
-                              }
-                              onChange={(e) =>
-                                setNewExercise({
-                                  ...newExercise,
-                                  sets: handleNumberChange(e.target.value, 0),
-                                })
-                              }
-                              min="1"
-                              className="mt-2 rounded-xl"
-                            />
-                          </div>
-                          <div>
-                            <Label
-                              htmlFor="reps"
-                              className={`text-sm font-medium ${theme.text}`}
-                            >
-                              Reps
-                            </Label>
-                            <Input
-                              id="reps"
-                              value={newExercise.reps}
-                              onChange={(e) =>
-                                setNewExercise({
-                                  ...newExercise,
-                                  reps: e.target.value,
-                                })
-                              }
-                              placeholder="e.g., 10-12"
-                              className="mt-2 rounded-xl"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label
-                              htmlFor="rest"
-                              className={`text-sm font-medium ${theme.text}`}
-                            >
-                              Rest (seconds)
-                            </Label>
-                            <Input
-                              id="rest"
-                              type="number"
-                              value={
-                                newExercise.rest_seconds === ""
-                                  ? ""
-                                  : newExercise.rest_seconds
-                              }
-                              onChange={(e) =>
-                                setNewExercise({
-                                  ...newExercise,
-                                  rest_seconds: handleNumberChange(
-                                    e.target.value,
-                                    0
-                                  ),
-                                })
-                              }
-                              min="0"
-                              className="mt-2 rounded-xl"
-                            />
-                          </div>
-                          <div>
-                            <Label
-                              htmlFor="rir"
-                              className={`text-sm font-medium ${theme.text}`}
-                            >
-                              RIR (Reps in Reserve)
-                            </Label>
-                            <Input
-                              id="rir"
-                              type="number"
-                              value={
-                                newExercise.rir === "" ? "" : newExercise.rir
-                              }
-                              onChange={(e) =>
-                                setNewExercise({
-                                  ...newExercise,
-                                  rir: handleNumberChange(e.target.value, 0),
-                                })
-                              }
-                              min="0"
-                              className="mt-2 rounded-xl"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label
-                            htmlFor="tempo"
-                            className={`text-sm font-medium ${theme.text}`}
+                      <div className="space-y-5">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                          <h4
+                            className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
-                            Tempo
-                          </Label>
-                          <Input
-                            id="tempo"
-                            value={newExercise.tempo}
-                            onChange={(e) =>
-                              setNewExercise({
-                                ...newExercise,
-                                tempo: e.target.value,
-                              })
-                            }
-                            placeholder="e.g., 2-0-1-0"
-                            className="mt-2 rounded-xl"
-                          />
-                          <p className={`text-xs ${theme.textSecondary} mt-1`}>
-                            Format: eccentric-pause-concentric-pause
-                          </p>
+                            <Dumbbell className="w-4 h-4 text-purple-600" />
+                            Straight Set Configuration
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                              <Label
+                                htmlFor="sets"
+                                className={`text-sm font-medium ${theme.text}`}
+                              >
+                                Sets
+                              </Label>
+                              <Input
+                                id="sets"
+                                type="number"
+                                value={
+                                  newExercise.sets === "" ? "" : newExercise.sets
+                                }
+                                onChange={(e) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    sets: handleNumberChange(e.target.value, 0),
+                                  })
+                                }
+                                min="1"
+                                className="mt-2 rounded-xl"
+                              />
+                            </div>
+                            <div>
+                              <Label
+                                htmlFor="reps"
+                                className={`text-sm font-medium ${theme.text}`}
+                              >
+                                Reps
+                              </Label>
+                              <Input
+                                id="reps"
+                                value={newExercise.reps}
+                                onChange={(e) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    reps: e.target.value,
+                                  })
+                                }
+                                placeholder="e.g., 10-12"
+                                className="mt-2 rounded-xl"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-5">
+                            <div>
+                              <Label
+                                htmlFor="rest"
+                                className={`text-sm font-medium ${theme.text}`}
+                              >
+                                Rest (seconds)
+                              </Label>
+                              <Input
+                                id="rest"
+                                type="number"
+                                value={
+                                  newExercise.rest_seconds === ""
+                                    ? ""
+                                    : newExercise.rest_seconds
+                                }
+                                onChange={(e) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    rest_seconds: handleNumberChange(
+                                      e.target.value,
+                                      0
+                                    ),
+                                  })
+                                }
+                                min="0"
+                                className="mt-2 rounded-xl"
+                              />
+                            </div>
+                            <div>
+                              <Label
+                                htmlFor="rir"
+                                className={`text-sm font-medium ${theme.text}`}
+                              >
+                                RIR
+                              </Label>
+                              <Input
+                                id="rir"
+                                type="number"
+                                value={
+                                  newExercise.rir === "" ? "" : newExercise.rir
+                                }
+                                onChange={(e) =>
+                                  setNewExercise({
+                                    ...newExercise,
+                                    rir: handleNumberChange(e.target.value, 0),
+                                  })
+                                }
+                                min="0"
+                                className="mt-2 rounded-xl"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-5">
+                            <Label
+                              htmlFor="tempo"
+                              className={`text-sm font-medium ${theme.text}`}
+                            >
+                              Tempo
+                            </Label>
+                            <Input
+                              id="tempo"
+                              value={newExercise.tempo}
+                              onChange={(e) =>
+                                setNewExercise({
+                                  ...newExercise,
+                                  tempo: e.target.value,
+                                })
+                              }
+                              placeholder="e.g., 2-0-1-0"
+                              className="mt-2 rounded-xl"
+                            />
+                            <p className={`text-xs ${theme.textSecondary} mt-1`}>
+                              Format: eccentric-pause-concentric-pause
+                            </p>
+                          </div>
                         </div>
                       </div>
                     )}
 
                     {newExercise.exercise_type === "superset" && (
                       <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
                             className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
@@ -3865,7 +3873,7 @@ export default function WorkoutTemplateForm({
                               className="mt-2"
                             />
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -3917,7 +3925,7 @@ export default function WorkoutTemplateForm({
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -3959,7 +3967,7 @@ export default function WorkoutTemplateForm({
                           </div>
 
                           {/* Load % / Weight Toggle Fields */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
                             {renderLoadWeightField(
                               newExercise.load_percentage,
                               newExercise.weight_kg,
@@ -4003,7 +4011,7 @@ export default function WorkoutTemplateForm({
 
                     {newExercise.exercise_type === "amrap" && (
                       <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
                             className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
@@ -4047,7 +4055,7 @@ export default function WorkoutTemplateForm({
 
                     {newExercise.exercise_type === "emom" && (
                       <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
                             className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
@@ -4206,7 +4214,7 @@ export default function WorkoutTemplateForm({
 
                     {newExercise.exercise_type === "tabata" && (
                       <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
                             className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
@@ -4369,7 +4377,7 @@ export default function WorkoutTemplateForm({
                               (set, setIndex) => (
                                 <div
                                   key={setIndex}
-                                  className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
+                                  className="px-3 py-4 sm:p-5 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]"
                                 >
                                   <div className="flex flex-wrap items-center justify-between gap-2">
                                     <h5 className={`font-medium ${theme.text}`}>
@@ -4396,17 +4404,17 @@ export default function WorkoutTemplateForm({
                                   </div>
 
                                   {/* Exercises in this set */}
-                                  <div className="space-y-2 mb-3">
+                                  <div className="space-y-3 mb-4">
                                     {(Array.isArray(set.exercises)
                                       ? set.exercises
                                       : []
                                     ).map((exercise, exerciseIndex) => (
                                       <div
                                         key={exerciseIndex}
-                                        className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600"
+                                        className="px-3 py-4 sm:p-4 rounded-lg border border-[color:var(--fc-surface-card-border)]" style={{ background: "var(--fc-surface-sunken)" }}
                                       >
-                                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                                          <span className="text-xs text-slate-500 w-6">
+                                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                                          <span className="text-xs fc-text-dim w-6">
                                             {exerciseIndex + 1}.
                                           </span>
                                           <div className="flex-1">
@@ -4500,7 +4508,7 @@ export default function WorkoutTemplateForm({
 
                     {newExercise.exercise_type === "drop_set" && (
                       <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
                             className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
@@ -4564,7 +4572,7 @@ export default function WorkoutTemplateForm({
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -4610,7 +4618,7 @@ export default function WorkoutTemplateForm({
 
                     {newExercise.exercise_type === "giant_set" && (
                       <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
                             className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
@@ -4623,7 +4631,7 @@ export default function WorkoutTemplateForm({
                           </p>
 
                           {/* Exercise List */}
-                          <div className="space-y-3 mb-4">
+                          <div className="space-y-4 mb-5">
                             <Label
                               className={`text-sm font-medium ${theme.text}`}
                             >
@@ -4633,10 +4641,10 @@ export default function WorkoutTemplateForm({
                               (exercise, index) => (
                                 <div
                                   key={index}
-                                  className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
+                                  className="px-3 py-4 sm:p-4 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]"
                                 >
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300 w-8">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                    <span className="text-sm font-medium fc-text-dim w-6 sm:w-8">
                                       {index + 1}.
                                     </span>
                                     <div className="flex-1">
@@ -4681,7 +4689,7 @@ export default function WorkoutTemplateForm({
                                       <X className="w-3 h-3" />
                                     </Button>
                                   </div>
-                                  <div className="ml-10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div className="mt-3 grid grid-cols-1 gap-4 sm:ml-8 sm:grid-cols-2">
                                     <div>
                                       <Label
                                         className={`text-xs font-medium ${theme.text}`}
@@ -4837,7 +4845,7 @@ export default function WorkoutTemplateForm({
 
                     {newExercise.exercise_type === "cluster_set" && (
                       <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
                             className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
@@ -4899,7 +4907,7 @@ export default function WorkoutTemplateForm({
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -4985,7 +4993,7 @@ export default function WorkoutTemplateForm({
 
                     {newExercise.exercise_type === "rest_pause" && (
                       <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
                             className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
@@ -5048,7 +5056,7 @@ export default function WorkoutTemplateForm({
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
                             <div>
                               <Label
                                 className={`text-sm font-medium ${theme.text}`}
@@ -5108,7 +5116,7 @@ export default function WorkoutTemplateForm({
 
                     {newExercise.exercise_type === "pre_exhaustion" && (
                       <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
                             className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >
@@ -5251,7 +5259,7 @@ export default function WorkoutTemplateForm({
                             </div>
 
                             {/* Load % / Weight Toggle Fields */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
                               {renderLoadWeightField(
                                 newExercise.load_percentage,
                                 newExercise.weight_kg,
@@ -5296,7 +5304,7 @@ export default function WorkoutTemplateForm({
 
                     {newExercise.exercise_type === "for_time" && (
                       <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                        <div className="px-3 py-5 sm:p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
                           <h4
                             className={`font-semibold ${theme.text} mb-3 flex flex-wrap items-center gap-2`}
                           >

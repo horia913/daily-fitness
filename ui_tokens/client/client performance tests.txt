@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Analytics | Obsidian Refractive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #050505;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --refraction: rgba(59, 130, 246, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Obsidian Glass Effect */
+        .obsidian-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(200%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .obsidian-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        /* Refractive Monolith Light Leak */
+        .monolith-glow {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            background: var(--refraction);
+            filter: blur(80px);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-log {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: fixed;
+            bottom: 100px;
+            right: 24px;
+            z-index: 60;
+        }
+
+        .btn-log:hover {
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 12px 32px rgba(16, 185, 129, 0.6);
+        }
+
+        .btn-log:active { transform: scale(0.9); }
+
+        .performance-tab-active {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .history-row {
+            border-bottom: 1px solid var(--glass-border);
+            transition: background 0.2s ease;
+        }
+
+        .history-row:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .trend-up { color: var(--accent); }
+        .trend-down { color: var(--primary); }
+
+        /* Navigation Bar Refinement */
+        .bottom-nav {
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .metric-giant {
+            font-size: 64px;
+            line-height: 1;
+            letter-spacing: -0.05em;
+            background: linear-gradient(to bottom, #fff 40%, #666 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12 pb-40">
+    <div class="fixed inset-0 z-[-1] overflow-hidden">
+        <div class="monolith-glow top-0 left-1/4"></div>
+        <div class="monolith-glow bottom-0 right-1/4" style="background: rgba(239, 68, 68, 0.1);"></div>
+    </div>
+
+    <!-- Header Section -->
+    <header class="max-w-4xl mx-auto mb-12 flex justify-between items-end">
+        <div>
+            <nav class="flex gap-2 mb-4">
+                <span class="text-xs font-bold uppercase tracking-widest text-neutral-500">Progress</span>
+                <span class="text-xs font-bold uppercase tracking-widest text-neutral-500">/</span>
+                <span class="text-xs font-bold uppercase tracking-widest text-blue-400">Performance Tests</span>
+            </nav>
+            <h1 class="text-4xl md:text-5xl font-bold tracking-tight">Performance<br/><span class="text-neutral-500">Analytics</span></h1>
+        </div>
+        <div class="hidden md:block">
+            <div class="obsidian-card p-4 flex items-center gap-4">
+                <div class="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent">
+                    <i data-lucide="award" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="text-[10px] uppercase text-neutral-400 font-bold">Current Level</div>
+                    <div class="text-sm font-bold">Elite Athlete</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto space-y-8">
+        
+        <!-- Test Type Switcher -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button class="obsidian-card p-6 text-left performance-tab-active kinetic-shimmer group">
+                <div class="flex justify-between items-start mb-8">
+                    <div class="p-3 bg-blue-500/10 rounded-2xl text-blue-400 group-hover:scale-110 transition-transform">
+                        <i data-lucide="timer" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex items-center gap-1 text-accent mono text-sm font-bold">
+                        <i data-lucide="trending-up" class="w-4 h-4"></i>
+                        3.2%
+                    </div>
+                </div>
+                <h3 class="text-xl font-bold mb-1">1km Run</h3>
+                <p class="text-sm text-neutral-400">Aerobic capacity & speed</p>
+                <div class="mt-4 text-xs mono text-neutral-500 font-medium tracking-wider">LAST: 4:23</div>
+            </button>
+
+            <button class="obsidian-card p-6 text-left hover:bg-white/5 transition-colors group">
+                <div class="flex justify-between items-start mb-8">
+                    <div class="p-3 bg-red-500/10 rounded-2xl text-red-400 group-hover:scale-110 transition-transform">
+                        <i data-lucide="heart-pulse" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex items-center gap-1 text-accent mono text-sm font-bold">
+                        <i data-lucide="trending-up" class="w-4 h-4"></i>
+                        12%
+                    </div>
+                </div>
+                <h3 class="text-xl font-bold mb-1">Step Test</h3>
+                <p class="text-sm text-neutral-400">Recovery heart rate efficiency</p>
+                <div class="mt-4 text-xs mono text-neutral-500 font-medium tracking-wider">LAST: 45 BPM</div>
+            </button>
+        </section>
+
+        <!-- Main Display Monolith -->
+        <section class="obsidian-card overflow-hidden p-8 md:p-12 border-white/20">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-6">
+                        <span class="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-widest">Selected Test</span>
+                        <span class="text-neutral-500 text-sm mono">Dec 25, 2025</span>
+                    </div>
+                    <h2 class="text-3xl font-bold mb-8">1km Standard Run</h2>
+                    
+                    <div class="relative inline-block">
+                        <div class="metric-giant mono font-bold">04:23</div>
+                        <div class="absolute -right-12 bottom-4 text-neutral-500 mono font-medium">MIN</div>
+                    </div>
+                </div>
+                
+                <div class="w-full md:w-64 space-y-4">
+                    <div class="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                        <span class="text-sm text-neutral-400">Improvement</span>
+                        <span class="text-accent font-bold mono">-0:15s ↓</span>
+                    </div>
+                    <div class="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                        <span class="text-sm text-neutral-400">Percentile</span>
+                        <span class="text-blue-400 font-bold mono">Top 8%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini Sparkline Placeholder -->
+            <div class="mt-12 h-24 w-full flex items-end gap-1">
+                <div class="flex-1 bg-white/5 rounded-t-lg h-1/2"></div>
+                <div class="flex-1 bg-white/5 rounded-t-lg h-2/3"></div>
+                <div class="flex-1 bg-white/5 rounded-t-lg h-3/4"></div>
+                <div class="flex-1 bg-white/5 rounded-t-lg h-1/2"></div>
+                <div class="flex-1 bg-white/5 rounded-t-lg h-2/3"></div>
+                <div class="flex-1 bg-blue-500/40 rounded-t-lg h-full border-t-2 border-blue-400"></div>
+            </div>
+        </section>
+
+        <!-- History List -->
+        <section class="space-y-4">
+            <h3 class="text-lg font-semibold px-2">Historical Logs</h3>
+            <div class="obsidian-card overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="text-[10px] uppercase tracking-widest text-neutral-500 border-bottom border-white/5">
+                                <th class="p-6 font-bold">Date</th>
+                                <th class="p-6 font-bold">Result</th>
+                                <th class="p-6 font-bold">Trend</th>
+                                <th class="p-6 font-bold text-right">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody class="mono text-sm">
+                            <tr class="history-row">
+                                <td class="p-6 text-neutral-300">Dec 12, 2025</td>
+                                <td class="p-6 font-bold">04:38</td>
+                                <td class="p-6 text-accent font-bold">-0:04s</td>
+                                <td class="p-6 text-right text-neutral-500">Post-holiday peak</td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="p-6 text-neutral-300">Nov 28, 2025</td>
+                                <td class="p-6 font-bold">04:42</td>
+                                <td class="p-6 text-neutral-400">--</td>
+                                <td class="p-6 text-right text-neutral-500">Baseline set</td>
+                            </tr>
+                            <tr class="history-row">
+                                <td class="p-6 text-neutral-300">Nov 14, 2025</td>
+                                <td class="p-6 font-bold">04:55</td>
+                                <td class="p-6 text-primary font-bold">+0:10s</td>
+                                <td class="p-6 text-right text-neutral-500">Recovering from cold</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Floating Action Button -->
+    <button class="btn-log" aria-label="Log new test result">
+        <i data-lucide="plus" class="w-8 h-8 text-white"></i>
+    </button>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 bottom-nav z-50">
+        <div class="max-w-lg mx-auto flex items-center justify-around">
+            <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Dash</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-blue-400">
+                <i data-lucide="line-chart" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Progress</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                <i data-lucide="calendar" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Plans</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                <i data-lucide="settings" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Profile</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Staggered entry animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.obsidian-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 120);
+            });
+        });
+
+        // Simple haptic feedback simulation
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(5);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Summary | Kinetic Ember</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --amber: #F59E0B;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+            line-height: 1.625;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Kinetic Thermal Background */
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 50% -20%, rgba(239, 68, 68, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 0% 100%, rgba(59, 130, 246, 0.1) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        /* Crystalline Card Architecture */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        /* Kinetic Shimmer Animation */
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        /* Celebration Animation */
+        .trophy-glow {
+            filter: drop-shadow(0 0 20px rgba(245, 158, 11, 0.4));
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(5deg); }
+        }
+
+        /* Buttons & Interactions */
+        .btn-primary {
+            height: 56px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(239, 68, 68, 0.5); }
+
+        .btn-secondary {
+            height: 56px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.3); }
+
+        /* Typography */
+        .text-h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.025em; }
+        .text-h2 { font-size: 20px; font-weight: 600; }
+        .text-data { font-size: 24px; font-weight: 700; }
+
+        /* Stagger Reveal */
+        .reveal { opacity: 0; transform: translateY(20px); animation: revealUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        @keyframes revealUp { to { opacity: 1; transform: translateY(0); } }
+
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+
+        .streak-fire {
+            background: linear-gradient(to top, #F59E0B, #EF4444);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: pulse-fire 2s infinite;
+        }
+
+        @keyframes pulse-fire {
+            0%, 100% { filter: brightness(1) drop-shadow(0 0 5px rgba(239, 68, 68, 0.2)); }
+            50% { filter: brightness(1.3) drop-shadow(0 0 15px rgba(239, 68, 68, 0.5)); }
+        }
+
+        /* Collapsible List */
+        .exercise-row {
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: background 0.2s ease;
+        }
+        .exercise-row:last-child { border-bottom: none; }
+        .exercise-row:active { background: rgba(255,255,255,0.03); }
+
+        .pr-badge {
+            background: linear-gradient(45deg, #F59E0B, #D97706);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .sticky-actions {
+            background: linear-gradient(to top, var(--bg-dark) 80%, transparent);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+<body class="p-6 pb-48 max-w-2xl mx-auto">
+    <div class="refraction-bg"></div>
+
+    <!-- Celebration Hero -->
+    <header class="text-center pt-8 pb-12 reveal">
+        <div class="mb-6 relative inline-block">
+            <div class="trophy-glow">
+                <i data-lucide="trophy" class="w-20 h-20 text-amber-500 mx-auto"></i>
+            </div>
+            <div class="absolute -top-2 -right-2">
+                <div class="w-6 h-6 bg-accent rounded-full flex items-center justify-center animate-bounce">
+                    <i data-lucide="check" class="w-4 h-4 text-black"></i>
+                </div>
+            </div>
+        </div>
+        <h1 class="text-h1 mb-2">WORKOUT COMPLETE!</h1>
+        <div class="flex items-center justify-center gap-2 text-neutral-400 mono">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+            <span>45 minutes 23 seconds</span>
+        </div>
+        <p class="mt-4 italic text-neutral-300">"Another step closer to your goals, Alex!"</p>
+    </header>
+
+    <!-- Achievement Cards Grid -->
+    <section class="grid grid-cols-2 gap-4 mb-8">
+        <div class="crystal-card kinetic-shimmer p-5 reveal delay-1">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400">
+                    <i data-lucide="star" class="w-4 h-4"></i>
+                </div>
+                <span class="text-sm font-semibold text-neutral-300">New PRs</span>
+            </div>
+            <div class="text-data text-red-400 mono leading-none">2 <span class="text-sm text-neutral-500">🏆</span></div>
+            <div class="text-xs text-neutral-500 mt-2 uppercase tracking-widest font-bold">Unstoppable</div>
+        </div>
+
+        <div class="crystal-card kinetic-shimmer p-5 reveal delay-2">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400">
+                    <i data-lucide="layers" class="w-4 h-4"></i>
+                </div>
+                <span class="text-sm font-semibold text-neutral-300">Volume</span>
+            </div>
+            <div class="text-data text-blue-400 mono leading-none">12,500 <span class="text-sm text-neutral-500">kg</span></div>
+            <div class="text-xs text-neutral-500 mt-2 uppercase tracking-widest font-bold">+12% vs last</div>
+        </div>
+
+        <div class="crystal-card kinetic-shimmer p-5 reveal delay-3">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center text-green-400">
+                    <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                </div>
+                <span class="text-sm font-semibold text-neutral-300">Total Sets</span>
+            </div>
+            <div class="text-data text-green-400 mono leading-none">16</div>
+            <div class="text-xs text-neutral-500 mt-2 uppercase tracking-widest font-bold">100% Complete</div>
+        </div>
+
+        <div class="crystal-card kinetic-shimmer p-5 reveal delay-4 border-amber-500/30">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-500">
+                    <i data-lucide="flame" class="w-4 h-4"></i>
+                </div>
+                <span class="text-sm font-semibold text-neutral-300">Streak</span>
+            </div>
+            <div class="text-data streak-fire mono leading-none">7 Days</div>
+            <div class="text-xs text-neutral-500 mt-2 uppercase tracking-widest font-bold">Maintained 🔥</div>
+        </div>
+    </section>
+
+    <!-- Exercise Breakdown -->
+    <section class="reveal delay-4 mb-12">
+        <h3 class="text-h2 mb-4 px-1 flex items-center justify-between">
+            Workout Summary
+            <span class="text-sm font-normal text-neutral-500 mono">5 Exercises</span>
+        </h3>
+        
+        <div class="crystal-card">
+            <!-- Exercise Item -->
+            <div class="exercise-row p-5">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h4 class="font-bold">Barbell Deadlift</h4>
+                        <div class="flex gap-2 mt-1">
+                            <span class="pr-badge">New PR</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="mono text-lg font-bold">145<span class="text-sm text-neutral-400">kg</span></div>
+                        <div class="text-xs text-accent">+5kg ↑</div>
+                    </div>
+                </div>
+                <div class="flex gap-4 text-sm text-neutral-400 mt-3 mono">
+                    <span>Set 1: 140kg x 5</span>
+                    <span>Set 2: 145kg x 3</span>
+                    <span>Set 3: 145kg x 3</span>
+                </div>
+            </div>
+
+            <!-- Exercise Item -->
+            <div class="exercise-row p-5">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h4 class="font-bold">Weighted Pullups</h4>
+                    </div>
+                    <div class="text-right">
+                        <div class="mono text-lg font-bold">20<span class="text-sm text-neutral-400">kg</span></div>
+                        <div class="text-xs text-neutral-500">Consistent</div>
+                    </div>
+                </div>
+                <div class="flex gap-4 text-sm text-neutral-400 mt-3 mono">
+                    <span>Set 1: BW x 12</span>
+                    <span>Set 2: 10kg x 8</span>
+                    <span>Set 3: 20kg x 6</span>
+                </div>
+            </div>
+
+            <!-- Exercise Item -->
+            <div class="exercise-row p-5">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h4 class="font-bold">Dumbbell Rows</h4>
+                        <div class="flex gap-2 mt-1">
+                            <span class="pr-badge">Volume PR</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="mono text-lg font-bold">40<span class="text-sm text-neutral-400">kg</span></div>
+                        <div class="text-xs text-accent">+2 reps ↑</div>
+                    </div>
+                </div>
+                <div class="flex gap-4 text-sm text-neutral-400 mt-3 mono">
+                    <span>3 Sets x 12 Reps</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sticky Bottom Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 p-6 sticky-actions z-50">
+        <div class="max-w-2xl mx-auto flex flex-col gap-3">
+            <button class="btn-primary w-full rounded-2xl flex items-center justify-center gap-3 font-bold text-lg">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                Back to Dashboard
+            </button>
+            <div class="flex gap-3">
+                <button class="btn-secondary flex-1 rounded-2xl flex items-center justify-center gap-2 font-semibold text-neutral-300">
+                    <i data-lucide="share-2" class="w-5 h-5"></i>
+                    Share Results
+                </button>
+                <button class="btn-secondary flex-1 rounded-2xl flex items-center justify-center gap-2 font-semibold text-neutral-300">
+                    <i data-lucide="file-text" class="w-5 h-5"></i>
+                    Detailed Log
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Haptic Feedback Simulation (if supported)
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(15);
+                }
+            });
+        });
+
+        // Simple Canvas Confetti for Celebration
+        function fireConfetti() {
+            const colors = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B'];
+            for(let i=0; i<50; i++) {
+                const confetti = document.createElement('div');
+                confetti.style.position = 'fixed';
+                confetti.style.width = '8px';
+                confetti.style.height = '8px';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.top = '-10px';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.zIndex = '100';
+                confetti.style.borderRadius = '2px';
+                confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+                
+                document.body.appendChild(confetti);
+
+                const animation = confetti.animate([
+                    { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
+                    { transform: `translate(${(Math.random() - 0.5) * 200}px, 100vh) rotate(${Math.random() * 720}deg)`, opacity: 0 }
+                ], {
+                    duration: 2000 + Math.random() * 3000,
+                    easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+                });
+
+                animation.onfinish = () => confetti.remove();
+            }
+        }
+
+        // Trigger celebration on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(fireConfetti, 500);
+        });
+    </script>
+</body>
+</html>

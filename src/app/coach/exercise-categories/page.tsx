@@ -134,9 +134,9 @@ export default function ExerciseCategories() {
                 boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(0, 0, 0, 0.08)'
               }}>
                 <div className="animate-pulse">
-                  <div className={`h-8 ${isDark ? 'bg-slate-700' : 'bg-slate-200'} rounded-xl mb-4`}></div>
-                  <div className={`h-4 ${isDark ? 'bg-slate-700' : 'bg-slate-200'} rounded-lg w-3/4 mb-2`}></div>
-                  <div className={`h-4 ${isDark ? 'bg-slate-700' : 'bg-slate-200'} rounded-lg w-1/2`}></div>
+                  <div className="h-8 rounded-xl mb-4" style={{ background: "var(--fc-surface-sunken)" }}></div>
+                  <div className="h-4 rounded-lg w-3/4 mb-2" style={{ background: "var(--fc-surface-sunken)" }}></div>
+                  <div className="h-4 rounded-lg w-1/2" style={{ background: "var(--fc-surface-sunken)" }}></div>
                 </div>
               </div>
             </div>
@@ -150,88 +150,28 @@ export default function ExerciseCategories() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div style={{ 
-        backgroundColor: isDark ? '#0A0A0A' : '#E8E9F3',
-        backgroundImage: isDark 
-          ? 'linear-gradient(to bottom right, #0A0A0A, #1A1A1A)' 
-          : 'linear-gradient(to bottom right, #E8E9F3, #F5F5FF)',
-        minHeight: '100vh',
-        position: 'relative'
-      }}>
-        {/* Floating Background Elements */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className={`absolute -top-40 -right-40 w-80 h-80 ${isDark ? 'bg-purple-500/10' : 'bg-purple-200/40'} rounded-full blur-3xl`}></div>
-          <div className={`absolute -bottom-40 -left-40 w-80 h-80 ${isDark ? 'bg-orange-500/10' : 'bg-orange-200/40'} rounded-full blur-3xl`}></div>
-          <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 ${isDark ? 'bg-green-500/10' : 'bg-green-200/40'} rounded-full blur-3xl`}></div>
-        </div>
-
-        <div className="relative" style={{ padding: '24px 20px', paddingBottom: '100px' }}>
-          <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div className="fc-glass fc-card p-6 sm:p-10">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <Button
-                    variant="ghost"
-                    onClick={() => router.push('/coach/exercises')}
-                    className="fc-btn fc-btn-ghost h-10 w-10"
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                  <div>
-                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                      Exercise Catalog
-                    </span>
-                    <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                      Exercise Categories
-                    </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Organize your exercise library with custom categories.
-                    </p>
-                  </div>
+        <div className="min-h-screen relative z-10 p-6 md:p-12 pb-32">
+          <div className="max-w-7xl mx-auto">
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-[color:var(--fc-accent)] mb-1">
+                  <Layers className="w-5 h-5" />
+                  <span className="text-sm font-bold tracking-widest uppercase font-mono fc-text-primary">Library Management</span>
                 </div>
-                <button
-                  onClick={() => setShowCreateForm(true)}
-                  className="fc-btn fc-btn-primary"
-                >
-                  <Plus style={{ width: '20px', height: '20px' }} />
-                  Create Category
-                  <ArrowRight style={{ width: '20px', height: '20px' }} />
-                </button>
+                <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Exercise Categories</h1>
+                <p className="text-base fc-text-dim">Organize your protocols with kinetic visual hierarchy.</p>
               </div>
-            </div>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="fc-btn fc-btn-primary hidden md:flex items-center gap-3 px-8 rounded-2xl font-bold h-12"
+              >
+                <Plus className="w-5 h-5" />
+                Create New Category
+              </button>
+            </header>
 
-            <div className="fc-glass fc-card p-4">
-              <div style={{ position: 'relative' }}>
-                <Search style={{ 
-                  position: 'absolute', 
-                  left: '16px', 
-                  top: '50%', 
-                  transform: 'translateY(-50%)', 
-                  color: isDark ? '#9CA3AF' : '#6B7280',
-                  width: '20px',
-                  height: '20px'
-                }} />
-                <Input
-                  placeholder="Search categories..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{
-                    paddingLeft: '48px',
-                    height: '48px',
-                    borderRadius: '16px',
-                    border: `2px solid ${isDark ? '#2A2A2A' : '#E5E7EB'}`,
-                    backgroundColor: 'transparent',
-                    color: isDark ? '#FFFFFF' : '#1A1A1A',
-                    fontSize: '16px',
-                    width: '100%'
-                  }}
-                  className="focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                />
-              </div>
-            </div>
-
-            {/* Enhanced Categories Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3" style={{ gap: '20px' }}>
+            {/* Categories Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCategories.map(category => {
                 const IconComponent = categoryIcons[category.icon as keyof typeof categoryIcons] || Dumbbell
                 return (
@@ -483,7 +423,16 @@ export default function ExerciseCategories() {
             />
           </div>
         </div>
-        </div>
+
+        {/* Mobile FAB */}
+        <button
+          type="button"
+          onClick={() => setShowCreateForm(true)}
+          className="fc-btn fc-btn-primary fixed bottom-6 right-6 w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg md:hidden z-50"
+          aria-label="Create category"
+        >
+          <Plus className="w-7 h-7" />
+        </button>
       </AnimatedBackground>
     </ProtectedRoute>
   )

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { GlassCard } from '@/components/ui/GlassCard';
 import { 
   Plus, 
   Pencil, 
@@ -235,26 +236,32 @@ export default function GoalTemplatesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 pb-24">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Target className="w-7 h-7 text-blue-400" />
-            Goal Templates
-          </h2>
-          <p className="text-slate-400 mt-1">
-            Manage the goal types that clients can select
-          </p>
+      <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+              <Target className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                Goal Templates
+              </h1>
+              <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                Manage the goal types that clients can select
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleCreate}
+            className="fc-btn fc-btn-primary flex items-center gap-2 shrink-0"
+          >
+            <Plus className="w-5 h-5" />
+            Add Template
+          </button>
         </div>
-        <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Add Template
-        </button>
-      </div>
+      </GlassCard>
 
       {/* Error Display */}
       {error && (

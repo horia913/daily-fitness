@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { GlassCard } from '@/components/ui/GlassCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
@@ -275,17 +276,21 @@ export default function CreateUserPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg">
-              <UserPlus className="w-7 h-7 text-white" />
+        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="flex items-center justify-center gap-4 sm:justify-start">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+              <UserPlus className="w-6 h-6" />
             </div>
-            <h1 className="text-3xl font-bold text-slate-800">Create New User Account</h1>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                Create New User Account
+              </h1>
+              <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                Administrative tool for creating new coach and client accounts
+              </p>
+            </div>
           </div>
-          <p className="text-slate-600 text-lg">
-            Administrative tool for creating new coach and client accounts
-          </p>
-        </div>
+        </GlassCard>
 
         {/* Success Message */}
         {success && (

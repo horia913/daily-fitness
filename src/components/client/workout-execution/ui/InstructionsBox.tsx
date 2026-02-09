@@ -18,15 +18,19 @@ export function InstructionsBox({
 
   return (
     <div
-      className={`bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800 ${className}`}
+      className={`rounded-xl p-3 ${className}`}
+      style={{
+        background: "color-mix(in srgb, var(--fc-accent-cyan) 8%, var(--fc-surface-card))",
+        borderLeft: "3px solid var(--fc-accent-cyan)",
+      }}
     >
-      <div className="flex items-start gap-3">
-        <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+      <div className="flex items-start gap-2.5">
+        <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "var(--fc-accent-cyan)" }} />
         <div>
-          <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-1 text-sm">
+          <h4 className="font-semibold text-xs fc-text-primary mb-0.5">
             Instructions
           </h4>
-          <p className="text-blue-700 dark:text-blue-300 text-sm">
+          <p className="text-xs fc-text-dim leading-relaxed">
             {instructions}
           </p>
         </div>

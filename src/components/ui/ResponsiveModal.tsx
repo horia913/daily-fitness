@@ -52,9 +52,9 @@ export default function ResponsiveModal({
       data-theme={isDark ? 'dark' : 'light'}
     >
       {gradientFrame ? (
-        <div className="rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl">
+        <div className="rounded-3xl p-[1px] shadow-2xl" style={{ background: 'var(--fc-domain-workouts)' }}>
           <div 
-            className={`relative ${theme.card} fc-glass fc-card shadow-2xl rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
+            className="fc-modal relative fc-glass fc-card shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden"
             style={{
               animation: 'modalSlideIn 0.3s ease-out',
               maxWidth: `min(95vw, ${maxWidthMap[maxWidth]})`,
@@ -74,12 +74,12 @@ export default function ResponsiveModal({
                 )}
                 <div>
                   {title && (
-                    <h2 className={`text-2xl font-bold ${theme.text}`} style={{ fontSize: '28px', fontWeight: '700', color: '#1A1A1A', marginBottom: '4px' }}>
+                    <h2 className="text-2xl font-bold fc-text-primary mb-1">
                       {title}
                     </h2>
                   )}
                   {subtitle && (
-                    <p className={`text-sm ${theme.textSecondary} mt-1`} style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>
+                    <p className="text-sm fc-text-dim mt-1">
                       {subtitle}
                     </p>
                   )}
@@ -89,8 +89,7 @@ export default function ResponsiveModal({
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className={`p-2 rounded-xl transition-all duration-200 ${theme.textSecondary} hover:${theme.text} hover:${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}
-                style={{ padding: '8px', borderRadius: '12px', backgroundColor: 'transparent', color: '#6B7280' }}
+                className="p-2 rounded-xl transition-all duration-200 fc-text-dim hover:fc-text-primary fc-glass-soft hover:opacity-90"
                 aria-label="Close modal"
               >
                 <X className="w-5 h-5" />
@@ -114,7 +113,7 @@ export default function ResponsiveModal({
         </div>
       ) : (
         <div 
-          className={`relative ${theme.card} fc-glass fc-card shadow-2xl rounded-3xl border ${theme.border} w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden`}
+          className="fc-modal relative fc-glass fc-card shadow-2xl rounded-3xl border border-[color:var(--fc-glass-border-strong)] w-full flex flex-col transform transition-all duration-300 ease-out overflow-hidden"
           style={{
             animation: 'modalSlideIn 0.3s ease-out',
             maxWidth: `min(95vw, ${maxWidthMap[maxWidth]})`,
@@ -128,7 +127,7 @@ export default function ResponsiveModal({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {icon && (
-                    <div className={`p-3 rounded-2xl ${isDark ? 'bg-slate-700' : 'bg-gradient-to-br from-purple-100 to-orange-100'}`} style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="p-3 rounded-2xl fc-icon-tile fc-icon-workouts flex items-center justify-center w-14 h-14">
                       {icon}
                     </div>
                   )}

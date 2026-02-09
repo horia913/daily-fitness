@@ -461,8 +461,13 @@ export class WorkoutTemplateService {
     }
   }
 
-  // Get a single template by ID (efficient - doesn't load all templates)
-  static async getWorkoutTemplateById(templateId: string): Promise<WorkoutTemplate | null> {
+  // Get a single template by ID (efficient - doesn't load all templates).
+  // Use skipExerciseCount: true when the caller will load blocks and derive count from them
+  // (avoids duplicate heavy queries and reduces timeouts on template details page).
+  static async getWorkoutTemplateById(
+    templateId: string,
+    options?: { skipExerciseCount?: boolean }
+  ): Promise<WorkoutTemplate | null> {
     try {
       const { ensureAuthenticated } = await import('./supabase');
       await ensureAuthenticated();
@@ -480,8 +485,8 @@ export class WorkoutTemplateService {
 
       if (!data) return null
 
-      // Get exercise count for this single template
-      const exerciseCount = await this.countExercisesForTemplate(templateId)
+      const skipCount = options?.skipExerciseCount === true
+      const exerciseCount = skipCount ? 0 : await this.countExercisesForTemplate(templateId)
 
       return {
         ...data,
@@ -1757,32 +1762,27 @@ export class WorkoutTemplateService {
 
   static async getProgramProgress(clientId: string): Promise<ProgramAssignmentProgress | null> {
     try {
-      const { data, error } = await supabase
-        .from('program_assignment_progress')
-        .select('*')
-        .eq('client_id', clientId)
-        .eq('is_program_completed', false)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      // REFACTORED: Read from canonical program_progress + program_assignments
+      // instead of legacy program_assignment_progress table
+      const { getProgramState } = await import('./programStateService')
+      const state = await getProgramState(supabase, clientId)
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.log('No active program found for client')
-          return null // No active program
-        }
-        if (error.code === 'PGRST205') {
-          console.log('program_assignment_progress table not found, returning null')
-          return null
-        }
-        if (error.code === 'PGRST301') {
-          console.log('406 Not Acceptable - RLS policy issue, returning null')
-          return null
-        }
-        console.log('Error accessing program_assignment_progress:', error)
+      if (!state.assignment) {
         return null
       }
-      return data
+
+      // Map canonical state to legacy ProgramAssignmentProgress shape
+      return {
+        id: state.assignment.id, // Using assignment ID as stand-in
+        assignment_id: state.assignment.id,
+        client_id: state.assignment.client_id,
+        program_id: state.assignment.program_id,
+        current_week: state.currentWeekNumber,
+        current_day: state.currentDayNumber,
+        is_program_completed: state.isCompleted,
+        cycle_start_date: state.assignment.start_date || new Date().toISOString(),
+        created_at: state.assignment.created_at,
+      } as ProgramAssignmentProgress
     } catch (error) {
       console.error('Error getting program progress:', error)
       return null

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Giant Set | Kinetic Glass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .crystal-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+            transform: rotate(30deg);
+            pointer-events: none;
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-primary {
+            height: 56px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:active { transform: scale(0.95); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4); }
+
+        .btn-secondary {
+            height: 56px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1.5px solid var(--glass-border);
+            color: #FFFFFF;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-2px); }
+
+        .text-h1 { font-size: 30px; line-height: 1.25; font-weight: 700; }
+        .text-h2 { font-size: 20px; line-height: 1.25; font-weight: 600; }
+        .text-h3 { font-size: 18px; line-height: 1.25; font-weight: 500; }
+        .text-body { font-size: 16px; line-height: 1.625; font-weight: 400; }
+        .text-caption { font-size: 14px; line-height: 1.4; font-weight: 400; }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(239, 68, 68, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .input-field {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: white;
+            transition: all 0.2s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.07);
+        }
+
+        .giant-set-line {
+            position: absolute;
+            left: 28px;
+            top: 60px;
+            bottom: 40px;
+            width: 2px;
+            background: linear-gradient(to bottom, var(--primary), var(--secondary));
+            opacity: 0.3;
+        }
+
+        .exercise-number {
+            background: linear-gradient(135deg, var(--primary), #B91C1C);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+        }
+
+        .sticky-footer {
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid var(--glass-border);
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.98) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .animate-card {
+            animation: fadeInScale 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Section -->
+    <header class="max-w-3xl mx-auto flex items-center justify-between mb-8">
+        <div class="flex items-center gap-4">
+            <button class="p-3 rounded-xl bg-white/5 border border-white/10 text-neutral-400 hover:text-white transition-all">
+                <i data-lucide="chevron-left" class="w-6 h-6"></i>
+            </button>
+            <div>
+                <h1 class="text-h1 tracking-tight">Create Template</h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="text-caption text-neutral-500 mono">STEP 2/3</span>
+                    <span class="w-1 h-1 rounded-full bg-neutral-700"></span>
+                    <span class="text-caption text-primary font-semibold uppercase tracking-widest">Giant Set Route</span>
+                </div>
+            </div>
+        </div>
+        <div class="hidden md:block">
+            <i data-lucide="layers-2" class="w-10 h-10 text-white/10"></i>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto space-y-6">
+        
+        <!-- Protocol Selector (Summary View) -->
+        <section class="crystal-card p-6 flex items-center justify-between border-l-4 border-l-primary">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                    <i data-lucide="zap" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <label class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mono">Selected Protocol</label>
+                    <h3 class="text-h3 font-bold">Giant Set</h3>
+                </div>
+            </div>
+            <button class="text-sm font-semibold text-secondary hover:underline underline-offset-4">Change</button>
+        </section>
+
+        <!-- Exercises List Container -->
+        <section class="relative crystal-card p-6 md:p-8">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-h2">Sequence</h2>
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-caption text-neutral-400">
+                    <i data-lucide="info" class="w-4 h-4"></i>
+                    No rest between exercises
+                </div>
+            </div>
+
+            <div class="giant-set-line"></div>
+            
+            <div id="exercise-list" class="space-y-6 mb-8">
+                <!-- Exercise Card 1 -->
+                <div class="exercise-card animate-card relative pl-12">
+                    <div class="absolute left-0 top-0 w-8 h-8 rounded-full exercise-number flex items-center justify-center text-xs font-bold mono z-10">1</div>
+                    <div class="crystal-card bg-white/[0.02] p-5 space-y-4">
+                        <div class="flex gap-3">
+                            <div class="flex-1">
+                                <label class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mono mb-1 block">Exercise Movement</label>
+                                <div class="relative">
+                                    <input type="text" placeholder="Search exercise..." value="Leg Press (45 Degree)" class="input-field w-full pl-10">
+                                    <i data-lucide="search" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500"></i>
+                                </div>
+                            </div>
+                            <button class="h-12 w-12 flex-none flex items-center justify-center rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all mt-5">
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <div class="w-full">
+                            <label class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mono mb-1 block">Reps / Duration</label>
+                            <input type="text" placeholder="e.g. 10-12 or 45s" class="input-field w-full font-semibold" value="12-15 Reps">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exercise Card 2 -->
+                <div class="exercise-card animate-card relative pl-12">
+                    <div class="absolute left-0 top-0 w-8 h-8 rounded-full exercise-number flex items-center justify-center text-xs font-bold mono z-10">2</div>
+                    <div class="crystal-card bg-white/[0.02] p-5 space-y-4">
+                        <div class="flex gap-3">
+                            <div class="flex-1">
+                                <label class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mono mb-1 block">Exercise Movement</label>
+                                <div class="relative">
+                                    <input type="text" placeholder="Search exercise..." value="Goblet Squats" class="input-field w-full pl-10">
+                                    <i data-lucide="search" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500"></i>
+                                </div>
+                            </div>
+                            <button class="h-12 w-12 flex-none flex items-center justify-center rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all mt-5">
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <div class="w-full">
+                            <label class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mono mb-1 block">Reps / Duration</label>
+                            <input type="text" placeholder="e.g. 10-12 or 45s" class="input-field w-full font-semibold" value="AMRAP">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Exercise Button -->
+            <button id="add-exercise" class="w-full py-6 rounded-2xl border-2 border-dashed border-white/10 text-neutral-400 font-bold uppercase tracking-widest text-sm hover:border-primary/50 hover:text-white hover:bg-primary/5 transition-all flex items-center justify-center gap-2">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                Add Exercise to Giant Set
+            </button>
+        </section>
+
+        <!-- Global Parameters Section -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="crystal-card p-6">
+                <h3 class="text-h3 font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="refresh-ccw" class="w-5 h-5 text-primary"></i>
+                    Configuration
+                </h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mono mb-2 block">Total Sets</label>
+                        <input type="number" value="4" min="1" class="input-field w-full text-center text-xl font-bold mono">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mono mb-2 block">Rest (Sec)</label>
+                        <input type="number" value="120" min="0" class="input-field w-full text-center text-xl font-bold mono">
+                    </div>
+                </div>
+            </div>
+
+            <div class="crystal-card p-6">
+                <h3 class="text-h3 font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5 text-secondary"></i>
+                    Intensity
+                </h3>
+                <div>
+                    <label class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mono mb-2 block">Load Target (% 1RM)</label>
+                    <div class="relative">
+                        <input type="number" placeholder="Optional" class="input-field w-full text-center text-xl font-bold mono">
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 font-bold">%</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Notes Section -->
+        <section class="crystal-card p-6">
+            <label class="text-h3 font-bold mb-4 flex items-center gap-2">
+                <i data-lucide="sticky-note" class="w-5 h-5 text-accent"></i>
+                Coach Notes
+            </label>
+            <textarea rows="3" placeholder="Add specific cues or intensity goals for this giant set..." class="input-field w-full resize-none leading-relaxed"></textarea>
+        </section>
+
+    </main>
+
+    <!-- Sticky Bottom Actions -->
+    <footer class="fixed bottom-0 left-0 right-0 p-4 sticky-footer z-50">
+        <div class="max-w-3xl mx-auto flex gap-4">
+            <button class="btn-secondary flex-1 rounded-2xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2">
+                Cancel
+            </button>
+            <button class="btn-primary flex-[2] rounded-2xl text-white font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 shadow-2xl">
+                <i data-lucide="save" class="w-5 h-5"></i>
+                Save Exercise
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Simple script to demonstrate adding exercises
+        const addButton = document.getElementById('add-exercise');
+        const exerciseList = document.getElementById('exercise-list');
+
+        addButton.addEventListener('click', () => {
+            const count = exerciseList.children.length + 1;
+            const card = document.createElement('div');
+            card.className = 'exercise-card animate-card relative pl-12';
+            card.innerHTML = `
+                <div class="absolute left-0 top-0 w-8 h-8 rounded-full exercise-number flex items-center justify-center text-xs font-bold mono z-10">${count}</div>
+                <div class="crystal-card bg-white/[0.02] p-5 space-y-4">
+                    <div class="flex gap-3">
+                        <div class="flex-1">
+                            <label class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mono mb-1 block">Exercise Movement</label>
+                            <div class="relative">
+                                <input type="text" placeholder="Search exercise..." class="input-field w-full pl-10">
+                                <i data-lucide="search" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500"></i>
+                            </div>
+                        </div>
+                        <button class="h-12 w-12 flex-none flex items-center justify-center rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all mt-5" onclick="this.closest('.exercise-card').remove()">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <div class="w-full">
+                        <label class="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mono mb-1 block">Reps / Duration</label>
+                        <input type="text" placeholder="e.g. 10-12 or 45s" class="input-field w-full font-semibold">
+                    </div>
+                </div>
+            `;
+            exerciseList.appendChild(card);
+            lucide.createIcons();
+            
+            // Haptic feedback
+            if (window.navigator.vibrate) window.navigator.vibrate(15);
+            
+            // Auto scroll to bottom
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        });
+
+        // Entrance animations for existing cards
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card, .exercise-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                }, index * 80);
+            });
+        });
+    </script>
+</body>
+</html></html>

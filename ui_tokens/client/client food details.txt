@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Details | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-secondary {
+            height: 48px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1.5px solid rgba(59, 130, 246, 0.4);
+            color: #3B82F6;
+            transition: all 0.3s ease;
+        }
+
+        .btn-danger {
+            height: 48px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1.5px solid rgba(239, 68, 68, 0.4);
+            color: #EF4444;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover, .btn-danger:hover { transform: translateY(-2px); }
+        .btn-secondary:active, .btn-danger:active { transform: scale(0.98); }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.05) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .nutrition-label-line {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 8px 0;
+        }
+
+        .macro-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .macro-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            border-radius: 4px;
+        }
+
+        .text-h1 { font-size: 24px; line-height: 1.2; font-weight: 700; }
+        .text-calories { font-size: 48px; line-height: 1; font-weight: 800; }
+        
+        /* Entrance animation */
+        .reveal {
+            opacity: 0;
+            transform: translateY(10px);
+            animation: revealUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        @keyframes revealUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="p-6 md:p-8 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Top Navigation -->
+    <nav class="flex items-center justify-between mb-8 reveal" style="animation-delay: 0.1s;">
+        <button onclick="history.back()" class="w-10 h-10 rounded-full crystal-card flex items-center justify-center text-neutral-400 hover:text-white transition-colors">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        <div class="flex gap-3">
+            <button class="w-10 h-10 rounded-full crystal-card flex items-center justify-center text-neutral-400">
+                <i data-lucide="share-2" class="w-5 h-5"></i>
+            </button>
+            <button class="w-10 h-10 rounded-full crystal-card flex items-center justify-center text-neutral-400">
+                <i data-lucide="star" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Header Section -->
+    <header class="mb-8 reveal" style="animation-delay: 0.2s;">
+        <h1 class="text-h1 tracking-tight mb-2">Wild Atlantic Salmon</h1>
+        <div class="flex items-center gap-2">
+            <span class="mono text-sm text-neutral-400">Serving Size:</span>
+            <span class="mono text-sm font-bold text-secondary">150g (1 Fillet)</span>
+        </div>
+    </header>
+
+    <!-- Calorie Hero Card -->
+    <section class="mb-6 reveal" style="animation-delay: 0.3s;">
+        <div class="crystal-card kinetic-shimmer p-8 text-center border-t-2 border-t-secondary/30">
+            <div class="text-neutral-400 text-sm font-medium uppercase tracking-widest mb-1">Total Energy</div>
+            <div class="flex justify-center items-baseline gap-2">
+                <span class="text-calories text-white">312</span>
+                <span class="text-xl font-bold text-neutral-500 uppercase">kcal</span>
+            </div>
+            <div class="mt-4 flex justify-center gap-6">
+                <div class="flex items-center gap-1.5 text-accent">
+                    <i data-lucide="zap" class="w-4 h-4"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider">High Protein</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-secondary">
+                    <i data-lucide="droplet" class="w-4 h-4"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider">Omega-3s</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Macro Breakdown -->
+    <section class="grid grid-cols-1 gap-4 mb-8 reveal" style="animation-delay: 0.4s;">
+        <div class="crystal-card p-6">
+            <h3 class="text-sm font-bold uppercase tracking-widest text-neutral-500 mb-6">Macronutrients</h3>
+            <div class="space-y-6">
+                <!-- Protein -->
+                <div>
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-sm font-semibold">Protein</span>
+                        <span class="mono text-sm font-bold text-secondary">38.5g <span class="text-neutral-500 font-normal">/ 49%</span></span>
+                    </div>
+                    <div class="macro-bar">
+                        <div class="macro-progress bg-secondary" style="width: 49%;"></div>
+                    </div>
+                </div>
+                <!-- Carbs -->
+                <div>
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-sm font-semibold">Carbohydrates</span>
+                        <span class="mono text-sm font-bold text-primary">0.0g <span class="text-neutral-500 font-normal">/ 0%</span></span>
+                    </div>
+                    <div class="macro-bar">
+                        <div class="macro-progress bg-primary" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <!-- Fats -->
+                <div>
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-sm font-semibold">Fats</span>
+                        <span class="mono text-sm font-bold text-accent">15.8g <span class="text-neutral-500 font-normal">/ 51%</span></span>
+                    </div>
+                    <div class="macro-bar">
+                        <div class="macro-progress bg-accent" style="width: 51%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Detailed Nutrition Label (Vitreous Style) -->
+    <section class="reveal" style="animation-delay: 0.5s;">
+        <div class="crystal-card p-6 overflow-hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-sm font-bold uppercase tracking-widest text-neutral-500">Micronutrients</h3>
+                <span class="text-[10px] mono bg-neutral-800 px-2 py-1 rounded text-neutral-400">per 150g</span>
+            </div>
+            
+            <div class="space-y-0">
+                <div class="nutrition-label-line flex justify-between">
+                    <span class="text-sm text-neutral-300">Saturated Fat</span>
+                    <span class="mono text-sm">3.2g</span>
+                </div>
+                <div class="nutrition-label-line flex justify-between">
+                    <span class="text-sm text-neutral-300">Cholesterol</span>
+                    <span class="mono text-sm">82mg</span>
+                </div>
+                <div class="nutrition-label-line flex justify-between">
+                    <span class="text-sm text-neutral-300 font-bold">Sodium</span>
+                    <span class="mono text-sm font-bold text-primary">94mg</span>
+                </div>
+                <div class="nutrition-label-line flex justify-between">
+                    <span class="text-sm text-neutral-300">Potassium</span>
+                    <span class="mono text-sm">726mg</span>
+                </div>
+                <div class="nutrition-label-line flex justify-between border-b-2 border-b-white/20">
+                    <span class="text-sm text-neutral-300 font-bold">Dietary Fiber</span>
+                    <span class="mono text-sm">0g</span>
+                </div>
+                <div class="nutrition-label-line flex justify-between">
+                    <span class="text-sm text-neutral-400">Sugars</span>
+                    <span class="mono text-sm text-neutral-400">0g</span>
+                </div>
+                <div class="nutrition-label-line flex justify-between">
+                    <span class="text-sm text-neutral-300">Vitamin D</span>
+                    <span class="mono text-sm text-accent">120% DV</span>
+                </div>
+                <div class="pt-4">
+                    <p class="text-[10px] text-neutral-500 italic leading-relaxed">
+                        * Percent Daily Values are based on a 2,000 calorie diet. Your daily values may be higher or lower depending on your energy needs.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sticky Thumb Zone Action Bar -->
+    <div class="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/80 to-transparent z-50 reveal" style="animation-delay: 0.6s;">
+        <div class="max-w-screen-xl mx-auto grid grid-cols-2 gap-4">
+            <button class="btn-secondary rounded-2xl flex items-center justify-center gap-2 font-bold uppercase tracking-wider text-sm">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                Edit Food
+            </button>
+            <button class="btn-danger rounded-2xl flex items-center justify-center gap-2 font-bold uppercase tracking-wider text-sm">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                Delete
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Vibration feedback for actions
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(5);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

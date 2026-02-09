@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Tracking | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .crystal-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+            transform: rotate(15deg);
+            pointer-events: none;
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -150%;
+            left: -150%;
+            width: 400%;
+            height: 400%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-primary {
+            height: 52px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-check {
+            width: 52px;
+            height: 52px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-check.active {
+            background: var(--accent);
+            color: black;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+            border-color: transparent;
+        }
+
+        .streak-badge {
+            background: linear-gradient(45deg, #F59E0B, #EF4444);
+            animation: pulse-fire 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-fire {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
+        }
+
+        .habit-grid-item {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+
+        .habit-grid-item.complete {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg-dark);
+        }
+
+        .tectonic-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 20% 90%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        /* Hide Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .text-h1 { font-size: 30px; line-height: 1.25; font-weight: 700; }
+        .text-h2 { font-size: 20px; line-height: 1.25; font-weight: 600; }
+        .text-caption { font-size: 14px; line-height: 1.4; font-weight: 400; }
+
+        .progress-bar-fill {
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10 pb-36">
+    <div class="tectonic-overlay"></div>
+
+    <!-- Header & Stats Summary -->
+    <header class="mb-10">
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <h1 class="text-h1 tracking-tight">Habit Tracker</h1>
+                <p class="text-caption text-neutral-400 mt-1">Consistency is the bridge to your goals.</p>
+            </div>
+            <div class="streak-badge flex items-center gap-1.5 px-4 py-2 rounded-2xl shadow-lg">
+                <i data-lucide="flame" class="w-5 h-5 fill-current"></i>
+                <span class="text-sm font-bold mono">6 DAY STREAK</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="crystal-card p-4 flex flex-col justify-center">
+                <span class="text-caption text-neutral-400 mb-1">Active Habits</span>
+                <span class="text-2xl font-bold mono">05</span>
+            </div>
+            <div class="crystal-card p-4 flex flex-col justify-center border-l-4 border-l-accent">
+                <span class="text-caption text-neutral-400 mb-1">Today's Progress</span>
+                <span class="text-2xl font-bold mono">4<span class="text-neutral-500">/5</span></span>
+            </div>
+            <div class="crystal-card p-4 hidden md:flex flex-col justify-center">
+                <span class="text-caption text-neutral-400 mb-1">Completion Rate</span>
+                <span class="text-2xl font-bold mono">88%</span>
+            </div>
+            <div class="crystal-card p-4 hidden md:flex flex-col justify-center">
+                <span class="text-caption text-neutral-400 mb-1">Total Points</span>
+                <span class="text-2xl font-bold mono">1,240</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Habits Checklist -->
+    <section class="space-y-6">
+        <h2 class="text-h2 mb-4 flex items-center gap-2">
+            Today's Checklist
+            <span class="w-2 h-2 rounded-full bg-accent animate-pulse"></span>
+        </h2>
+
+        <!-- Habit Card 1 -->
+        <div class="crystal-card kinetic-shimmer p-5 group transition-all hover:border-white/20">
+            <div class="flex items-center gap-5 mb-5">
+                <div class="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                    <i data-lucide="droplets" class="w-7 h-7"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between items-end mb-1">
+                        <h3 class="font-bold text-lg">Hydration</h3>
+                        <span class="mono text-sm text-accent">6/8 glasses</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div class="progress-bar-fill h-full bg-blue-500" style="width: 75%;"></div>
+                    </div>
+                </div>
+                <button class="btn-check rounded-2xl border-2 border-white/10 flex items-center justify-center hover:bg-white/5" onclick="this.classList.toggle('active')">
+                    <i data-lucide="check" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <!-- Weekly Mini Grid -->
+            <div class="flex items-center justify-between pt-4 border-top border-white/5">
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    <div class="habit-grid-item complete">M</div>
+                    <div class="habit-grid-item complete">T</div>
+                    <div class="habit-grid-item complete">W</div>
+                    <div class="habit-grid-item complete">T</div>
+                    <div class="habit-grid-item">F</div>
+                    <div class="habit-grid-item">S</div>
+                    <div class="habit-grid-item">S</div>
+                </div>
+                <span class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">4 Day Streak</span>
+            </div>
+        </div>
+
+        <!-- Habit Card 2 -->
+        <div class="crystal-card p-5 group transition-all hover:border-white/20">
+            <div class="flex items-center gap-5 mb-5">
+                <div class="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 border border-purple-500/20">
+                    <i data-lucide="moon" class="w-7 h-7"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between items-end mb-1">
+                        <h3 class="font-bold text-lg">Sleep Quality</h3>
+                        <span class="mono text-sm text-accent">7.5/8 hrs</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div class="progress-bar-fill h-full bg-purple-500" style="width: 92%;"></div>
+                    </div>
+                </div>
+                <button class="btn-check rounded-2xl border-2 border-white/10 flex items-center justify-center active" onclick="this.classList.toggle('active')">
+                    <i data-lucide="check" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div class="flex items-center justify-between pt-4 border-top border-white/5">
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    <div class="habit-grid-item complete">M</div>
+                    <div class="habit-grid-item complete">T</div>
+                    <div class="habit-grid-item complete">W</div>
+                    <div class="habit-grid-item complete">T</div>
+                    <div class="habit-grid-item complete">F</div>
+                    <div class="habit-grid-item">S</div>
+                    <div class="habit-grid-item">S</div>
+                </div>
+                <span class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">12 Day Streak</span>
+            </div>
+        </div>
+
+        <!-- Habit Card 3 -->
+        <div class="crystal-card p-5 group transition-all hover:border-white/20">
+            <div class="flex items-center gap-5 mb-5">
+                <div class="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-400 border border-orange-500/20">
+                    <i data-lucide="footprints" class="w-7 h-7"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between items-end mb-1">
+                        <h3 class="font-bold text-lg">Daily Steps</h3>
+                        <span class="mono text-sm text-accent">10.2k/12k</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div class="progress-bar-fill h-full bg-orange-500" style="width: 85%;"></div>
+                    </div>
+                </div>
+                <button class="btn-check rounded-2xl border-2 border-white/10 flex items-center justify-center hover:bg-white/5" onclick="this.classList.toggle('active')">
+                    <i data-lucide="check" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div class="flex items-center justify-between pt-4 border-top border-white/5">
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    <div class="habit-grid-item complete">M</div>
+                    <div class="habit-grid-item">T</div>
+                    <div class="habit-grid-item complete">W</div>
+                    <div class="habit-grid-item complete">T</div>
+                    <div class="habit-grid-item">F</div>
+                    <div class="habit-grid-item">S</div>
+                    <div class="habit-grid-item">S</div>
+                </div>
+                <span class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">2 Day Streak</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Weekly Analysis Accordion -->
+    <section class="mt-10">
+        <div class="crystal-card p-6 border-white/5">
+            <button class="w-full flex justify-between items-center" onclick="document.getElementById('weekly-detail').classList.toggle('hidden')">
+                <h3 class="text-h2">Weekly Performance</h3>
+                <i data-lucide="chevron-down" class="w-5 h-5 text-neutral-400"></i>
+            </button>
+            <div id="weekly-detail" class="mt-6 space-y-4">
+                <div class="flex items-center gap-4">
+                    <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                        <div class="h-full bg-accent w-[85%]"></div>
+                    </div>
+                    <span class="mono text-xs">85% Compliance</span>
+                </div>
+                <p class="text-sm text-neutral-400 italic">"You are most consistent with your <b>Sleep Quality</b>. Your <b>Hydration</b> tends to dip on Wednesdays."</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Floating Navigation & CTA -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black via-black/80 to-transparent z-50">
+        <div class="max-w-screen-xl mx-auto flex items-center justify-between gap-4">
+            <div class="flex bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-2 gap-2">
+                <button class="w-12 h-12 flex items-center justify-center text-neutral-500 hover:text-white transition-colors">
+                    <i data-lucide="layout-grid"></i>
+                </button>
+                <button class="w-12 h-12 flex items-center justify-center text-accent bg-accent/10 rounded-2xl">
+                    <i data-lucide="check-circle"></i>
+                </button>
+                <button class="w-12 h-12 flex items-center justify-center text-neutral-500 hover:text-white transition-colors">
+                    <i data-lucide="bar-chart-2"></i>
+                </button>
+            </div>
+
+            <button class="btn-primary px-8 rounded-2xl flex items-center justify-center gap-2 font-bold text-black shadow-2xl active:scale-95 transition-transform" onclick="triggerAddModal()">
+                <i data-lucide="plus" class="w-5 h-5"></i>
+                <span class="hidden md:inline">Add Habit</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Simple Add Modal Placeholder -->
+    <div id="add-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-6">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-md" onclick="triggerAddModal()"></div>
+        <div class="crystal-card w-full max-w-md p-8 relative animate-in fade-in zoom-in duration-300">
+            <h2 class="text-2xl font-bold mb-6">Track New Habit</h2>
+            <div class="space-y-4 mb-8">
+                <div>
+                    <label class="text-xs uppercase tracking-widest text-neutral-500 font-bold mb-2 block">Habit Name</label>
+                    <input type="text" placeholder="e.g. Read for 20 mins" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-accent outline-none transition-all">
+                </div>
+                <div>
+                    <label class="text-xs uppercase tracking-widest text-neutral-500 font-bold mb-2 block">Icon & Color</label>
+                    <div class="flex gap-3">
+                        <div class="w-12 h-12 rounded-xl bg-accent/20 border border-accent flex items-center justify-center text-accent"><i data-lucide="book-open"></i></div>
+                        <div class="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-neutral-400"><i data-lucide="heart"></i></div>
+                        <div class="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-neutral-400"><i data-lucide="zap"></i></div>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-primary w-full rounded-xl font-bold text-black" onclick="triggerAddModal()">Create Habit</button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Reveal animations
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+
+        // Toggle Modal
+        function triggerAddModal() {
+            const modal = document.getElementById('add-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        // Haptic Feedback for Mobile
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(12);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -3,12 +3,11 @@
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useTheme } from "@/contexts/ThemeContext";
 import { GoalsAndHabits } from "@/components/progress/GoalsAndHabits";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft, Target } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function GoalsAndHabitsPage() {
   const router = useRouter();
@@ -18,34 +17,27 @@ export default function GoalsAndHabitsPage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <Button
-                  onClick={() => router.push("/client/progress")}
-                  variant="ghost"
-                  size="icon"
-                  className="fc-btn fc-btn-ghost h-10 w-10"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Progress Hub
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                    Goals & Habits
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Set targets, track streaks, and stay accountable.
-                  </p>
+        <div className="relative z-10 min-h-screen fc-page">
+          {/* Fixed top nav */}
+          <nav className="fixed top-0 left-0 right-0 z-50 fc-glass border-b border-[color:var(--fc-glass-border)] backdrop-blur-md">
+            <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4 sm:px-6">
+              <Link
+                href="/client/progress"
+                className="flex items-center gap-3 fc-text-dim hover:fc-text-primary transition-colors group"
+              >
+                <div className="p-2 rounded-xl fc-glass-soft group-hover:bg-white/10 transition-colors">
+                  <ChevronLeft className="w-5 h-5" />
                 </div>
-              </div>
+                <span className="font-medium">Dashboard</span>
+              </Link>
+              <h1 className="text-xl font-bold tracking-tight fc-text-primary">Goals & Habits</h1>
+              <div className="w-20" aria-hidden />
             </div>
-          </GlassCard>
+          </nav>
 
-          <GoalsAndHabits loading={false} />
+          <main className="max-w-4xl mx-auto pt-24 pb-24 px-4 sm:px-6">
+            <GoalsAndHabits loading={false} />
+          </main>
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

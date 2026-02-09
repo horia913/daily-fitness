@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Program Architecture | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #070707;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --mercury: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Mercury Fluidity Background */
+        .mercury-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+            z-index: -1;
+            filter: blur(80px);
+        }
+
+        /* Crystalline Kinetic Card */
+        .crystal-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), border 0.3s ease;
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255,255,255,0.15);
+        }
+
+        /* Kinetic Shimmer Animation */
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -150%;
+            left: -150%;
+            width: 400%;
+            height: 400%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: flow 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes flow {
+            0% { transform: rotate(0deg) translate(-10%, -10%); }
+            100% { transform: rotate(360deg) translate(10%, 10%); }
+        }
+
+        /* Interactions */
+        .btn-primary {
+            height: 56px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4); }
+
+        .btn-secondary {
+            height: 52px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); }
+
+        /* Accordion Custom Styling */
+        .week-accordion[open] .accordion-icon {
+            transform: rotate(180deg);
+        }
+        
+        .week-accordion summary::-webkit-details-marker { display: none; }
+        
+        /* Hierarchy Typography */
+        .text-h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+        .text-h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+        .text-h3 { font-size: 16px; font-weight: 500; }
+        
+        /* Bottom Sticky Bar */
+        .action-bar {
+            background: rgba(7, 7, 7, 0.85);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--glass-border);
+        }
+
+        /* Status Pills */
+        .block-tag {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+
+        .tag-straight { background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.2); }
+        .tag-superset { background: rgba(245, 158, 11, 0.15); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.2); }
+    </style>
+</head>
+<body class="p-6 md:p-12 pb-40">
+    <div class="mercury-bg"></div>
+
+    <!-- Navigation Header -->
+    <nav class="flex justify-between items-center mb-10">
+        <button class="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors">
+            <i data-lucide="chevron-left" class="w-5 h-5"></i>
+            <span class="font-medium">Back to Programs</span>
+        </button>
+        <div class="flex gap-3">
+            <button class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-neutral-400 hover:text-white transition-all">
+                <i data-lucide="share-2" class="w-4 h-4"></i>
+            </button>
+            <button class="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-neutral-400 hover:text-white transition-all">
+                <i data-lucide="more-horizontal" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Program Hero -->
+    <header class="mb-12">
+        <div class="flex flex-wrap items-start justify-between gap-6">
+            <div class="max-w-2xl">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full text-[10px] font-bold uppercase tracking-widest">Advanced Hypertrophy</span>
+                    <span class="text-neutral-500 mono text-xs">ID: PC-9902</span>
+                </div>
+                <h1 class="text-h1 mb-4">Metabolic Overload Phase 1</h1>
+                <p class="text-neutral-400 text-lg leading-relaxed">A high-volume protocol designed for mechanical tension and sarcoplasmic hypertrophy. Focuses on eccentric control and short rest intervals.</p>
+            </div>
+            
+            <div class="crystal-card p-6 flex flex-col gap-4 min-w-[240px]">
+                <div class="flex justify-between items-center">
+                    <span class="text-neutral-400 text-sm">Assigned Clients</span>
+                    <span class="bg-accent/10 text-accent px-2 py-0.5 rounded text-xs font-bold">5 ACTIVE</span>
+                </div>
+                <div class="flex -space-x-3 overflow-hidden">
+                    <img class="inline-block h-10 w-10 rounded-full ring-2 ring-[#121212]" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="">
+                    <img class="inline-block h-10 w-10 rounded-full ring-2 ring-[#121212]" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sara" alt="">
+                    <img class="inline-block h-10 w-10 rounded-full ring-2 ring-[#121212]" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Milo" alt="">
+                    <img class="inline-block h-10 w-10 rounded-full ring-2 ring-[#121212]" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jordan" alt="">
+                    <div class="flex items-center justify-center h-10 w-10 rounded-full ring-2 ring-[#121212] bg-neutral-800 text-[10px] font-bold">+1</div>
+                </div>
+                <button class="text-sm font-semibold text-secondary flex items-center gap-1.5 hover:underline transition-all">
+                    Manage Access <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Progression Rules Shortcut -->
+    <section class="mb-12">
+        <div class="crystal-card kinetic-shimmer p-6 flex flex-col md:flex-row items-center justify-between gap-6 border-l-4 border-l-secondary">
+            <div class="flex items-center gap-5">
+                <div class="w-14 h-14 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary">
+                    <i data-lucide="trending-up" class="w-7 h-7"></i>
+                </div>
+                <div>
+                    <h3 class="text-h2">Auto-Progression Engine</h3>
+                    <p class="text-sm text-neutral-400 mt-1">Weight increases by <span class="text-white font-medium">2.5%</span> every <span class="text-white font-medium">8 sessions</span> if RPE < 8.</p>
+                </div>
+            </div>
+            <button class="btn-secondary px-8 rounded-2xl font-bold flex items-center gap-2 whitespace-nowrap">
+                <i data-lucide="settings-2" class="w-4 h-4"></i>
+                Edit Progression Rules
+            </button>
+        </div>
+    </section>
+
+    <!-- Weekly Breakdown Accordion -->
+    <section class="space-y-6">
+        <h2 class="text-neutral-500 font-bold uppercase tracking-widest text-xs mb-4">Training Schedule</h2>
+
+        <!-- Week 1: Open by default -->
+        <details class="week-accordion group crystal-card overflow-hidden" open>
+            <summary class="flex items-center justify-between p-6 cursor-pointer list-none select-none">
+                <div class="flex items-center gap-4">
+                    <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-xs font-bold mono">01</div>
+                    <div>
+                        <h3 class="text-h2">Week 1: Adaptation Phase</h3>
+                        <p class="text-sm text-neutral-400">4 Workouts • Total Volume: 42,500kg</p>
+                    </div>
+                </div>
+                <i data-lucide="chevron-down" class="accordion-icon w-6 h-6 text-neutral-500 transition-transform duration-300"></i>
+            </summary>
+            
+            <div class="px-6 pb-6 space-y-4">
+                <!-- Workout Item -->
+                <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                            <i data-lucide="dumbbell" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg">Push A: Horizontal Emphasis</h4>
+                            <div class="flex gap-2 mt-1">
+                                <span class="block-tag tag-straight">Straight Sets</span>
+                                <span class="text-xs text-neutral-500 mono py-1">6 Exercises • 55m</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="p-3 text-neutral-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <i data-lucide="eye" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Workout Item -->
+                <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400">
+                            <i data-lucide="layers" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg">Pull A: Vertical Pull & Biceps</h4>
+                            <div class="flex gap-2 mt-1">
+                                <span class="block-tag tag-superset">Superset Flow</span>
+                                <span class="text-xs text-neutral-500 mono py-1">8 Exercises • 65m</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="p-3 text-neutral-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+                        <i data-lucide="eye" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </details>
+
+        <!-- Week 2 -->
+        <details class="week-accordion group crystal-card overflow-hidden">
+            <summary class="flex items-center justify-between p-6 cursor-pointer list-none select-none hover:bg-white/[0.02] transition-colors">
+                <div class="flex items-center gap-4">
+                    <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-xs font-bold mono">02</div>
+                    <div>
+                        <h3 class="text-h2">Week 2: Intensity Ramp</h3>
+                        <p class="text-sm text-neutral-400">4 Workouts • Volume increase: +5%</p>
+                    </div>
+                </div>
+                <i data-lucide="chevron-down" class="accordion-icon w-6 h-6 text-neutral-500 transition-transform duration-300"></i>
+            </summary>
+            <div class="px-6 pb-6 text-neutral-500 text-sm italic">Details collapsed...</div>
+        </details>
+
+        <!-- Week 3 -->
+        <details class="week-accordion group crystal-card overflow-hidden">
+            <summary class="flex items-center justify-between p-6 cursor-pointer list-none select-none hover:bg-white/[0.02] transition-colors">
+                <div class="flex items-center gap-4">
+                    <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-xs font-bold mono">03</div>
+                    <div>
+                        <h3 class="text-h2">Week 3: Peak Overload</h3>
+                        <p class="text-sm text-neutral-400">4 Workouts • Max RPE week</p>
+                    </div>
+                </div>
+                <i data-lucide="chevron-down" class="accordion-icon w-6 h-6 text-neutral-500 transition-transform duration-300"></i>
+            </summary>
+            <div class="px-6 pb-6 text-neutral-500 text-sm italic">Details collapsed...</div>
+        </details>
+    </section>
+
+    <!-- Fixed Action Bar -->
+    <div class="fixed bottom-0 left-0 right-0 p-4 md:p-6 action-bar z-50">
+        <div class="max-w-4xl mx-auto flex flex-col md:flex-row gap-4">
+            <button class="btn-primary flex-1 rounded-2xl flex items-center justify-center gap-3 font-bold text-lg">
+                <i data-lucide="user-plus" class="w-6 h-6"></i>
+                Assign to Client(s)
+            </button>
+            <div class="flex gap-4">
+                <button class="btn-secondary px-6 rounded-2xl flex items-center justify-center gap-2 font-bold text-secondary">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                    <span class="hidden md:inline">Edit Program</span>
+                </button>
+                <button class="h-[52px] w-[52px] md:px-6 md:w-auto bg-red-500/10 border border-red-500/30 text-red-500 rounded-2xl flex items-center justify-center gap-2 hover:bg-red-500/20 transition-all font-bold">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    <span class="hidden md:inline">Delete</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Subtle entry animations
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.crystal-card, header, nav');
+            elements.forEach((el, i) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(15px)';
+                setTimeout(() => {
+                    el.style.transition = 'all 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                }, i * 80);
+            });
+        });
+
+        // Haptic feedback simulation
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if ('vibrate' in navigator) {
+                    navigator.vibrate(8);
+                }
+            });
+        });
+
+        // Handle details/accordion exclusivity if needed
+        const accordions = document.querySelectorAll('.week-accordion');
+        accordions.forEach((acc) => {
+            acc.addEventListener('toggle', () => {
+                if (acc.open) {
+                    accordions.forEach((other) => {
+                        if (other !== acc) other.open = false;
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

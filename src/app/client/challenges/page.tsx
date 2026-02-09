@@ -14,6 +14,7 @@ import { Challenge, getActiveChallenges, joinChallenge, getClientChallenges } fr
 import { ChallengeCard } from "@/components/client/ChallengeCard";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { withTimeout } from "@/lib/withTimeout";
 
 function ChallengesPageContent() {
   const { user, loading: authLoading } = useAuth();
@@ -28,6 +29,7 @@ function ChallengesPageContent() {
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<"fat_loss" | "muscle_gain" | null>(null);
   const [joining, setJoining] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -39,16 +41,23 @@ function ChallengesPageContent() {
     if (!user?.id) return;
 
     setLoading(true);
+    setLoadError(null);
     try {
-      const [active, myParticipations] = await Promise.all([
-        getActiveChallenges(),
-        getClientChallenges(user.id),
-      ]);
-
-      setActiveChallenges(active);
-      setMyChallenges(myParticipations.map(p => p.id)); // Use challenge id from the Challenge object
-    } catch (error) {
+      await withTimeout(
+        (async () => {
+          const [active, myParticipations] = await Promise.all([
+            getActiveChallenges(),
+            getClientChallenges(user.id),
+          ]);
+          setActiveChallenges(active);
+          setMyChallenges(myParticipations.map(p => p.id));
+        })(),
+        30000,
+        "timeout"
+      );
+    } catch (error: any) {
       console.error("Error loading challenges:", error);
+      setLoadError(error?.message === "timeout" ? "Loading took too long. Please try again." : (error?.message || "Failed to load challenges"));
     } finally {
       setLoading(false);
     }
@@ -118,77 +127,82 @@ function ChallengesPageContent() {
     );
   }
 
+  if (loadError) {
+    return (
+      <ProtectedRoute>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+            <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center">
+              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+              <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadChallenges(); }} className="fc-btn fc-btn-primary">
+                Retry
+              </Button>
+            </GlassCard>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
+
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <Link href="/client/progress">
-                <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              </Link>
-              <div>
-                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                  Progress Hub
-                </span>
-                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                  Challenges
-                </h1>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  Join challenges and compete with others.
-                </p>
-              </div>
-            </div>
-            <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
-              {activeChallenges.length} active challenges
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-8 sm:px-6 lg:px-10 fc-page space-y-8">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <nav className="flex items-center gap-2 text-sm fc-text-subtle mb-2 font-mono">
+              <Link href="/client/menu" className="hover:fc-text-primary">Menu</Link>
+              <span>/</span>
+              <span className="fc-text-primary">Challenges</span>
+            </nav>
+            <h1 className="text-4xl font-bold tracking-tight fc-text-primary">
+              Challenges
+            </h1>
+            <p className="fc-text-dim mt-2">
+              Join challenges and compete with others.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="fc-glass-soft px-4 py-2 rounded-xl border border-[color:var(--fc-glass-border)] flex items-center gap-2">
+              <Trophy className="w-5 h-5 fc-text-warning" />
+              <span className="font-mono text-sm font-bold fc-text-primary">
+                {activeChallenges.length} active
+              </span>
             </div>
           </div>
-        </GlassCard>
+        </header>
 
-        <GlassCard elevation={2} className="fc-glass fc-card p-6">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                Browse Challenges
-              </h2>
-              <p className="text-sm text-[color:var(--fc-text-dim)]">
-                Pick a challenge track and start competing.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => setActiveTab("all")}
-                className={cn(
-                  "fc-btn",
-                  activeTab === "all"
-                    ? "fc-btn-primary"
-                    : "fc-btn-secondary text-[color:var(--fc-text-primary)]"
-                )}
-              >
-                <Trophy className="w-4 h-4 mr-2" />
-                All ({activeChallenges.length})
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => setActiveTab("my")}
-                className={cn(
-                  "fc-btn",
-                  activeTab === "my"
-                    ? "fc-btn-primary"
-                    : "fc-btn-secondary text-[color:var(--fc-text-primary)]"
-                )}
-              >
-                <Users className="w-4 h-4 mr-2" />
-                My Challenges ({myChallenges.length})
-              </Button>
-            </div>
+        {/* Tabs */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[color:var(--fc-glass-border)] pb-4">
+          <div className="flex gap-6 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setActiveTab("all")}
+              className={cn(
+                "pb-2 text-sm font-bold tracking-wider uppercase whitespace-nowrap border-b-2 transition-colors",
+                activeTab === "all"
+                  ? "fc-text-primary border-[color:var(--fc-status-error)]"
+                  : "fc-text-subtle border-transparent hover:fc-text-primary"
+              )}
+            >
+              Browse all
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("my")}
+              className={cn(
+                "pb-2 text-sm font-bold tracking-wider uppercase whitespace-nowrap border-b-2 transition-colors",
+                activeTab === "my"
+                  ? "fc-text-primary border-[color:var(--fc-status-error)]"
+                  : "fc-text-subtle border-transparent hover:fc-text-primary"
+              )}
+            >
+              My challenges
+            </button>
           </div>
-        </GlassCard>
+        </div>
 
         {/* Challenges Grid */}
         {displayedChallenges.length === 0 ? (
@@ -204,7 +218,7 @@ function ChallengesPageContent() {
             </p>
           </GlassCard>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-6">
             {displayedChallenges.map((challenge) => (
               <ChallengeCard
                 key={challenge.id}

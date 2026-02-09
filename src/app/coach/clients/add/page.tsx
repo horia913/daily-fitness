@@ -460,97 +460,62 @@ export default function AddClient() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <Button
-                  variant="ghost"
-                  onClick={() => router.push('/coach/clients')}
-                  className="fc-btn fc-btn-ghost h-10 w-10"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Client Onboarding
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                    Add New Client
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Generate a signup link and invite your client.
-                  </p>
-                </div>
+        <div className="relative z-10 mx-auto w-full max-w-2xl px-4 pb-32 pt-10 sm:px-6 space-y-8">
+          <header className="flex items-center gap-4 mb-10">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/coach/clients')}
+              className="w-12 h-12 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)] hover:bg-white/10 transition-all"
+            >
+              <ArrowLeft className="w-6 h-6 fc-text-primary" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Add New Client</h1>
+              <p className="text-sm fc-text-dim font-mono uppercase tracking-wider mt-1">Invite by email</p>
+            </div>
+          </header>
+
+          <GlassCard elevation={2} className="fc-glass fc-card rounded-3xl p-6 sm:p-8">
+            <ProgressIndicator steps={steps} currentStep={currentStep} />
+            <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
+              <h2 className="text-lg font-semibold fc-text-primary mb-1">{steps[currentStep - 1]?.title}</h2>
+              <p className="text-sm fc-text-dim mb-6">
+                {currentStep === 1 ? "Enter the client's email address" : "Generate and send the invite link"}
+              </p>
+              <div className="space-y-6">
+                {renderStepContent()}
               </div>
-              <Badge className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                Step {currentStep} of {steps.length}
-              </Badge>
             </div>
           </GlassCard>
 
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
-            <ProgressIndicator steps={steps} currentStep={currentStep} />
-          </GlassCard>
-
-          <div>
-            <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-              <CardHeader className="pb-6">
-                <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                    {currentStep === 1 && <Mail className="w-5 h-5 text-purple-600 dark:text-purple-400" />}
-                    {currentStep === 2 && <UserPlus className="w-5 h-5 text-purple-600 dark:text-purple-400" />}
-                  </div>
-                  {steps[currentStep - 1]?.title}
-                  <Badge className="bg-purple-500 text-white ml-auto">
-                    {currentStep}/{steps.length}
-                  </Badge>
-                </CardTitle>
-                <CardDescription className={`${theme.textSecondary} text-base`}>
-                  {currentStep === 1 && "Enter the client's email address"}
-                  {currentStep === 2 && "Generate and send the invite link"}
-                </CardDescription>
-              </CardHeader>
-              
-              <CardContent className="p-8">
-                {renderStepContent()}
-              </CardContent>
-            </Card>
-
-            {/* Navigation Buttons */}
-            {currentStep < 2 && (
-              <div className="flex justify-between mt-8">
-                <Button
-                  variant="outline"
-                  onClick={prevStep}
-                  disabled={currentStep === 1}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="w-4 h-4" />
+          {currentStep < 2 && (
+            <div className="sticky bottom-0 left-0 right-0 fc-glass rounded-2xl border border-[color:var(--fc-glass-border)] p-4 flex items-center justify-between gap-4 -mx-4 sm:mx-0 sm:rounded-3xl">
+              <Button variant="ghost" onClick={() => router.push('/coach/clients')} className="fc-btn fc-btn-ghost">
+                Cancel
+              </Button>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={prevStep} disabled={currentStep === 1} className="fc-btn fc-btn-ghost">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
                   Previous
                 </Button>
-                
-                <Button
-                  onClick={nextStep}
-                  className={`${theme.primary} ${theme.shadow} flex items-center gap-2`}
-                >
+                <Button onClick={nextStep} className="fc-btn fc-btn-primary">
                   {currentStep === 1 ? 'Generate Invite' : 'Next'}
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Error Display */}
-            {error && (
-              <div className="mt-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                  <span className="font-medium text-red-800 dark:text-red-200">Error</span>
-                </div>
-                <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+          {error && (
+            <div className="fc-glass rounded-2xl border border-red-500/30 p-4">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                <span className="font-medium fc-text-primary">Error</span>
               </div>
-            )}
-          </div>
+              <p className="text-sm fc-text-dim mt-1">{error}</p>
+            </div>
+          )}
         </div>
       </AnimatedBackground>
     </ProtectedRoute>

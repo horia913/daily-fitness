@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goal Architecture | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #070707;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Machined Monolith Logic - Structural Rigidity */
+        .monolith-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(25px) saturate(200%);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Kinetic Refraction Shimmer */
+        .shimmer-edge {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .shimmer-edge::after {
+            content: '';
+            position: absolute;
+            top: -150%;
+            left: -150%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(
+                45deg, 
+                transparent 45%, 
+                rgba(255,255,255,0.08) 50%, 
+                transparent 55%
+            );
+            animation: machined-sweep 8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            pointer-events: none;
+        }
+
+        @keyframes machined-sweep {
+            0% { transform: translate(-20%, -20%) rotate(0deg); }
+            100% { transform: translate(20%, 20%) rotate(5deg); }
+        }
+
+        .progress-bar-container {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 99px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 99px;
+            transition: width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .btn-fab {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 12px 24px rgba(239, 68, 68, 0.4), inset 0 2px 4px rgba(255,255,255,0.3);
+            border-radius: 20px;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .btn-fab:hover {
+            transform: translateY(-6px) rotate(90deg);
+            box-shadow: 0 20px 32px rgba(239, 68, 68, 0.5);
+        }
+
+        .status-tag {
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+        }
+
+        .refraction-bg {
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .goal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+        }
+
+        .is-open .collapsible-content {
+            max-height: 1000px;
+        }
+
+        .is-open .chevron-icon {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12 pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Architecture -->
+    <header class="max-w-6xl mx-auto flex justify-between items-end mb-12">
+        <div>
+            <div class="flex items-center gap-3 mb-2">
+                <span class="w-12 h-[2px] bg-primary"></span>
+                <span class="mono text-primary text-sm font-bold tracking-widest">PERFORMANCE ARCHIVE</span>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-bold tracking-tighter">Your Goals</h1>
+        </div>
+        <div class="hidden md:block text-right">
+            <div class="mono text-2xl font-bold text-neutral-300">03 / 08</div>
+            <div class="text-caption text-neutral-500 uppercase tracking-widest text-[10px]">Active Trajectories</div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto space-y-12">
+        
+        <!-- Monolith Stats Summary -->
+        <section class="monolith-card shimmer-edge p-8 flex flex-col md:flex-row items-center gap-12">
+            <div class="relative w-32 h-32 flex-shrink-0">
+                <svg viewBox="0 0 100 100" class="w-full h-full -rotate-90">
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"></circle>
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="url(#monolithGradient)" stroke-width="12" stroke-dasharray="276" stroke-dashoffset="69" stroke-linecap="round"></circle>
+                    <defs>
+                        <linearGradient id="monolithGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#EF4444" />
+                            <stop offset="100%" style="stop-color:#3B82F6" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span class="text-3xl font-bold mono">75%</span>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-8 flex-1">
+                <div>
+                    <div class="text-neutral-500 text-xs uppercase tracking-widest mb-1">Monthly Yield</div>
+                    <div class="text-3xl font-bold mono text-accent">+12.4%</div>
+                </div>
+                <div>
+                    <div class="text-neutral-500 text-xs uppercase tracking-widest mb-1">Consistency</div>
+                    <div class="text-3xl font-bold mono">98<span class="text-lg opacity-50">/100</span></div>
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <div class="text-neutral-500 text-xs uppercase tracking-widest mb-1">Next Milestone</div>
+                    <div class="text-lg font-semibold leading-tight">100kg Bench Press</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Active Trajectories (Goal Grid) -->
+        <section>
+            <div class="flex items-center gap-4 mb-8">
+                <h2 class="text-xl font-semibold">Active Trajectories</h2>
+                <div class="h-[1px] flex-1 bg-white/10"></div>
+            </div>
+
+            <div class="goal-grid">
+                <!-- Goal Card 1: Weight -->
+                <div class="monolith-card shimmer-edge p-6 flex flex-col justify-between group cursor-pointer hover:border-neutral-500 transition-all duration-300">
+                    <div>
+                        <div class="flex justify-between items-start mb-6">
+                            <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                                <i data-lucide="scale" class="w-6 h-6"></i>
+                            </div>
+                            <span class="status-tag bg-accent/20 text-accent border border-accent/30">On Track ✓</span>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-1">Target Weight</h3>
+                        <p class="text-neutral-400 text-sm mb-6">Reach 78.5kg for peak competition form.</p>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="flex justify-between text-sm mono">
+                            <span class="text-neutral-400">Current: 81.2kg</span>
+                            <span class="text-white">Target: 78.5kg</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-fill" style="width: 65%;"></div>
+                        </div>
+                        <div class="flex justify-between items-center pt-2">
+                            <div class="flex items-center gap-2 text-xs text-neutral-500">
+                                <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                                <span>Deadline: March 14</span>
+                            </div>
+                            <div class="mono text-xs font-bold text-primary">65% DONE</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Goal Card 2: Strength -->
+                <div class="monolith-card shimmer-edge p-6 flex flex-col justify-between group cursor-pointer hover:border-neutral-500 transition-all duration-300">
+                    <div>
+                        <div class="flex justify-between items-start mb-6">
+                            <div class="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400">
+                                <i data-lucide="dumbbell" class="w-6 h-6"></i>
+                            </div>
+                            <span class="status-tag bg-primary/20 text-primary border border-primary/30">Urgent ▲</span>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-1">Squat 140kg</h3>
+                        <p class="text-neutral-400 text-sm mb-6">Mastering the heavy triple progression.</p>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="flex justify-between text-sm mono">
+                            <span class="text-neutral-400">Best: 132.5kg</span>
+                            <span class="text-white">Target: 140kg</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-fill" style="width: 82%;"></div>
+                        </div>
+                        <div class="flex justify-between items-center pt-2">
+                            <div class="flex items-center gap-2 text-xs text-neutral-500">
+                                <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                                <span>Deadline: Feb 28</span>
+                            </div>
+                            <div class="mono text-xs font-bold text-primary">82% DONE</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Goal Card 3: Consistency -->
+                <div class="monolith-card shimmer-edge p-6 flex flex-col justify-between group cursor-pointer hover:border-neutral-500 transition-all duration-300">
+                    <div>
+                        <div class="flex justify-between items-start mb-6">
+                            <div class="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400">
+                                <i data-lucide="activity" class="w-6 h-6"></i>
+                            </div>
+                            <span class="status-tag bg-blue-500/20 text-blue-400 border border-blue-500/30">Stable</span>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-1">The 50 Session Streak</h3>
+                        <p class="text-neutral-400 text-sm mb-6">5 training days per week, zero skips.</p>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="flex justify-between text-sm mono">
+                            <span class="text-neutral-400">Today: #34</span>
+                            <span class="text-white">Target: #50</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-fill" style="width: 45%;"></div>
+                        </div>
+                        <div class="flex justify-between items-center pt-2">
+                            <div class="flex items-center gap-2 text-xs text-neutral-500">
+                                <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                                <span>Streak: 12 Days</span>
+                            </div>
+                            <div class="mono text-xs font-bold text-primary">45% DONE</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Completed Archives -->
+        <section id="completed-section" class="monolith-card overflow-hidden">
+            <button onclick="toggleCompleted()" class="w-full flex items-center justify-between p-6 hover:bg-white/5 transition-colors">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center">
+                        <i data-lucide="archive" class="w-5 h-5 text-neutral-400"></i>
+                    </div>
+                    <div class="text-left">
+                        <h3 class="font-bold">Completed Archives</h3>
+                        <p class="text-xs text-neutral-500 uppercase mono">14 Milestones Secured</p>
+                    </div>
+                </div>
+                <i data-lucide="chevron-down" class="chevron-icon transition-transform duration-300"></i>
+            </button>
+            
+            <div class="collapsible-content">
+                <div class="p-6 pt-0 space-y-4">
+                    <div class="flex items-center justify-between p-4 border border-white/5 rounded-xl bg-white/[0.02]">
+                        <div class="flex items-center gap-4">
+                            <div class="text-accent">
+                                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <div class="font-semibold">Lose 5kg Body Fat</div>
+                                <div class="text-xs text-neutral-500 mono">Final: 79.5kg • Completed Jan 12</div>
+                            </div>
+                        </div>
+                        <div class="status-tag bg-accent/10 text-accent">🏆 ARCHIVED</div>
+                    </div>
+                    <div class="flex items-center justify-between p-4 border border-white/5 rounded-xl bg-white/[0.02]">
+                        <div class="flex items-center gap-4">
+                            <div class="text-accent">
+                                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <div class="font-semibold">First 200kg Deadlift</div>
+                                <div class="text-xs text-neutral-500 mono">Final: 205kg • Completed Dec 24</div>
+                            </div>
+                        </div>
+                        <div class="status-tag bg-accent/10 text-accent">🏆 ARCHIVED</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Floating Action Architecture -->
+    <div class="fixed bottom-8 right-8 z-50">
+        <button class="btn-fab flex items-center justify-center group" aria-label="Add New Goal">
+            <i data-lucide="plus" class="w-8 h-8 text-white"></i>
+            <!-- Label appears on hover/wide screens -->
+            <span class="absolute right-20 bg-neutral-900 border border-white/10 px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-2xl">
+                NEW ARCHIVE
+            </span>
+        </button>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Toggle Completed Section
+        function toggleCompleted() {
+            const section = document.getElementById('completed-section');
+            section.classList.toggle('is-open');
+        }
+
+        // Kinetic Entrance Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.monolith-card');
+            elements.forEach((el, i) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(30px) scale(0.98)';
+                setTimeout(() => {
+                    el.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0) scale(1)';
+                }, i * 150);
+            });
+        });
+
+        // Haptic Feedback for the FAB
+        const fab = document.querySelector('.btn-fab');
+        fab.addEventListener('click', () => {
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate([15, 30, 15]);
+            }
+        });
+    </script>
+</body>
+</html>

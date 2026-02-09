@@ -9,7 +9,7 @@ export const semanticColors = {
     dark: '#E55325',
     gradient: 'linear-gradient(135deg, #FF6B35 0%, #FF4E50 100%)',
   },
-  
+
   // Trust/Progress (Secondary Actions, Stats)
   trust: {
     primary: '#4A90E2',
@@ -17,7 +17,7 @@ export const semanticColors = {
     dark: '#3A7BC8',
     gradient: 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
   },
-  
+
   // Success/Achievement (Completed, Goals Met)
   success: {
     primary: '#7CB342',
@@ -25,7 +25,7 @@ export const semanticColors = {
     dark: '#689F38',
     gradient: 'linear-gradient(135deg, #7CB342 0%, #558B2F 100%)',
   },
-  
+
   // Warning/Intensity (High effort, alerts)
   warning: {
     primary: '#FFA726',
@@ -33,7 +33,7 @@ export const semanticColors = {
     dark: '#FB8C00',
     gradient: 'linear-gradient(135deg, #FFA726 0%, #FF9800 100%)',
   },
-  
+
   // Critical/Peak (Max effort, urgent)
   critical: {
     primary: '#E53935',
@@ -41,7 +41,7 @@ export const semanticColors = {
     dark: '#C62828',
     gradient: 'linear-gradient(135deg, #E53935 0%, #D32F2F 100%)',
   },
-  
+
   // Neutral/Inactive
   neutral: {
     primary: '#9E9E9E',
@@ -51,23 +51,23 @@ export const semanticColors = {
   },
 } as const;
 
-// Time-based gradient colors - Palette A: Athletic Blue/Teal
+// Time-based gradient colors — Rulebook 1.7: aurora cyan/purple/indigo, basalt base (#0b0f14, #121824)
 export const timeBasedGradients = {
   morning: {
-    light: ['#DBEAFE', '#BFDBFE', '#FED7AA', '#FFEDD5'], // Cool blues → sunrise orange
-    dark: ['#0C1821', '#0F2027', '#1E293B', '#1C1917'],
+    light: ['#f6f2ec', '#e8e3db', '#BAE6FD', '#A5F3FC'], // Warm base + cyan tint
+    dark: ['#0b0f14', '#121824', '#0e7490', '#155e75'],   // Basalt + cyan
   },
   afternoon: {
-    light: ['#BAE6FD', '#A5F3FC', '#99F6E4', '#FEF3C7'], // Bright blue → teal → cream
-    dark: ['#0C1821', '#0F2027', '#134E4A', '#1F2937'],
+    light: ['#f6f2ec', '#e8e3db', '#A5F3FC', '#99F6E4'], // Warm base + cyan/teal
+    dark: ['#0b0f14', '#121824', '#0e7490', '#0f766e'],   // Basalt + cyan/teal
   },
   evening: {
-    light: ['#7DD3FC', '#60A5FA', '#FBBF24', '#FDE68A'], // Deep blue → golden hour
-    dark: ['#0C4A6E', '#075985', '#92400E', '#78350F'],
+    light: ['#f6f2ec', '#e8e3db', '#7DD3FC', '#60A5FA'],  // Warm base + blue
+    dark: ['#0b0f14', '#121824', '#0E7490', '#155E75'],   // Basalt + cyan/blue
   },
   night: {
-    light: ['#C7D2FE', '#A5B4FC', '#818CF8', '#6366F1'], // Deep purple/indigo
-    dark: ['#1E1B4B', '#312E81', '#3730A3', '#4C1D95'],
+    light: ['#f6f2ec', '#e8e3db', '#A5B4FC', '#818CF8'],  // Warm base + purple/indigo
+    dark: ['#0b0f14', '#121824', '#3730A3', '#4f46e5'],   // Basalt + indigo (rulebook accent.indigo)
   },
 } as const;
 
@@ -75,7 +75,7 @@ export const timeBasedGradients = {
 export function getTimeBasedGradient(isDark: boolean = false): string[] {
   const hour = new Date().getHours();
   const mode = isDark ? 'dark' : 'light';
-  
+
   if (hour >= 5 && hour < 12) {
     return [...timeBasedGradients.morning[mode]] as string[];
   } else if (hour >= 12 && hour < 18) {

@@ -5,7 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -115,32 +114,30 @@ function CreateProgramContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen p-4 sm:p-6">
-        <div className="max-w-3xl mx-auto space-y-6 relative z-10">
-          <GlassCard elevation={3} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex items-start gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => (window.location.href = "/coach/programs")}
-                className="fc-btn fc-btn-ghost h-10 w-10"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              <div className="flex-1">
-                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                  Program Builder
-                </span>
-                <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                  Create Training Program
-                </h1>
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  Build a structured multi-week program for your clients.
-                </p>
-              </div>
-            </div>
-          </GlassCard>
+      <div className="min-h-screen p-4 sm:p-6 md:p-8 lg:p-12 relative z-10">
+        <main className="max-w-4xl mx-auto">
+          <nav className="flex items-center gap-2 text-sm fc-text-dim mb-4 font-mono uppercase tracking-widest">
+            <button
+              type="button"
+              onClick={() => (window.location.href = "/coach/programs")}
+              className="hover:fc-text-primary transition-colors"
+            >
+              Programs
+            </button>
+            <span className="fc-text-subtle">/</span>
+            <span className="fc-text-primary">New Creation</span>
+          </nav>
+          <header className="mb-10">
+            <h1 className="text-3xl font-bold tracking-tight fc-text-primary mb-2">
+              Create Training Program
+            </h1>
+            <p className="fc-text-dim">
+              Define the blueprint for your client&apos;s success.
+            </p>
+          </header>
+          <div className="space-y-6">
 
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 md:p-10">
             <div className="space-y-6">
               <div>
                 <h2 className="text-base font-semibold text-[color:var(--fc-text-primary)]">
@@ -284,7 +281,7 @@ function CreateProgramContent() {
                   }}
                 >
                   Training Category
-                  <span className="text-xs text-slate-500 ml-2">
+                    <span className="text-xs fc-text-dim ml-2">
                     (optional - for volume calculator)
                   </span>
                 </label>
@@ -323,7 +320,7 @@ function CreateProgramContent() {
                   </SelectContent>
                 </Select>
                 {categories.length === 0 && (
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs fc-text-dim mt-1">
                     No categories available. Create categories in the Categories section.
                   </p>
                 )}
@@ -361,9 +358,9 @@ function CreateProgramContent() {
                 {saving ? "Creating..." : "Create Program"}
               </Button>
             </div>
-          </GlassCard>
+          </div>
 
-          <GlassCard elevation={1} className="fc-glass-soft fc-card p-4">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4">
             <div className="flex items-start gap-3">
               <Info
                 className="w-5 h-5 flex-shrink-0 mt-0.5"
@@ -373,14 +370,15 @@ function CreateProgramContent() {
               />
               <div>
                 <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  After creating the program, you'll be able to configure the
+                  After creating the program, you&apos;ll be able to configure the
                   weekly schedule, assign workout templates to specific days,
                   and set up progression rules for each week.
                 </p>
               </div>
             </div>
-          </GlassCard>
-        </div>
+          </div>
+          </div>
+        </main>
       </div>
     </AnimatedBackground>
   );

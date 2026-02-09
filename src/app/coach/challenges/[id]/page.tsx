@@ -10,7 +10,7 @@ import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Trophy, Users, Calendar, CheckCircle, XCircle, Video, Clock } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, CheckCircle, XCircle, Video, Clock, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { getChallengeDetails, getChallengeParticipants, getPendingVideoSubmissions, reviewVideoSubmission, ChallengeVideoSubmission } from "@/lib/challengeService";
 import { supabase } from "@/lib/supabase";
@@ -131,53 +131,64 @@ function CoachChallengeDetailContent() {
     );
   }
 
+  const start = new Date(challenge.start_date);
+  const end = new Date(challenge.end_date);
+  const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 30;
+  const today = new Date();
+  const currentDay = Math.min(Math.max(1, Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))), totalDays);
+
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl space-y-6">
-        <GlassCard elevation={1} className="p-6 md:p-8">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-3">
-              <Badge className="fc-badge fc-badge-strong w-fit">Challenge Overview</Badge>
-              <div className="flex items-center gap-4">
-                <Link href="/coach/challenges">
-                  <Button variant="ghost" size="icon" className="fc-btn fc-btn-ghost h-10 w-10">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                </Link>
-                <div>
-                  <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                    {challenge.name}
-                  </h1>
-                  <div className="mt-2 flex flex-wrap gap-4 text-sm text-[color:var(--fc-text-dim)]">
-                    <span className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      {new Date(challenge.start_date).toLocaleDateString()} - {new Date(challenge.end_date).toLocaleDateString()}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <Users className="w-4 h-4" />
-                      {participants.length} participants
-                    </span>
-                  </div>
+      <div className="relative z-10 min-h-screen pb-40">
+        <header className="sticky top-0 z-40 fc-glass border-b border-[color:var(--fc-glass-border)] px-6 py-4 flex items-center justify-between backdrop-blur-md">
+          <div className="flex items-center gap-4">
+            <Link href="/coach/challenges">
+              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-xl fc-glass border border-[color:var(--fc-glass-border)]">
+                <ArrowLeft className="w-6 h-6" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight fc-text-primary">Challenge Detail</h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-sm fc-text-dim font-medium uppercase tracking-wider">Active Challenge</span>
+              </div>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="w-10 h-10 rounded-xl">
+            <MoreVertical className="w-6 h-6 fc-text-dim" />
+          </Button>
+        </header>
+
+        <main className="max-w-3xl mx-auto px-6 py-8 space-y-8">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 rounded-2xl">
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-2xl font-bold fc-text-primary">{challenge.name}</h2>
+              <span className="fc-glass-soft px-3 py-1 rounded-lg text-sm font-semibold border border-[color:var(--fc-glass-border)]">
+                Day {currentDay} / {totalDays}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="p-3 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)]">
+                <div className="text-sm fc-text-dim mb-1">Participants</div>
+                <div className="text-xl font-bold font-mono fc-text-primary">{participants.length}</div>
+              </div>
+              <div className="p-3 rounded-2xl fc-glass border border-[color:var(--fc-glass-border)]">
+                <div className="text-sm fc-text-dim mb-1">Date range</div>
+                <div className="text-sm font-semibold fc-text-primary">
+                  {start.toLocaleDateString()} – {end.toLocaleDateString()}
                 </div>
               </div>
             </div>
-            <Badge
-              style={{
-                background: getSemanticColor("success").gradient,
-                color: "#fff",
-              }}
-            >
-              {challenge.status}
-            </Badge>
-          </div>
-          {challenge.description && (
-            <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
-              {challenge.description}
-            </p>
-          )}
-        </GlassCard>
+            {challenge.description && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold fc-text-primary uppercase tracking-widest flex items-center gap-2">Challenge Rules</h3>
+                <p className="text-sm fc-text-dim leading-relaxed">{challenge.description}</p>
+              </div>
+            )}
+          </GlassCard>
 
         {/* Pending Video Reviews */}
         {pendingSubmissions.length > 0 && (
@@ -342,6 +353,7 @@ function CoachChallengeDetailContent() {
             </div>
           )}
         </GlassCard>
+        </main>
       </div>
     </AnimatedBackground>
   );

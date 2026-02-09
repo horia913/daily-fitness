@@ -61,6 +61,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { withTimeout } from "@/lib/withTimeout";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Achievement {
@@ -89,6 +90,7 @@ export default function ClientAchievements() {
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [categories, setCategories] = useState<AchievementCategory[]>([]);
   const [totalEarned, setTotalEarned] = useState(0);
@@ -112,6 +114,8 @@ export default function ClientAchievements() {
 
     setLoading(true);
     try {
+      await withTimeout(
+        (async () => {
       // Load earned achievements from database
       const { data: earnedData, error: earnedError } = await supabase
         .from("achievements")
@@ -363,13 +367,17 @@ export default function ClientAchievements() {
       setCategories(achievementCategories);
       setTotalEarned(allAchievements.filter((a) => a.is_earned).length);
       setTotalAvailable(allAchievements.length);
-    } catch (error) {
+        })(),
+        30000,
+        "timeout"
+      );
+    } catch (error: any) {
       console.error("Error loading achievements:", error);
-      // Set fallback data
       setAchievements([]);
       setCategories([]);
       setTotalEarned(0);
       setTotalAvailable(0);
+      setLoadError(error?.message === "timeout" ? "Loading took too long. Please try again." : (error?.message || "Failed to load achievements"));
     } finally {
       setLoading(false);
     }
@@ -561,12 +569,27 @@ export default function ClientAchievements() {
     return { earned, locked, streaks, prs, goals, milestones };
   };
 
+  if (loadError) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <AnimatedBackground>
+          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page px-4 flex items-center justify-center min-h-[40vh]">
+            <GlassCard className="fc-glass fc-card p-8 text-center max-w-md">
+              <p className="fc-text-dim mb-4">{loadError}</p>
+              <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadAchievements(); }} className="fc-btn fc-btn-primary">Retry</Button>
+            </GlassCard>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
+
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page">
             <div className="fc-glass fc-card p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -591,39 +614,60 @@ export default function ClientAchievements() {
 
   const stats = getAchievementStats();
 
+  const progressPercent =
+    totalAvailable > 0
+      ? Math.round((totalEarned / totalAvailable) * 100)
+      : 0;
+
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Trophy className="w-6 h-6 text-white" />
+        <div className="relative z-10 mx-auto w-full max-w-2xl fc-page px-4 sm:px-6 pb-32 flex flex-col gap-8">
+          {/* Header: Achievements, tier, XP */}
+          <header className="flex justify-between items-end">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight fc-text-primary mb-2">
+                Achievements
+              </h1>
+              <p className="fc-text-dim font-medium">
+                Tier: <span className="fc-text-primary">{getMotivationalMessage().replace(/[^\w\s]/g, "").slice(0, 20) || "Striver"}</span>
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-2xl font-bold fc-text-error">
+                {totalEarned * 50} XP
+              </div>
+              <div className="text-[10px] uppercase tracking-widest fc-text-subtle font-bold">
+                Total Power
+              </div>
+            </div>
+          </header>
+
+          {/* Hero: Unlocks progress */}
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 rounded-2xl border-l-4 border-l-[color:var(--fc-status-error)]">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <div className="text-3xl font-bold fc-text-primary">
+                  {totalEarned} <span className="text-lg fc-text-dim">/ {totalAvailable}</span>
                 </div>
-                <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Trophy Room
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                    Achievements
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    {getMotivationalMessage()}
-                  </p>
+                <div className="text-sm font-semibold fc-text-subtle uppercase tracking-wider">
+                  Unlocks Completed
                 </div>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <Button className="fc-btn fc-btn-primary">
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share Trophy Room
-                </Button>
-                <Button variant="outline" className="fc-btn fc-btn-secondary">
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  View Public Profile
-                </Button>
+              <div className="w-16 h-16 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center">
+                <Award className="w-8 h-8 fc-text-warning" />
               </div>
+            </div>
+            <div className="h-3 w-full rounded-full bg-[color:var(--fc-glass-highlight)] overflow-hidden mb-2">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[color:var(--fc-status-error)] to-[color:var(--fc-domain-workouts)] transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[11px] font-mono font-bold fc-text-subtle">
+              <span>PROGRESS: {progressPercent}%</span>
+              <span>NEXT: KEEP GRINDING</span>
             </div>
           </GlassCard>
 

@@ -104,7 +104,7 @@ export default function SimpleModal({
       data-theme={isDark ? 'dark' : 'light'}
     >
       <div 
-        className={`relative w-full ${sizeStyles} max-h-[90vh] ${theme.card} ${theme.shadow} fc-glass fc-card rounded-3xl border ${variantStyles.borderColor} flex flex-col transform transition-all duration-300 ease-out`}
+        className={`fc-modal relative w-full ${sizeStyles} max-h-[90vh] fc-glass fc-card rounded-3xl border ${variantStyles.borderColor} flex flex-col transform transition-all duration-300 ease-out`}
         onClick={(e) => e.stopPropagation()}
         style={{
           animation: 'modalSlideIn 0.3s ease-out'
@@ -119,7 +119,7 @@ export default function SimpleModal({
                   <IconComponent className={`w-5 h-5 ${variantStyles.iconColor}`} />
                 </div>
               )}
-              <h2 className={`text-xl font-bold ${theme.text}`}>{title}</h2>
+              <h2 className="text-xl font-bold fc-text-primary">{title}</h2>
             </div>
             <button 
               onClick={onClose}

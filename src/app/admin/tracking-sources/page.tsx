@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { GlassCard } from '@/components/ui/GlassCard';
 import { 
   Database, 
   Search,
@@ -116,17 +117,23 @@ export default function TrackingSourcesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 pb-24">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Database className="w-7 h-7 text-cyan-400" />
-          Tracking Sources Reference
-        </h2>
-        <p className="text-slate-400 mt-1">
-          Available data sources for auto-tracking goals and achievements
-        </p>
-      </div>
+      <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
+            <Database className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+              Tracking Sources Reference
+            </h1>
+            <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+              Available data sources for auto-tracking goals and achievements
+            </p>
+          </div>
+        </div>
+      </GlassCard>
 
       {/* Info Banner */}
       <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4 flex items-start gap-3">

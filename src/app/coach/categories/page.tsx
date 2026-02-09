@@ -267,102 +267,54 @@ export default function WorkoutCategories() {
     );
   }
 
+  const [filterType, setFilterType] = useState<"all" | "workouts" | "exercises" | "programs">("all");
+
   return (
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div
-          style={{
-            backgroundColor: isDark ? "#0A0A0A" : "#E8E9F3",
-            backgroundImage: isDark
-              ? "linear-gradient(to bottom right, #0A0A0A, #1A1A1A)"
-              : "linear-gradient(to bottom right, #E8E9F3, #F5F5FF)",
-            minHeight: "100vh",
-            position: "relative",
-          }}
-        >
-          {/* Floating Background Elements */}
-          <div className="fixed inset-0 overflow-hidden pointer-events-none">
-            <div
-              className={`absolute -top-40 -right-40 w-80 h-80 ${
-                isDark ? "bg-purple-500/10" : "bg-purple-200/40"
-              } rounded-full blur-3xl`}
-            ></div>
-            <div
-              className={`absolute -bottom-40 -left-40 w-80 h-80 ${
-                isDark ? "bg-orange-500/10" : "bg-orange-200/40"
-              } rounded-full blur-3xl`}
-            ></div>
-            <div
-              className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 ${
-                isDark ? "bg-green-500/10" : "bg-green-200/40"
-              } rounded-full blur-3xl`}
-            ></div>
-          </div>
+        <div className="min-h-screen relative z-10 p-6 md:p-12 pb-32">
+          <div className="max-w-5xl mx-auto space-y-8">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div>
+                <nav className="flex items-center gap-2 text-sm fc-text-dim mb-4 font-mono uppercase tracking-widest">
+                  Coach <ArrowRight className="w-3 h-3 inline" /> Management
+                </nav>
+                <h1 className="text-4xl font-bold tracking-tight fc-text-primary mb-2">Categories</h1>
+                <p className="text-lg fc-text-dim">Organize your forge with custom tags and classifications.</p>
+              </div>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="fc-btn fc-btn-primary px-8 rounded-2xl h-14 font-bold flex items-center justify-center gap-3 shrink-0"
+              >
+                <Plus className="w-6 h-6" />
+                New Category
+              </button>
+            </header>
 
-          <div
-            className="relative"
-            style={{ padding: "24px 20px", paddingBottom: "100px" }}
-          >
-            <div
-              className="max-w-7xl mx-auto"
-              style={{ display: "flex", flexDirection: "column", gap: "24px" }}
-            >
-              <div className="fc-glass fc-card p-6 sm:p-10">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                      Program Taxonomy
-                    </span>
-                    <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
-                      Workout Categories
-                    </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Organize your workout templates with custom categories.
-                    </p>
-                  </div>
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex items-center gap-2 fc-glass p-1.5 rounded-2xl border border-[color:var(--fc-glass-border)]">
+                {(["all", "workouts", "exercises", "programs"] as const).map((f) => (
                   <button
-                    onClick={() => setShowCreateForm(true)}
-                    className="fc-btn fc-btn-primary"
+                    key={f}
+                    type="button"
+                    onClick={() => setFilterType(f)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterType === f ? "fc-glass-soft fc-text-primary" : "fc-text-dim hover:fc-text-primary"}`}
                   >
-                    <Plus style={{ width: "20px", height: "20px" }} />
-                    Create Category
-                    <ArrowRight style={{ width: "20px", height: "20px" }} />
+                    {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
                   </button>
-                </div>
+                ))}
               </div>
-
-              <div className="fc-glass fc-card p-4">
-                <div style={{ position: "relative" }}>
-                  <Search
-                    style={{
-                      position: "absolute",
-                      left: "16px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      color: isDark ? "#9CA3AF" : "#6B7280",
-                      width: "20px",
-                      height: "20px",
-                    }}
-                  />
-                  <Input
-                    placeholder="Search categories..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{
-                      paddingLeft: "48px",
-                      height: "48px",
-                      borderRadius: "16px",
-                      border: `2px solid ${isDark ? "#2A2A2A" : "#E5E7EB"}`,
-                      backgroundColor: "transparent",
-                      color: isDark ? "#FFFFFF" : "#1A1A1A",
-                      fontSize: "16px",
-                      width: "100%",
-                    }}
-                    className="focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  />
-                </div>
+              <div className="relative w-full md:w-72">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 fc-text-dim pointer-events-none" />
+                <Input
+                  placeholder="Search categories..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="fc-input h-12 pl-11 w-full rounded-xl"
+                />
               </div>
+            </div>
 
               {/* Enhanced Categories Grid */}
               <div
@@ -731,7 +683,6 @@ export default function WorkoutCategories() {
                 category={editingCategory}
                 colors={categoryColors}
               />
-            </div>
           </div>
         </div>
       </AnimatedBackground>

@@ -14,28 +14,19 @@ import {
   Calendar,
   Clock,
   CheckCircle,
-  AlertCircle,
-  RefreshCw,
-  TrendingUp,
-  TrendingDown,
-  Filter,
+  ChevronRight,
   SortAsc,
-  BookOpen,
-  Star,
-  Sparkles,
-  Zap,
-  Heart,
-  Target,
   Timer,
-  Gift,
   Crown,
   Flame,
   Award,
-  Plus,
+  ShoppingCart,
+  BookOpen,
   Eye,
-  ShoppingCart
+  Plus
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { withTimeout } from '@/lib/withTimeout'
 import Link from 'next/link'
 
 interface ClipCard {
@@ -59,6 +50,7 @@ export default function ClientClipCards() {
   const { performanceSettings } = useTheme()
   const [clipcards, setClipcards] = useState<ClipCard[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'active' | 'low_sessions' | 'used_up' | 'expired'>('all')
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'expiring' | 'sessions_remaining'>('newest')
 
@@ -68,32 +60,34 @@ export default function ClientClipCards() {
 
   const loadClipCards = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: clipcardsData, error } = await supabase
-        .from('clipcards')
-        .select(`
-          *,
-          clipcard_type:clipcard_types(
-            name,
-            sessions_count,
-            validity_days,
-            price
-          )
-        `)
-        .eq('client_id', user.id)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.log('ClipCards table not found, using empty array')
-        setClipcards([])
-      } else {
-        setClipcards(clipcardsData || [])
-      }
-    } catch (error) {
+      setLoadError(null)
+      await withTimeout(
+        (async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
+          const { data: clipcardsData, error } = await supabase
+            .from('clipcards')
+            .select(`
+              *,
+              clipcard_type:clipcard_types(
+                name,
+                sessions_count,
+                validity_days,
+                price
+              )
+            `)
+            .eq('client_id', user.id)
+            .order('created_at', { ascending: false })
+          if (error) throw error
+          setClipcards(clipcardsData || [])
+        })(),
+        30000,
+        'timeout'
+      )
+    } catch (error: any) {
       console.error('Error loading clipcards:', error)
       setClipcards([])
+      setLoadError(error?.message === 'timeout' ? 'Loading took too long. Please try again.' : (error?.message || 'Failed to load clipcards'))
     } finally {
       setLoading(false)
     }
@@ -227,12 +221,27 @@ export default function ClientClipCards() {
     return clipcards.reduce((total, clipcard) => total + clipcard.sessions_remaining, 0)
   }
 
+  if (loadError) {
+    return (
+      <ProtectedRoute requiredRole="client">
+        <AnimatedBackground>
+          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page px-4 flex items-center justify-center min-h-[40vh]">
+            <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center max-w-md">
+              <p className="fc-text-dim mb-4">{loadError}</p>
+              <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadClipCards(); }} className="fc-btn fc-btn-primary">Retry</Button>
+            </GlassCard>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    )
+  }
+
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page">
             <GlassCard elevation={2} className="fc-glass fc-card p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -259,78 +268,81 @@ export default function ClientClipCards() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <CreditCard className="w-6 h-6 text-white" />
+        <div className="relative z-10 mx-auto w-full max-w-7xl fc-page px-4 sm:px-6 pb-32 flex flex-col gap-8">
+          {/* Header & summary stats (mockup: Session Packages) */}
+          <header className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+            <div>
+              <nav className="flex items-center gap-2 text-sm fc-text-dim mb-4">
+                <Link href="/client" className="hover:fc-text-primary">Account</Link>
+                <ChevronRight className="w-4 h-4" />
+                <span className="fc-text-primary">Clipcards</span>
+              </nav>
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight fc-text-primary mb-2">
+                Session Packages
+              </h1>
+              <p className="fc-text-dim text-lg">
+                Manage and track your prepaid training credits.
+              </p>
+            </div>
+            <div className="flex gap-4 flex-shrink-0">
+              <GlassCard elevation={2} className="fc-glass fc-card p-5 flex items-center gap-4 min-w-[180px] rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-domain-workouts)]/10 flex items-center justify-center">
+                  <CreditCard className="w-6 h-6 fc-text-workouts" />
                 </div>
                 <div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    ClipCard Wallet
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                    My ClipCards
-                  </h1>
-                  <p className="text-sm text-[color:var(--fc-text-dim)]">
-                    Track your packages and session balance at a glance.
-                  </p>
+                  <div className="text-[10px] uppercase tracking-widest fc-text-subtle font-mono font-bold">Total Available</div>
+                  <div className="text-2xl font-bold font-mono fc-text-primary">{getTotalRemainingSessions()}</div>
                 </div>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                  {getActiveClipcardsCount()} active
+              </GlassCard>
+              <GlassCard elevation={2} className="fc-glass fc-card p-5 flex items-center gap-4 min-w-[180px] rounded-2xl border border-[color:var(--fc-glass-border)]">
+                <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-status-success)]/10 flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 fc-text-success" />
                 </div>
-                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                  {getTotalRemainingSessions()} sessions left
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest fc-text-subtle font-mono font-bold">Active Plans</div>
+                  <div className="text-2xl font-bold font-mono fc-text-primary">{getActiveClipcardsCount()}</div>
                 </div>
-                <div className="fc-glass-soft fc-card px-4 py-2 text-sm font-semibold text-[color:var(--fc-text-primary)]">
-                  {clipcards.length} total
-                </div>
-              </div>
+              </GlassCard>
             </div>
-          </GlassCard>
+          </header>
 
-            {/* Filters and Sorting */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Filter by Status</label>
-                    <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
-                      <SelectTrigger className="w-full">
-                        <Filter className="w-4 h-4 mr-2" />
-                        <SelectValue placeholder="Filter ClipCards" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All ClipCards</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="low_sessions">Low Sessions</SelectItem>
-                        <SelectItem value="used_up">Used Up</SelectItem>
-                        <SelectItem value="expired">Expired</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Sort by</label>
-                    <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                      <SelectTrigger className="w-full">
-                        <SortAsc className="w-4 h-4 mr-2" />
-                        <SelectValue placeholder="Sort ClipCards" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="newest">Newest First</SelectItem>
-                        <SelectItem value="oldest">Oldest First</SelectItem>
-                        <SelectItem value="expiring">Expiring Soon</SelectItem>
-                        <SelectItem value="sessions_remaining">Most Sessions</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-            </GlassCard>
+          {/* Filter pills + sort */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-3 overflow-x-auto pb-2">
+              {(['all', 'active', 'low_sessions', 'used_up', 'expired'] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilter(key)}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap border transition-all ${
+                    filter === key
+                      ? 'fc-glass border-[color:var(--fc-glass-border-strong)] fc-text-primary bg-white text-black'
+                      : 'border-[color:var(--fc-glass-border)] fc-text-subtle hover:fc-text-primary fc-glass-soft'
+                  }`}
+                >
+                  {key === 'all' ? 'All Packages' : key === 'low_sessions' ? 'Low Sessions' : key === 'used_up' ? 'Used Up' : getStatusText(key)}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm fc-text-subtle hidden md:block">Sort by:</span>
+              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <SelectTrigger className="w-[180px] fc-select rounded-xl">
+                  <SortAsc className="w-4 h-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="expiring">Expiry Date</SelectItem>
+                  <SelectItem value="sessions_remaining">Sessions Left</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-            {/* ClipCards List */}
-            <div className="space-y-4">
+            {/* ClipCards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {filteredAndSortedClipcards().map((clipcard) => {
                 const status = getClipCardStatus(clipcard)
                 const usagePercentage = getUsagePercentage(clipcard)
@@ -435,17 +447,17 @@ export default function ClientClipCards() {
               })}
 
               {filteredAndSortedClipcards().length === 0 && (
-                <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
+                <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center col-span-full">
                   <div className="w-24 h-24 bg-[color:var(--fc-glass-highlight)] rounded-3xl flex items-center justify-center mx-auto mb-6">
-                    <CreditCard className="w-12 h-12 text-[color:var(--fc-text-subtle)]" />
+                    <CreditCard className="w-12 h-12 fc-text-subtle" />
                   </div>
-                  <h3 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-4">
-                    {filter === 'all' ? 'No ClipCards Found' : `No ${filter.replace('_', ' ')} ClipCards`}
+                  <h3 className="text-2xl font-bold fc-text-primary mb-4">
+                    {filter === 'all' ? 'No packages' : `No ${filter.replace('_', ' ')} packages`}
                   </h3>
-                  <p className="text-[color:var(--fc-text-dim)] mb-8 max-w-md mx-auto">
+                  <p className="fc-text-dim mb-8 max-w-md mx-auto">
                     {filter === 'all' 
-                      ? "You don't have any ClipCards yet. Contact your coach to purchase a ClipCard package and start your fitness journey!"
-                      : `You don't have any ${filter.replace('_', ' ')} ClipCards at the moment.`
+                      ? "You don't have any session packages yet."
+                      : `No ${filter.replace('_', ' ')} packages at the moment.`
                     }
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -462,6 +474,20 @@ export default function ClientClipCards() {
                   </div>
                 </GlassCard>
               )}
+            </div>
+
+            {/* Floating CTA: Need more sessions? */}
+            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-lg z-50">
+              <GlassCard elevation={2} className="fc-glass fc-card p-4 flex items-center justify-between rounded-2xl border border-[color:var(--fc-glass-border)] shadow-xl">
+                <div className="flex items-center gap-3 pl-2">
+                  <div className="w-2 h-2 rounded-full bg-[color:var(--fc-status-success)] animate-pulse" />
+                  <span className="text-sm font-medium fc-text-primary">Need more sessions?</span>
+                </div>
+                <Button className="bg-[color:var(--fc-status-error)] hover:opacity-90 text-white px-6 py-3 rounded-2xl font-bold text-sm gap-2">
+                  <ShoppingCart className="w-4 h-4" />
+                  Purchase New Pack
+                </Button>
+              </GlassCard>
             </div>
           </div>
         </AnimatedBackground>

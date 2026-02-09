@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Program | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 15% 15%, rgba(239, 68, 68, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        /* Form Elements */
+        .input-group {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 52px;
+            background: var(--input-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 0 16px;
+            color: white;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: var(--secondary);
+            background: rgba(59, 130, 246, 0.05);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #A3A3A3;
+            margin-bottom: 8px;
+            margin-left: 4px;
+        }
+
+        textarea.form-input {
+            height: 120px;
+            padding: 16px;
+            resize: none;
+        }
+
+        /* Select Customization */
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23737373'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 16px;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            height: 52px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .btn-primary:active { transform: scale(0.97); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4); }
+
+        .btn-secondary {
+            height: 52px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #262626;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Tabs */
+        .tab-btn {
+            position: relative;
+            padding: 12px 24px;
+            font-weight: 500;
+            color: #737373;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active { color: white; }
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .text-h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; }
+    </style>
+</head>
+<body class="p-4 md:p-8 lg:p-12">
+    <div class="refraction-bg"></div>
+
+    <main class="max-w-4xl mx-auto">
+        <!-- Breadcrumbs & Header -->
+        <nav class="flex items-center gap-2 text-sm text-neutral-500 mb-4 mono uppercase tracking-widest">
+            <a href="#" class="hover:text-white transition-colors">Programs</a>
+            <i data-lucide="chevron-right" class="w-3 h-3"></i>
+            <span class="text-neutral-300">New Creation</span>
+        </nav>
+
+        <header class="mb-10">
+            <h1 class="text-h1 mb-2">Create Training Program</h1>
+            <p class="text-neutral-400">Define the blueprint for your client's success.</p>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="flex border-b border-white/10 mb-8 overflow-x-auto">
+            <button class="tab-btn active flex items-center gap-2 whitespace-nowrap">
+                <i data-lucide="info" class="w-4 h-4"></i>
+                Basic Info
+            </button>
+            <button class="tab-btn flex items-center gap-2 whitespace-nowrap">
+                <i data-lucide="calendar-days" class="w-4 h-4"></i>
+                Weekly Schedule
+            </button>
+            <button class="tab-btn flex items-center gap-2 whitespace-nowrap">
+                <i data-lucide="line-chart" class="w-4 h-4"></i>
+                Progression Rules
+            </button>
+        </div>
+
+        <!-- Form Card -->
+        <section class="crystal-card kinetic-shimmer p-6 md:p-10">
+            <form id="programForm" class="space-y-8">
+                
+                <!-- Row 1: Program Name -->
+                <div class="input-group">
+                    <label class="form-label" for="progName">Program Name <span class="text-primary">*</span></label>
+                    <input type="text" id="progName" class="form-input" placeholder="e.g. 12-Week Hypertrophy Masterclass" required>
+                </div>
+
+                <!-- Row 2: Description -->
+                <div class="input-group">
+                    <label class="form-label" for="progDesc">Description</label>
+                    <textarea id="progDesc" class="form-input" placeholder="Explain the focus and goals of this protocol..."></textarea>
+                </div>
+
+                <!-- Row 3: Grid Details -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="input-group">
+                        <label class="form-label" for="difficulty">Difficulty Level</label>
+                        <select id="difficulty" class="form-input form-select">
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate" selected>Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="form-label" for="duration">Duration (Weeks)</label>
+                        <div class="relative">
+                            <input type="number" id="duration" class="form-input" min="1" max="52" value="12">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 mono text-sm">WKS</span>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="form-label" for="audience">Target Audience</label>
+                        <select id="audience" class="form-input form-select">
+                            <option value="general">General Fitness</option>
+                            <option value="weightloss">Weight Loss</option>
+                            <option value="strength">Strength & Power</option>
+                            <option value="bodybuilding">Bodybuilding</option>
+                            <option value="athletic">Athletic Performance</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 mt-auto h-[52px]">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="eye" class="w-5 h-5 text-neutral-400"></i>
+                            <div>
+                                <p class="text-sm font-semibold">Active Status</p>
+                                <p class="text-[10px] text-neutral-500 uppercase mono">Visible to clients</p>
+                            </div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="pt-8 mt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <button type="button" class="btn-secondary w-full md:w-auto px-8 rounded-xl flex items-center justify-center gap-2 font-medium text-neutral-300">
+                        Cancel
+                    </button>
+                    <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                        <button type="submit" class="btn-primary w-full md:w-auto px-10 rounded-xl flex items-center justify-center gap-2 font-bold tracking-tight">
+                            Save & Continue
+                            <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </section>
+        
+        <p class="text-center text-neutral-600 text-sm mt-8 mono">
+            Auto-saving draft... <span class="text-accent">●</span>
+        </p>
+    </main>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Subtle animation for elements on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.crystal-card, header, .tab-btn');
+            elements.forEach((el, index) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(15px)';
+                setTimeout(() => {
+                    el.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+
+        // Haptic feedback simulation
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(8);
+                }
+            });
+        });
+
+        // Form Submit Prevent Default
+        document.getElementById('programForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('.btn-primary');
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Saving...';
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                btn.innerHTML = 'Saved Successfully <i data-lucide="check" class="w-5 h-5"></i>';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('bg-accent', 'text-white');
+                lucide.createIcons();
+            }, 1200);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Custom Food | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-modal {
+            background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 32px 32px 0 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .input-glass {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1.5px solid var(--glass-border);
+            border-radius: 16px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .input-glass:focus-within {
+            border-color: var(--secondary);
+            background: rgba(59, 130, 246, 0.08);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-success {
+            height: 56px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-success:active { transform: scale(0.96); filter: brightness(0.9); }
+
+        .macro-pill {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--glass-border);
+            transition: transform 0.2s ease;
+        }
+
+        .macro-pill:focus-within {
+            transform: translateY(-2px);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        /* Custom scrollbar for mobile */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 20% 90%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .text-h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+        .text-label { font-size: 14px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-end md:justify-center p-0 md:p-6">
+    <div class="refraction-bg"></div>
+
+    <!-- Main Create Food Container -->
+    <div class="crystal-modal w-full max-w-xl min-h-[90vh] md:min-h-0 md:rounded-[32px] flex flex-col shadow-2xl kinetic-shimmer">
+        
+        <!-- Header -->
+        <header class="p-6 flex justify-between items-center border-b border-white/5">
+            <div>
+                <h1 class="text-h1">Add Custom Food</h1>
+                <p class="text-sm text-neutral-400 mt-0.5">Define your personal nutritional data</p>
+            </div>
+            <button class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-neutral-400 hover:text-white transition-colors" onclick="history.back()">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </header>
+
+        <!-- Form Content -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-8 pb-32">
+            
+            <!-- Basic Identification -->
+            <section class="space-y-4">
+                <div class="space-y-2">
+                    <label class="text-label ml-1">Food Name</label>
+                    <div class="input-glass flex items-center px-4 py-1">
+                        <i data-lucide="utensils" class="w-5 h-5 text-neutral-500 mr-3"></i>
+                        <input type="text" placeholder="e.g. Organic Greek Yogurt" class="w-full h-12 bg-transparent outline-none text-lg font-medium placeholder:text-neutral-600">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-label ml-1">Serving Size</label>
+                        <div class="input-glass flex items-center px-4 py-1">
+                            <input type="number" inputmode="decimal" placeholder="100" class="w-full h-12 bg-transparent outline-none text-lg font-medium mono">
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-label ml-1">Unit</label>
+                        <div class="input-glass flex items-center px-4 py-1">
+                            <select class="w-full h-12 bg-transparent outline-none text-lg font-medium appearance-none cursor-pointer">
+                                <option class="bg-[#1A1A1A]">grams (g)</option>
+                                <option class="bg-[#1A1A1A]">milliliters (ml)</option>
+                                <option class="bg-[#1A1A1A]">oz</option>
+                                <option class="bg-[#1A1A1A]">pieces</option>
+                            </select>
+                            <i data-lucide="chevron-down" class="w-5 h-5 text-neutral-500"></i>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Calories Focus -->
+            <section class="p-6 rounded-3xl bg-white/[0.02] border border-white/5 flex flex-col items-center justify-center text-center">
+                <label class="text-label mb-2">Total Energy</label>
+                <div class="flex items-baseline gap-2">
+                    <input type="number" inputmode="numeric" placeholder="0" class="w-32 bg-transparent text-center text-6xl font-bold mono outline-none text-white placeholder:text-white/10">
+                    <span class="text-xl font-medium text-neutral-500 uppercase tracking-widest">kcal</span>
+                </div>
+                <div class="w-full max-w-[200px] h-1 bg-white/5 mt-6 rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-blue-500 to-emerald-500 w-2/3 shadow-[0_0_12px_rgba(59,130,246,0.5)]"></div>
+                </div>
+            </section>
+
+            <!-- Macros Breakdown -->
+            <section class="space-y-4">
+                <h3 class="text-label ml-1">Macronutrients (per serving)</h3>
+                <div class="grid grid-cols-3 gap-3">
+                    <!-- Protein -->
+                    <div class="macro-pill p-4 rounded-2xl">
+                        <div class="flex items-center gap-2 mb-3">
+                            <div class="w-2 h-2 rounded-full bg-blue-400"></div>
+                            <span class="text-sm font-bold text-blue-400">PRO</span>
+                        </div>
+                        <div class="flex items-baseline">
+                            <input type="number" inputmode="decimal" placeholder="0" class="w-full bg-transparent text-2xl font-bold mono outline-none">
+                            <span class="text-xs text-neutral-500 font-bold ml-1">g</span>
+                        </div>
+                    </div>
+                    <!-- Carbs -->
+                    <div class="macro-pill p-4 rounded-2xl">
+                        <div class="flex items-center gap-2 mb-3">
+                            <div class="w-2 h-2 rounded-full bg-amber-400"></div>
+                            <span class="text-sm font-bold text-amber-400">CHO</span>
+                        </div>
+                        <div class="flex items-baseline">
+                            <input type="number" inputmode="decimal" placeholder="0" class="w-full bg-transparent text-2xl font-bold mono outline-none">
+                            <span class="text-xs text-neutral-500 font-bold ml-1">g</span>
+                        </div>
+                    </div>
+                    <!-- Fat -->
+                    <div class="macro-pill p-4 rounded-2xl">
+                        <div class="flex items-center gap-2 mb-3">
+                            <div class="w-2 h-2 rounded-full bg-red-400"></div>
+                            <span class="text-sm font-bold text-red-400">FAT</span>
+                        </div>
+                        <div class="flex items-baseline">
+                            <input type="number" inputmode="decimal" placeholder="0" class="w-full bg-transparent text-2xl font-bold mono outline-none">
+                            <span class="text-xs text-neutral-500 font-bold ml-1">g</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Metadata/Info -->
+            <div class="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex gap-3">
+                <i data-lucide="info" class="w-5 h-5 text-blue-400 shrink-0"></i>
+                <p class="text-sm text-blue-200/70 leading-relaxed">
+                    Custom foods are saved to your private library. Only you can see them unless you choose to share with your coach.
+                </p>
+            </div>
+        </div>
+
+        <!-- Sticky Footer Actions -->
+        <footer class="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/90 to-transparent pt-12">
+            <div class="flex gap-4 max-w-screen-xl mx-auto">
+                <button class="flex-1 h-14 rounded-2xl bg-white/5 border border-white/10 font-bold text-neutral-300 hover:bg-white/10 transition-all active:scale-95" onclick="history.back()">
+                    Cancel
+                </button>
+                <button class="btn-success flex-[2] rounded-2xl flex items-center justify-center gap-2 font-bold text-white tracking-wide" id="save-btn">
+                    <i data-lucide="save" class="w-5 h-5"></i>
+                    SAVE FOOD
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Entry Animations
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.querySelector('.crystal-modal');
+            const sections = document.querySelectorAll('section');
+            
+            modal.style.opacity = '0';
+            modal.style.transform = 'translateY(100px)';
+            
+            setTimeout(() => {
+                modal.style.transition = 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)';
+                modal.style.opacity = '1';
+                modal.style.transform = 'translateY(0)';
+            }, 100);
+
+            sections.forEach((s, i) => {
+                s.style.opacity = '0';
+                s.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    s.style.transition = 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
+                    s.style.opacity = '1';
+                    s.style.transform = 'translateY(0)';
+                }, 300 + (i * 100));
+            });
+        });
+
+        // Haptic Feedback Simulation
+        const saveBtn = document.getElementById('save-btn');
+        saveBtn.addEventListener('click', () => {
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(20);
+            }
+            
+            saveBtn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> SAVING...`;
+            lucide.createIcons();
+            
+            // Mock Success State
+            setTimeout(() => {
+                saveBtn.classList.remove('btn-success');
+                saveBtn.style.background = '#10B981';
+                saveBtn.innerHTML = `<i data-lucide="check" class="w-5 h-5"></i> SAVED!`;
+                lucide.createIcons();
+                
+                setTimeout(() => {
+                    // Logic to return to previous page
+                    console.log("Food saved successfully");
+                }, 1000);
+            }, 1500);
+        });
+
+        // Interactive Macro Visualization (Mockup)
+        const inputs = document.querySelectorAll('input[type="number"]');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                if (window.navigator.vibrate) window.navigator.vibrate(5);
+            });
+        });
+    </script>
+</body>
+</html>

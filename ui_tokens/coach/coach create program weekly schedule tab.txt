@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Schedule | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #070708;
+            --obsidian: #111114;
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --caustic-light: rgba(239, 68, 68, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Caustic Obsidian Effect */
+        .obsidian-panel {
+            background: linear-gradient(165deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1);
+        }
+
+        .caustic-refraction {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 80% 20%, var(--caustic-light) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 40%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Kinetic Interaction */
+        .interactive-card {
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .interactive-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255,255,255,0.3);
+            background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+        }
+
+        /* Nav Tabs */
+        .tab-indicator {
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            height: 2px;
+            background: var(--primary);
+            box-shadow: 0 0 12px var(--primary);
+            transition: all 0.3s ease;
+        }
+
+        /* Form Styling */
+        .custom-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23737373'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 18px;
+        }
+
+        .btn-primary {
+            height: 52px;
+            background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%);
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(239, 68, 68, 0.4); }
+        .btn-primary:active { transform: scale(0.96); }
+
+        .btn-secondary {
+            height: 52px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.2s ease;
+        }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+
+        /* Hide Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-reveal { animation: fadeIn 0.5s ease forwards; }
+    </style>
+</head>
+<body class="p-4 md:p-8 lg:p-12 pb-32">
+    <div class="caustic-refraction"></div>
+
+    <main class="max-w-6xl mx-auto">
+        <!-- Breadcrumb -->
+        <div class="flex items-center gap-3 text-sm mono uppercase tracking-[0.2em] text-neutral-500 mb-6">
+            <span class="hover:text-white transition-colors cursor-pointer">Programs</span>
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            <span class="text-neutral-200">New Program</span>
+        </div>
+
+        <!-- Header -->
+        <header class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div>
+                <h1 class="text-[32px] font-bold tracking-tight mb-2">Weekly Schedule</h1>
+                <p class="text-neutral-400 max-w-xl text-lg">Assign workout templates to each day. This schedule will serve as the foundation for the entire program duration.</p>
+            </div>
+            
+            <!-- Week Selector (Read Only) -->
+            <div class="relative min-w-[200px]">
+                <label class="text-sm font-semibold text-neutral-500 mono mb-2 block uppercase">Current Focus</label>
+                <div class="h-12 w-full bg-white/5 border border-white/10 rounded-xl flex items-center px-4 gap-3 opacity-60 cursor-not-allowed">
+                    <i data-lucide="lock" class="w-4 h-4"></i>
+                    <span class="font-medium">Week 1 (Master)</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex border-b border-white/10 mb-10 overflow-x-auto no-scrollbar relative">
+            <button class="px-8 py-4 text-neutral-500 font-medium hover:text-neutral-300 transition-colors flex items-center gap-2 whitespace-nowrap">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+                Basic Info
+            </button>
+            <button class="px-8 py-4 text-white font-semibold flex items-center gap-2 whitespace-nowrap relative">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+                Weekly Schedule
+                <div class="tab-indicator w-full"></div>
+            </button>
+            <button class="px-8 py-4 text-neutral-500 font-medium hover:text-neutral-300 transition-colors flex items-center gap-2 whitespace-nowrap">
+                <i data-lucide="zap" class="w-4 h-4"></i>
+                Progression Rules
+            </button>
+        </nav>
+
+        <!-- Info Card: Global Behavior -->
+        <section class="mb-8 obsidian-panel p-6 border-l-4 border-l-blue-500 flex items-start gap-5 animate-reveal">
+            <div class="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
+                <i data-lucide="info" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold mb-1">Week 1 Auto-Apply</h3>
+                <p class="text-neutral-400 leading-relaxed">Changes made to this Week 1 schedule will automatically populate all subsequent weeks. You can later customize specific weeks in the full editor.</p>
+            </div>
+        </section>
+
+        <!-- Schedule Grid -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-12">
+            <!-- Day Template JS will generate or hardcode for SEO/Speed -->
+            <script>
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const workouts = ['Rest Day', 'Upper Body Power', 'Lower Body Power', 'Hypertrophy: Chest/Back', 'Hypertrophy: Legs', 'Full Body Blitz'];
+                
+                document.write(days.map((day, i) => `
+                    <div class="obsidian-panel interactive-card p-5 animate-reveal" style="animation-delay: ${i * 0.05}s">
+                        <div class="flex justify-between items-center mb-6">
+                            <span class="mono text-sm text-neutral-500 uppercase tracking-widest font-bold">Day 0${i+1}</span>
+                            <div class="w-2 h-2 rounded-full ${i === 0 || i === 2 ? 'bg-primary' : 'bg-neutral-700'}"></div>
+                        </div>
+                        <h4 class="text-xl font-bold mb-6">${day}</h4>
+                        
+                        <div class="relative">
+                            <label class="text-[12px] font-bold text-neutral-500 uppercase mb-2 block ml-1">Assigned Protocol</label>
+                            <select class="custom-select w-full h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 transition-all outline-none">
+                                ${workouts.map(w => `<option class="bg-neutral-900">${w}</option>`).join('')}
+                            </select>
+                        </div>
+
+                        <div class="mt-4 flex items-center gap-2 text-neutral-500">
+                             <i data-lucide="clock-3" class="w-4 h-4"></i>
+                             <span class="text-sm">Default: 08:00 AM</span>
+                        </div>
+                    </div>
+                `).join(''));
+            </script>
+        </section>
+
+        <!-- Footer Actions -->
+        <footer class="fixed bottom-0 left-0 right-0 p-6 bg-black/80 backdrop-blur-xl border-t border-white/10 z-50">
+            <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                <button class="btn-secondary px-8 rounded-2xl flex items-center justify-center gap-3 w-full md:w-auto font-medium text-neutral-300">
+                    <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                    Back to Basic Info
+                </button>
+                
+                <div class="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                    <button class="px-8 text-neutral-400 hover:text-white transition-colors font-medium h-12">
+                        Save as Draft
+                    </button>
+                    <button class="btn-primary px-10 rounded-2xl flex items-center justify-center gap-3 w-full md:w-auto font-bold tracking-tight">
+                        Continue to Rules
+                        <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <script>
+        // Initialize Lucide
+        lucide.createIcons();
+
+        // Haptic Feedback Simulation
+        document.querySelectorAll('button, .interactive-card, select').forEach(el => {
+            el.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+            });
+        });
+
+        // Dynamic interactivity for selects
+        document.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', function() {
+                const card = this.closest('.interactive-card');
+                const dot = card.querySelector('.w-2');
+                if (this.value === 'Rest Day') {
+                    dot.classList.remove('bg-primary');
+                    dot.classList.add('bg-neutral-700');
+                    card.style.opacity = '0.7';
+                } else {
+                    dot.classList.add('bg-primary');
+                    dot.classList.remove('bg-neutral-700');
+                    card.style.opacity = '1';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

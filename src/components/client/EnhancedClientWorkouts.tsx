@@ -37,6 +37,9 @@ import {
   Layers,
   ChevronRight,
   ChevronDown,
+  LayoutGrid,
+  LineChart,
+  Plus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -599,7 +602,7 @@ export default function EnhancedClientWorkouts({
 
       setTodaysWorkout(nextWorkout);
 
-      // TASK 3: Get program progress from program_day_assignments (source of truth)
+      // TASK 3: Get program progress from canonical ledger (program_day_completions)
       // Get active program assignment first
       const activeProgramAssignment = allProgramAssignments && allProgramAssignments.length > 0
         ? allProgramAssignments[0]
@@ -1346,78 +1349,78 @@ export default function EnhancedClientWorkouts({
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="animate-pulse p-4">
-          <div className="max-w-5xl mx-auto space-y-6">
-            <div className="bg-white rounded-lg border border-slate-200 p-6">
-              <div className="h-8 bg-slate-200 rounded mb-2"></div>
-              <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+      <AnimatedBackground>
+        <div className="relative z-10 min-h-screen fc-page animate-pulse">
+          <div className="max-w-5xl mx-auto flex flex-col gap-6">
+            <div className="fc-glass fc-card p-6 rounded-2xl">
+              <div className="h-8 fc-glass-soft rounded mb-2" />
+              <div className="h-4 fc-glass-soft rounded w-[75%]" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ gap: "var(--fc-gap-cards)" }}>
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-48 bg-slate-200 rounded-2xl"></div>
+                <div key={i} className="h-48 fc-glass-soft rounded-2xl border border-[color:var(--fc-glass-border)]" />
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     );
   }
 
   if (loadError && useNewLoader) {
     return (
-      <div className={`min-h-screen ${theme.background}`}>
-        <div className="p-6">
-          <div className="max-w-3xl mx-auto">
-            <GlassCard>
+      <AnimatedBackground>
+        <div className="relative z-10 min-h-screen fc-page flex items-center justify-center">
+          <div className="max-w-3xl w-full">
+            <GlassCard className="fc-card">
               <div className="p-6 space-y-4 text-center">
-                <h2 className="text-lg font-semibold text-slate-800">
+                <h2 className="text-lg font-semibold fc-text-primary">
                   Unable to load workouts
                 </h2>
-                <p className="text-sm text-slate-600">{loadError}</p>
-                <Button onClick={() => loadWorkoutDataFromApi()}>
+                <p className="text-sm fc-text-dim">{loadError}</p>
+                <Button variant="fc-primary" onClick={() => loadWorkoutDataFromApi()}>
                   Refresh
                 </Button>
               </div>
             </GlassCard>
           </div>
         </div>
-      </div>
+      </AnimatedBackground>
     );
   }
 
   return (
     <AnimatedBackground>
-      {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="relative z-10 min-h-screen pb-28">
-          <div className="px-5 py-6">
-            <div className="relative z-10 max-w-4xl mx-auto flex flex-col gap-5">
+      <>
+      {performanceSettings.floatingParticles && (
+        <FloatingParticles />
+      )}
+      <div className="relative z-10 min-h-screen pb-28 fc-page">
+          <div className="relative z-10 max-w-4xl mx-auto flex flex-col gap-5" style={{ gap: "var(--fc-gap-sections)" }}>
             {/* Header Section */}
-            <header className="mb-12">
+            <header className="flex justify-between items-center mb-10">
               <div>
-                <h4 className="mono text-xs font-medium uppercase tracking-[0.3em] fc-text-workouts mb-2">
-                  Training Protocol
-                </h4>
-                <h1 className="text-4xl md:text-5xl font-extrabold leading-tight tracking-tight fc-text-primary m-0">
-                  Your <span className="fc-text-subtle">Workouts</span>
-                </h1>
+                <h1 className="text-3xl font-bold tracking-tight fc-text-primary m-0">Your Workouts</h1>
+                <p className="text-sm fc-text-dim mt-1">{programSubtitle}</p>
+              </div>
+              <div className="w-14 h-14 rounded-2xl fc-glass border-2 border-[color:var(--fc-glass-border)] flex items-center justify-center overflow-hidden p-0.5">
+                <img src={getAvatarUrl()} alt="" className="w-full h-full rounded-xl object-cover" />
               </div>
             </header>
 
             {/* Unified Hero Card */}
             {todaysWorkout?.hasWorkout ? (
               <section className="mb-8">
-                <div className="fc-accent-workouts rounded-2xl">
-                  <GlassCard
-                    elevation={2}
-                    className="fc-glass fc-card fc-kinetic-shimmer p-8 min-h-[280px] flex flex-col justify-between relative overflow-hidden"
-                  >
+                <GlassCard
+                  elevation={2}
+                  className="fc-hero-card fc-kinetic-shimmer p-6 sm:p-8 min-h-[240px] flex flex-col justify-between relative overflow-hidden"
+                >
                   <div className="relative z-10 flex flex-col gap-6 flex-1">
                     <div className="flex justify-between items-start">
                       <div className="flex flex-col gap-3">
                         <span className="fc-pill fc-pill-glass fc-text-workouts inline-flex items-center gap-1 w-fit fc-streak-pulse">
                           <Zap className="w-3 h-3" />
-                          Next Up
+                          Today
                         </span>
                         {currentProgram && (
                           <div className="flex flex-wrap items-center gap-2">
@@ -1434,21 +1437,21 @@ export default function EnhancedClientWorkouts({
                             )}
                           </div>
                         )}
-                        <h2 className="text-3xl font-bold leading-tight tracking-tight fc-text-primary m-0">
+                        <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight tracking-tight fc-text-primary m-0">
                           {todaysWorkout.templateName}
                         </h2>
-                        <div className="flex flex-wrap gap-5 fc-text-dim">
-                          <div className="flex items-center gap-2">
-                            <Dumbbell className="w-5 h-5 fc-text-workouts" />
-                            <span className="text-base font-medium">
+                        <div className="flex flex-wrap gap-4 fc-text-dim">
+                          <div className="flex items-center gap-1.5">
+                            <Dumbbell className="w-4 h-4 fc-text-workouts" />
+                            <span className="text-sm font-medium">
                               {(todaysWorkout.exerciseCount ??
                                 (todaysWorkout.exercises?.length || 0))}{" "}
                               Exercises
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Layers className="w-5 h-5 fc-text-workouts" />
-                            <span className="text-base font-medium">
+                          <div className="flex items-center gap-1.5">
+                            <Layers className="w-4 h-4 fc-text-workouts" />
+                            <span className="text-sm font-medium">
                               {(todaysWorkout.totalSets ??
                                 (todaysWorkout.exercises?.reduce(
                                   (sum, e) => sum + (e.sets || 0),
@@ -1457,9 +1460,9 @@ export default function EnhancedClientWorkouts({
                               Sets
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-5 h-5 fc-text-dim" />
-                            <span className="text-base font-medium font-mono">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="w-4 h-4 fc-text-dim" />
+                            <span className="text-sm font-medium font-mono">
                               ~{todaysWorkout.estimatedDuration || 0} min
                             </span>
                           </div>
@@ -1467,57 +1470,13 @@ export default function EnhancedClientWorkouts({
                       </div>
                     </div>
 
-                    <div className="fc-glass-soft rounded-2xl p-4 sm:p-5">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs uppercase tracking-[0.3em] fc-text-dim">
-                          Progress Snapshot
-                        </span>
-                        <span className="font-mono text-sm font-bold fc-text-workouts">
-                          {weeklyProgress.current} / {weeklyProgress.goal}{" "}
-                          <span className="font-normal fc-text-subtle">
-                            Workouts
-                          </span>
-                        </span>
-                      </div>
-                      <div className="fc-progress-track">
-                        <div
-                          className="fc-progress-fill"
-                          style={{ width: `${weeklyProgressPercent}%` }}
-                        />
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-6">
-                        <div>
-                          <p className="text-[11px] font-normal uppercase tracking-[0.18em] fc-text-dim mb-1">
-                            Total Volume
-                          </p>
-                          <p className="text-lg font-bold font-mono tracking-tight fc-text-primary m-0">
-                            {weeklyStats.totalVolume.toLocaleString()}
-                            <span className="text-xs font-normal fc-text-subtle ml-1">
-                              kg
-                            </span>
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-normal uppercase tracking-[0.18em] fc-text-dim mb-1">
-                            Active Time
-                          </p>
-                          <p className="text-lg font-bold font-mono tracking-tight fc-text-primary m-0">
-                            {weeklyStats.activeTime}
-                            <span className="text-xs font-normal fc-text-subtle ml-1">
-                              min
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* Buttons */}
-                    <div className="mt-8 flex flex-col gap-4">
+                    <div className="mt-8 flex flex-col md:flex-row gap-4">
                       <Button
                         variant="fc-primary"
                         size="xl"
                         onClick={() => startWorkout(todaysWorkout)}
-                        className="w-full"
+                        className="flex-1 gap-3"
                       >
                         <Play className="w-6 h-6 fill-current" />
                         Start Workout
@@ -1525,12 +1484,12 @@ export default function EnhancedClientWorkouts({
                       <Button
                         variant="fc-secondary"
                         size="lg"
-                        onClick={() =>
-                          router.push(
-                            `/client/workouts/${todaysWorkout.templateId}/details`
-                          )
-                        }
-                        className="w-full"
+                        onClick={() => {
+                          const tid = todaysWorkout.templateId;
+                          const aid = tid != null ? assignmentIdByTemplate[tid] : undefined;
+                          router.push(aid ? `/client/workouts/${aid}/details` : tid ? `/client/workouts/${tid}/details` : "/client/workouts");
+                        }}
+                        className="px-6 gap-2 fc-text-dim font-semibold"
                       >
                         <Info className="w-5 h-5" />
                         Details
@@ -1538,24 +1497,23 @@ export default function EnhancedClientWorkouts({
                     </div>
                   </div>
                 </GlassCard>
-                </div>
               </section>
             ) : (
-              <GlassCard elevation={2} className="p-8 sm:p-16 text-center overflow-hidden">
+              <GlassCard elevation={2} className="fc-card p-8 sm:p-16 text-center overflow-hidden">
                   {todaysWorkout?.weekCompleted ? (
                     <>
-                      <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8">
-                        <Trophy className="w-8 h-8 sm:w-12 sm:h-12 text-white" />
+                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8 fc-icon-tile fc-icon-meals bg-[color-mix(in_srgb,var(--fc-status-success)_25%,transparent)] border-[color:var(--fc-status-success)]">
+                        <Trophy className="w-8 h-8 sm:w-12 sm:h-12 fc-text-success" />
                       </div>
-                      <h3 className="text-xl sm:text-2xl font-semibold text-slate-800 dark:text-white mb-3 sm:mb-4">
+                      <h3 className="text-xl sm:text-2xl font-semibold fc-text-primary mb-3 sm:mb-4">
                         Week {todaysWorkout.currentWeek} Complete! 🎉
                       </h3>
-                      <p className="text-slate-600 dark:text-slate-300 text-lg sm:text-xl mb-4">
+                      <p className="fc-text-dim text-lg sm:text-xl mb-4">
                         {todaysWorkout.message ||
                           "The work is done for the week! You have completed all workouts, recharge your batteries and be prepared to crush next week!"}
                       </p>
-                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-4 sm:p-6 rounded-2xl border border-green-200 dark:border-green-800">
-                        <p className="text-slate-800 dark:text-white text-sm sm:text-base">
+                      <div className="fc-glass-soft p-4 sm:p-6 rounded-2xl border border-[color:var(--fc-glass-border)] fc-accent-meals">
+                        <p className="fc-text-primary text-sm sm:text-base">
                           🏆 Amazing work this week! Your dedication is paying
                           off. Take this time to recover, stay hydrated, and get
                           ready for another week of progress.
@@ -1564,18 +1522,18 @@ export default function EnhancedClientWorkouts({
                     </>
                   ) : todaysWorkout?.message?.includes("No active program") ? (
                     <>
-                      <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8">
-                        <Target className="w-8 h-8 sm:w-12 sm:h-12 text-white" />
+                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8 fc-icon-tile fc-icon-workouts">
+                        <Target className="w-8 h-8 sm:w-12 sm:h-12 fc-text-workouts" />
                       </div>
-                      <h3 className="text-xl sm:text-2xl font-semibold text-slate-800 dark:text-white mb-3 sm:mb-4">
+                      <h3 className="text-xl sm:text-2xl font-semibold fc-text-primary mb-3 sm:mb-4">
                         Ready to Get Started? 💪
                       </h3>
-                      <p className="text-slate-600 dark:text-slate-300 text-lg sm:text-xl mb-4">
+                      <p className="fc-text-dim text-lg sm:text-xl mb-4">
                         No active program assigned. Contact your coach to get
                         started with your fitness journey!
                       </p>
-                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 p-4 sm:p-6 rounded-2xl border border-blue-200 dark:border-blue-800">
-                        <p className="text-slate-800 dark:text-white text-sm sm:text-base">
+                      <div className="fc-glass-soft p-4 sm:p-6 rounded-2xl border border-[color:var(--fc-glass-border)] fc-accent-workouts">
+                        <p className="fc-text-primary text-sm sm:text-base">
                           🎯 Your coach will create a personalized workout
                           program just for you. Once assigned, you&apos;ll see
                           your daily workouts here!
@@ -1584,16 +1542,16 @@ export default function EnhancedClientWorkouts({
                     </>
                   ) : (
                     <>
-                      <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8">
-                        <Calendar className="w-8 h-8 sm:w-12 sm:h-12 text-slate-500 dark:text-slate-400" />
+                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8 fc-icon-tile fc-icon-meals border-[color:var(--fc-glass-border)]">
+                        <Calendar className="w-8 h-8 sm:w-12 sm:h-12 fc-text-dim" />
                       </div>
-                      <h3 className="text-xl sm:text-2xl font-semibold text-slate-800 dark:text-white mb-3 sm:mb-4">
+                      <h3 className="text-xl sm:text-2xl font-semibold fc-text-primary mb-3 sm:mb-4">
                         Rest Day
                       </h3>
-                      <p className="text-slate-600 dark:text-slate-300 text-lg sm:text-xl mb-4">
+                      <p className="fc-text-dim text-lg sm:text-xl mb-4">
                         {getMotivationalMessage()}
                       </p>
-                      <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base">
+                      <p className="fc-text-dim text-sm sm:text-base">
                         Check back tomorrow for your next workout.
                       </p>
                     </>
@@ -1601,66 +1559,70 @@ export default function EnhancedClientWorkouts({
               </GlassCard>
             )}
 
+            {/* Weekly Progress - standalone section (mockup layout) */}
+            {(weeklyProgress.goal > 0 || weeklyStats.totalVolume > 0 || weeklyStats.activeTime > 0) && (
+              <section className="mb-8">
+                <GlassCard elevation={2} className="fc-card p-6 rounded-2xl border-l-4 border-l-[color:var(--fc-domain-workouts)]">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex justify-between items-end">
+                        <h3 className="text-lg font-semibold fc-text-primary">Weekly Progress</h3>
+                        <span className="font-mono text-sm font-bold fc-text-workouts">
+                          {weeklyProgress.current}
+                          {" / "}
+                          {weeklyProgress.goal}{" "}
+                          <span className="font-normal fc-text-subtle">Workouts</span>
+                        </span>
+                      </div>
+                      <div className="fc-progress-track">
+                        <div
+                          className="fc-progress-fill"
+                          style={{ width: `${weeklyProgressPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="hidden md:block h-12 w-px bg-[color:var(--fc-glass-border)]" />
+                    <div className="flex gap-8">
+                      <div>
+                        <p className="text-xs uppercase tracking-widest fc-text-dim mb-1">Total Volume</p>
+                        <p className="text-xl font-bold font-mono tracking-tight fc-text-primary m-0">
+                          {weeklyStats.totalVolume.toLocaleString()}
+                          <span className="text-sm font-normal fc-text-subtle ml-1">kg</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-widest fc-text-dim mb-1">Active Time</p>
+                        <p className="text-xl font-bold font-mono tracking-tight fc-text-primary m-0">
+                          {weeklyStats.activeTime}
+                          <span className="text-sm font-normal fc-text-subtle ml-1">min</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </GlassCard>
+              </section>
+            )}
+
             {/* SECONDARY FEATURES - Below main workout */}
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-4 gap-2 sm:gap-3">
-              <GlassCard
-                elevation={1}
-                className="fc-glass fc-card p-2 sm:p-4 text-center flex flex-col items-center justify-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[100px]"
-              >
-                <div className="fc-icon-tile fc-icon-habits w-7 h-7 sm:w-9 sm:h-9">
-                  <Flame className="w-3 h-3 sm:w-4 sm:h-4" />
-                </div>
-                <div className="text-base sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
-                  {dayStreak}
-                </div>
-                <div className="text-[9px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.18em] fc-text-dim leading-tight">
-                  Day Streak
-                </div>
-              </GlassCard>
-              <GlassCard
-                elevation={1}
-                className="fc-glass fc-card p-2 sm:p-4 text-center flex flex-col items-center justify-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[100px]"
-              >
-                <div className="fc-icon-tile fc-icon-challenges w-7 h-7 sm:w-9 sm:h-9">
-                  <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
-                </div>
-                <div className="text-base sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
-                  {thisMonthWorkouts}
-                </div>
-                <div className="text-[9px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.18em] fc-text-dim leading-tight">
-                  This Month
-                </div>
-              </GlassCard>
-              <GlassCard
-                elevation={1}
-                className="fc-glass fc-card p-2 sm:p-4 text-center flex flex-col items-center justify-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[100px]"
-              >
-                <div className="fc-icon-tile fc-icon-workouts w-7 h-7 sm:w-9 sm:h-9">
-                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-                </div>
-                <div className="text-base sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
-                  {successRate}%
-                </div>
-                <div className="text-[9px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.18em] fc-text-dim leading-tight">
-                  Success Rate
-                </div>
-              </GlassCard>
-              <GlassCard
-                elevation={1}
-                className="fc-glass fc-card p-2 sm:p-4 text-center flex flex-col items-center justify-center gap-1 sm:gap-2 min-h-[80px] sm:min-h-[100px]"
-              >
-                <div className="fc-icon-tile fc-icon-meals w-7 h-7 sm:w-9 sm:h-9">
-                  <Dumbbell className="w-3 h-3 sm:w-4 sm:h-4" />
-                </div>
-                <div className="text-base sm:text-2xl font-extrabold fc-text-primary leading-tight font-mono">
-                  {allTimeVolume.toLocaleString()}
-                </div>
-                <div className="text-[9px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.18em] fc-text-dim leading-tight">
-                  All Time kg
-                </div>
-              </GlassCard>
+            {/* Quick Stats Strip */}
+            <div className="fc-stats-strip">
+              <div className="fc-stats-strip-item">
+                <span className="fc-stats-strip-value fc-text-warning">{dayStreak}</span>
+                <span className="fc-stats-strip-label">Streak</span>
+              </div>
+              <div className="fc-stats-strip-item">
+                <span className="fc-stats-strip-value">{thisMonthWorkouts}</span>
+                <span className="fc-stats-strip-label">Month</span>
+              </div>
+              <div className="fc-stats-strip-item">
+                <span className="fc-stats-strip-value fc-text-success">{successRate}%</span>
+                <span className="fc-stats-strip-label">Rate</span>
+              </div>
+              <div className="fc-stats-strip-item">
+                <span className="fc-stats-strip-value">{allTimeVolume.toLocaleString()}</span>
+                <span className="fc-stats-strip-label">Total kg</span>
+              </div>
             </div>
 
             {/* This Week's Workouts - dedupe by id to avoid duplicate React keys */}
@@ -1705,43 +1667,45 @@ export default function EnhancedClientWorkouts({
                         }}
                       >
                         <div className={isSkipped ? "opacity-70" : ""}>
-                          <GlassCard
-                            elevation={2}
-                            className={`fc-glass fc-card fc-list-row p-4 sm:p-5 cursor-pointer fc-hover-rise fc-press ${
-                              isCompleted ? "fc-accent-workouts" : ""
+                          <div
+                            className={`fc-surface rounded-2xl p-4 sm:p-5 cursor-pointer transition-all duration-200 hover:translate-y-[-1px] active:scale-[0.98] ${
+                              isCompleted ? "border-l-4 border-l-[color:var(--fc-status-success)]" : ""
                             }`}
                           >
-                            {/* Mobile: Stacked, Desktop: Row */}
                             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                              {/* Top section */}
                               <div className="flex items-center gap-3 sm:gap-4 flex-1">
-                                <div className={`fc-icon-tile fc-icon-workouts ${dateVariant} w-11 h-11 sm:w-12 sm:h-12 shrink-0`}>
-                                  <CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 border ${isCompleted ? "bg-[color:var(--fc-status-success)]/10 border-[color:var(--fc-status-success)]/20 text-[color:var(--fc-status-success)]" : isSkipped ? "bg-[color:var(--fc-glass-highlight)] border-[color:var(--fc-glass-border)] fc-text-subtle" : "bg-[color:var(--fc-domain-workouts)]/10 border-[color:var(--fc-domain-workouts)]/20 fc-text-workouts"}`}>
+                                  <span className="text-[9px] font-bold uppercase tracking-wide">{monthAbbr}</span>
+                                  <span className="text-lg font-extrabold leading-none">{day}</span>
                                 </div>
                                 <div className="flex-1">
-                                  <h4 className="text-base sm:text-lg font-semibold leading-tight fc-text-primary mb-1">
+                                  <h4 className="text-base font-bold leading-tight fc-text-primary mb-0.5">
                                     {assignment.name || "Workout"}
                                   </h4>
-                                  <div className="text-xs uppercase tracking-wider fc-text-dim">
-                                    {isToday ? "Today" : scheduleLabel} • {dateLabel}
+                                  <div className="text-xs fc-text-dim">
+                                    {isCompleted && assignment.completed_at
+                                      ? `Completed ${new Date(assignment.completed_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${assignment.duration_minutes ? ` • ${assignment.duration_minutes} min` : ""}`
+                                      : isSkipped
+                                      ? "Marked as skipped"
+                                      : isToday
+                                      ? "Today"
+                                      : `Scheduled • ${dateLabel}`}
                                   </div>
                                 </div>
                               </div>
-                              
-                              {/* Bottom section on mobile / Right on desktop */}
-                              <div className="flex items-center justify-between sm:justify-end gap-3 pl-14 sm:pl-0">
+                              <div className="flex items-center justify-between sm:justify-end gap-3 pl-0 sm:pl-0">
                                 <span className={`fc-status-pill ${statusVariant}`}>
-                                  {isCompleted && <CheckCircle className="w-3.5 h-3.5" />}
+                                  {isCompleted ? <CheckCircle className="w-3.5 h-3.5" /> : null}
                                   {isCompleted
                                     ? "DONE"
                                     : isSkipped
                                     ? "SKIPPED"
                                     : "UPCOMING"}
                                 </span>
-                                <ChevronRight className="w-6 h-6 fc-text-subtle" />
+                                <ChevronRight className="w-5 h-5 fc-text-subtle" />
                               </div>
                             </div>
-                          </GlassCard>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1752,79 +1716,58 @@ export default function EnhancedClientWorkouts({
 
             {/* Completed Programs */}
             {completedPrograms.length > 0 && (
-              <GlassCard elevation={2} className="overflow-hidden">
-                <div className="p-8 border-b border-slate-200 dark:border-slate-700">
+              <GlassCard elevation={2} className="fc-card overflow-hidden">
+                <div className="p-8 border-b border-[color:var(--fc-glass-border)]">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
-                      <Trophy className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 fc-icon-tile fc-icon-challenges rounded-xl flex items-center justify-center">
+                      <Trophy className="w-5 h-5 fc-text-challenges" />
                     </div>
-                    <span className={`text-2xl font-bold ${theme.text}`}>
+                    <span className="text-2xl font-bold fc-text-primary">
                       Completed Programs
                     </span>
                   </div>
                 </div>
                 <div className="p-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style={{ gap: "var(--fc-gap-cards)" }}>
                     {completedPrograms.map((program) => (
                       <GlassCard
                         key={program.id}
                         elevation={1}
-                        className="p-6 border-2 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600 transition-all duration-300"
+                        className="fc-card p-6 border-2 border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-accent-purple)] transition-all duration-300"
                       >
                           <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                              <Trophy className="w-6 h-6 text-white" />
+                            <div className="w-12 h-12 fc-icon-tile fc-icon-challenges rounded-xl flex items-center justify-center">
+                              <Trophy className="w-6 h-6 fc-text-challenges" />
                             </div>
-                            <Badge className="bg-gradient-to-r from-green-600 to-emerald-600 text-white border-0 px-3 py-1">
+                            <Badge className="fc-text-success bg-[color:var(--fc-status-success)] text-white border-0 px-3 py-1">
                               {(program as any).completion_percentage ||
-                                Math.round(
-                                  (program.current_week / program.total_weeks) *
-                                    100
-                                )}
+                                Math.round(100 * (program.current_week / program.total_weeks))}
                               % Complete
                             </Badge>
                           </div>
-                          <h4
-                            className={`font-bold text-lg mb-2 ${theme.text}`}
-                          >
+                          <h4 className="font-bold text-lg mb-2 fc-text-primary">
                             {(program as any).program_name || program.name}
                           </h4>
-                          <p
-                            className={`text-sm ${theme.textSecondary} mb-4 line-clamp-2`}
-                          >
+                          <p className="text-sm fc-text-dim mb-4 line-clamp-2">
                             {(program as any).program_description ||
                               program.description}
                           </p>
                           <div className="space-y-2 text-sm">
                             <div className="flex items-center justify-between">
-                              <span className={theme.textSecondary}>
-                                Duration:
-                              </span>
-                              <span className={theme.text}>
-                                {program.total_weeks} weeks
-                              </span>
+                              <span className="fc-text-dim">Duration:</span>
+                              <span className="fc-text-primary">{program.total_weeks} weeks</span>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className={theme.textSecondary}>
-                                Coach:
-                              </span>
-                              <span className={theme.text}>
-                                {program.coach_name}
-                              </span>
+                              <span className="fc-text-dim">Coach:</span>
+                              <span className="fc-text-primary">{program.coach_name}</span>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className={theme.textSecondary}>
-                                Workouts:
-                              </span>
-                              <span className={theme.text}>
-                                {(program as any).total_workouts_completed || 0}
-                              </span>
+                              <span className="fc-text-dim">Workouts:</span>
+                              <span className="fc-text-primary">{(program as any).total_workouts_completed || 0}</span>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className={theme.textSecondary}>
-                                Completed:
-                              </span>
-                              <span className={theme.text}>
+                              <span className="fc-text-dim">Completed:</span>
+                              <span className="fc-text-primary">
                                 {new Date(
                                   (program as any).completed_date || new Date()
                                 ).toLocaleDateString()}
@@ -1833,31 +1776,19 @@ export default function EnhancedClientWorkouts({
                           </div>
                           <div className="mt-4">
                             <div className="flex items-center justify-between text-sm mb-2">
-                              <span className={theme.textSecondary}>
-                                Progress
-                              </span>
-                              <span className={theme.text}>
+                              <span className="fc-text-dim">Progress</span>
+                              <span className="fc-text-primary">
                                 {(program as any).completion_percentage ||
-                                  Math.round(
-                                    (program.current_week /
-                                      program.total_weeks) *
-                                      100
-                                  )}
+                                  Math.round(100 * (program.current_week / program.total_weeks))}
                                 %
                               </span>
                             </div>
-                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                            <div className="w-full fc-glass-soft rounded-full h-2 border border-[color:var(--fc-glass-border)]">
                               <div
-                                className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
+                                className="h-2 rounded-full transition-all duration-500 bg-[color:var(--fc-status-success)]"
                                 style={{
-                                  width: `${
-                                    (program as any).completion_percentage ||
-                                    Math.round(
-                                      (program.current_week /
-                                        program.total_weeks) *
-                                        100
-                                    )
-                                  }%`,
+                                  width: `${(program as any).completion_percentage ||
+                                    Math.round(100 * (program.current_week / program.total_weeks))}%`,
                                 }}
                               ></div>
                             </div>
@@ -1941,33 +1872,28 @@ export default function EnhancedClientWorkouts({
                         }
                         className="group block"
                       >
-                        <GlassCard
-                          elevation={2}
-                          className="fc-glass fc-card fc-list-row p-4 sm:p-5 transition-all duration-300 fc-hover-rise fc-press"
+                        <div
+                          className="fc-surface rounded-2xl p-4 sm:p-5 transition-all duration-200 hover:translate-y-[-1px] active:scale-[0.98]"
                         >
-                          {/* Mobile: Stacked layout, Desktop: Row layout */}
                           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                            {/* Top row on mobile / Left section on desktop */}
                             <div className="flex items-center gap-3 sm:gap-4 flex-1">
-                              {/* Icon */}
-                              <div className={`fc-icon-tile ${iconVariant} w-11 h-11 sm:w-12 sm:h-12 shrink-0`}>
+                              <div className={`fc-icon-tile ${iconVariant} w-10 h-10 sm:w-11 sm:h-11 shrink-0`}>
                                 {assignment.type === "program" ? (
-                                  <Award className="w-5 h-5 sm:w-6 sm:h-6" />
+                                  <Award className="w-5 h-5" />
                                 ) : (
-                                  <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6" />
+                                  <Dumbbell className="w-5 h-5" />
                                 )}
                               </div>
 
-                              {/* Title and meta */}
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-base sm:text-lg font-semibold fc-text-primary leading-tight mb-1">
+                                <h4 className="text-base font-bold fc-text-primary leading-tight mb-0.5">
                                   {template?.name ||
                                     assignment.name ||
                                     (assignment.type === "program"
                                       ? "Program"
                                       : "Workout")}
                                 </h4>
-                                <div className="text-xs sm:text-[11px] uppercase tracking-wider fc-text-dim">
+                                <div className="text-[11px] uppercase tracking-wider fc-text-dim">
                                   {monthName.toUpperCase()} {dayNumber}
                                   {coach?.first_name && (
                                     <span className="hidden sm:inline"> • Coach: {coach.first_name}</span>
@@ -2041,7 +1967,7 @@ export default function EnhancedClientWorkouts({
                               )}
                             </div>
                           </div>
-                        </GlassCard>
+                        </div>
                       </Link>
                     );
                   })}
@@ -2054,20 +1980,20 @@ export default function EnhancedClientWorkouts({
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
                 <GlassCard
                   elevation={3}
-                  className="max-w-2xl w-full max-h-[80vh] overflow-hidden rounded-3xl"
+                  className="fc-card max-w-2xl w-full max-h-[80vh] overflow-hidden rounded-3xl"
                 >
-                  <div className="border-b border-slate-200 dark:border-slate-700 p-8">
+                  <div className="border-b border-[color:var(--fc-glass-border)] p-8">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                          <Shuffle className="w-4 h-4 text-white" />
+                        <div className="w-8 h-8 fc-icon-tile fc-icon-workouts rounded-lg flex items-center justify-center">
+                          <Shuffle className="w-4 h-4 fc-text-workouts" />
                         </div>
-                        <span className={`text-xl font-bold ${theme.text}`}>
+                        <span className="text-xl font-bold fc-text-primary">
                           Exercise Alternatives
                         </span>
                       </div>
                       <Button
-                        variant="ghost"
+                        variant="fc-ghost"
                         size="sm"
                         onClick={() => setShowAlternatives(null)}
                         className="p-3 rounded-xl"
@@ -2079,7 +2005,7 @@ export default function EnhancedClientWorkouts({
                   <div className="p-8">
                     {selectedExerciseAlternatives.length > 0 ? (
                       <div className="space-y-6">
-                        <p className={`text-base ${theme.textSecondary}`}>
+                        <p className="text-base fc-text-dim">
                           Choose an alternative exercise if equipment is
                           unavailable or you prefer a different variation:
                         </p>
@@ -2087,17 +2013,13 @@ export default function EnhancedClientWorkouts({
                           {selectedExerciseAlternatives.map((alternative) => (
                             <div
                               key={alternative.id}
-                              className={`flex items-center justify-between p-6 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-blue-300 dark:hover:border-blue-600 transition-colors ${theme.card}`}
+                              className="flex items-center justify-between p-6 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl hover:border-[color:var(--fc-domain-workouts)] transition-colors"
                             >
                               <div className="flex-1">
-                                <h4
-                                  className={`font-semibold text-lg mb-2 ${theme.text}`}
-                                >
+                                <h4 className="font-semibold text-lg mb-2 fc-text-primary">
                                   {alternative.alternative_exercise?.name}
                                 </h4>
-                                <p
-                                  className={`text-base mb-3 ${theme.textSecondary}`}
-                                >
+                                <p className="text-base mb-3 fc-text-dim">
                                   {
                                     alternative.alternative_exercise
                                       ?.description
@@ -2106,13 +2028,11 @@ export default function EnhancedClientWorkouts({
                                 <div className="flex items-center gap-3">
                                   <Badge
                                     variant="outline"
-                                    className="text-sm px-3 py-1"
+                                    className="text-sm px-3 py-1 border-[color:var(--fc-glass-border)]"
                                   >
                                     {alternative.reason}
                                   </Badge>
-                                  <span
-                                    className={`text-sm ${theme.textSecondary}`}
-                                  >
+                                  <span className="text-sm fc-text-dim">
                                     {typeof alternative.alternative_exercise
                                       ?.category === "string"
                                       ? alternative.alternative_exercise
@@ -2125,13 +2045,14 @@ export default function EnhancedClientWorkouts({
                                 </div>
                               </div>
                               <Button
+                                variant="fc-primary"
                                 onClick={() =>
                                   swapExercise(
                                     showAlternatives,
                                     alternative.alternative_exercise_id
                                   )
                                 }
-                                className="ml-6 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3"
+                                className="ml-6 rounded-xl px-6 py-3"
                               >
                                 <ArrowRight className="w-4 h-4 mr-2" />
                                 Use This
@@ -2142,13 +2063,11 @@ export default function EnhancedClientWorkouts({
                       </div>
                     ) : (
                       <div className="text-center py-12">
-                        <Lightbulb className="w-16 h-16 text-slate-400 dark:text-slate-500 mx-auto mb-6" />
-                        <h3
-                          className={`font-semibold text-xl mb-3 ${theme.text}`}
-                        >
+                        <Lightbulb className="w-16 h-16 fc-text-dim mx-auto mb-6" />
+                        <h3 className="font-semibold text-xl mb-3 fc-text-primary">
                           No alternatives available
                         </h3>
-                        <p className={`text-base ${theme.textSecondary}`}>
+                        <p className="text-base fc-text-dim">
                           This exercise doesn&apos;t have any alternatives
                           configured yet.
                         </p>
@@ -2160,7 +2079,32 @@ export default function EnhancedClientWorkouts({
             )}
           </div>
         </div>
-      </div>
+
+        {/* Fixed bottom nav — mockup: Dashboard, Workouts (active), Analytics, Quick Log */}
+        <nav className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
+          <div className="h-24 bg-[color:var(--fc-bg-base)]/90 backdrop-blur-xl border-t border-[color:var(--fc-glass-border)]" aria-hidden />
+          <div className="fixed bottom-0 left-0 right-0 z-50 max-w-4xl mx-auto px-6 h-24 flex items-center justify-between gap-4 pointer-events-auto">
+            <div className="flex flex-1 justify-around md:justify-start md:gap-12">
+              <Link href="/client" className="flex flex-col items-center gap-1.5 fc-text-subtle hover:fc-text-primary transition-colors group">
+                <LayoutGrid className="w-7 h-7 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-bold uppercase tracking-widest">Dashboard</span>
+              </Link>
+              <span className="flex flex-col items-center gap-1.5 fc-text-workouts" aria-current="page">
+                <Calendar className="w-7 h-7 scale-110" />
+                <span className="text-[11px] font-bold uppercase tracking-widest">Workouts</span>
+              </span>
+              <Link href="/client/progress/analytics" className="flex flex-col items-center gap-1.5 fc-text-subtle hover:fc-text-primary transition-colors group">
+                <LineChart className="w-7 h-7 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-bold uppercase tracking-widest">Analytics</span>
+              </Link>
+            </div>
+            <Link href="/client/progress/workout-logs" className="fc-btn fc-btn-primary h-14 w-14 md:h-12 md:w-auto md:px-6 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg">
+              <Plus className="w-6 h-6 md:w-5 md:h-5" />
+              <span className="hidden md:inline">Quick Log</span>
+            </Link>
+          </div>
+        </nav>
+      </>
     </AnimatedBackground>
   );
 }

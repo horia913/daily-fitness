@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clients | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.08) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-primary {
+            height: 48px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:active { transform: scale(0.95); }
+
+        .btn-secondary {
+            height: 44px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+
+        .status-pulse {
+            position: relative;
+        }
+
+        .status-pulse::after {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: inherit;
+            border: 2px solid currentColor;
+            animation: pulse-ring 2s infinite;
+            opacity: 0;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        .compliance-ring {
+            transform: rotate(-90deg);
+            transition: stroke-dashoffset 1s ease-out;
+        }
+
+        .search-container {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: rgba(10, 10, 10, 0.7);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1rem 1.5rem;
+        }
+
+        .filter-chip {
+            white-space: nowrap;
+            padding: 8px 20px;
+            border-radius: 100px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.03);
+            color: #A3A3A3;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .filter-chip.active {
+            background: #FFFFFF;
+            color: #0A0A0A;
+            border-color: #FFFFFF;
+        }
+
+        .bulk-actions-bar {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(150%);
+            background: #FFFFFF;
+            color: #0A0A0A;
+            padding: 12px 24px;
+            border-radius: 100px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            z-index: 100;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .bulk-actions-bar.visible { transform: translateX(-50%) translateY(0); }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .card-checkbox {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            border: 2px solid var(--glass-border);
+            appearance: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .card-checkbox:checked {
+            background-color: var(--secondary);
+            border-color: var(--secondary);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+            background-size: 14px;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+    </style>
+</head>
+<body class="pb-32">
+    <div class="refraction-bg"></div>
+
+    <!-- Search & Navigation Sticky Header -->
+    <header class="search-container">
+        <div class="max-w-7xl mx-auto flex flex-col gap-4">
+            <div class="flex items-center justify-between">
+                <h1 class="text-[30px] font-bold tracking-tight">Clients</h1>
+                <div class="flex items-center gap-3">
+                    <span class="mono text-xs text-neutral-500 uppercase tracking-widest">Active Clients: 42</span>
+                </div>
+            </div>
+            
+            <div class="relative group">
+                <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 transition-colors group-focus-within:text-white"></i>
+                <input type="text" placeholder="Search clients by name, goal, or status..." 
+                    class="w-full h-14 bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 transition-all">
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                <button class="filter-chip active">All Clients</button>
+                <button class="filter-chip">Active</button>
+                <button class="filter-chip">At-Risk</button>
+                <button class="filter-chip">Inactive</button>
+                <div class="h-6 w-[1px] bg-white/10 mx-2"></div>
+                <button class="filter-chip flex items-center gap-2">
+                    <i data-lucide="arrow-up-down" class="w-3.5 h-3.5"></i>
+                    Compliance
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Client Grid -->
+    <main class="p-6 md:p-8 max-w-7xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="client-grid">
+            
+            <!-- Client Card 1 -->
+            <div class="crystal-card kinetic-shimmer p-6 group">
+                <input type="checkbox" class="card-checkbox client-select">
+                <div class="flex items-start gap-5">
+                    <div class="relative">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden border-2 border-white/10 bg-neutral-800">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Felix" class="w-full h-full object-cover">
+                        </div>
+                        <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-accent rounded-full border-4 border-black status-pulse text-accent"></div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-[18px] font-bold mb-1">Felix Henderson</h3>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-[10px] px-2 py-0.5 rounded bg-accent/10 text-accent font-bold uppercase mono">Active</span>
+                            <span class="text-caption text-neutral-500 mono">Joined Oct '23</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-neutral-400">
+                            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                            <span class="text-sm">Active 2h ago</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <div class="flex items-center gap-4">
+                        <div class="relative w-12 h-12">
+                            <svg class="w-full h-full compliance-ring" viewBox="0 0 36 36">
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="3"></circle>
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="url(#blueGrad)" stroke-width="3" stroke-dasharray="100" stroke-dashoffset="15" stroke-linecap="round"></circle>
+                                <defs>
+                                    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" style="stop-color:#3B82F6" />
+                                        <stop offset="100%" style="stop-color:#60A5FA" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center text-[10px] font-bold mono">85%</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] uppercase text-neutral-500 font-bold tracking-widest">Compliance</div>
+                            <div class="text-sm font-semibold">Above Target</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="p-2.5 rounded-xl bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-all">
+                            <i data-lucide="message-square" class="w-5 h-5"></i>
+                        </button>
+                        <button class="p-2.5 rounded-xl bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-all">
+                            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Client Card 2 (At-Risk) -->
+            <div class="crystal-card kinetic-shimmer p-6 group">
+                <input type="checkbox" class="card-checkbox client-select">
+                <div class="flex items-start gap-5">
+                    <div class="relative">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden border-2 border-white/10 bg-neutral-800">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="Sarah" class="w-full h-full object-cover">
+                        </div>
+                        <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-amber-500 rounded-full border-4 border-black status-pulse text-amber-500"></div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-[18px] font-bold mb-1">Sarah Jenkins</h3>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 font-bold uppercase mono">At Risk</span>
+                            <span class="text-caption text-neutral-500 mono">Joined Jan '24</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-neutral-400">
+                            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                            <span class="text-sm">Active 3 days ago</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <div class="flex items-center gap-4">
+                        <div class="relative w-12 h-12">
+                            <svg class="w-full h-full compliance-ring" viewBox="0 0 36 36">
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="3"></circle>
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="#F59E0B" stroke-width="3" stroke-dasharray="100" stroke-dashoffset="55" stroke-linecap="round"></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center text-[10px] font-bold mono">45%</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] uppercase text-neutral-500 font-bold tracking-widest">Compliance</div>
+                            <div class="text-sm font-semibold">Action Needed</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="p-2.5 rounded-xl bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-all">
+                            <i data-lucide="message-square" class="w-5 h-5"></i>
+                        </button>
+                        <button class="p-2.5 rounded-xl bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-all">
+                            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Client Card 3 -->
+            <div class="crystal-card kinetic-shimmer p-6 group">
+                <input type="checkbox" class="card-checkbox client-select">
+                <div class="flex items-start gap-5">
+                    <div class="relative">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden border-2 border-white/10 bg-neutral-800">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" alt="Marcus" class="w-full h-full object-cover">
+                        </div>
+                        <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-accent rounded-full border-4 border-black status-pulse text-accent"></div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-[18px] font-bold mb-1">Marcus Thorne</h3>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-[10px] px-2 py-0.5 rounded bg-accent/10 text-accent font-bold uppercase mono">Active</span>
+                            <span class="text-caption text-neutral-500 mono">Joined Nov '23</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-neutral-400">
+                            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                            <span class="text-sm">Active 45m ago</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <div class="flex items-center gap-4">
+                        <div class="relative w-12 h-12">
+                            <svg class="w-full h-full compliance-ring" viewBox="0 0 36 36">
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="3"></circle>
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="url(#blueGrad)" stroke-width="3" stroke-dasharray="100" stroke-dashoffset="8" stroke-linecap="round"></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center text-[10px] font-bold mono">92%</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] uppercase text-neutral-500 font-bold tracking-widest">Compliance</div>
+                            <div class="text-sm font-semibold">Elite Performer</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="p-2.5 rounded-xl bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-all">
+                            <i data-lucide="message-square" class="w-5 h-5"></i>
+                        </button>
+                        <button class="p-2.5 rounded-xl bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-all">
+                            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bulk Load of Skeleton-like or Static Cards for context -->
+            <!-- Repeat standard cards as needed -->
+        </div>
+    </main>
+
+    <!-- Bulk Action Bar -->
+    <div class="bulk-actions-bar" id="bulk-bar">
+        <span class="font-bold text-sm"><span id="select-count">0</span> Selected</span>
+        <div class="w-[1px] h-6 bg-black/10"></div>
+        <button class="flex items-center gap-2 font-semibold text-sm hover:opacity-70 transition-opacity">
+            <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+            Assign Workout
+        </button>
+        <button class="flex items-center gap-2 font-semibold text-sm hover:opacity-70 transition-opacity">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            Message
+        </button>
+        <button onclick="clearSelection()" class="p-1.5 hover:bg-black/5 rounded-full transition-colors">
+            <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+    </div>
+
+    <!-- Floating Action Button -->
+    <button class="fixed bottom-24 right-6 md:right-12 btn-primary w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl z-50">
+        <i data-lucide="user-plus" class="w-6 h-6"></i>
+    </button>
+
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 bg-black/80 backdrop-blur-xl border-top border-white/10 z-50">
+        <div class="max-w-xl mx-auto flex items-center justify-around">
+            <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Dash</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-primary">
+                <i data-lucide="users" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Clients</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                <i data-lucide="calendar" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Library</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                <i data-lucide="bar-chart-2" class="w-6 h-6"></i>
+                <span class="text-[10px] font-bold uppercase tracking-widest">Growth</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Selection Logic
+        const checkboxes = document.querySelectorAll('.client-select');
+        const bulkBar = document.getElementById('bulk-bar');
+        const selectCount = document.getElementById('select-count');
+
+        checkboxes.forEach(box => {
+            box.addEventListener('change', () => {
+                const checked = document.querySelectorAll('.client-select:checked');
+                const count = checked.length;
+                
+                if (count > 0) {
+                    bulkBar.classList.add('visible');
+                    selectCount.innerText = count;
+                } else {
+                    bulkBar.classList.remove('visible');
+                }
+            });
+        });
+
+        function clearSelection() {
+            checkboxes.forEach(box => box.checked = false);
+            bulkBar.classList.remove('visible');
+        }
+
+        // Animation for entry
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
+
+        // Haptic feedback simulation
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) window.navigator.vibrate(10);
+            });
+        });
+    </script>
+</body>
+</html>

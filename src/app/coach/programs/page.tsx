@@ -5,13 +5,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
-import { GlassCard } from "@/components/ui/GlassCard";
+
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { supabase } from "@/lib/supabase";
 import WorkoutTemplateService from "@/lib/workoutTemplateService";
 import ProgramCard from "@/components/features/programs/ProgramCard";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Plus, BookOpen, X } from "lucide-react";
+import { RefreshCw, Plus, BookOpen, X, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -32,7 +32,7 @@ interface Program {
 
 function ProgramsDashboardContent() {
   const { user } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { getSemanticColor, performanceSettings } = useTheme();
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,15 +191,35 @@ function ProgramsDashboardContent() {
     loadAssignmentCounts(coachId);
   }, [coachId, loadPrograms, loadAssignmentCounts]);
 
+  // Refetch when user returns to the tab/page so we don't stay stuck if load was suspended or state corrupted
+  useEffect(() => {
+    if (!coachId) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        loadPrograms(coachId);
+        loadAssignmentCounts(coachId);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [coachId, loadPrograms, loadAssignmentCounts]);
+
+  // Prevent stuck loading: if still loading after 15s (e.g. tab was backgrounded), clear it so UI can recover
+  useEffect(() => {
+    if (!loading) return;
+    const t = setTimeout(() => setLoading(false), 15000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
   if (!coachId) {
     return (
       <AnimatedBackground>
         <div className="min-h-screen flex items-center justify-center p-4">
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
             <p className="text-[color:var(--fc-text-dim)]">
               Please sign in to view programs.
             </p>
-          </GlassCard>
+          </div>
         </div>
       </AnimatedBackground>
     );
@@ -234,7 +254,7 @@ function ProgramsDashboardContent() {
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen p-4 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-6 relative z-10">
-          <GlassCard elevation={3} className="fc-glass fc-card p-6 sm:p-10">
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <div className="flex items-start gap-4">
                 <div
@@ -247,10 +267,12 @@ function ProgramsDashboardContent() {
                   <BookOpen className="w-7 h-7 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Program Library
-                  </span>
-                  <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                  <nav className="flex items-center gap-2 text-sm fc-text-dim font-mono uppercase tracking-widest mb-2">
+                    <span>Coach</span>
+                    <ChevronRight className="w-3 h-3" />
+                    <span className="fc-text-primary">Programs</span>
+                  </nav>
+                  <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
                     Training Programs
                   </h1>
                   <p className="text-sm text-[color:var(--fc-text-dim)]">
@@ -281,12 +303,12 @@ function ProgramsDashboardContent() {
                 </Link>
               </div>
             </div>
-          </GlassCard>
+          </div>
 
           {/* Stats Summary */}
           {programs.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <GlassCard elevation={2} className="fc-glass fc-card p-5">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5">
                 <div className="flex items-center gap-4">
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center"
@@ -300,16 +322,16 @@ function ProgramsDashboardContent() {
                     <AnimatedNumber
                       value={totalPrograms}
                       className="text-2xl font-bold"
-                      color={isDark ? "#fff" : "#1A1A1A"}
+                      color="var(--fc-text-primary)"
                     />
                     <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Total Programs
                     </p>
                   </div>
                 </div>
-              </GlassCard>
+              </div>
 
-              <GlassCard elevation={2} className="fc-glass fc-card p-5">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5">
                 <div className="flex items-center gap-4">
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center"
@@ -323,16 +345,16 @@ function ProgramsDashboardContent() {
                     <AnimatedNumber
                       value={activePrograms}
                       className="text-2xl font-bold"
-                      color={isDark ? "#fff" : "#1A1A1A"}
+                      color="var(--fc-text-primary)"
                     />
                     <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Active Programs
                     </p>
                   </div>
                 </div>
-              </GlassCard>
+              </div>
 
-              <GlassCard elevation={2} className="fc-glass fc-card p-5">
+              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-5">
                 <div className="flex items-center gap-4">
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center"
@@ -346,14 +368,14 @@ function ProgramsDashboardContent() {
                     <AnimatedNumber
                       value={totalAssignments}
                       className="text-2xl font-bold"
-                      color={isDark ? "#fff" : "#1A1A1A"}
+                      color="var(--fc-text-primary)"
                     />
                     <p className="text-sm text-[color:var(--fc-text-dim)]">
                       Total Assignments
                     </p>
                   </div>
                 </div>
-              </GlassCard>
+              </div>
             </div>
           )}
 
@@ -384,14 +406,11 @@ function ProgramsDashboardContent() {
 
           {/* Empty State */}
           {programs.length === 0 && (
-            <GlassCard elevation={2} className="fc-glass fc-card py-16 px-6">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] py-16 px-6">
               <div className="text-center max-w-lg mx-auto">
                 <div className="relative inline-block mb-6">
                   <BookOpen
-                    className="w-20 h-20 mx-auto"
-                    style={{
-                      color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-                    }}
+                    className="w-20 h-20 mx-auto fc-text-dim"
                   />
                   <div
                     className="absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center"
@@ -416,7 +435,7 @@ function ProgramsDashboardContent() {
                   </Button>
                 </Link>
               </div>
-            </GlassCard>
+            </div>
           )}
         </div>
       </div>
@@ -430,23 +449,15 @@ function ProgramsDashboardContent() {
             backdropFilter: "blur(4px)",
           }}
         >
-          <GlassCard
-            elevation={4}
-            className="max-w-2xl w-full max-h-[90vh] overflow-hidden"
-          >
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] max-w-2xl w-full max-h-[90vh] overflow-hidden">
             {/* Modal Header */}
             <div
               className="flex items-center justify-between p-6"
               style={{
-                borderBottom: `1px solid ${
-                  isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                }`,
+                borderBottom: "1px solid var(--fc-surface-card-border)",
               }}
             >
-              <h2
-                className="text-xl font-bold"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
+              <h2 className="text-xl font-bold fc-text-primary">
                 Assign Program
               </h2>
               <button
@@ -465,12 +476,7 @@ function ProgramsDashboardContent() {
             <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
               {/* Search */}
               <div>
-                <label
-                  className="block text-sm font-semibold mb-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
-                  }}
-                >
+                <label className="block text-sm font-semibold mb-2 fc-text-primary">
                   Search Clients
                 </label>
                 <input
@@ -478,15 +484,10 @@ function ProgramsDashboardContent() {
                   value={clientSearchQuery}
                   onChange={(e) => setClientSearchQuery(e.target.value)}
                   placeholder="Search by name or email"
-                  className="w-full p-3 rounded-xl"
+                  className="w-full p-3 rounded-xl fc-text-primary"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
-                    border: `1px solid ${
-                      isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                    }`,
-                    color: isDark ? "#fff" : "#1A1A1A",
+                    background: "var(--fc-surface-sunken)",
+                    border: "1px solid var(--fc-surface-card-border)",
                   }}
                 />
               </div>
@@ -512,10 +513,7 @@ function ProgramsDashboardContent() {
                       }}
                       className="w-5 h-5"
                     />
-                    <span
-                      className="font-medium"
-                      style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                    >
+                    <span className="font-medium fc-text-primary">
                       {client.profiles?.first_name} {client.profiles?.last_name}
                     </span>
                   </label>
@@ -524,39 +522,24 @@ function ProgramsDashboardContent() {
 
               {/* Start Date */}
               <div>
-                <label
-                  className="block text-sm font-semibold mb-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
-                  }}
-                >
+                <label className="block text-sm font-semibold mb-2 fc-text-primary">
                   Start Date
                 </label>
                 <input
                   type="date"
                   value={assignStartDate}
                   onChange={(e) => setAssignStartDate(e.target.value)}
-                  className="w-full p-3 rounded-xl"
+                  className="w-full p-3 rounded-xl fc-text-primary"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
-                    border: `1px solid ${
-                      isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                    }`,
-                    color: isDark ? "#fff" : "#1A1A1A",
+                    background: "var(--fc-surface-sunken)",
+                    border: "1px solid var(--fc-surface-card-border)",
                   }}
                 />
               </div>
 
               {/* Notes */}
               <div>
-                <label
-                  className="block text-sm font-semibold mb-2"
-                  style={{
-                    color: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
-                  }}
-                >
+                <label className="block text-sm font-semibold mb-2 fc-text-primary">
                   Notes (Optional)
                 </label>
                 <textarea
@@ -564,15 +547,10 @@ function ProgramsDashboardContent() {
                   onChange={(e) => setAssignNotes(e.target.value)}
                   placeholder="Add any notes for the client"
                   rows={3}
-                  className="w-full p-3 rounded-xl resize-none"
+                  className="w-full p-3 rounded-xl resize-none fc-text-primary"
                   style={{
-                    background: isDark
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
-                    border: `1px solid ${
-                      isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"
-                    }`,
-                    color: isDark ? "#fff" : "#1A1A1A",
+                    background: "var(--fc-surface-sunken)",
+                    border: "1px solid var(--fc-surface-card-border)",
                   }}
                 />
               </div>
@@ -582,9 +560,7 @@ function ProgramsDashboardContent() {
             <div
               className="flex items-center justify-end gap-3 p-6"
               style={{
-                borderTop: `1px solid ${
-                  isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                }`,
+                borderTop: "1px solid var(--fc-surface-card-border)",
               }}
             >
               <Button
@@ -610,7 +586,7 @@ function ProgramsDashboardContent() {
                 Assign to {selectedClients.length} client{selectedClients.length !== 1 ? "s" : ""}
               </Button>
             </div>
-          </GlassCard>
+          </div>
         </div>
       )}
 
@@ -623,19 +599,11 @@ function ProgramsDashboardContent() {
             backdropFilter: "blur(4px)",
           }}
         >
-          <GlassCard elevation={4} className="max-w-md w-full p-6">
-            <h2
-              className="text-xl font-bold mb-4"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] max-w-md w-full p-6">
+            <h2 className="text-xl font-bold mb-4 fc-text-primary">
               Delete Program?
             </h2>
-            <p
-              className="mb-6"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-              }}
-            >
+            <p className="mb-6 fc-text-dim">
               Are you sure you want to delete "{programToDelete.name}"? This action
               cannot be undone.
             </p>
@@ -646,12 +614,7 @@ function ProgramsDashboardContent() {
                 onChange={(e) => setConfirmImpact(e.target.checked)}
                 className="w-5 h-5"
               />
-              <span
-                className="text-sm"
-                style={{
-                  color: isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.9)",
-                }}
-              >
+              <span className="text-sm fc-text-primary">
                 I understand this will affect assigned clients
               </span>
             </label>
@@ -679,7 +642,7 @@ function ProgramsDashboardContent() {
                 Delete Program
               </Button>
             </div>
-          </GlassCard>
+          </div>
         </div>
       )}
     </AnimatedBackground>

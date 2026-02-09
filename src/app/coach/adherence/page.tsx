@@ -6,8 +6,8 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { GlassCard } from '@/components/ui/GlassCard'
-import { Badge } from '@/components/ui/badge'
-import { ShieldCheck } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Filter, Download, ChevronRight } from 'lucide-react'
 import OptimizedAdherenceTracking from '@/components/coach/OptimizedAdherenceTracking'
 
 export default function CoachAdherencePage() {
@@ -18,34 +18,32 @@ export default function CoachAdherencePage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen">
-          <div className="relative px-6 pb-16 pt-10">
-            <div className="max-w-7xl mx-auto space-y-6">
-              <GlassCard className="p-6 md:p-8">
-                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-3">
-                    <Badge className="fc-badge fc-badge-strong w-fit">Adherence Signals</Badge>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg">
-                        <ShieldCheck className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                          Client Adherence
-                        </h1>
-                        <p className="text-sm text-[color:var(--fc-text-dim)]">
-                          Monitor consistency, streaks, and adherence patterns.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </GlassCard>
+        <div className="min-h-screen p-6 md:p-10 pb-32">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div>
+                <nav className="flex items-center gap-2 text-sm fc-text-dim mb-2 font-mono uppercase tracking-widest">
+                  <span>Coach</span>
+                  <ChevronRight className="w-3 h-3" />
+                  <span className="fc-text-primary">Adherence</span>
+                </nav>
+                <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Adherence Overview</h1>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
+                  <Filter className="w-4 h-4 mr-2" />
+                  Filter
+                </Button>
+                <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </div>
+            </header>
 
-              <GlassCard className="p-4 sm:p-6">
-                <OptimizedAdherenceTracking coachId={user?.id || ''} />
-              </GlassCard>
-            </div>
+            <GlassCard className="p-4 sm:p-6 rounded-2xl">
+              <OptimizedAdherenceTracking coachId={user?.id || ''} />
+            </GlassCard>
           </div>
         </div>
       </AnimatedBackground>

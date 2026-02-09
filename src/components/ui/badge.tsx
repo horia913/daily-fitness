@@ -18,7 +18,8 @@ const badgeVariants = cva(
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         "fc-glass": "fc-badge fc-glass-soft text-white",
-        "fc-outline": "fc-badge border-white/20 text-white/70",
+        "fc-outline":
+          "fc-badge border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-dim)]",
         "fc-filled": "fc-badge bg-[var(--fc-accent-cyan)] text-black",
       },
     },

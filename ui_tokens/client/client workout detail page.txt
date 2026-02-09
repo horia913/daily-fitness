@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Protocol | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #070707;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --refraction: rgba(59, 130, 246, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Gridwork Background */
+        .grid-overlay {
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(var(--glass-border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--glass-border) 1px, transparent 1px);
+            background-size: 40px 40px;
+            mask-image: radial-gradient(circle at 50% 50%, black, transparent 80%);
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+        .refraction-blob {
+            position: fixed;
+            width: 500px;
+            height: 500px;
+            background: var(--refraction);
+            filter: blur(120px);
+            border-radius: 50%;
+            z-index: -2;
+            top: -10%;
+            right: -10%;
+            animation: float 20s infinite alternate;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-100px, 50px); }
+        }
+
+        /* Monolith Components */
+        .monolith-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .monolith-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+        }
+
+        .refractive-edge {
+            position: relative;
+        }
+
+        .refractive-edge::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent, rgba(59, 130, 246, 0.2));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        /* Kinetic Shimmer Animation */
+        .shimmer-text {
+            background: linear-gradient(90deg, #fff 0%, var(--secondary) 50%, #fff 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shine 8s linear infinite;
+        }
+
+        @keyframes shine {
+            to { background-position: 200% center; }
+        }
+
+        /* Button Styling */
+        .btn-start {
+            background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%);
+            box-shadow: 0 0 30px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.5);
+        }
+
+        .btn-start:active { transform: scale(0.98); }
+
+        /* Accordion Customization */
+        .exercise-item {
+            max-height: 80px;
+            overflow: hidden;
+            transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .exercise-item.active {
+            max-height: 500px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .rotate-icon { transition: transform 0.3s ease; }
+        .active .rotate-icon { transform: rotate(180deg); }
+
+        .block-badge {
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="grid-overlay"></div>
+    <div class="refraction-blob"></div>
+
+    <!-- Navigation -->
+    <nav class="flex justify-between items-center p-6 max-w-5xl mx-auto">
+        <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        <div class="text-center">
+            <span class="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-bold">Protocol View</span>
+        </div>
+        <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">
+            <i data-lucide="more-horizontal" class="w-6 h-6"></i>
+        </button>
+    </nav>
+
+    <main class="max-w-3xl mx-auto p-6 pb-40">
+        <!-- Header Section -->
+        <header class="mb-10">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-bold border border-blue-500/20 tracking-wider">HYPERTROPHY</span>
+                <span class="text-neutral-500 text-xs mono">PHASE 2 • WEEK 4</span>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-extrabold tracking-tighter mb-6 shimmer-text">Pull Day: Upper Back & Biceps Focus</h1>
+            
+            <!-- Coach's Monolith Note -->
+            <div class="monolith-card refractive-edge p-5 rounded-3xl border-l-4 border-l-blue-500 flex gap-4">
+                <div class="w-12 h-12 rounded-2xl overflow-hidden flex-shrink-0 border border-white/10">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=CoachMarcus" alt="Coach" class="w-full h-full object-cover">
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold text-blue-400 mb-1">Coach Marcus</h4>
+                    <p class="text-sm text-neutral-300 italic leading-relaxed">"Focus on the controlled eccentric today. On the rows, think about pulling your elbows to your hips to maximize lat engagement."</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+            <div class="monolith-card rounded-2xl p-4 text-center">
+                <i data-lucide="clock" class="w-5 h-5 mx-auto mb-2 text-neutral-500"></i>
+                <div class="text-lg font-bold">~65</div>
+                <div class="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">Minutes</div>
+            </div>
+            <div class="monolith-card rounded-2xl p-4 text-center">
+                <i data-lucide="layers" class="w-5 h-5 mx-auto mb-2 text-neutral-500"></i>
+                <div class="text-lg font-bold">24</div>
+                <div class="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">Total Sets</div>
+            </div>
+            <div class="monolith-card rounded-2xl p-4 text-center">
+                <i data-lucide="dumbbell" class="w-5 h-5 mx-auto mb-2 text-neutral-500"></i>
+                <div class="text-lg font-bold">8</div>
+                <div class="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">Exercises</div>
+            </div>
+            <div class="monolith-card rounded-2xl p-4 text-center">
+                <i data-lucide="Zap" class="w-5 h-5 mx-auto mb-2 text-neutral-500"></i>
+                <div class="text-lg font-bold text-accent">3</div>
+                <div class="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">Drop Sets</div>
+            </div>
+        </section>
+
+        <!-- Exercise List -->
+        <section class="space-y-4">
+            <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500 mb-6">Workout Content</h3>
+            
+            <!-- Exercise Item 1: Straight Set -->
+            <div class="monolith-card refractive-edge rounded-3xl exercise-item active overflow-hidden" onclick="toggleExercise(this)">
+                <div class="flex items-center justify-between p-5 cursor-pointer">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-bold mono text-lg">01</div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span class="block-badge bg-blue-500/20 text-blue-400 border border-blue-500/20">Straight Set</span>
+                            </div>
+                            <h4 class="font-bold text-lg">Barbell Pendlay Row</h4>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-down" class="w-5 h-5 text-neutral-500 rotate-icon"></i>
+                </div>
+                <div class="px-5 pb-6">
+                    <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="bg-black/40 rounded-2xl p-3 border border-white/5">
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold mb-1">Sets</div>
+                            <div class="mono font-bold text-lg">4 Sets</div>
+                        </div>
+                        <div class="bg-black/40 rounded-2xl p-3 border border-white/5">
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold mb-1">Reps</div>
+                            <div class="mono font-bold text-lg">8-10</div>
+                        </div>
+                        <div class="bg-black/40 rounded-2xl p-3 border border-white/5">
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold mb-1">Rest</div>
+                            <div class="mono font-bold text-lg">120s</div>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="history" class="w-4 h-4 text-neutral-500"></i>
+                            <span class="text-sm text-neutral-400">Previous best: <span class="text-white font-bold mono">85kg × 8</span></span>
+                        </div>
+                        <i data-lucide="trending-up" class="w-4 h-4 text-accent"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Exercise Item 2: Superset -->
+            <div class="monolith-card refractive-edge rounded-3xl exercise-item overflow-hidden" onclick="toggleExercise(this)">
+                <div class="flex items-center justify-between p-5 cursor-pointer">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-bold mono text-lg">02</div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span class="block-badge bg-orange-500/20 text-orange-400 border border-orange-500/20">Superset A</span>
+                            </div>
+                            <h4 class="font-bold text-lg">Weighted Pull-ups</h4>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-down" class="w-5 h-5 text-neutral-500 rotate-icon"></i>
+                </div>
+                <div class="px-5 pb-6">
+                    <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="bg-black/40 rounded-2xl p-3 border border-white/5">
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold mb-1">Sets</div>
+                            <div class="mono font-bold text-lg">3 Sets</div>
+                        </div>
+                        <div class="bg-black/40 rounded-2xl p-3 border border-white/5">
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold mb-1">Reps</div>
+                            <div class="mono font-bold text-lg">AMRAP</div>
+                        </div>
+                        <div class="bg-black/40 rounded-2xl p-3 border border-white/5">
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold mb-1">Rest</div>
+                            <div class="mono font-bold text-lg">0s</div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-neutral-400 leading-relaxed mb-4">Pair immediately with Seated Cable Rows. Do not rest between movements A1 and A2.</p>
+                </div>
+            </div>
+
+            <!-- Exercise Item 3: Drop Set -->
+            <div class="monolith-card refractive-edge rounded-3xl exercise-item overflow-hidden" onclick="toggleExercise(this)">
+                <div class="flex items-center justify-between p-5 cursor-pointer">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-bold mono text-lg">03</div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span class="block-badge bg-purple-500/20 text-purple-400 border border-purple-500/20">Drop Set</span>
+                            </div>
+                            <h4 class="font-bold text-lg">Dumbbell Hammer Curls</h4>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-down" class="w-5 h-5 text-neutral-500 rotate-icon"></i>
+                </div>
+                <div class="px-5 pb-6">
+                    <div class="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 text-sm text-purple-200">
+                        Perform 3 sets of 12. On the final set, drop the weight by 30% and perform reps to failure.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Equipment Section -->
+        <section class="mt-12 mb-8">
+            <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500 mb-4">Required Gear</h3>
+            <div class="flex flex-wrap gap-2">
+                <span class="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm">
+                    <i data-lucide="package" class="w-4 h-4"></i> Barbell
+                </span>
+                <span class="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm">
+                    <i data-lucide="package" class="w-4 h-4"></i> Dumbbells
+                </span>
+                <span class="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm">
+                    <i data-lucide="package" class="w-4 h-4"></i> Cable Machine
+                </span>
+            </div>
+        </section>
+    </main>
+
+    <!-- Fixed Bottom Action Bar -->
+    <div class="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/90 to-transparent backdrop-blur-md z-50">
+        <div class="max-w-3xl mx-auto flex flex-col md:flex-row gap-4">
+            <button class="flex-1 h-16 btn-start rounded-2xl flex items-center justify-center gap-3 text-lg font-extrabold uppercase tracking-widest">
+                <i data-lucide="play" class="w-6 h-6 fill-current"></i>
+                Begin Protocol
+            </button>
+            <button class="h-16 px-8 rounded-2xl bg-white/5 border border-white/10 font-bold hover:bg-white/10 transition-colors">
+                Reschedule
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Exercise Toggle Logic
+        function toggleExercise(element) {
+            // Close other items
+            document.querySelectorAll('.exercise-item').forEach(item => {
+                if(item !== element) item.classList.remove('active');
+            });
+            // Toggle current item
+            element.classList.toggle('active');
+        }
+
+        // Entrance Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.monolith-card, header, .btn-start');
+            elements.forEach((el, i) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    el.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                }, i * 100);
+            });
+        });
+
+        // Haptic Feedback Simulation
+        document.querySelector('.btn-start').addEventListener('click', () => {
+            if (window.navigator.vibrate) {
+                window.navigator.vibrate(20);
+            }
+        });
+    </script>
+</body>
+</html>

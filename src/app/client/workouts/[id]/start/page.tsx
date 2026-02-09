@@ -6,7 +6,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
-import { GlassCard } from "@/components/ui/GlassCard";
 import {
   Card,
   CardContent,
@@ -52,6 +51,8 @@ import {
   WorkoutBlock,
   LiveWorkoutBlock,
   LoggedSet,
+  WORKOUT_BLOCK_CONFIGS,
+  type WorkoutBlockType,
 } from "@/types/workoutBlocks";
 import {
   fetchE1RMs,
@@ -2090,23 +2091,21 @@ export default function LiveWorkout() {
         return;
       }
 
-      // Get current week from program_assignment_progress
-      const { data: progress } = await supabase
-        .from("program_assignment_progress")
-        .select("current_week, program_id")
-        .eq("assignment_id", programAssignmentId)
-        .eq("client_id", user.id)
-        .maybeSingle();
+      // Get current week from canonical programStateService
+      const { getProgramState } = await import("@/lib/programStateService");
+      const programState = await getProgramState(supabase, user.id);
 
-      if (!progress?.current_week) {
+      if (!programState.assignment || programState.isCompleted || !programState.currentWeekNumber) {
         return;
       }
+
+      const currentWeekForProgression = programState.currentWeekNumber;
 
       // Get program category
       const { data: program } = await supabase
         .from("workout_programs")
         .select("category")
-        .eq("id", progress.program_id)
+        .eq("id", programState.assignment.program_id)
         .maybeSingle();
 
       const category = program?.category || undefined;
@@ -2137,7 +2136,7 @@ export default function LiveWorkout() {
 
       const suggestions = await getProgressionSuggestionsForWorkout(
         programAssignmentId,
-        progress.current_week,
+        currentWeekForProgression,
         exerciseIds,
         exerciseNames,
         category,
@@ -3102,6 +3101,13 @@ export default function LiveWorkout() {
       } = await supabase.auth.getUser();
       if (!user) {
         console.error("❌ User not authenticated");
+        addToast({
+          title: "Could not complete workout",
+          description: "Please sign in again.",
+          variant: "destructive",
+        });
+        isCompletingWorkoutRef.current = false;
+        setIsCompletingWorkout(false);
         return;
       }
 
@@ -3636,7 +3642,7 @@ export default function LiveWorkout() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Last Workout */}
-          <div className="rounded-lg p-3 bg-white/60 dark:bg-slate-800/60 border border-green-200 dark:border-green-700">
+          <div className="rounded-lg p-3 fc-glass-soft border border-[color:var(--fc-status-success)]">
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
               <span className={`text-sm font-semibold ${theme.text}`}>
@@ -3676,7 +3682,7 @@ export default function LiveWorkout() {
           </div>
 
           {/* Personal Best */}
-          <div className="rounded-lg p-3 bg-white/60 dark:bg-slate-800/60 border border-green-200 dark:border-green-700">
+          <div className="rounded-lg p-3 fc-glass-soft border border-[color:var(--fc-status-success)]">
             <div className="flex items-center gap-2 mb-2">
               <Trophy className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
               <span className={`text-sm font-semibold ${theme.text}`}>
@@ -3735,91 +3741,88 @@ export default function LiveWorkout() {
             totalSets={currentExercise?.sets}
           />
 
-          <div className="px-5 py-6">
-            <div className="max-w-4xl mx-auto flex flex-col gap-5">
-              {/* Enhanced Header - Mobile Optimized */}
-              <GlassCard elevation={2} className="fc-glass fc-card p-4 sm:p-5 mb-4 sm:mb-5">
-                <div className="flex items-start gap-3 sm:gap-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push("/client/workouts")}
-                    className="p-2 sm:p-3 rounded-xl fc-text-dim hover:fc-text-primary flex-shrink-0"
+          <div className="fc-page">
+            <div className="max-w-4xl mx-auto flex flex-col gap-5" style={{ gap: "var(--fc-gap-sections)" }}>
+              {/* Header: symmetric (X | Current Block | Placeholder) when block system; else legacy */}
+              {useBlockSystem && workoutBlocks.length > 0 ? (
+                <div className="flex items-center justify-between mb-3">
+                  <button
+                    onClick={() => {
+                      if (typeof window !== "undefined" && window.confirm("Exit workout? Progress is saved.")) {
+                        router.push("/client/workouts");
+                      }
+                    }}
+                    className="w-9 h-9 rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] flex items-center justify-center fc-text-dim transition-all active:scale-95 flex-shrink-0"
+                    aria-label="Exit workout"
                   >
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="text-center min-w-0 flex-1 px-2">
+                    <span className="text-[10px] uppercase tracking-[0.2em] fc-text-dim block font-mono">
+                      Block {currentBlockIndex + 1}/{workoutBlocks.length}
+                    </span>
+                    <span className="text-sm font-semibold fc-text-primary truncate block">
+                      {(() => {
+                        const block = workoutBlocks[currentBlockIndex];
+                        const type = (block?.block?.block_type as WorkoutBlockType) || "straight_set";
+                        return WORKOUT_BLOCK_CONFIGS[type]?.name ?? "Straight Set";
+                      })()}
+                    </span>
+                  </div>
+                  <div className="w-9 h-9 flex-shrink-0" aria-hidden />
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 mb-3">
+                  <button
+                    onClick={() => router.push("/client/workouts")}
+                    className="w-9 h-9 rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] flex items-center justify-center fc-text-dim transition-all active:scale-95 flex-shrink-0"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-3">
-                      <div className="fc-icon-tile fc-icon-workouts w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
-                        <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] sm:tracking-[0.3em] fc-text-dim">
-                            Live Session
-                          </p>
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-xs fc-text-dim">Live</span>
-                          </div>
-                        </div>
-                        <h1 className="text-base sm:text-xl font-bold fc-text-primary leading-tight mt-1 break-words">
-                          {assignment?.name || "Workout"}
-                        </h1>
-                        <p className="text-xs sm:text-sm fc-text-dim mt-0.5">
-                          Live workout execution
-                        </p>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--fc-status-success)" }} />
+                      <span className="text-[10px] uppercase tracking-[0.2em] fc-text-dim font-mono">
+                        Live Session
+                      </span>
                     </div>
+                    <h1 className="text-base font-bold fc-text-primary leading-tight truncate">
+                      {assignment?.name || "Workout"}
+                    </h1>
                   </div>
                 </div>
-              </GlassCard>
+              )}
               {/* Workout Block System */}
               {useBlockSystem && workoutBlocks.length > 0 ? (
                 <>
                   {/* Block Progress Indicator */}
                   {workoutBlocks.length > 1 && (
-                    <GlassCard elevation={2} className="p-4 mb-4">
-                      <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                    <div className="mb-3">
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                         {workoutBlocks.map((block, index) => {
                           const isCompleted =
                             block.isCompleted || index < currentBlockIndex;
                           const isCurrent = index === currentBlockIndex;
-                          const blockClass = isCompleted
-                            ? "opacity-50 pointer-events-none bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
-                            : isCurrent
-                            ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                            : "bg-slate-50 dark:bg-slate-800";
 
                           return (
                             <div
                               key={block.block.id}
-                              className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg border-2 ${
-                                isCompleted
-                                  ? "border-gray-300 dark:border-gray-600"
+                              className="flex-1 h-1.5 rounded-full transition-all min-w-[20px]"
+                              style={{
+                                background: isCompleted
+                                  ? "var(--fc-status-success)"
                                   : isCurrent
-                                  ? "border-blue-500"
-                                  : "border-slate-300 dark:border-slate-600"
-                              } ${blockClass}`}
+                                  ? "var(--fc-domain-workouts)"
+                                  : "var(--fc-surface-sunken)",
+                              }}
                               title={
                                 block.block.block_name || `Block ${index + 1}`
                               }
-                            >
-                              {isCompleted ? (
-                                <Check className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                              ) : (
-                                <span className="text-sm font-semibold">
-                                  {index + 1}
-                                </span>
-                              )}
-                            </div>
+                            />
                           );
                         })}
                       </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-2 text-center">
-                        Block {currentBlockIndex + 1} of {workoutBlocks.length}
-                      </div>
-                    </GlassCard>
+                    </div>
                   )}
                   <LiveWorkoutBlockExecutor
                     block={workoutBlocks[currentBlockIndex]}
@@ -4054,7 +4057,7 @@ export default function LiveWorkout() {
                                       }
                                       className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >
-                                      <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                      <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
                                     <Button
                                       variant="ghost"
@@ -4064,7 +4067,7 @@ export default function LiveWorkout() {
                                       }
                                       className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >
-                                      <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                      <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
                                   </div>
                                   <div className="flex flex-wrap gap-2 text-sm">
@@ -4097,7 +4100,7 @@ export default function LiveWorkout() {
                               </div>
 
                               {/* Logging Fields */}
-                              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 dark:border-slate-600">
+                              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-[color:var(--fc-glass-border)]">
                                 <div>
                                   <label
                                     className={`block text-sm font-medium ${theme.text} mb-1`}
@@ -4110,7 +4113,7 @@ export default function LiveWorkout() {
                                     onChange={(e) =>
                                       setAmrapWeight(e.target.value)
                                     }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
                                     step="0.5"
                                     placeholder="0"
                                   />
@@ -4127,7 +4130,7 @@ export default function LiveWorkout() {
                                     onChange={(e) =>
                                       setAmrapReps(e.target.value)
                                     }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
                                     placeholder="0"
                                   />
                                 </div>
@@ -4142,7 +4145,7 @@ export default function LiveWorkout() {
                               {/* Primary: Log and Continue */}
                               <Button
                                 onClick={completeAmrapSet}
-                                className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                                className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
                                 disabled={isLoggingSet}
                               >
                                 <Check className="w-5 h-5 mr-2" /> Log AMRAP
@@ -4176,7 +4179,7 @@ export default function LiveWorkout() {
                               :
                               {(amrapTimeLeft % 60).toString().padStart(2, "0")}
                             </div>
-                            <div className="mt-2 text-slate-600 dark:text-slate-300">
+                            <div className="mt-2 fc-text-dim">
                               Time Remaining
                             </div>
                             <Button
@@ -4306,7 +4309,7 @@ export default function LiveWorkout() {
                                   setEmomRepTimeLeft(minutes * 60);
                                   setEmomRepActive(true);
                                 }}
-                                className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                                className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
                               >
                                 <Clock className="w-5 h-5 mr-2" /> Start EMOM
                               </Button>
@@ -4322,7 +4325,7 @@ export default function LiveWorkout() {
                                   .toString()
                                   .padStart(2, "0")}
                               </div>
-                              <div className="mt-2 text-slate-600 dark:text-slate-300">
+                              <div className="mt-2 fc-text-dim">
                                 Time Remaining
                               </div>
                               <Button
@@ -4412,14 +4415,14 @@ export default function LiveWorkout() {
                                 setEmomPhaseLeft(workSeconds);
                                 setEmomActive(true);
                               }}
-                              className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                              className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
                             >
                               <Clock className="w-5 h-5 mr-2" /> Start EMOM
                             </Button>
                           </div>
                         ) : emomActive ? (
                           <div className="flex flex-col items-center justify-center py-8">
-                            <div className="text-sm uppercase tracking-wide text-slate-600 dark:text-slate-300 mb-1">
+                            <div className="text-sm uppercase tracking-wide fc-text-dim mb-1">
                               Total Remaining
                             </div>
                             <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-300 mb-4">
@@ -4446,7 +4449,7 @@ export default function LiveWorkout() {
                               :
                               {(emomPhaseLeft % 60).toString().padStart(2, "0")}
                             </div>
-                            <div className="mt-2 text-slate-600 dark:text-slate-300">
+                            <div className="mt-2 fc-text-dim">
                               {emomPhase === "work" ? "Work" : "Rest"} phase
                             </div>
                             <Button
@@ -4641,7 +4644,7 @@ export default function LiveWorkout() {
                                                     return (
                                                       <div
                                                         key={exerciseIndex}
-                                                        className="rounded-lg p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600"
+                                                        className="rounded-lg p-3 bg-white dark:bg-slate-800 border border-[color:var(--fc-glass-border)]"
                                                       >
                                                         <div className="flex items-start gap-3">
                                                           <div
@@ -4676,7 +4679,7 @@ export default function LiveWorkout() {
                                                                 }
                                                                 className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                                               >
-                                                                <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                                                <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                                               </Button>
                                                               <Button
                                                                 variant="ghost"
@@ -4688,7 +4691,7 @@ export default function LiveWorkout() {
                                                                 }
                                                                 className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                                               >
-                                                                <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                                                <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                                               </Button>
                                                             </div>
                                                             <div className="flex flex-wrap gap-2 text-sm">
@@ -4838,7 +4841,7 @@ export default function LiveWorkout() {
                                 const rounds = currentExercise?.sets || 1;
                                 setIntervalTotalRounds(rounds);
                               }}
-                              className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                              className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
                             >
                               <Clock className="w-5 h-5 mr-2" /> Start{" "}
                               {currentType === "tabata" ? "Tabata" : "Circuit"}
@@ -4846,7 +4849,7 @@ export default function LiveWorkout() {
                           </div>
                         ) : (
                           <div className="flex flex-col items-center justify-center py-8">
-                            <div className="text-sm text-slate-600 dark:text-slate-300 mb-1">
+                            <div className="text-sm fc-text-dim mb-1">
                               Round{" "}
                               {Math.min(
                                 intervalRound +
@@ -4874,7 +4877,7 @@ export default function LiveWorkout() {
                                 .toString()
                                 .padStart(2, "0")}
                             </div>
-                            <div className="mt-2 text-slate-600 dark:text-slate-300">
+                            <div className="mt-2 fc-text-dim">
                               {intervalPhase === "work" ? "Work" : "Rest"} phase
                             </div>
                             <Button
@@ -5006,7 +5009,7 @@ export default function LiveWorkout() {
                                 onClick={() => setShowPlateCalculator(true)}
                                 className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                               >
-                                <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -5016,7 +5019,7 @@ export default function LiveWorkout() {
                                 }
                                 className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                               >
-                                <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                               </Button>
                             </div>
                             <div className="flex flex-wrap gap-2.5">
@@ -5136,7 +5139,7 @@ export default function LiveWorkout() {
                                         return copy;
                                       });
                                     }}
-                                    className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
                                     step="0.5"
                                     placeholder={
                                       idx === 0 ? "Enter weight" : "Auto-filled"
@@ -5160,7 +5163,7 @@ export default function LiveWorkout() {
                                       1
                                     }
                                     readOnly
-                                    className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-slate-100 dark:bg-slate-700 ${theme.text} font-semibold`}
+                                    className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-glass-border)] fc-glass-soft ${theme.text} font-semibold`}
                                   />
                                 </div>
                               </div>
@@ -5172,7 +5175,7 @@ export default function LiveWorkout() {
                         <div className="flex justify-center mt-6 mb-4">
                           <Button
                             onClick={() => setShowClusterTimer(true)}
-                            className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg"
+                            className="w-full fc-btn fc-btn-primary px-6 py-3 rounded-xl font-semibold"
                           >
                             <Clock className="w-4 h-4 mr-2" />
                             Start Rest Timer
@@ -5194,7 +5197,7 @@ export default function LiveWorkout() {
                                 clusterWeights
                               );
                             }}
-                            className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                            className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
                             disabled={clusterWeights.some(
                               (w) => !w || w === "0"
                             )}
@@ -5316,7 +5319,7 @@ export default function LiveWorkout() {
                                 onClick={() => setShowPlateCalculator(true)}
                                 className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                               >
-                                <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -5326,7 +5329,7 @@ export default function LiveWorkout() {
                                 }
                                 className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                               >
-                                <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                               </Button>
                             </div>
                             <div className="flex flex-wrap gap-2.5">
@@ -5408,7 +5411,7 @@ export default function LiveWorkout() {
                                       weight: parseFloat(e.target.value) || 0,
                                     }))
                                   }
-                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
                                   step="0.5"
                                   placeholder="0"
                                 />
@@ -5432,7 +5435,7 @@ export default function LiveWorkout() {
                                       reps: parseInt(e.target.value) || 0,
                                     }))
                                   }
-                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                  className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
                                   placeholder="0"
                                 />
                               </div>
@@ -5483,7 +5486,7 @@ export default function LiveWorkout() {
                                             )
                                           )
                                         }
-                                        className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                        className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
                                         placeholder="0"
                                       />
                                     </div>
@@ -5506,7 +5509,7 @@ export default function LiveWorkout() {
                                           0
                                         }
                                         readOnly
-                                        className={`w-full h-10 text-center text-sm rounded-lg border-2 border-blue-300 dark:border-blue-700 bg-slate-100 dark:bg-slate-700 ${theme.text} font-semibold`}
+                                        className={`w-full h-10 text-center text-sm rounded-lg border-2 border-[color:var(--fc-glass-border)] fc-glass-soft ${theme.text} font-semibold`}
                                       />
                                     </div>
                                   </div>
@@ -5531,7 +5534,7 @@ export default function LiveWorkout() {
                                 miniSets: restPauseExtraReps,
                               });
                             }}
-                            className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                            className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
                             disabled={
                               currentSetData.weight <= 0 ||
                               currentSetData.reps <= 0
@@ -5654,7 +5657,7 @@ export default function LiveWorkout() {
                                 setForTimeActive(true);
                                 setForTimeStopped(false);
                               }}
-                              className="w-full bg-[linear-gradient(135deg,rgba(59,130,246,1)_0%,rgba(99,102,241,1)_50%,rgba(147,51,234,1)_100%)] hover:brightness-110 text-white rounded-xl py-6 text-lg font-bold shadow-lg transition-all"
+                              className="w-full fc-btn fc-btn-primary rounded-xl py-6 text-lg font-bold"
                             >
                               <Clock className="w-5 h-5 mr-2" /> Start For Time
                             </Button>
@@ -5670,7 +5673,7 @@ export default function LiveWorkout() {
                                 .toString()
                                 .padStart(2, "0")}
                             </div>
-                            <div className="mt-2 text-slate-600 dark:text-slate-300">
+                            <div className="mt-2 fc-text-dim">
                               Time Remaining
                             </div>
                             <Button
@@ -5703,7 +5706,7 @@ export default function LiveWorkout() {
                                   .toString()
                                   .padStart(2, "0")}
                               </div>
-                              <div className="text-sm text-slate-600 dark:text-slate-300">
+                              <div className="text-sm fc-text-dim">
                                 Completion Time
                               </div>
                             </div>
@@ -5711,7 +5714,7 @@ export default function LiveWorkout() {
                             {/* Weight and Reps Inputs */}
                             <div className="grid grid-cols-2 gap-4">
                               <div>
-                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                                <label className="block text-sm font-semibold fc-text-dim mb-2">
                                   Weight (kg)
                                 </label>
                                 <input
@@ -5727,13 +5730,13 @@ export default function LiveWorkout() {
                                       weight: parseFloat(e.target.value) || 0,
                                     }))
                                   }
-                                  className="w-full h-12 text-center text-lg font-bold rounded-xl border-2 border-blue-300 dark:border-indigo-700 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 dark:focus:border-indigo-500"
+                                  className="w-full h-12 text-center text-lg font-bold rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary focus:outline-none focus:border-[color:var(--fc-domain-workouts)] dark:focus:border-indigo-500"
                                   step="0.5"
                                   placeholder="0"
                                 />
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                                <label className="block text-sm font-semibold fc-text-dim mb-2">
                                   Reps
                                 </label>
                                 <input
@@ -5749,7 +5752,7 @@ export default function LiveWorkout() {
                                       reps: parseInt(e.target.value) || 0,
                                     }))
                                   }
-                                  className="w-full h-12 text-center text-lg font-bold rounded-xl border-2 border-blue-300 dark:border-indigo-700 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 dark:focus:border-indigo-500"
+                                  className="w-full h-12 text-center text-lg font-bold rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary focus:outline-none focus:border-[color:var(--fc-domain-workouts)] dark:focus:border-indigo-500"
                                   placeholder="0"
                                 />
                               </div>
@@ -5770,7 +5773,7 @@ export default function LiveWorkout() {
                           </div>
                         ) : (
                           <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <div className="text-sm text-slate-700 dark:text-slate-200">
+                            <div className="text-sm fc-text-dim">
                               Completion time recorded: {forTimeCompletionSecs}s
                             </div>
                           </div>
@@ -5862,7 +5865,7 @@ export default function LiveWorkout() {
                                       }
                                       className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >
-                                      <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                      <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
                                     <Button
                                       variant="ghost"
@@ -5872,7 +5875,7 @@ export default function LiveWorkout() {
                                       }
                                       className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >
-                                      <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                      <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
                                   </div>
                                 </div>
@@ -5942,7 +5945,7 @@ export default function LiveWorkout() {
                                     onChange={(e) =>
                                       setSupersetAWeight(e.target.value)
                                     }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
                                     step="0.5"
                                     placeholder="0"
                                   />
@@ -5959,7 +5962,7 @@ export default function LiveWorkout() {
                                     onChange={(e) =>
                                       setSupersetAReps(e.target.value)
                                     }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
                                     placeholder="0"
                                   />
                                 </div>
@@ -6007,7 +6010,7 @@ export default function LiveWorkout() {
                                       }
                                       className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >
-                                      <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                      <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
                                     <Button
                                       variant="ghost"
@@ -6017,7 +6020,7 @@ export default function LiveWorkout() {
                                       }
                                       className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                     >
-                                      <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                      <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
                                   </div>
                                 </div>
@@ -6079,7 +6082,7 @@ export default function LiveWorkout() {
                                     onChange={(e) =>
                                       setSupersetBWeight(e.target.value)
                                     }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
                                     step="0.5"
                                     placeholder="0"
                                   />
@@ -6096,7 +6099,7 @@ export default function LiveWorkout() {
                                     onChange={(e) =>
                                       setSupersetBReps(e.target.value)
                                     }
-                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 ${theme.text} font-semibold focus:outline-none focus:border-blue-500`}
+                                    className={`w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft ${theme.text} font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]`}
                                     placeholder="0"
                                   />
                                 </div>
@@ -6196,7 +6199,7 @@ export default function LiveWorkout() {
                                   </div>
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2">
-                                      <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                                      <div className="text-base sm:text-lg font-bold fc-text-primary">
                                         {displayName}
                                       </div>
                                       {/* Utility Icon Buttons */}
@@ -6208,7 +6211,7 @@ export default function LiveWorkout() {
                                         }
                                         className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                       >
-                                        <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                        <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                       </Button>
                                       <Button
                                         variant="ghost"
@@ -6218,7 +6221,7 @@ export default function LiveWorkout() {
                                         }
                                         className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                       >
-                                        <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                        <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                       </Button>
                                     </div>
                                   </div>
@@ -6249,7 +6252,7 @@ export default function LiveWorkout() {
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
                                     <label
-                                      className={`block text-sm font-medium text-slate-800 dark:text-slate-200 mb-1`}
+                                      className={`block text-sm font-medium fc-text-primary mb-1`}
                                     >
                                       Weight (kg)
                                     </label>
@@ -6263,13 +6266,13 @@ export default function LiveWorkout() {
                                           )
                                         )
                                       }
-                                      className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 bg-white/90 dark:bg-slate-700 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500 dark:focus:border-indigo-500`}
+                                      className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)] dark:focus:border-indigo-500`}
                                       step="0.5"
                                     />
                                   </div>
                                   <div>
                                     <label
-                                      className={`block text-sm font-medium text-slate-800 dark:text-slate-200 mb-1`}
+                                      className={`block text-sm font-medium fc-text-primary mb-1`}
                                     >
                                       Reps
                                     </label>
@@ -6277,7 +6280,7 @@ export default function LiveWorkout() {
                                       type="number"
                                       value={giantReps[idx] || ""}
                                       readOnly
-                                      className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 bg-white/80 dark:bg-slate-700 text-slate-900 dark:text-white font-semibold`}
+                                      className={`w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-indigo-700 fc-surface fc-text-primary font-semibold`}
                                     />
                                   </div>
                                 </div>
@@ -6418,7 +6421,7 @@ export default function LiveWorkout() {
                                   onClick={() => setShowPlateCalculator(true)}
                                   className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                 >
-                                  <Calculator className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                  <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -6428,7 +6431,7 @@ export default function LiveWorkout() {
                                   }
                                   className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
                                 >
-                                  <RefreshCw className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                  <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                 </Button>
                               </div>
                               <div
@@ -6641,13 +6644,13 @@ export default function LiveWorkout() {
                             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                               <div className="flex items-center gap-2 mb-2">
                                 <Calculator className="w-3 h-3 text-orange-500" />
-                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                                <span className="text-xs font-medium fc-text-dim">
                                   Drop Set (Second Set)
                                 </span>
                               </div>
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                  <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1">
+                                  <label className="block text-xs fc-text-dim mb-1">
                                     Drop Weight (kg)
                                   </label>
                                   <input
@@ -6656,7 +6659,7 @@ export default function LiveWorkout() {
                                     onChange={(e) =>
                                       setDropWeight(e.target.value)
                                     }
-                                    className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-slate-700 dark:text-slate-300"
+                                    className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 fc-text-dim"
                                     step="0.5"
                                     placeholder={
                                       currentSetData.weight > 0
@@ -6678,7 +6681,7 @@ export default function LiveWorkout() {
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1">
+                                  <label className="block text-xs fc-text-dim mb-1">
                                     Reps
                                   </label>
                                   <input
@@ -6687,7 +6690,7 @@ export default function LiveWorkout() {
                                     onChange={(e) =>
                                       setDropReps(parseInt(e.target.value) || 0)
                                     }
-                                    className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-slate-700 dark:text-slate-300"
+                                    className="w-full h-8 text-center text-sm rounded-lg border border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 fc-text-dim"
                                     placeholder="0"
                                   />
                                 </div>
@@ -6758,7 +6761,7 @@ export default function LiveWorkout() {
                       </Button>
 
                       <div className="text-center px-4">
-                        <div className="text-sm text-slate-600 dark:text-slate-300">
+                        <div className="text-sm fc-text-dim">
                           Exercise
                         </div>
                         <div className="text-lg font-bold">
@@ -7366,7 +7369,7 @@ export default function LiveWorkout() {
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
                       <Calculator className="w-4 h-4 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">
+                    <h3 className="text-xl font-bold fc-text-primary">
                       Barbell Plate Calculator
                     </h3>
                   </div>
@@ -7379,7 +7382,7 @@ export default function LiveWorkout() {
                       setTargetWeight("");
                       setSelectedBarbell(20);
                     }}
-                    className="text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
+                    className="fc-text-dim hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
                   >
                     <X className="w-5 h-5" />
                   </Button>
@@ -7390,7 +7393,7 @@ export default function LiveWorkout() {
                   <div className="space-y-6">
                     {/* Barbell Selection */}
                     <div className="space-y-3">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      <label className="text-sm font-medium fc-text-dim">
                         Select Barbell:
                       </label>
                       <div className="grid grid-cols-2 gap-2">
@@ -7401,14 +7404,14 @@ export default function LiveWorkout() {
                             className={`p-3 rounded-xl border-2 transition-all ${
                               selectedBarbell === barbell.weight
                                 ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500"
+                                : "border-[color:var(--fc-glass-border)] hover:border-slate-300 dark:hover:border-slate-500"
                             }`}
                           >
                             <div className="text-center">
-                              <div className="text-lg font-bold text-slate-800 dark:text-white">
+                              <div className="text-lg font-bold fc-text-primary">
                                 {barbell.weight}kg
                               </div>
-                              <div className="text-xs text-slate-600 dark:text-slate-400">
+                              <div className="text-xs fc-text-dim">
                                 {barbell.name}
                               </div>
                               <div className="text-xs mt-1">
@@ -7422,7 +7425,7 @@ export default function LiveWorkout() {
 
                     {/* Weight Input */}
                     <div className="space-y-3">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      <label className="text-sm font-medium fc-text-dim">
                         Target Weight:
                       </label>
                       <div className="relative">
@@ -7430,10 +7433,10 @@ export default function LiveWorkout() {
                           type="number"
                           value={targetWeight}
                           onChange={(e) => setTargetWeight(e.target.value)}
-                          className="w-full p-4 text-2xl font-bold text-center border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:border-blue-500 focus:outline-none"
+                          className="w-full p-4 text-2xl font-bold text-center border-2 border-[color:var(--fc-glass-border)] rounded-xl bg-white dark:bg-slate-700 fc-text-primary focus:border-[color:var(--fc-domain-workouts)] focus:outline-none"
                           placeholder="142.5"
                         />
-                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-500 dark:text-slate-400 font-medium">
+                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 fc-text-dim font-medium">
                           kg
                         </div>
                       </div>
@@ -7600,7 +7603,7 @@ export default function LiveWorkout() {
 
                               {/* Visual Barbell Display */}
                               <div className="p-3 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                                <div className="text-center text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                <div className="text-center text-xs font-medium fc-text-dim mb-2">
                                   Load on each side:
                                 </div>
                                 <div className="flex items-center justify-between">
@@ -7638,7 +7641,7 @@ export default function LiveWorkout() {
                                                   <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
                                                 </div>
                                               </div>
-                                              <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-1">
+                                              <div className="text-xs font-medium fc-text-dim mt-1">
                                                 {plate.weight}
                                               </div>
                                             </div>
@@ -7688,7 +7691,7 @@ export default function LiveWorkout() {
                                                   <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
                                                 </div>
                                               </div>
-                                              <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-1">
+                                              <div className="text-xs font-medium fc-text-dim mt-1">
                                                 {plate.weight}
                                               </div>
                                             </div>
@@ -7781,7 +7784,7 @@ export default function LiveWorkout() {
                     {/* Back Button */}
                     <button
                       onClick={() => setShowPlateResults(false)}
-                      className="w-full py-3 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-white font-medium rounded-xl hover:bg-slate-300 dark:hover:bg-slate-500 transition-all"
+                      className="w-full py-3 bg-slate-200 dark:bg-slate-600 fc-text-primary font-medium rounded-xl hover:bg-slate-300 dark:hover:bg-slate-500 transition-all"
                     >
                       Calculate New Weight
                     </button>
@@ -8115,7 +8118,7 @@ export default function LiveWorkout() {
                     <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
                       <Calculator className="w-4 h-4 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">
+                    <h3 className="text-xl font-bold fc-text-primary">
                       Drop Set Calculator
                     </h3>
                   </div>
@@ -8123,7 +8126,7 @@ export default function LiveWorkout() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowDropSetCalculator(false)}
-                    className="text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
+                    className="fc-text-dim hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
                   >
                     <X className="w-5 h-5" />
                   </Button>
@@ -8132,7 +8135,7 @@ export default function LiveWorkout() {
                 <div className="space-y-6">
                   {/* Working Weight Input */}
                   <div>
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                    <label className="text-sm font-medium fc-text-dim mb-2 block">
                       Working Weight (kg):
                     </label>
                     <input
@@ -8146,7 +8149,7 @@ export default function LiveWorkout() {
                           weight: parseFloat(e.target.value) || 0,
                         }))
                       }
-                      className="w-full h-12 text-center text-lg rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-700 text-slate-800 dark:text-white font-semibold focus:outline-none focus:border-blue-500"
+                      className="w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-domain-workouts)] fc-glass-soft fc-text-primary font-semibold focus:outline-none focus:border-[color:var(--fc-domain-workouts)]"
                       step="0.5"
                       placeholder="Enter weight"
                     />
@@ -8156,7 +8159,7 @@ export default function LiveWorkout() {
                   <div className="rounded-xl p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700">
                     <div className="flex items-center gap-2 mb-2">
                       <Calculator className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      <span className="text-sm font-semibold fc-text-primary">
                         Auto-calculated drop weight:
                       </span>
                     </div>
@@ -8173,11 +8176,11 @@ export default function LiveWorkout() {
                         kg
                       </div>
                     ) : (
-                      <div className="text-slate-600 dark:text-slate-400">
+                      <div className="fc-text-dim">
                         Enter working weight to see calculation
                       </div>
                     )}
-                    <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                    <div className="text-xs fc-text-dim mt-1">
                       Drop percentage:{" "}
                       {Number(currentExercise?.meta?.drop_percentage) ||
                         Number(currentExercise?.drop_percentage) ||
@@ -8188,18 +8191,18 @@ export default function LiveWorkout() {
 
                   {/* Manual Override */}
                   <div>
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                    <label className="text-sm font-medium fc-text-dim mb-2 block">
                       Manual Drop Weight (kg):
                     </label>
                     <input
                       type="number"
                       value={dropWeight === "" ? "" : dropWeight}
                       onChange={(e) => setDropWeight(e.target.value)}
-                      className="w-full h-12 text-center text-lg rounded-xl border-2 border-purple-300 dark:border-purple-700 bg-white dark:bg-slate-700 text-slate-800 dark:text-white font-semibold focus:outline-none focus:border-purple-500"
+                      className="w-full h-12 text-center text-lg rounded-xl border-2 border-purple-300 dark:border-purple-700 bg-white dark:bg-slate-700 fc-text-primary font-semibold focus:outline-none focus:border-purple-500"
                       step="0.5"
                       placeholder="Override calculated weight"
                     />
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                    <p className="text-xs fc-text-dim mt-1">
                       Leave empty to use auto-calculated weight
                     </p>
                   </div>
@@ -8220,7 +8223,7 @@ export default function LiveWorkout() {
                     <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl flex items-center justify-center">
                       <Clock className="w-4 h-4 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">
+                    <h3 className="text-xl font-bold fc-text-primary">
                       Cluster Rest Timer
                     </h3>
                   </div>
@@ -8228,7 +8231,7 @@ export default function LiveWorkout() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowClusterTimer(false)}
-                    className="text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
+                    className="fc-text-dim hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
                   >
                     <X className="w-5 h-5" />
                   </Button>
@@ -8242,13 +8245,13 @@ export default function LiveWorkout() {
                         Number(currentExercise?.intra_cluster_rest) ||
                         0}
                     </div>
-                    <div className="text-lg font-semibold text-slate-700 dark:text-slate-300">
+                    <div className="text-lg font-semibold fc-text-dim">
                       seconds rest
                     </div>
                   </div>
 
                   {/* Instructions */}
-                  <div className="text-sm text-slate-600 dark:text-slate-400">
+                  <div className="text-sm fc-text-dim">
                     Use this timer between each cluster set. Tap start to begin
                     the countdown.
                   </div>

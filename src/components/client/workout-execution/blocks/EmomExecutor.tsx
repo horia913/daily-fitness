@@ -13,7 +13,6 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 
@@ -261,14 +260,14 @@ export function EmomExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {/* Minute Counter */}
-      <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-xl p-6 border-2 border-cyan-200 dark:border-cyan-700 text-center">
-        <div className="text-2xl font-semibold text-cyan-800 dark:text-cyan-200 mb-2">
+      <div className="rounded-xl p-5 text-center" style={{ background: "color-mix(in srgb, var(--fc-accent-cyan) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-accent-cyan) 25%, transparent)" }}>
+        <div className="text-2xl font-semibold mb-2" style={{ color: "var(--fc-accent-cyan)" }}>
           Minute {currentMinute} of {durationMinutes}
         </div>
-        <div className="text-4xl font-bold text-cyan-600 dark:text-cyan-400 mb-2">
+        <div className="text-4xl font-bold mb-2" style={{ color: "var(--fc-accent-cyan)" }}>
           {formatTime(timeRemaining)}
         </div>
-        <div className="text-sm text-cyan-700 dark:text-cyan-300 mb-4">
+        <div className="text-sm fc-text-dim mb-4">
           {isActive ? "Work Time" : isActive === false && currentMinute === 1 && timeRemaining === 60 ? "Ready to Start" : "Complete"}
         </div>
         {!isActive && currentMinute === 1 && timeRemaining === 60 && (
@@ -283,7 +282,7 @@ export function EmomExecutor({
       </div>
 
       {/* Weight and Reps Input */}
-      <GlassCard elevation={1} className="p-4">
+      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <LargeInput
@@ -306,7 +305,8 @@ export function EmomExecutor({
                   setWeight(String(suggested_weight));
                   setIsWeightPristine(false);
                 }}
-                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-xs font-medium hover:underline"
+                style={{ color: "var(--fc-accent-cyan)" }}
               >
                 {currentExercise?.load_percentage != null ? `${currentExercise.load_percentage}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
               </button>
@@ -322,7 +322,7 @@ export function EmomExecutor({
             stepAmount={1}
           />
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 
@@ -336,15 +336,16 @@ export function EmomExecutor({
       <Button
         onClick={handleLog}
         disabled={isLoggingSet || !isActive}
-        className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white text-lg py-4"
+        variant="fc-primary"
+        className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <CheckCircle className="w-5 h-5 mr-2" />
         {isLoggingSet ? "Logging..." : "LOG WORK"}
       </Button>
       <Button
         onClick={handleCompleteBlock}
-        variant="outline"
-        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-lg py-4 border-0"
+        variant="fc-primary"
+        className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
       >
         <CheckCircle className="w-5 h-5 mr-2" />
         Complete Block

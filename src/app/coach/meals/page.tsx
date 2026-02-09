@@ -277,24 +277,30 @@ export default function CoachMealsPage() {
     }
   }, [user, loadData]);
 
+  const ADD_FOOD_TIMEOUT_MS = 25000;
+
   const handleAddFood = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     setLoading(true);
     try {
-      const { error } = await supabase.from("foods").insert({
+      const insertPromise = supabase.from("foods").insert({
         name: foodForm.name,
         brand: foodForm.brand || null,
-        serving_size: parseFloat(foodForm.serving_size),
+        serving_size: parseFloat(String(foodForm.serving_size)) || 0,
         serving_unit: foodForm.serving_unit,
-        calories_per_serving: parseFloat(foodForm.calories_per_serving),
-        protein: parseFloat(foodForm.protein || "0"),
-        carbs: parseFloat(foodForm.carbs || "0"),
-        fat: parseFloat(foodForm.fat || "0"),
-        fiber: parseFloat(foodForm.fiber || "0"),
+        calories_per_serving: parseFloat(String(foodForm.calories_per_serving)) || 0,
+        protein: parseFloat(String(foodForm.protein)) || 0,
+        carbs: parseFloat(String(foodForm.carbs)) || 0,
+        fat: parseFloat(String(foodForm.fat)) || 0,
+        fiber: parseFloat(String(foodForm.fiber)) || 0,
         category: foodForm.category,
       });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), ADD_FOOD_TIMEOUT_MS)
+      );
+      const { error } = await Promise.race([insertPromise, timeoutPromise]);
 
       if (error) throw error;
 
@@ -312,8 +318,13 @@ export default function CoachMealsPage() {
         category: "General",
       });
       loadData();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error adding food:", error);
+      if (error instanceof Error && error.message === "timeout") {
+        alert("Request took too long. Check your connection and try again.");
+      } else {
+        alert("Could not add food. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -592,16 +603,13 @@ export default function CoachMealsPage() {
             <GlassCard className="p-6 md:p-8">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-3">
-                  <Badge className="fc-badge fc-badge-strong w-fit">
-                    Nutrition Ops
-                  </Badge>
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora-green)]/20 text-[color:var(--fc-accent-green)]">
                       <ChefHat className="h-6 w-6" />
                     </div>
                     <div>
                       <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                        Meal Plan Library
+                        Nutrition Studio
                       </h1>
                       <p className="text-sm text-[color:var(--fc-text-dim)]">
                         Build nutrition strategies, macros, and client assignments.

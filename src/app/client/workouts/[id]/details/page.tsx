@@ -5,9 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft,
   MoreHorizontal,
-  Clock,
-  Layers,
-  Dumbbell,
   Play,
   ChevronDown,
   History,
@@ -17,8 +14,9 @@ import { supabase } from "@/lib/supabase";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { useTheme } from "@/contexts/ThemeContext";
 import { fetchPersonalRecords } from "@/lib/personalRecords";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { withTimeout } from "@/lib/withTimeout";
 
 interface AssignmentInfo {
   id: string;
@@ -144,6 +142,7 @@ export default function WorkoutDetailsPage() {
   const [blocks, setBlocks] = useState<StructuredBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
   const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
   const [expandedExercises, setExpandedExercises] = useState<Set<string>>(
     new Set()
@@ -157,6 +156,8 @@ export default function WorkoutDetailsPage() {
       setError(null);
 
       try {
+        await withTimeout(
+          (async () => {
         const {
           data: { user },
         } = await supabase.auth.getUser();
@@ -239,31 +240,18 @@ export default function WorkoutDetailsPage() {
           estimatedDuration = template?.estimated_duration || null;
         }
 
-        // Fetch program assignment progress to get current_week if part of a program
+        // Fetch current week from canonical programStateService
         let currentWeek: number | null = null;
         try {
-          const { data: programProgress, error: programError } = await supabase
-            .from("program_assignment_progress")
-            .select("current_week")
-            .eq("client_id", user.id)
-            .eq("is_program_completed", false)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (programError) {
-            // Silently fail - this is optional data
-            console.warn(
-              "Error fetching program assignment progress:",
-              programError
-            );
-          } else {
-            currentWeek = programProgress?.current_week || null;
+          const { getProgramState } = await import("@/lib/programStateService");
+          const programState = await getProgramState(supabase, user.id);
+          if (programState.assignment && !programState.isCompleted) {
+            currentWeek = programState.currentWeekNumber;
           }
         } catch (programErr) {
           // Silently fail - this is optional data
           console.warn(
-            "Error fetching program assignment progress:",
+            "Error fetching program state:",
             programErr
           );
         }
@@ -555,20 +543,24 @@ export default function WorkoutDetailsPage() {
           console.log("Error loading personal records:", prError);
           setPersonalRecords([]);
         }
-      } catch (loadError: any) {
-        console.error("Error loading workout details:", loadError);
-        setError(loadError?.message || "Failed to load workout details");
-      } finally {
-        setLoading(false);
-      }
+      })(),
+      30000,
+      "timeout"
+    );
+  } catch (loadError: any) {
+      console.error("Error loading workout details:", loadError);
+      setError(loadError?.message === "timeout" ? "Loading took too long. Please try again." : (loadError?.message || "Failed to load workout details"));
+  } finally {
+      setLoading(false);
+  }
     };
 
     load(id as string).catch((loadError) => {
       console.error("Unexpected error loading workout details:", loadError);
-      setError("Failed to load workout details");
+      setError(loadError?.message === "timeout" ? "Loading took too long. Please try again." : "Failed to load workout details");
       setLoading(false);
     });
-  }, [id]);
+  }, [id, retryTrigger]);
 
   // Calculate stats
   const totalSets = useMemo(() => {
@@ -612,35 +604,27 @@ export default function WorkoutDetailsPage() {
     });
   };
 
-  // Glass card style (matching mockup)
-  const glassCardStyle: React.CSSProperties = {
-    background: isDark
-      ? "rgba(255, 255, 255, 0.03)"
-      : "rgba(255, 255, 255, 0.4)",
-    backdropFilter: "blur(12px) saturate(180%)",
-    WebkitBackdropFilter: "blur(12px) saturate(180%)",
-    border: `1px solid ${
-      isDark ? "rgba(255, 255, 255, 0.125)" : "rgba(255, 255, 255, 0.2)"
-    }`,
-    borderRadius: "24px",
-    boxShadow: isDark
-      ? "0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 0 20px 0 rgba(255, 255, 255, 0.02)"
-      : "0 4px 24px -1px rgba(0, 0, 0, 0.1), inset 0 0 20px 0 rgba(255, 255, 255, 0.05)",
-    transition: "all 0.4s cubic-bezier(0.23, 1, 0.32, 1)",
-    position: "relative",
-    overflow: "hidden",
-  };
-
   if (loading) {
     return (
       <AnimatedBackground>
-        <div className="relative z-10 min-h-screen px-5 py-6 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center rounded-3xl border border-white/20 bg-white/80 px-8 py-6 shadow-lg backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/80">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4" />
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                Loading workout details...
-              </p>
+        <div className="relative z-10 min-h-screen fc-page" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
+          <div className="pt-6 space-y-6 max-w-3xl mx-auto">
+            <div className="flex items-center gap-3">
+              <div className="fc-skeleton w-9 h-9 rounded-full" />
+              <div className="fc-skeleton h-3 w-24 rounded" />
+              <div className="flex-1" />
+              <div className="fc-skeleton w-9 h-9 rounded-full" />
+            </div>
+            <div className="space-y-3">
+              <div className="fc-skeleton h-4 w-20 rounded" />
+              <div className="fc-skeleton h-10 w-3/4 rounded" />
+              <div className="fc-skeleton h-16 w-full rounded-2xl" />
+            </div>
+            <div className="fc-skeleton h-16 w-full rounded-2xl" />
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="fc-skeleton h-20 w-full rounded-2xl" />
+              ))}
             </div>
           </div>
         </div>
@@ -651,30 +635,34 @@ export default function WorkoutDetailsPage() {
   if (error || !assignment) {
     return (
       <AnimatedBackground>
-        <div className="relative z-10 min-h-screen px-5 py-6 sm:px-6 lg:px-8">
+        <div className="relative z-10 min-h-screen fc-page">
           <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center space-y-4 rounded-3xl border border-white/20 bg-white/80 px-8 py-6 shadow-lg backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/80">
-              <p className="text-base font-semibold text-red-500">
+            <div className="text-center space-y-4 fc-glass fc-card px-8 py-6">
+              <p className="text-base font-semibold fc-text-error">
                 {error || "Workout not found"}
               </p>
-              <button
-                onClick={() => router.push("/client/workouts")}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "999px",
-                  background: isDark
-                    ? "rgba(255,255,255,0.05)"
-                    : "rgba(0,0,0,0.02)",
-                  border: `1px solid ${
-                    isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                  }`,
-                  color: isDark ? "#FFFFFF" : "#1A1A1A",
-                  cursor: "pointer",
-                }}
-              >
-                <ChevronLeft className="w-4 h-4 inline mr-2" />
-                Go Back
-              </button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button
+                  type="button"
+                  variant="fc-secondary"
+                  onClick={() => {
+                    setError(null);
+                    setLoading(true);
+                    setRetryTrigger((t) => t + 1);
+                  }}
+                  className="gap-2 fc-btn"
+                >
+                  Retry
+                </Button>
+                <Button
+                  variant="fc-secondary"
+                  onClick={() => router.push("/client/workouts")}
+                  className="gap-2 fc-btn"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Go Back
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -688,75 +676,55 @@ export default function WorkoutDetailsPage() {
     return reps;
   };
 
-  // Get block type badge color (inline styles)
+  // Get block type badge color (design system tokens)
   const getBlockTypeBadgeColor = (blockType: string | null) => {
-    if (!blockType) {
-      return {
-        bg: "rgba(59, 130, 246, 0.2)",
-        text: "#3B82F6",
-        border: "rgba(59, 130, 246, 0.2)",
-      };
-    }
-    const type = blockType.toLowerCase();
-    if (type.includes("superset")) {
-      return {
-        bg: "rgba(249, 115, 22, 0.2)",
-        text: "#F97316",
-        border: "rgba(249, 115, 22, 0.2)",
-      };
-    }
-    if (type.includes("drop")) {
-      return {
-        bg: "rgba(168, 85, 247, 0.2)",
-        text: "#A855F7",
-        border: "rgba(168, 85, 247, 0.2)",
-      };
-    }
-    if (type.includes("giant")) {
-      return {
-        bg: "rgba(239, 68, 68, 0.2)",
-        text: "#EF4444",
-        border: "rgba(239, 68, 68, 0.2)",
-      };
-    }
-    if (type.includes("cluster")) {
-      return {
-        bg: "rgba(99, 102, 241, 0.2)",
-        text: "#6366F1",
-        border: "rgba(99, 102, 241, 0.2)",
-      };
-    }
-    if (type.includes("rest_pause")) {
-      return {
-        bg: "rgba(20, 184, 166, 0.2)",
-        text: "#14B8A6",
-        border: "rgba(20, 184, 166, 0.2)",
-      };
-    }
-    if (type.includes("pyramid")) {
-      return {
-        bg: "rgba(34, 197, 94, 0.2)",
-        text: "#22C55E",
-        border: "rgba(34, 197, 94, 0.2)",
-      };
-    }
-    if (
-      type.includes("amrap") ||
-      type.includes("emom") ||
-      type.includes("for_time") ||
-      type.includes("tabata")
-    ) {
-      return {
-        bg: "rgba(234, 179, 8, 0.2)",
-        text: "#EAB308",
-        border: "rgba(234, 179, 8, 0.2)",
-      };
-    }
-    return {
-      bg: "rgba(59, 130, 246, 0.2)",
-      text: "#3B82F6",
-      border: "rgba(59, 130, 246, 0.2)",
+    const vars = {
+      workouts: {
+        bg: "color-mix(in srgb, var(--fc-domain-workouts) 20%, transparent)",
+        text: "var(--fc-domain-workouts)",
+        border: "color-mix(in srgb, var(--fc-domain-workouts) 30%, transparent)",
+      },
+      warning: {
+        bg: "color-mix(in srgb, var(--fc-status-warning) 20%, transparent)",
+        text: "var(--fc-status-warning)",
+        border: "color-mix(in srgb, var(--fc-status-warning) 30%, transparent)",
+      },
+      purple: {
+        bg: "color-mix(in srgb, var(--fc-accent-purple) 20%, transparent)",
+        text: "var(--fc-accent-purple)",
+        border: "color-mix(in srgb, var(--fc-accent-purple) 30%, transparent)",
+      },
+      error: {
+        bg: "color-mix(in srgb, var(--fc-status-error) 20%, transparent)",
+        text: "var(--fc-status-error)",
+        border: "color-mix(in srgb, var(--fc-status-error) 30%, transparent)",
+      },
+      indigo: {
+        bg: "color-mix(in srgb, var(--fc-accent-indigo) 20%, transparent)",
+        text: "var(--fc-accent-indigo)",
+        border: "color-mix(in srgb, var(--fc-accent-indigo) 30%, transparent)",
+      },
+      success: {
+        bg: "color-mix(in srgb, var(--fc-status-success) 20%, transparent)",
+        text: "var(--fc-status-success)",
+        border: "color-mix(in srgb, var(--fc-status-success) 30%, transparent)",
+      },
+      cyan: {
+        bg: "color-mix(in srgb, var(--fc-accent-cyan) 20%, transparent)",
+        text: "var(--fc-accent-cyan)",
+        border: "color-mix(in srgb, var(--fc-accent-cyan) 30%, transparent)",
+      },
     };
+    if (!blockType) return vars.workouts;
+    const type = blockType.toLowerCase();
+    if (type.includes("superset")) return vars.warning;
+    if (type.includes("drop")) return vars.purple;
+    if (type.includes("giant")) return vars.error;
+    if (type.includes("cluster")) return vars.indigo;
+    if (type.includes("rest_pause")) return vars.cyan;
+    if (type.includes("pyramid")) return vars.success;
+    if (type.includes("amrap") || type.includes("emom") || type.includes("for_time") || type.includes("tabata")) return vars.warning;
+    return vars.workouts;
   };
 
   // Format block type label
@@ -1347,9 +1315,7 @@ export default function WorkoutDetailsPage() {
           to { background-position: 200% center; }
         }
         .shimmer-text {
-          background: linear-gradient(90deg, ${
-            isDark ? "#fff" : "#1A1A1A"
-          } 0%, #3B82F6 50%, ${isDark ? "#fff" : "#1A1A1A"} 100%);
+          background: linear-gradient(90deg, var(--fc-text-primary) 0%, var(--fc-accent-indigo) 50%, var(--fc-text-primary) 100%);
           background-size: 200% auto;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
@@ -1373,66 +1339,81 @@ export default function WorkoutDetailsPage() {
         }}
       />
       <div className="relative fc-app-bg isolate">
-        <div className="fc-muted-overlay" />
-        <div className="fc-grain-layer" />
-        <div className="fc-vignette-layer" />
-        <div className="relative z-10 min-h-screen pb-32">
+        <div className="relative z-10 min-h-screen pb-32 fc-page">
           {/* Navigation */}
-          <nav className="mb-12 px-6">
+          <nav className="flex justify-between items-center mb-6" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
             <button
               onClick={() => router.push("/client/workouts")}
-              className="group inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] font-mono fc-text-dim hover:fc-text-primary transition-colors"
+              className="w-9 h-9 flex items-center justify-center rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] transition-all active:scale-95"
             >
-              <ChevronLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
-              Back to Program
+              <ChevronLeft className="w-5 h-5 fc-text-primary" />
+            </button>
+            <div className="text-center">
+              <span className="text-[10px] uppercase tracking-[0.3em] fc-text-dim font-bold">Workout Details</span>
+            </div>
+            <button className="w-9 h-9 flex items-center justify-center rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] transition-all active:scale-95" aria-label="More options">
+              <MoreHorizontal className="w-5 h-5 fc-text-primary" />
             </button>
           </nav>
 
-          <main className="max-w-4xl mx-auto px-6 pb-40">
+          <main className="max-w-3xl mx-auto pb-40" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
             {/* Header Section */}
-            <header className="mb-14">
-              <p className="text-xs uppercase tracking-[0.3em] fc-text-dim mb-3">
-                Workout Detail
-              </p>
+            <header className="mb-10">
               <div className="flex flex-wrap items-center gap-3 mb-4">
                 {assignment.category && (
                   <Badge
                     variant="fc-outline"
-                    className="px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.2em]"
+                    className="px-3 py-1 text-xs font-bold uppercase tracking-wider"
                   >
                     {assignment.category}
                   </Badge>
                 )}
-                <span className="text-[11px] uppercase tracking-[0.22em] font-mono fc-text-dim">
-                  {assignment.estimatedDuration || 0} mins
-                </span>
+                {assignment.currentWeek != null && (
+                  <span className="text-xs font-mono fc-text-dim">
+                    PHASE • WEEK {assignment.currentWeek}
+                  </span>
+                )}
               </div>
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight fc-text-primary mb-4">
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter mb-6 shimmer-text">
                 {assignment.name}
               </h1>
               {assignment.description && (
-                <p className="text-base md:text-lg leading-relaxed fc-text-dim max-w-2xl">
-                  {assignment.description}
-                </p>
+                <div className="fc-surface p-4 rounded-2xl border-l-4 border-l-[color:var(--fc-domain-workouts)]">
+                  <p className="text-sm fc-text-dim italic leading-relaxed">{assignment.description}</p>
+                </div>
               )}
             </header>
 
+            {/* Stats Strip */}
+            <section className="mb-8">
+              <div className="fc-stats-strip">
+                <div className="fc-stats-strip-item">
+                  <span className="fc-stats-strip-value">~{assignment.estimatedDuration ?? 0}</span>
+                  <span className="fc-stats-strip-label">Minutes</span>
+                </div>
+                <div className="fc-stats-strip-item">
+                  <span className="fc-stats-strip-value">{blocks.reduce((s, b) => s + (b.rawBlock?.total_sets ?? 0), 0)}</span>
+                  <span className="fc-stats-strip-label">Sets</span>
+                </div>
+                <div className="fc-stats-strip-item">
+                  <span className="fc-stats-strip-value">{blocks.reduce((s, b) => s + (b.exercises?.length ?? 0), 0)}</span>
+                  <span className="fc-stats-strip-label">Exercises</span>
+                </div>
+                <div className="fc-stats-strip-item">
+                  <span className="fc-stats-strip-value fc-text-success">{blocks.filter(b => (b.blockType || "").toLowerCase() === "drop_set" || (b.blockType || "").toLowerCase() === "dropset").length}</span>
+                  <span className="fc-stats-strip-label">Drop Sets</span>
+                </div>
+              </div>
+            </section>
+
           {/* Exercise List */}
-          <section style={{ marginBottom: "128px" }}>
-            <h2
-              style={{
-                fontFamily: "monospace",
-                fontSize: "12px",
-                textTransform: "uppercase",
-                letterSpacing: "0.3em",
-                color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)",
-                marginBottom: "32px",
-              }}
-            >
-              Workout Protocol
+          <section style={{ marginBottom: "var(--fc-page-pb)" }}>
+            <h2 className="text-xs font-bold uppercase tracking-[0.2em] fc-text-dim mb-6">
+              Workout Content
             </h2>
             <div
-              style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+              className="flex flex-col"
+              style={{ gap: "var(--fc-gap-cards)" }}
             >
               {blocks.map((block, blockIndex) => {
                 const isExpanded = expandedExercises.has(block.id);
@@ -1445,69 +1426,21 @@ export default function WorkoutDetailsPage() {
                     className={`exercise-item ${isExpanded ? "active" : ""}`}
                     onClick={() => toggleExercise(block.id)}
                   >
-                    <GlassCard
-                      elevation={2}
-                      className="overflow-hidden cursor-pointer"
+                    <div
+                      className="fc-surface rounded-2xl overflow-hidden cursor-pointer border border-[color:var(--fc-surface-card-border)] transition-all"
                     >
                     <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "24px 32px",
-                      }}
+                      className="flex items-center justify-between p-4"
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "48px",
-                            height: "48px",
-                            borderRadius: "100%",
-                            background: isDark
-                              ? "rgba(255,255,255,0.03)"
-                              : "rgba(255,255,255,0.4)",
-                            backdropFilter: "blur(12px) saturate(180%)",
-                            WebkitBackdropFilter: "blur(12px) saturate(180%)",
-                            border: `1px solid ${
-                              isDark
-                                ? "rgba(255,255,255,0.125)"
-                                : "rgba(255,255,255,0.2)"
-                            }`,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: 700,
-                            fontFamily: "monospace",
-                            fontSize: "18px",
-                            color: isDark ? "rgba(255,255,255,0.8)" : "#1A1A1A",
-                            boxShadow: "0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 0 20px 0 rgba(255, 255, 255, 0.02)",
-                          }}
-                        >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold font-mono text-sm fc-text-primary" style={{ background: badgeColor.bg, color: badgeColor.text }}>
                           {String(blockIndex + 1).padStart(2, "0")}
                         </div>
                         <div>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              marginBottom: "4px",
-                            }}
-                          >
+                          <div className="flex items-center gap-2 mb-1">
                             <span
+                              className="fc-badge fc-pill"
                               style={{
-                                fontSize: "10px",
-                                letterSpacing: "0.1em",
-                                padding: "2px 8px",
-                                borderRadius: "4px",
-                                textTransform: "uppercase",
-                                fontWeight: 700,
                                 background: badgeColor.bg,
                                 color: badgeColor.text,
                                 border: `1px solid ${badgeColor.border}`,
@@ -1516,14 +1449,7 @@ export default function WorkoutDetailsPage() {
                               {formatBlockTypeLabel(block.blockType, null)}
                             </span>
                           </div>
-                          <h4
-                            style={{
-                              fontSize: "18px",
-                              fontWeight: 700,
-                              color: isDark ? "#FFFFFF" : "#1A1A1A",
-                              margin: 0,
-                            }}
-                          >
+                          <h4 className="text-lg font-bold fc-text-primary m-0">
                             {(() => {
                               // Helper to filter out "test" values
                               const isValidName = (
@@ -1574,44 +1500,20 @@ export default function WorkoutDetailsPage() {
                           </h4>
                         </div>
                       </div>
-                      <ChevronDown
-                        className="rotate-icon"
-                        style={{
-                          width: "20px",
-                          height: "20px",
-                          color: isDark ? "rgba(255,255,255,0.5)" : "#6B7280",
-                        }}
-                      />
+                      <ChevronDown className="rotate-icon w-5 h-5 fc-text-dim" />
                     </div>
                     {isExpanded && (
-                      <div style={{ padding: "0 32px 32px" }}>
+                      <div className="px-4 pb-4">
                         {/* Block Notes */}
                         {block.notes && (
                           <div
+                            className="p-3 rounded-xl mb-4"
                             style={{
-                              padding: "12px 16px",
-                              background: isDark
-                                ? "rgba(59, 130, 246, 0.1)"
-                                : "rgba(59, 130, 246, 0.05)",
-                              borderRadius: "12px",
-                              border: `1px solid ${
-                                isDark
-                                  ? "rgba(59, 130, 246, 0.2)"
-                                  : "rgba(59, 130, 246, 0.1)"
-                              }`,
-                              marginBottom: "20px",
+                              background: "color-mix(in srgb, var(--fc-domain-workouts) 8%, var(--fc-surface-card))",
+                              borderLeft: "3px solid var(--fc-domain-workouts)",
                             }}
                           >
-                            <p
-                              style={{
-                                fontSize: "14px",
-                                color: isDark
-                                  ? "rgba(255,255,255,0.8)"
-                                  : "#1A1A1A",
-                                lineHeight: "1.5",
-                                margin: 0,
-                              }}
-                            >
+                            <p className="text-sm fc-text-primary leading-relaxed m-0">
                               {block.notes}
                             </p>
                           </div>
@@ -1622,76 +1524,29 @@ export default function WorkoutDetailsPage() {
                           <div
                             data-block-type={block.blockType}
                             data-block-id={block.id}
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "repeat(2, 1fr)",
-                              gap: "12px",
-                              marginBottom: "20px",
-                              // Force visibility for debugging
-                              visibility: "visible",
-                              opacity: 1,
-                              position: "relative",
-                              zIndex: 1,
-                            }}
+                            className="flex flex-wrap gap-3 mb-4 relative z-[1]"
                           >
                             {blockParams.map((param, idx) => (
                               <div
                                 key={`${block.id}-param-${idx}`}
                                 data-param-label={param.label}
                                 data-param-value={param.value}
-                                style={{
-                                  background: isDark
-                                    ? "rgba(0,0,0,0.4)"
-                                    : "rgba(0,0,0,0.02)",
-                                  borderRadius: "12px",
-                                  padding: "12px",
-                                  border: `1px solid ${
-                                    isDark
-                                      ? "rgba(255,255,255,0.05)"
-                                      : "rgba(0,0,0,0.05)"
-                                  }`,
-                                  // Force visibility
-                                  visibility: "visible",
-                                  opacity: 1,
-                                  display: "block",
-                                }}
+                                className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                                style={{ background: "var(--fc-surface-sunken)" }}
                               >
-                                <div
-                                  style={{
-                                    fontSize: "10px",
-                                    color: isDark
-                                      ? "rgba(255,255,255,0.5)"
-                                      : "#6B7280",
-                                    textTransform: "uppercase",
-                                    fontWeight: 700,
-                                    marginBottom: "4px",
-                                  }}
-                                >
+                                <span className="text-[10px] uppercase tracking-wider fc-text-dim font-semibold">
                                   {param.label}
-                                </div>
-                                <div
-                                  style={{
-                                    fontFamily: "monospace",
-                                    fontWeight: 700,
-                                    fontSize: "16px",
-                                    color: isDark ? "#FFFFFF" : "#1A1A1A",
-                                  }}
-                                >
+                                </span>
+                                <span className="font-mono font-bold text-sm fc-text-primary">
                                   {param.value}
-                                </div>
+                                </span>
                               </div>
                             ))}
                           </div>
                         )}
 
                         {/* Exercises in Block */}
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "12px",
-                          }}
-                        >
+                        <div className="flex flex-col gap-3">
                           {block.exercises.map((exercise, exerciseIndex) => {
                             const previousBest = getPreviousBest(exercise.name);
                             const exerciseBadgeColor = getBlockTypeBadgeColor(
@@ -1701,117 +1556,27 @@ export default function WorkoutDetailsPage() {
                             return (
                               <div
                                 key={exercise.id}
-                                style={{
-                                  background: isDark
-                                    ? "rgba(255, 255, 255, 0.03)"
-                                    : "rgba(255, 255, 255, 0.4)",
-                                  backdropFilter: "blur(12px) saturate(180%)",
-                                  WebkitBackdropFilter: "blur(12px) saturate(180%)",
-                                  borderRadius: "16px",
-                                  padding: "16px",
-                                  border: `1px solid ${
-                                    isDark
-                                      ? "rgba(255,255,255,0.125)"
-                                      : "rgba(255,255,255,0.2)"
-                                  }`,
-                                  boxShadow: "0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 0 20px 0 rgba(255, 255, 255, 0.02)",
-                                  transition: "all 0.4s cubic-bezier(0.23, 1, 0.32, 1)",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: "16px",
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.transform = "translateY(-4px) scale(1.01)";
-                                  e.currentTarget.style.background = isDark
-                                    ? "rgba(255, 255, 255, 0.05)"
-                                    : "rgba(255, 255, 255, 0.5)";
-                                  e.currentTarget.style.borderColor = isDark
-                                    ? "rgba(255,255,255,0.2)"
-                                    : "rgba(255,255,255,0.3)";
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.transform = "translateY(0) scale(1)";
-                                  e.currentTarget.style.background = isDark
-                                    ? "rgba(255, 255, 255, 0.03)"
-                                    : "rgba(255, 255, 255, 0.4)";
-                                  e.currentTarget.style.borderColor = isDark
-                                    ? "rgba(255,255,255,0.125)"
-                                    : "rgba(255,255,255,0.2)";
-                                }}
+                                className="rounded-xl p-3 flex flex-col gap-3 transition-all duration-200"
+                                style={{ background: "var(--fc-surface-sunken)" }}
                               >
-                                <div style={{ display: "flex", alignItems: "start", gap: "12px" }}>
-                                  <div
-                                    style={{
-                                      width: "40px",
-                                      height: "40px",
-                                      borderRadius: "100%",
-                                      background: isDark
-                                        ? "rgba(255,255,255,0.03)"
-                                        : "rgba(255,255,255,0.4)",
-                                      backdropFilter: "blur(12px) saturate(180%)",
-                                      WebkitBackdropFilter: "blur(12px) saturate(180%)",
-                                      border: `1px solid ${
-                                        isDark
-                                          ? "rgba(255,255,255,0.125)"
-                                          : "rgba(255,255,255,0.2)"
-                                      }`,
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontWeight: 700,
-                                      fontFamily: "monospace",
-                                      fontSize: "14px",
-                                      color: isDark ? "rgba(255,255,255,0.8)" : "#1A1A1A",
-                                      flexShrink: 0,
-                                      boxShadow: "0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 0 20px 0 rgba(255, 255, 255, 0.02)",
-                                    }}
-                                  >
+                                <div className="flex items-start gap-3">
+                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold font-mono text-xs fc-text-dim flex-shrink-0" style={{ background: "var(--fc-surface-card)" }}>
                                     {exercise.exerciseLetter || String(exerciseIndex + 1).padStart(2, "0")}
                                   </div>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div className="flex-1 min-w-0">
                                     {exercise.exerciseLetter && (
-                                      <span
-                                        style={{
-                                          fontSize: "9px",
-                                          letterSpacing: "0.1em",
-                                          padding: "2px 8px",
-                                          borderRadius: "100px",
-                                          textTransform: "uppercase",
-                                          fontWeight: 800,
-                                          background: isDark
-                                            ? "rgba(251, 191, 36, 0.15)"
-                                            : "rgba(251, 191, 36, 0.15)",
-                                          color: isDark ? "#FBBF24" : "#FBBF24",
-                                          border: `1px solid ${isDark ? "rgba(251, 191, 36, 0.3)" : "rgba(251, 191, 36, 0.3)"}`,
-                                          marginBottom: "4px",
-                                          display: "inline-block",
-                                        }}
-                                      >
+                                      <span className="fc-badge fc-pill fc-text-warning border border-[color:var(--fc-status-warning)] bg-[color-mix(in_srgb,var(--fc-status-warning)_15%,transparent)] mb-1 inline-block">
                                         {formatBlockTypeLabel(
                                           block.blockType,
                                           exercise.exerciseLetter
                                         )}
                                       </span>
                                     )}
-                                    <h3
-                                      style={{
-                                        fontSize: "16px",
-                                        fontWeight: 600,
-                                        color: isDark ? "#FFFFFF" : "#1A1A1A",
-                                        margin: "4px 0 0 0",
-                                      }}
-                                    >
+                                    <h3 className="text-base font-semibold fc-text-primary mt-1">
                                       {exercise.name}
                                     </h3>
                                     {exercise.notes && (
-                                      <p
-                                        style={{
-                                          fontSize: "12px",
-                                          color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)",
-                                          margin: "4px 0 0 0",
-                                          lineHeight: "1.5",
-                                        }}
-                                      >
+                                      <p className="text-xs fc-text-dim mt-1 leading-relaxed">
                                         {exercise.notes}
                                       </p>
                                     )}
@@ -1828,40 +1593,11 @@ export default function WorkoutDetailsPage() {
                                     const timeParams = getTimeBasedParameters(block, exercise);
                                     if (timeParams.length > 0) {
                                       return (
-                                        <div
-                                          style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "16px 24px",
-                                            flexWrap: "wrap",
-                                          }}
-                                        >
+                                        <div className="flex items-center gap-4 gap-y-6 flex-wrap">
                                           {timeParams.map((param, idx) => (
-                                            <div key={idx} style={{ textAlign: "center", minWidth: "60px" }}>
-                                              <div
-                                                style={{
-                                                  fontSize: "9px",
-                                                  color: isDark
-                                                    ? "rgba(255,255,255,0.3)"
-                                                    : "rgba(0,0,0,0.3)",
-                                                  textTransform: "uppercase",
-                                                  fontFamily: "monospace",
-                                                  letterSpacing: "0.1em",
-                                                  marginBottom: "2px",
-                                                }}
-                                              >
-                                                {param.label}
-                                              </div>
-                                              <div
-                                                style={{
-                                                  fontFamily: "monospace",
-                                                  fontWeight: 500,
-                                                  fontSize: "20px",
-                                                  color: isDark ? "#FFFFFF" : "#1A1A1A",
-                                                }}
-                                              >
-                                                {param.value}
-                                              </div>
+                                            <div key={idx} className="text-center min-w-[60px]">
+                                              <div className="fc-micro text-[9px] mb-0.5">{param.label}</div>
+                                              <div className="font-mono font-medium text-xl fc-text-primary">{param.value}</div>
                                             </div>
                                           ))}
                                         </div>
@@ -1874,38 +1610,11 @@ export default function WorkoutDetailsPage() {
                                   const exerciseFields = getExerciseCardFields(block, exercise);
                                   if (exerciseFields.length > 0) {
                                       return (
-                                        <div
-                                          style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "16px 24px",
-                                            flexWrap: "wrap",
-                                          }}
-                                        >
+                                        <div className="flex items-center gap-4 gap-y-6 flex-wrap">
                                           {exerciseFields.map((field, idx) => (
-                                            <div key={idx} style={{ textAlign: "center", minWidth: "60px" }}>
-                                              <div
-                                                style={{
-                                                  fontSize: "9px",
-                                                  color: isDark
-                                                    ? "rgba(255,255,255,0.3)"
-                                                    : "rgba(0,0,0,0.3)",
-                                                  textTransform: "uppercase",
-                                                  fontFamily: "monospace",
-                                                  letterSpacing: "0.1em",
-                                                  marginBottom: "2px",
-                                                }}
-                                              >
-                                                {field.label}
-                                              </div>
-                                              <div
-                                                style={{
-                                                  fontFamily: "monospace",
-                                                  fontWeight: 500,
-                                                  fontSize: "20px",
-                                                  color: field.label === "Rest" ? (isDark ? "#22D3EE" : "#0891B2") : (isDark ? "#FFFFFF" : "#1A1A1A"),
-                                                }}
-                                              >
+                                            <div key={idx} className="text-center min-w-[60px]">
+                                              <div className="fc-micro text-[9px] mb-0.5">{field.label}</div>
+                                              <div className={`font-mono font-medium text-xl ${field.label === "Rest" ? "text-[color:var(--fc-accent-cyan)]" : "fc-text-primary"}`}>
                                                 {field.value || "—"}
                                               </div>
                                             </div>
@@ -1957,41 +1666,16 @@ export default function WorkoutDetailsPage() {
                                   if (optionalFields.length > 0) {
                                     return (
                                       <div
+                                        className="grid gap-3 mt-3"
                                         style={{
-                                          display: "grid",
                                           gridTemplateColumns: `repeat(${Math.min(optionalFields.length, 3)}, 1fr)`,
-                                          gap: "12px",
-                                          marginTop: "12px",
                                           marginBottom: previousBest ? "12px" : "0",
                                         }}
                                       >
                                         {optionalFields.map((field, idx) => (
                                           <div key={idx}>
-                                            <div
-                                              style={{
-                                                fontSize: "10px",
-                                                color: isDark
-                                                  ? "rgba(255,255,255,0.5)"
-                                                  : "#6B7280",
-                                                textTransform: "uppercase",
-                                                fontWeight: 700,
-                                                marginBottom: "4px",
-                                              }}
-                                            >
-                                              {field.label}
-                                            </div>
-                                            <div
-                                              style={{
-                                                fontFamily: "monospace",
-                                                fontWeight: 700,
-                                                fontSize: "16px",
-                                                color: isDark
-                                                  ? "#FFFFFF"
-                                                  : "#1A1A1A",
-                                              }}
-                                            >
-                                              {field.value}
-                                            </div>
+                                            <div className="fc-micro mb-1">{field.label}</div>
+                                            <div className="font-mono font-bold text-base fc-text-primary">{field.value}</div>
                                           </div>
                                         ))}
                                       </div>
@@ -2002,158 +1686,48 @@ export default function WorkoutDetailsPage() {
 
                                 {/* Previous Best */}
                                 {previousBest && (
-                                  <div
-                                    style={{
-                                      padding: "12px",
-                                      background: isDark
-                                        ? "rgba(255,255,255,0.05)"
-                                        : "rgba(0,0,0,0.02)",
-                                      borderRadius: "12px",
-                                      marginTop: "12px",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "space-between",
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "8px",
-                                      }}
-                                    >
-                                      <History
-                                        style={{
-                                          width: "14px",
-                                          height: "14px",
-                                          color: isDark
-                                            ? "rgba(255,255,255,0.5)"
-                                            : "#6B7280",
-                                        }}
-                                      />
-                                      <span
-                                        style={{
-                                          fontSize: "13px",
-                                          color: isDark
-                                            ? "rgba(255,255,255,0.6)"
-                                            : "#6B7280",
-                                        }}
-                                      >
-                                        Previous best:{" "}
-                                        <span
-                                          style={{
-                                            color: isDark
-                                              ? "#FFFFFF"
-                                              : "#1A1A1A",
-                                            fontWeight: 700,
-                                            fontFamily: "monospace",
-                                          }}
-                                        >
+                                  <div className="px-3 py-2 rounded-lg flex items-center justify-between" style={{ background: "color-mix(in srgb, var(--fc-status-success) 8%, var(--fc-surface-card))" }}>
+                                    <div className="flex items-center gap-2">
+                                      <History className="w-3 h-3 fc-text-dim" />
+                                      <span className="text-xs fc-text-dim">
+                                        PR:{" "}
+                                        <span className="fc-text-primary font-bold font-mono">
                                           {previousBest.record}
                                         </span>
                                       </span>
                                     </div>
-                                    <TrendingUp
-                                      style={{
-                                        width: "14px",
-                                        height: "14px",
-                                        color: "#10B981",
-                                      }}
-                                    />
-            </div>
-          )}
+                                    <TrendingUp className="w-3 h-3 fc-text-success" />
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
                         </div>
                       </div>
                     )}
-                    </GlassCard>
+                    </div>
                   </div>
                 );
               })}
             </div>
           </section>
+
+          {/* Spacer for bottom action bar */}
+          <div className="h-20" />
         </main>
 
-        {/* Fixed Bottom Action Button */}
-        <div
-          style={{
-            position: "fixed",
-            bottom: "80px",
-            left: 0,
-            width: "100%",
-            padding: "16px 24px",
-            display: "flex",
-            justifyContent: "center",
-            pointerEvents: "none",
-            zIndex: 50,
-          }}
-        >
-          <button
-            onClick={() =>
-              router.push(`/client/workouts/${assignment.id}/start`)
-            }
-            style={{
-              pointerEvents: "auto",
-              background: "#FFFFFF",
-              borderRadius: "100px",
-              padding: "12px 24px",
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              color: "#000000",
-              transition: "all 0.3s ease",
-              cursor: "pointer",
-              border: "none",
-              boxShadow: "0 4px 24px -1px rgba(0, 0, 0, 0.2)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 0 30px rgba(255, 255, 255, 0.3)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 4px 24px -1px rgba(0, 0, 0, 0.2), inset 0 0 20px 0 rgba(255, 255, 255, 0.02)";
-            }}
-          >
-            <span
-              style={{
-                fontFamily: "monospace",
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                fontSize: "12px",
-                textTransform: "uppercase",
-                color: "#000000",
-              }}
+        {/* Fixed Bottom Action Bar */}
+        <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
+          <div className="max-w-3xl mx-auto">
+            <Button
+              variant="fc-primary"
+              className="w-full h-14 rounded-2xl gap-3 text-base font-bold uppercase tracking-wider shadow-lg"
+              onClick={() => router.push(`/client/workouts/${assignment.id}/start`)}
             >
-              Initialize Session
-            </span>
-            <div
-              className="button-icon-container"
-              style={{
-                background: "#000000",
-                color: "#FFFFFF",
-                borderRadius: "100px",
-                padding: "4px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "transform 0.3s ease",
-              }}
-            >
-              <ChevronLeft
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  transform: "rotate(180deg)",
-                  strokeWidth: 3,
-                }}
-              />
-            </div>
-          </button>
+              <Play className="w-5 h-5 fill-current" />
+              Begin Workout
+            </Button>
+          </div>
         </div>
       </div>
     </div>

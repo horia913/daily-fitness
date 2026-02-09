@@ -603,22 +603,19 @@ export default function CoachAchievements() {
         <div className="min-h-screen">
         <div className="relative p-6">
           <div className="max-w-7xl mx-auto space-y-8">
-          <GlassCard className="p-6 md:p-8">
+          <GlassCard elevation={2} className="fc-glass fc-card p-6 md:p-8">
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-3">
-                <Badge className="fc-badge fc-badge-strong w-fit">Achievement Engine</Badge>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg">
-                    <Award className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
-                      Gamification System
-                    </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Build tiered achievements that reward consistency and milestones.
-                    </p>
-                  </div>
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+                  <Award className="w-6 h-6" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                    Gamification System
+                  </h1>
+                  <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                    Build tiered achievements that reward consistency and milestones.
+                  </p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-3">

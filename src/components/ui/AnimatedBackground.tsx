@@ -21,8 +21,8 @@ export function AnimatedBackground({
     } catch {
       // Fallback to evening colors (blue and yellow) if theme context isn't ready
       return isDark
-        ? ["#0C4A6E", "#075985", "#92400E", "#78350F"]
-        : ["#7DD3FC", "#60A5FA", "#FBBF24", "#FDE68A"];
+        ? ["#0b0f14", "#121824", "#0E7490", "#155E75"]
+        : ["#f6f2ec", "#e8e3db", "#7DD3FC", "#60A5FA"];
     }
   });
 
@@ -49,21 +49,32 @@ export function AnimatedBackground({
     gradientColors.length > 0
       ? gradientColors
       : isDark
-      ? ["#0C4A6E", "#075985", "#92400E", "#78350F"]
-      : ["#7DD3FC", "#60A5FA", "#FBBF24", "#FDE68A"];
+      ? ["#0b0f14", "#121824", "#0E7490", "#155E75"]
+      : ["#f6f2ec", "#e8e3db", "#7DD3FC", "#60A5FA"];
 
   const gradientStyle: React.CSSProperties = {
     backgroundImage: `linear-gradient(180deg, ${validColors.join(", ")})`,
     backgroundSize: "100% 200%",
     backgroundPosition: "0% 50%",
     animation: performanceSettings.animatedBackground
-      ? "gradientShift 10s ease-in-out infinite"
+      ? "gradientShift 25s ease-in-out infinite"
       : "none",
   };
 
   return (
     <div className={`min-h-screen relative ${className}`} style={gradientStyle}>
-      {children}
+      {/* Vignette overlay for depth */}
+      <div
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          background: `radial-gradient(ellipse at 50% 50%, transparent 50%, var(--fc-vignette-edge) 100%)`,
+        }}
+        aria-hidden
+      />
+      {/* Content */}
+      <div className="relative z-[1]">
+        {children}
+      </div>
     </div>
   );
 }

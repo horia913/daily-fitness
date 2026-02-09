@@ -435,23 +435,23 @@ function GymConsoleContent() {
 
       <div className="relative z-10 h-[100dvh] flex flex-col">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-white/10">
+        <div className="px-4 py-3 border-b border-[color:var(--fc-glass-border)] fc-glass">
           <div className="max-w-7xl mx-auto flex items-center gap-4">
             <Link href="/coach">
-              <Button variant="ghost" size="icon" className="shrink-0">
+              <Button variant="ghost" size="icon" className="shrink-0 fc-btn fc-btn-ghost">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-cyan-400" />
-                <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                  Pickup Mode
-                </span>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
+                <Target className="h-5 w-5" />
               </div>
-              <h1 className="text-lg font-bold text-[color:var(--fc-text-primary)]">
-                Gym Console
-              </h1>
+              <div>
+                <h1 className="text-lg font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                  Gym Console
+                </h1>
+                <p className="text-xs text-[color:var(--fc-text-dim)]">Pickup Mode</p>
+              </div>
             </div>
           </div>
         </div>

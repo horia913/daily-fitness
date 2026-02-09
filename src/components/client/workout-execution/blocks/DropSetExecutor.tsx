@@ -12,9 +12,9 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
-import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
+import { getWeightDefaultAndSuggestion, getCoachSuggestedWeight } from "@/lib/weightDefaultService";
+import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 
 export function DropSetExecutor({
   block,
@@ -38,6 +38,7 @@ export function DropSetExecutor({
   onAlternativesClick,
   onRestTimerClick,
   onSetComplete,
+  onLastSetLoggedForRest,
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
@@ -65,6 +66,7 @@ export function DropSetExecutor({
     loadPercentage,
     e1rm: e1rm ?? null,
   });
+  const coachSuggestedWeight = getCoachSuggestedWeight(loadPercentage, e1rm);
 
   const dropPercentage = 20;
   const exerciseReps = currentExercise?.reps || block.block.reps_per_set || "";
@@ -224,8 +226,16 @@ export function DropSetExecutor({
           duration: 2000,
         });
 
-        // Update parent with new completed sets count
         const newCompletedSets = completedSets + 1;
+        if (newCompletedSets < totalSets) {
+          onLastSetLoggedForRest?.({
+            weight: initialWeightNum,
+            reps: initialRepsNum,
+            setNumber: newCompletedSets,
+            totalSets,
+            isPr: result.isNewPR,
+          });
+        }
         onSetComplete?.(newCompletedSets);
 
         // Complete block if last set
@@ -258,8 +268,8 @@ export function DropSetExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {/* Initial Set */}
-      <GlassCard elevation={1} className="p-4">
-        <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-4 text-lg">
+      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
+        <h4 className="font-semibold mb-4 text-lg" style={{ color: "var(--fc-accent-cyan)" }}>
           Initial (100%)
         </h4>
         <div className="grid grid-cols-2 gap-4">
@@ -277,19 +287,16 @@ export function DropSetExecutor({
               showStepper
               stepAmount={2.5}
             />
-            {suggested_weight != null && suggested_weight > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setInitialWeight(String(suggested_weight));
+            {coachSuggestedWeight != null && coachSuggestedWeight > 0 && (
+              <ApplySuggestedWeightButton
+                suggestedKg={coachSuggestedWeight}
+                onApply={() => {
+                  setInitialWeight(String(coachSuggestedWeight));
                   setIsWeightPristine(false);
-                  const dropVal = suggested_weight * (1 - dropPercentage / 100);
+                  const dropVal = coachSuggestedWeight * (1 - dropPercentage / 100);
                   setDropWeight(String(Math.round(dropVal * 2) / 2));
                 }}
-                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                {loadPercentage != null ? `${loadPercentage}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
-              </button>
+              />
             )}
           </div>
           <LargeInput
@@ -302,11 +309,11 @@ export function DropSetExecutor({
             stepAmount={1}
           />
         </div>
-      </GlassCard>
+      </div>
 
       {/* Drop Set */}
-      <GlassCard elevation={1} className="p-4">
-        <h4 className="font-semibold text-red-800 dark:text-red-200 mb-4 text-lg">
+      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
+        <h4 className="font-semibold mb-4 text-lg" style={{ color: "var(--fc-status-error)" }}>
           After Drop ({100 - dropPercentage}%)
         </h4>
         <div className="grid grid-cols-2 gap-4">
@@ -337,7 +344,7 @@ export function DropSetExecutor({
             stepAmount={1}
           />
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 
@@ -345,7 +352,8 @@ export function DropSetExecutor({
     <Button
       onClick={handleLog}
       disabled={isLoggingSet}
-      className="w-full bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white text-lg py-4"
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <TrendingDown className="w-5 h-5 mr-2" />
       {isLoggingSet ? "Logging..." : "LOG DROP SET"}

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Detail | Crystalline Kinetic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --prismatic: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8f00ff);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(200%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-border {
+            position: relative;
+        }
+
+        .kinetic-border::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 24px;
+            padding: 1px;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .prismatic-shimmer {
+            background: linear-gradient(120deg, transparent 30%, rgba(59, 130, 246, 0.1) 45%, rgba(239, 68, 68, 0.1) 50%, rgba(16, 185, 129, 0.1) 55%, transparent 70%);
+            background-size: 200% 100%;
+            animation: prism-sweep 8s infinite linear;
+        }
+
+        @keyframes prism-sweep {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .btn-primary {
+            height: 52px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-secondary {
+            height: 52px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:active, .btn-primary:active { transform: scale(0.96); }
+
+        .pr-badge {
+            background: linear-gradient(45deg, #F59E0B, #D97706);
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+            animation: trophy-bounce 2s infinite ease-in-out;
+        }
+
+        @keyframes trophy-bounce {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-3px) rotate(5deg); }
+        }
+
+        .exercise-row {
+            transition: background 0.2s ease;
+        }
+
+        .exercise-row:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 10%, rgba(239, 68, 68, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 20% 90%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .sticky-footer {
+            background: linear-gradient(to top, rgba(10, 10, 10, 1) 70%, rgba(10, 10, 10, 0));
+            backdrop-filter: blur(8px);
+        }
+
+        .status-pill {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--accent);
+        }
+
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="p-4 md:p-8 pb-32 max-w-3xl mx-auto">
+    <div class="refraction-bg"></div>
+
+    <!-- Header Navigation -->
+    <nav class="flex items-center justify-between mb-8">
+        <button onclick="history.back()" class="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors" aria-label="Go back">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        <div class="text-center">
+            <h1 class="text-sm font-bold uppercase tracking-[0.2em] text-neutral-500">Session Review</h1>
+            <p class="text-lg font-bold mono">DEC 25, 2025</p>
+        </div>
+        <button class="p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
+            <i data-lucide="more-horizontal" class="w-6 h-6"></i>
+        </button>
+    </nav>
+
+    <!-- Workout Hero -->
+    <header class="mb-8">
+        <div class="crystal-card prismatic-shimmer p-8 relative">
+            <div class="flex flex-col md:flex-row justify-between gap-6 items-start">
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="status-pill px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wider">Completed</span>
+                        <div class="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-500 text-sm font-bold uppercase">
+                            <i data-lucide="trophy" class="w-3.5 h-3.5"></i>
+                            2 PRs
+                        </div>
+                    </div>
+                    <h2 class="text-4xl font-bold tracking-tight mb-2">Hypertrophy: Push A</h2>
+                    <p class="text-neutral-400 flex items-center gap-2">
+                        <i data-lucide="clock" class="w-4 h-4 text-blue-400"></i>
+                        Started 10:34 AM • 45m 23s
+                    </p>
+                </div>
+            </div>
+
+            <!-- Major Metrics -->
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-8 pt-8 border-t border-white/10">
+                <div>
+                    <p class="text-sm text-neutral-500 uppercase font-bold tracking-widest mb-1">Total Volume</p>
+                    <p class="text-2xl font-bold mono">12,500<span class="text-sm ml-1 text-neutral-400">kg</span></p>
+                    <p class="text-accent text-sm font-medium mt-1">+8% vs last</p>
+                </div>
+                <div>
+                    <p class="text-sm text-neutral-500 uppercase font-bold tracking-widest mb-1">Avg Intensity</p>
+                    <p class="text-2xl font-bold mono">82<span class="text-sm ml-1 text-neutral-400">%</span></p>
+                    <p class="text-neutral-500 text-sm mt-1">RPE 8.5 target</p>
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <p class="text-sm text-neutral-500 uppercase font-bold tracking-widest mb-1">Exercises</p>
+                    <p class="text-2xl font-bold mono">06<span class="text-sm ml-1 text-neutral-400">Total</span></p>
+                    <div class="flex gap-1 mt-2">
+                        <div class="h-1 flex-1 bg-accent rounded-full"></div>
+                        <div class="h-1 flex-1 bg-accent rounded-full"></div>
+                        <div class="h-1 flex-1 bg-accent rounded-full"></div>
+                        <div class="h-1 flex-1 bg-accent rounded-full"></div>
+                        <div class="h-1 flex-1 bg-accent rounded-full"></div>
+                        <div class="h-1 flex-1 bg-accent rounded-full"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notes Section -->
+    <section class="space-y-4 mb-10">
+        <!-- Coach Feedback -->
+        <div class="crystal-card p-5 border-l-4 border-l-blue-500 bg-blue-500/5">
+            <div class="flex items-center gap-3 mb-2">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Coach" alt="Coach" class="w-8 h-8 rounded-full bg-neutral-800 border border-blue-500/30">
+                <span class="font-bold text-sm">Coach Marcus</span>
+                <span class="text-sm text-neutral-500 ml-auto">2h ago</span>
+            </div>
+            <p class="text-neutral-300 text-[15px] leading-relaxed italic">
+                "Incredible session Alex! That PR on the incline bench was smooth. Your bar path is looking much more stable compared to last week."
+            </p>
+        </div>
+        <!-- Client Notes -->
+        <div class="p-5 border border-white/5 rounded-3xl bg-white/[0.02]">
+            <h4 class="text-sm font-bold text-neutral-500 uppercase tracking-widest mb-2">Your Notes</h4>
+            <p class="text-neutral-400 text-[15px]">Felt strong on rows today. Increased rest by 30s on the final set to ensure quality reps.</p>
+        </div>
+    </section>
+
+    <!-- Exercise List -->
+    <section class="space-y-6">
+        <h3 class="text-xl font-bold flex items-center gap-3 px-2">
+            Exercise Breakdown
+            <span class="h-px flex-1 bg-white/10"></span>
+        </h3>
+
+        <!-- Exercise 1: Incline Bench -->
+        <div class="crystal-card overflow-visible">
+            <details open class="group">
+                <summary class="flex items-center justify-between p-6 cursor-pointer list-none">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
+                            <i data-lucide="dumbbell" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg">Incline Barbell Bench</h4>
+                            <p class="text-sm text-neutral-500">4 sets • Compound</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="hidden md:block text-right">
+                            <p class="text-sm font-bold text-accent">+5kg PR</p>
+                            <p class="text-sm text-neutral-500 mono">100kg max</p>
+                        </div>
+                        <i data-lucide="chevron-down" class="w-5 h-5 transition-transform group-open:rotate-180 text-neutral-500"></i>
+                    </div>
+                </summary>
+
+                <div class="px-6 pb-6 overflow-x-auto no-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-sm font-bold text-neutral-500 border-b border-white/10">
+                                <th class="pb-3 pr-4 uppercase tracking-tighter">Set</th>
+                                <th class="pb-3 pr-4 uppercase tracking-tighter">Load</th>
+                                <th class="pb-3 pr-4 uppercase tracking-tighter">Reps</th>
+                                <th class="pb-3 pr-4 uppercase tracking-tighter">Rest</th>
+                                <th class="pb-3 text-right"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="mono text-[15px]">
+                            <tr class="exercise-row">
+                                <td class="py-4 font-bold text-neutral-400">1</td>
+                                <td class="py-4">90.0 <span class="text-sm text-neutral-600">kg</span></td>
+                                <td class="py-4">8</td>
+                                <td class="py-4 text-neutral-500">2m</td>
+                                <td class="py-4 text-right"></td>
+                            </tr>
+                            <tr class="exercise-row relative">
+                                <td class="py-4 font-bold text-neutral-400">2</td>
+                                <td class="py-4 text-amber-400 font-bold">100.0 <span class="text-sm">kg</span></td>
+                                <td class="py-4">6</td>
+                                <td class="py-4 text-neutral-500">3m</td>
+                                <td class="py-4 text-right">
+                                    <span class="pr-badge px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-tighter">🏆 PR</span>
+                                </td>
+                            </tr>
+                            <tr class="exercise-row">
+                                <td class="py-4 font-bold text-neutral-400">3</td>
+                                <td class="py-4">95.0 <span class="text-sm text-neutral-600">kg</span></td>
+                                <td class="py-4">7</td>
+                                <td class="py-4 text-neutral-500">2m</td>
+                                <td class="py-4 text-right"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="mt-4 p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between text-sm">
+                        <span class="text-neutral-500">Last Session Volume: 2,400kg</span>
+                        <span class="text-accent font-bold">+150kg Improvement</span>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <!-- Exercise 2: Cable Flys -->
+        <div class="crystal-card">
+            <details class="group">
+                <summary class="flex items-center justify-between p-6 cursor-pointer list-none">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
+                            <i data-lucide="layers" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg">Cable Flys (Low-High)</h4>
+                            <p class="text-sm text-neutral-500">3 sets • Isolation</p>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-down" class="w-5 h-5 transition-transform group-open:rotate-180 text-neutral-500"></i>
+                </summary>
+                <div class="px-6 pb-6 text-center text-neutral-500 py-10 mono">
+                    Details collapsed by default for better scanability.
+                </div>
+            </details>
+        </div>
+    </section>
+
+    <!-- Bottom Sticky Actions -->
+    <div class="fixed bottom-0 left-0 right-0 p-6 sticky-footer z-50">
+        <div class="max-w-3xl mx-auto grid grid-cols-2 md:grid-cols-3 gap-3">
+            <button class="btn-primary rounded-2xl flex items-center justify-center gap-2 font-bold col-span-1">
+                <i data-lucide="repeat-2" class="w-5 h-5"></i>
+                Repeat
+            </button>
+            <button class="btn-secondary rounded-2xl flex items-center justify-center gap-2 font-bold col-span-1">
+                <i data-lucide="share" class="w-5 h-5 text-blue-400"></i>
+                Share
+            </button>
+            <button class="btn-secondary rounded-2xl hidden md:flex items-center justify-center gap-2 font-bold text-neutral-400">
+                <i data-lucide="file-text" class="w-5 h-5"></i>
+                Export PDF
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Reveal animations
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.crystal-card, nav, header, section');
+            elements.forEach((el, i) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(15px)';
+                el.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                setTimeout(() => {
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                }, i * 80);
+            });
+        });
+
+        // Haptic feedback simulation
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if ('vibrate' in navigator) {
+                    navigator.vibrate(10);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

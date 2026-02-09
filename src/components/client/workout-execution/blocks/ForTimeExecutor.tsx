@@ -14,7 +14,6 @@ import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { supabase } from "@/lib/supabase";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 
@@ -452,11 +451,11 @@ export function ForTimeExecutor({
       {/* Timer Display */}
       {!startTime && !timerStopped ? (
         // Initial state - Start Timer button
-        <div className="bg-rose-50 dark:bg-rose-900/20 rounded-xl p-6 border-2 border-rose-200 dark:border-rose-700 text-center">
-          <div className="text-5xl font-bold text-rose-600 dark:text-rose-400 mb-3">
+        <div className="rounded-xl p-5 text-center" style={{ background: "color-mix(in srgb, var(--fc-status-error) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-status-error) 25%, transparent)" }}>
+          <div className="text-5xl font-bold mb-3" style={{ color: "var(--fc-status-error)" }}>
             {formatTime(0)}
           </div>
-          <div className="text-lg text-slate-600 dark:text-slate-400 mb-4">
+          <div className="text-lg fc-text-dim mb-4">
             Complete as fast as possible
           </div>
           <Button
@@ -469,14 +468,14 @@ export function ForTimeExecutor({
         </div>
       ) : startTime && !timerStopped ? (
         // Timer running - Show elapsed time and Stop button
-        <div className="bg-rose-50 dark:bg-rose-900/20 rounded-xl p-6 border-2 border-rose-200 dark:border-rose-700 text-center">
-          <div className="text-5xl font-bold text-rose-600 dark:text-rose-400 mb-3">
+        <div className="rounded-xl p-5 text-center" style={{ background: "color-mix(in srgb, var(--fc-status-error) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-status-error) 25%, transparent)" }}>
+          <div className="text-5xl font-bold mb-3" style={{ color: "var(--fc-status-error)" }}>
             {formatTime(elapsedSeconds)}
           </div>
-          <div className="text-lg text-slate-600 dark:text-slate-400 mb-4">
+          <div className="text-lg fc-text-dim mb-4">
             Complete as fast as possible
           </div>
-          <div className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <div className="text-sm fc-text-dim mb-4">
             Time Cap: {timeCapMinutes} minutes
           </div>
           <Button
@@ -489,11 +488,11 @@ export function ForTimeExecutor({
         </div>
       ) : timerStopped && completionTime !== null ? (
         // Timer stopped - Show completion time
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-6 border-2 border-emerald-200 dark:border-emerald-700 text-center">
-          <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-2">
+        <div className="rounded-xl p-5 text-center" style={{ background: "color-mix(in srgb, var(--fc-status-success) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-status-success) 25%, transparent)" }}>
+          <div className="text-3xl font-bold mb-2" style={{ color: "var(--fc-status-success)" }}>
             {formatTime(completionTime)}
           </div>
-          <div className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+          <div className="text-sm fc-text-dim mb-4">
             Completion Time
           </div>
         </div>
@@ -501,7 +500,7 @@ export function ForTimeExecutor({
 
       {/* Weight and Reps Input - Show when timer is stopped or not started */}
       {(!startTime || timerStopped) && (
-        <GlassCard elevation={1} className="p-4">
+        <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <LargeInput
@@ -515,7 +514,7 @@ export function ForTimeExecutor({
                 stepAmount={2.5}
               />
               {suggested_weight != null && suggested_weight > 0 && (
-                <button type="button" onClick={() => { setWeight(String(suggested_weight)); setIsWeightPristine(false); }} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                <button type="button" onClick={() => { setWeight(String(suggested_weight)); setIsWeightPristine(false); }} className="text-xs font-medium hover:underline" style={{ color: "var(--fc-accent-cyan)" }}>
                   {loadPercentage != null ? `${loadPercentage}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
                 </button>
               )}
@@ -530,7 +529,7 @@ export function ForTimeExecutor({
               stepAmount={1}
             />
           </div>
-        </GlassCard>
+        </div>
       )}
     </div>
   );
@@ -615,7 +614,8 @@ export function ForTimeExecutor({
           }
         }}
         disabled={isLoggingSet || !isValidInput}
-        className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-emerald-600 disabled:hover:to-teal-600"
+        variant="fc-primary"
+        className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
         title={buttonDisabledReason || undefined}
       >
         <CheckCircle className="w-5 h-5 mr-2" />

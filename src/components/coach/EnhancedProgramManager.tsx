@@ -354,12 +354,12 @@ export default function EnhancedProgramManager({
         <div className="animate-pulse p-6 space-y-6">
           <div className="max-w-7xl mx-auto space-y-6">
             <div className={`${theme.card} rounded-2xl p-6`}>
-              <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+              <div className="h-8 bg-[var(--fc-surface-sunken)] rounded mb-4"></div>
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => (
                   <div
                     key={i}
-                    className="h-24 bg-slate-200 dark:bg-slate-700 rounded-2xl"
+                    className="h-24 bg-[var(--fc-surface-sunken)] rounded-2xl"
                   ></div>
                 ))}
               </div>
@@ -387,7 +387,7 @@ export default function EnhancedProgramManager({
           }}
         >
           <div
-            className="fc-glass fc-card"
+            className="fc-surface"
             style={{
               maxWidth: "28rem",
               width: "100%",
@@ -1035,7 +1035,7 @@ export default function EnhancedProgramManager({
               >
                 <CardContent className="text-center py-16">
                   <div className="relative mb-6">
-                    <Calendar className="w-20 h-20 text-slate-400 mx-auto" />
+                    <Calendar className="w-20 h-20 fc-text-dim mx-auto" />
                     <div className="absolute -top-2 -right-2 w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center">
                       <Plus className="w-3 h-3 text-white" />
                     </div>
@@ -1517,7 +1517,7 @@ function ProgramDetailsModal({
       }}
     >
       <div
-        className="fc-glass fc-card"
+        className="fc-surface"
         style={{
           maxWidth: "min(95vw, 80rem)",
           width: "100%",
@@ -3021,7 +3021,7 @@ function ProgramCreateForm({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-[9999]">
-      <Card className="fc-glass fc-card max-w-2xl w-full h-[88vh] max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+      <Card className="fc-surface max-w-2xl w-full h-[88vh] max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
         <div
           className="flex-shrink-0 p-6 border-b border-[color:var(--fc-glass-border)]"
         >
@@ -3224,7 +3224,7 @@ function ProgramCreateForm({
                   {dayNames.map((dayName, dayIndex) => (
                     <Card
                       key={dayIndex}
-                      className="fc-glass-soft fc-card rounded-2xl border border-[color:var(--fc-glass-border)]"
+                      className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)]"
                     >
                       <CardContent className="p-4">
                         <h4 className="font-medium mb-3 text-center text-[color:var(--fc-text-primary)]">
@@ -3435,7 +3435,7 @@ function ProgramCreateForm({
                     )}
 
                     {!selectedScheduleForProgression && (
-                      <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                      <div className="text-center py-8 fc-text-dim">
                         <p>Select a day above to edit progression rules.</p>
                       </div>
                     )}

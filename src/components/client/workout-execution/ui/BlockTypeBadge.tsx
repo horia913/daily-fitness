@@ -69,8 +69,8 @@ export function BlockTypeBadge({ blockType, blockName }: BlockTypeBadgeProps) {
 
   return (
     <Badge
-      variant="outline"
-      className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold border-2"
+      variant="fc-outline"
+      className="fc-micro flex items-center gap-2 px-3 py-1.5 text-sm font-semibold border-2 fc-text-workouts"
     >
       {getIcon()}
       <span>{displayName}</span>

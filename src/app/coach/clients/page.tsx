@@ -165,209 +165,59 @@ function ClientManagementContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
-        <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                Client Directory
-              </span>
-              <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)] sm:text-4xl">
-                Client Management
-              </h1>
-              <p className="text-sm text-[color:var(--fc-text-dim)]">
-                Manage your roster, compliance, and engagement signals.
-              </p>
-            </div>
-
-            <Link href="/coach/clients/add">
-              <Button className="fc-btn fc-btn-primary">
-                <UserPlus className="w-5 h-5 mr-2" />
-                Add Client
-              </Button>
-            </Link>
-          </div>
-        </GlassCard>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <GlassCard elevation={2} className="fc-glass fc-card p-5">
-            <div className="flex items-center gap-4">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  boxShadow: `0 4px 12px ${
-                    getSemanticColor("success").primary
-                  }30`,
-                }}
-              >
-                <Users className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <AnimatedNumber
-                  value={activeCount}
-                  className="text-3xl font-bold"
-                  color={getSemanticColor("success").primary}
-                />
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  Active Clients
-                </p>
-              </div>
-            </div>
-          </GlassCard>
-
-          <GlassCard elevation={2} className="fc-glass fc-card p-5">
-            <div className="flex items-center gap-4">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{
-                  background: getSemanticColor("warning").gradient,
-                  boxShadow: `0 4px 12px ${
-                    getSemanticColor("warning").primary
-                  }30`,
-                }}
-              >
-                <TrendingDown className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <AnimatedNumber
-                  value={atRiskCount}
-                  className="text-3xl font-bold"
-                  color={getSemanticColor("warning").primary}
-                />
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  At Risk
-                </p>
-              </div>
-            </div>
-          </GlassCard>
-
-          <GlassCard elevation={2} className="fc-glass fc-card p-5">
-            <div className="flex items-center gap-4">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{
-                  background: isDark
-                    ? "rgba(255,255,255,0.15)"
-                    : "rgba(0,0,0,0.1)",
-                }}
-              >
-                <Circle
-                  className="w-6 h-6"
-                  style={{ color: getSemanticColor("neutral").primary }}
-                />
-              </div>
-              <div>
-                <AnimatedNumber
-                  value={inactiveCount}
-                  className="text-3xl font-bold"
-                  color={getSemanticColor("neutral").primary}
-                />
-                <p className="text-sm text-[color:var(--fc-text-dim)]">
-                  Inactive
-                </p>
-              </div>
-            </div>
-          </GlassCard>
-        </div>
-
-        <GlassCard elevation={2} className="fc-glass fc-card p-4">
-          <div className="flex items-center gap-4 flex-wrap">
-              {/* Search */}
-              <div className="flex-1 min-w-[250px]">
-                <div className="relative">
-                  <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.5)"
-                        : "rgba(0,0,0,0.5)",
-                    }}
-                  />
-                  <Input
-                    type="text"
-                    placeholder="Search clients..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+      <div className="relative z-10 mx-auto w-full max-w-7xl fc-page pb-32">
+        {/* Sticky header: title, count, search, filters */}
+        <header className="sticky top-0 z-40 fc-glass border-b border-[color:var(--fc-glass-border)] backdrop-blur-md">
+          <div className="px-4 py-4 sm:px-6">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h1 className="text-[30px] font-bold tracking-tight fc-text-primary">Clients</h1>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-xs fc-text-dim uppercase tracking-widest">
+                    Active: {activeCount}
+                  </span>
+                  <Link href="/coach/clients/add">
+                    <Button size="sm" variant="fc-primary" className="gap-2">
+                      <UserPlus className="w-4 h-4" />
+                      Add
+                    </Button>
+                  </Link>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={statusFilter === "all" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setStatusFilter("all")}
-                  style={
-                    statusFilter === "all"
-                      ? {
-                          background: getSemanticColor("trust").gradient,
-                          boxShadow: `0 4px 12px ${
-                            getSemanticColor("trust").primary
-                          }30`,
-                        }
-                      : {}
-                  }
-                >
-                  All ({clients.length})
-                </Button>
-                <Button
-                  variant={statusFilter === "active" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setStatusFilter("active")}
-                  style={
-                    statusFilter === "active"
-                      ? {
-                          background: getSemanticColor("success").gradient,
-                          boxShadow: `0 4px 12px ${
-                            getSemanticColor("success").primary
-                          }30`,
-                        }
-                      : {}
-                  }
-                >
-                  Active ({activeCount})
-                </Button>
-                <Button
-                  variant={statusFilter === "at-risk" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setStatusFilter("at-risk")}
-                  style={
-                    statusFilter === "at-risk"
-                      ? {
-                          background: getSemanticColor("warning").gradient,
-                          boxShadow: `0 4px 12px ${
-                            getSemanticColor("warning").primary
-                          }30`,
-                        }
-                      : {}
-                  }
-                >
-                  At Risk ({atRiskCount})
-                </Button>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 fc-text-dim pointer-events-none" />
+                <Input
+                  type="text"
+                  placeholder="Search clients by name, goal, or status..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-14 fc-glass border border-[color:var(--fc-glass-border)] rounded-2xl pl-12 pr-4 fc-text-primary placeholder:fc-text-dim focus:ring-2 focus:ring-[color:var(--fc-domain-workouts)]/50"
+                />
               </div>
-
-              {/* View Toggle */}
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={viewMode === "grid" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setViewMode("grid")}
-                >
-                  <Grid3x3 className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setViewMode("list")}
-                >
-                  <List className="w-4 h-4" />
-                </Button>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {(["all", "active", "at-risk", "inactive"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setStatusFilter(filter)}
+                    className={statusFilter === filter
+                      ? "px-5 py-2 rounded-full font-medium bg-white text-[color:var(--fc-bg-deep)] border border-white whitespace-nowrap"
+                      : "px-5 py-2 rounded-full font-medium fc-glass border border-[color:var(--fc-glass-border)] fc-text-dim hover:fc-text-primary whitespace-nowrap"
+                    }
+                  >
+                    {filter === "all" ? "All Clients" : filter === "at-risk" ? "At-Risk" : filter === "active" ? "Active" : "Inactive"}
+                    {filter === "all" && ` (${clients.length})`}
+                    {filter === "active" && ` (${activeCount})`}
+                    {filter === "at-risk" && ` (${atRiskCount})`}
+                    {filter === "inactive" && ` (${inactiveCount})`}
+                  </button>
+                ))}
               </div>
+            </div>
           </div>
-        </GlassCard>
+        </header>
 
+        <main className="px-4 py-6 sm:px-6">
         {/* Client List/Grid */}
         {filteredClients.length === 0 ? (
           <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
@@ -616,6 +466,7 @@ function ClientManagementContent() {
             </div>
           </GlassCard>
         )}
+        </main>
       </div>
     </AnimatedBackground>
   );

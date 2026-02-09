@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Challenges | Kinetic Thermal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Crystalline Kinetic Refraction */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease;
+        }
+
+        .crystal-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 50%, transparent 55%);
+            animation: shine 8s infinite linear;
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-30%, -30%); }
+            100% { transform: translate(30%, 30%); }
+        }
+
+        .btn-primary {
+            height: 48px;
+            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-success {
+            height: 48px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-secondary {
+            height: 48px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1.5px solid rgba(59, 130, 246, 0.4);
+            color: #3B82F6;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:active, .btn-success:active { transform: scale(0.96); }
+        .btn-primary:hover, .btn-success:hover { transform: translateY(-2px); filter: brightness(1.1); }
+
+        .progress-bar-bg {
+            background: rgba(255,255,255,0.05);
+            height: 8px;
+            border-radius: 99px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 99px;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tab-active {
+            position: relative;
+            color: white;
+        }
+
+        .tab-active::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary);
+            box-shadow: 0 0 12px var(--primary);
+        }
+
+        .thermal-badge {
+            background: linear-gradient(90deg, #F59E0B, #EF4444);
+            padding: 2px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+        }
+
+        .refraction-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.07) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .countdown-timer {
+            animation: pulse-red 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { color: #EF4444; opacity: 1; }
+            50% { color: #F87171; opacity: 0.8; }
+        }
+
+        .prize-glow {
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        /* Responsive Grid fixes */
+        .challenge-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        @media (max-width: 640px) {
+            .challenge-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10 pb-32">
+    <div class="refraction-bg"></div>
+
+    <header class="max-w-7xl mx-auto mb-10">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+                <nav class="flex items-center gap-2 text-sm text-neutral-500 mb-2 mono">
+                    <span>DASHBOARD</span>
+                    <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                    <span class="text-neutral-300">CHALLENGES</span>
+                </nav>
+                <h1 class="text-4xl font-bold tracking-tight">Competitive Arena</h1>
+                <p class="text-neutral-400 mt-2">Push your boundaries and climb the ranks.</p>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <button class="p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
+                    <i data-lucide="filter" class="w-5 h-5"></i>
+                </button>
+                <div class="h-10 w-[1px] bg-white/10 mx-2"></div>
+                <div class="flex items-center gap-2 px-4 py-2 bg-accent/10 border border-accent/20 rounded-xl">
+                    <i data-lucide="award" class="w-5 h-5 text-accent"></i>
+                    <span class="mono text-sm font-bold">2,450 PTS</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto">
+        <!-- Active Challenge Hero -->
+        <section class="mb-12">
+            <div class="crystal-card kinetic-shimmer p-8 border-l-4 border-l-primary">
+                <div class="flex flex-col lg:flex-row justify-between gap-8">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="thermal-badge">Current Challenge</span>
+                            <span class="flex items-center gap-1.5 text-sm font-medium countdown-timer">
+                                <i data-lucide="clock" class="w-4 h-4"></i>
+                                <span class="mono">3d 14h 22m left</span>
+                            </span>
+                        </div>
+                        <h2 class="text-3xl font-bold mb-4">Summer Shred: Max Volume Peak</h2>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                            <div>
+                                <p class="text-xs text-neutral-500 uppercase tracking-widest mb-1 mono">Your Position</p>
+                                <p class="text-2xl font-bold">#12 <span class="text-sm text-neutral-500 font-normal">of 45</span></p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-neutral-500 uppercase tracking-widest mb-1 mono">Total Volume</p>
+                                <p class="text-2xl font-bold mono">42.5k <span class="text-sm text-neutral-500 font-normal">kg</span></p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-neutral-500 uppercase tracking-widest mb-1 mono">Target</p>
+                                <p class="text-2xl font-bold mono">50.0k <span class="text-sm text-neutral-500 font-normal">kg</span></p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-neutral-500 uppercase tracking-widest mb-1 mono">To Next Rank</p>
+                                <p class="text-2xl font-bold text-secondary mono">+1.2k</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4 mb-8">
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-neutral-300">Your Progress</span>
+                                <span class="mono text-accent">85%</span>
+                            </div>
+                            <div class="progress-bar-bg relative">
+                                <!-- Leader Progress (Ghost Bar) -->
+                                <div class="absolute top-0 left-0 h-full bg-white/10" style="width: 100%;"></div>
+                                <!-- User Progress -->
+                                <div class="progress-fill bg-gradient-to-r from-primary to-orange-500" style="width: 85%;"></div>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs text-neutral-500">
+                                <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                                <span>Leader: <strong>Marcus V.</strong> is currently at 49.2k kg</span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <button class="btn-primary px-8 rounded-xl flex items-center justify-center gap-2 font-bold text-sm tracking-wide">
+                                <i data-lucide="eye" class="w-4 h-4"></i>
+                                VIEW FULL LEADERBOARD
+                            </button>
+                            <button class="btn-secondary px-8 rounded-xl flex items-center justify-center gap-2 font-bold text-sm tracking-wide">
+                                <i data-lucide="share-2" class="w-4 h-4"></i>
+                                INVITE FRIENDS
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="lg:w-72 flex flex-col items-center justify-center bg-white/5 rounded-3xl p-6 border border-white/5">
+                        <div class="relative mb-4">
+                            <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-200 flex items-center justify-center prize-glow">
+                                <i data-lucide="trophy" class="w-12 h-12 text-bg-dark"></i>
+                            </div>
+                            <div class="absolute -bottom-2 -right-2 bg-primary px-2 py-1 rounded text-[10px] font-black uppercase">PRO</div>
+                        </div>
+                        <h3 class="font-bold text-lg mb-1">Winner's Bounty</h3>
+                        <p class="text-center text-sm text-neutral-400">Personalized Training Kit + 5,000 Pts</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabs & Filter -->
+        <div class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 border-b border-white/10">
+            <div class="flex gap-8 w-full md:w-auto overflow-x-auto no-scrollbar">
+                <button class="pb-4 text-sm font-bold tracking-widest tab-active uppercase">Browse All</button>
+                <button class="pb-4 text-sm font-bold tracking-widest text-neutral-500 hover:text-neutral-300 transition-colors uppercase">My Challenges</button>
+                <button class="pb-4 text-sm font-bold tracking-widest text-neutral-500 hover:text-neutral-300 transition-colors uppercase">Global Events</button>
+            </div>
+            <div class="flex items-center gap-4 pb-4">
+                <span class="text-xs mono text-neutral-500 uppercase">Sort by:</span>
+                <select class="bg-transparent text-sm font-semibold focus:outline-none cursor-pointer">
+                    <option class="bg-neutral-900">Ending Soon</option>
+                    <option class="bg-neutral-900">Most Participants</option>
+                    <option class="bg-neutral-900">Highest Reward</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Challenges Grid -->
+        <div class="challenge-grid">
+            <!-- Card 1 -->
+            <div class="crystal-card p-6 flex flex-col h-full">
+                <div class="flex justify-between items-start mb-6">
+                    <div class="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-400">
+                        <i data-lucide="zap" class="w-7 h-7"></i>
+                    </div>
+                    <div class="bg-neutral-800/50 px-3 py-1 rounded-full text-[10px] font-bold mono text-neutral-300 border border-white/5">
+                        Jan 1 - Jan 31
+                    </div>
+                </div>
+                <h3 class="text-xl font-bold mb-2 flex items-center gap-2">
+                    Metabolic Fire ⚡️
+                </h3>
+                <p class="text-sm text-neutral-400 mb-6 flex-1">Burn the highest calories across all HIIT sessions this month.</p>
+                
+                <div class="space-y-4 mb-6">
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center gap-2 text-neutral-400">
+                            <i data-lucide="users" class="w-4 h-4"></i>
+                            <span>156 Participants</span>
+                        </div>
+                        <span class="text-amber-400 font-bold flex items-center gap-1">
+                            <i data-lucide="gem" class="w-3.5 h-3.5"></i>
+                            Exclusive Badge
+                        </span>
+                    </div>
+                </div>
+
+                <button class="btn-success w-full rounded-xl flex items-center justify-center gap-2 font-bold text-sm">
+                    JOIN CHALLENGE
+                </button>
+            </div>
+
+            <!-- Card 2 (Already Joined) -->
+            <div class="crystal-card p-6 flex flex-col h-full">
+                <div class="flex justify-between items-start mb-6">
+                    <div class="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                        <i data-lucide="flame" class="w-7 h-7"></i>
+                    </div>
+                    <div class="bg-neutral-800/50 px-3 py-1 rounded-full text-[10px] font-bold mono text-neutral-300 border border-white/5">
+                        Ongoing
+                    </div>
+                </div>
+                <h3 class="text-xl font-bold mb-2 flex items-center gap-2">
+                    Squat Master 🏋️‍♂️
+                </h3>
+                <p class="text-sm text-neutral-400 mb-6 flex-1">Achieve a 10% increase in your 1RM Squat weight within 60 days.</p>
+                
+                <div class="space-y-4 mb-6">
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center gap-2 text-neutral-400">
+                            <i data-lucide="users" class="w-4 h-4"></i>
+                            <span>89 Participants</span>
+                        </div>
+                        <span class="text-amber-400 font-bold flex items-center gap-1">
+                            <i data-lucide="gift" class="w-3.5 h-3.5"></i>
+                            Supplements Pack
+                        </span>
+                    </div>
+                </div>
+
+                <button class="btn-secondary w-full rounded-xl flex items-center justify-center gap-2 font-bold text-sm">
+                    VIEW PROGRESS
+                </button>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="crystal-card p-6 flex flex-col h-full opacity-80">
+                <div class="flex justify-between items-start mb-6">
+                    <div class="w-14 h-14 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
+                        <i data-lucide="calendar-days" class="w-7 h-7"></i>
+                    </div>
+                    <div class="bg-blue-500/20 px-3 py-1 rounded-full text-[10px] font-bold mono text-blue-300 border border-blue-500/30 uppercase">
+                        Coming Soon
+                    </div>
+                </div>
+                <h3 class="text-xl font-bold mb-2 flex items-center gap-2">
+                    Perfect Streak 📅
+                </h3>
+                <p class="text-sm text-neutral-400 mb-6 flex-1">Complete 20 workouts in 20 days. No rest days allowed for this sprint.</p>
+                
+                <div class="space-y-4 mb-6">
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center gap-2 text-neutral-400">
+                            <i data-lucide="users" class="w-4 h-4"></i>
+                            <span>-- Participants</span>
+                        </div>
+                        <span class="text-amber-400 font-bold flex items-center gap-1">
+                            <i data-lucide="award" class="w-3.5 h-3.5"></i>
+                            Legendary Status
+                        </span>
+                    </div>
+                </div>
+
+                <button class="h-12 w-full rounded-xl flex items-center justify-center gap-2 font-bold text-sm bg-white/5 border border-white/10 text-neutral-500 cursor-not-allowed">
+                    OPENS IN 4 DAYS
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Fixed Bottom Nav Placeholder -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 bg-black/80 backdrop-blur-xl border-t border-white/10 z-50">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex gap-10">
+                <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-neutral-300 transition-colors">
+                    <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                    <span class="text-[9px] font-bold uppercase tracking-widest">Dash</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-primary">
+                    <i data-lucide="swords" class="w-6 h-6"></i>
+                    <span class="text-[9px] font-bold uppercase tracking-widest">Arena</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-neutral-300 transition-colors">
+                    <i data-lucide="bar-chart-2" class="w-6 h-6"></i>
+                    <span class="text-[9px] font-bold uppercase tracking-widest">Stats</span>
+                </button>
+            </div>
+            
+            <button class="btn-primary flex items-center gap-2 px-6 rounded-2xl font-bold shadow-2xl">
+                <i data-lucide="plus" class="w-5 h-5"></i>
+                <span class="hidden sm:block">QUICK LOG</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Reveal cards on scroll
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
+
+        // Simple haptic feedback simulation
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

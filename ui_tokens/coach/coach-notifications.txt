@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Command Center | Notifications</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #070707;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --thermal-red: rgba(239, 68, 68, 0.15);
+            --thermal-blue: rgba(59, 130, 246, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Pulsing Thermal Vitreous Background */
+        .thermal-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 80% 20%, var(--thermal-red) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, var(--thermal-blue) 0%, transparent 40%);
+            z-index: -1;
+            filter: blur(60px);
+            animation: thermal-pulse 10s infinite alternate ease-in-out;
+        }
+
+        @keyframes thermal-pulse {
+            0% { transform: scale(1) translate(0, 0); }
+            100% { transform: scale(1.1) translate(2%, 2%); }
+        }
+
+        /* Vitreous Card Styling */
+        .vitreous-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(150%);
+            border: 1px solid var(--glass-border);
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .vitreous-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.06);
+            transform: translateY(-2px);
+        }
+
+        /* Unread indicator pulse */
+        .unread-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--secondary);
+            border-radius: 50%;
+            box-shadow: 0 0 12px var(--secondary);
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        /* Sticky Filter Bar */
+        .filter-tab {
+            position: relative;
+            padding: 8px 16px;
+            color: #9ca3af;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .filter-tab.active {
+            color: #ffffff;
+        }
+
+        .filter-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 2px;
+            background: var(--primary);
+            border-radius: 2px;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        /* Thermal Icon Container */
+        .icon-box {
+            position: relative;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .icon-box::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: currentColor;
+            opacity: 0.1;
+        }
+
+        /* Layout Helpers */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .btn-action {
+            height: 40px;
+            padding: 0 16px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn-action:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.2);
+        }
+    </style>
+</head>
+<body class="safe-area-inset">
+    <div class="thermal-bg"></div>
+
+    <main class="max-w-2xl mx-auto min-h-screen flex flex-col">
+        
+        <!-- Header Section -->
+        <header class="p-6 pb-4 flex items-center justify-between sticky top-0 z-20 bg-[#070707]/60 backdrop-blur-md">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">Command Center</h1>
+                <p class="text-sm text-neutral-400 mt-0.5">Manage your client velocity</p>
+            </div>
+            <button class="btn-action flex items-center gap-2 text-neutral-300 hover:text-white" onclick="markAllRead()">
+                <i data-lucide="check-check" class="w-4 h-4"></i>
+                Mark all read
+            </button>
+        </header>
+
+        <!-- Filter Bar -->
+        <div class="px-6 mb-4 sticky top-[88px] z-20 bg-[#070707]/60 backdrop-blur-md border-b border-white/5">
+            <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar py-2">
+                <button class="filter-tab active">All</button>
+                <button class="filter-tab">Unread</button>
+                <button class="filter-tab">Sessions</button>
+                <button class="filter-tab">Workouts</button>
+                <button class="filter-tab">Messages</button>
+            </div>
+        </div>
+
+        <!-- Notification List -->
+        <section class="flex-1 px-4 space-y-3 pb-24" id="notification-list">
+            
+            <!-- Type: Workout Completion -->
+            <div class="vitreous-card p-4 rounded-2xl flex items-start gap-4 cursor-pointer relative group">
+                <div class="icon-box text-emerald-400">
+                    <i data-lucide="zap" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-bold uppercase tracking-widest text-emerald-500/80 mono">Workout Complete</span>
+                        <span class="text-[11px] text-neutral-500 mono">2m ago</span>
+                    </div>
+                    <p class="text-[15px] font-medium text-neutral-100">
+                        <span class="text-white font-bold">Sarah Jenkins</span> finished "Hypertrophy Upper A"
+                    </p>
+                    <p class="text-sm text-neutral-400 mt-1 line-clamp-1">Achieved 3 new PRs in Squat and Bench Press.</p>
+                </div>
+                <div class="unread-dot mt-2"></div>
+            </div>
+
+            <!-- Type: New Message -->
+            <div class="vitreous-card p-4 rounded-2xl flex items-start gap-4 cursor-pointer relative group">
+                <div class="icon-box text-blue-400">
+                    <i data-lucide="message-square" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-bold uppercase tracking-widest text-blue-500/80 mono">New Message</span>
+                        <span class="text-[11px] text-neutral-500 mono">14m ago</span>
+                    </div>
+                    <p class="text-[15px] font-medium text-neutral-100">
+                        <span class="text-white font-bold">Marcus Chen</span> sent a message
+                    </p>
+                    <p class="text-sm text-neutral-400 mt-1 italic">"Hey coach, I'm feeling a bit of strain in my left knee during..."</p>
+                </div>
+                <div class="unread-dot mt-2"></div>
+            </div>
+
+            <!-- Type: Session Cancelled -->
+            <div class="vitreous-card p-4 rounded-2xl flex items-start gap-4 cursor-pointer opacity-70 grayscale-[0.5]">
+                <div class="icon-box text-red-400">
+                    <i data-lucide="calendar-x" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-bold uppercase tracking-widest text-red-500/80 mono">Cancellation</span>
+                        <span class="text-[11px] text-neutral-500 mono">1h ago</span>
+                    </div>
+                    <p class="text-[15px] font-medium text-neutral-300">
+                        <span class="text-neutral-100 font-bold">Alex Rivera</span> cancelled 1:1 Session
+                    </p>
+                    <p class="text-sm text-neutral-500 mt-1">Scheduled for tomorrow at 10:00 AM.</p>
+                </div>
+            </div>
+
+            <!-- Type: Milestone Achievement -->
+            <div class="vitreous-card p-4 rounded-2xl flex items-start gap-4 cursor-pointer group">
+                <div class="icon-box text-amber-400">
+                    <i data-lucide="award" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-bold uppercase tracking-widest text-amber-500/80 mono">Client Milestone</span>
+                        <span class="text-[11px] text-neutral-500 mono">3h ago</span>
+                    </div>
+                    <p class="text-[15px] font-medium text-neutral-100">
+                        <span class="text-white font-bold">Emma Wilson</span> reached 50 workouts!
+                    </p>
+                    <p class="text-sm text-neutral-400 mt-1">Consistency rating: 98% this month.</p>
+                </div>
+            </div>
+
+            <!-- Empty State Loader Placeholder -->
+            <div class="py-12 flex flex-col items-center justify-center opacity-20">
+                <div class="w-12 h-12 border-2 border-dashed border-white rounded-full animate-spin-slow mb-4"></div>
+                <span class="text-sm mono tracking-tighter uppercase">Scanning encrypted feeds...</span>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Navigation Guard -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 z-50">
+        <div class="max-w-md mx-auto h-16 vitreous-card rounded-2xl flex items-center justify-around px-6 border-white/10 shadow-2xl">
+            <button class="p-2 text-neutral-500"><i data-lucide="layout-grid" class="w-6 h-6"></i></button>
+            <button class="p-2 text-neutral-500"><i data-lucide="users" class="w-6 h-6"></i></button>
+            <button class="p-2 text-primary relative">
+                <i data-lucide="bell" class="w-6 h-6"></i>
+                <span class="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full"></span>
+            </button>
+            <button class="p-2 text-neutral-500"><i data-lucide="bar-chart-2" class="w-6 h-6"></i></button>
+            <button class="p-2 text-neutral-500"><i data-lucide="settings" class="w-6 h-6"></i></button>
+        </div>
+    </nav>
+
+    <script>
+        lucide.createIcons();
+
+        // Simulate Mark All Read
+        function markAllRead() {
+            const dots = document.querySelectorAll('.unread-dot');
+            dots.forEach(dot => {
+                dot.style.transition = 'all 0.5s ease';
+                dot.style.opacity = '0';
+                dot.style.transform = 'scale(0)';
+                setTimeout(() => dot.remove(), 500);
+            });
+            
+            const cards = document.querySelectorAll('.vitreous-card');
+            cards.forEach(card => {
+                card.style.opacity = '0.7';
+            });
+        }
+
+        // Tab Switching Logic
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Add feedback haptic if mobile
+                if (window.navigator.vibrate) window.navigator.vibrate(5);
+            });
+        });
+
+        // Entrance Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const items = document.querySelectorAll('.vitreous-card');
+            items.forEach((item, index) => {
+                item.style.opacity = '0';
+                item.style.transform = 'translateY(10px)';
+                setTimeout(() => {
+                    item.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    item.style.opacity = '1';
+                    item.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+    </script>
+</body>
+</html>

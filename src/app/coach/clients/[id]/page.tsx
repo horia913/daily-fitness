@@ -348,7 +348,7 @@ function ClientDetailContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+      <div className="relative z-10 mx-auto w-full max-w-6xl fc-page flex flex-col" style={{ gap: "var(--fc-gap-sections)" }}>
         <Link href="/coach/clients" className="inline-flex">
           <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
             <ArrowLeft className="w-4 h-4 mr-2" />

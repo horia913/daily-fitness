@@ -14,8 +14,9 @@ import { LargeInput } from "../ui/LargeInput";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { useLoggingReset } from "../hooks/useLoggingReset";
+import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
+import { getCoachSuggestedWeight } from "@/lib/weightDefaultService";
 
 export function PreExhaustionExecutor({
   block,
@@ -37,6 +38,7 @@ export function PreExhaustionExecutor({
   onAlternativesClick,
   onRestTimerClick,
   onSetComplete,
+  onLastSetLoggedForRest,
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const isolationExercise = block.block.exercises?.[0];
@@ -254,8 +256,16 @@ export function PreExhaustionExecutor({
           duration: 2000,
         });
 
-        // Update parent with new completed sets count
         const newCompletedSets = completedSets + 1;
+        if (newCompletedSets < totalSets) {
+          onLastSetLoggedForRest?.({
+            weight: compoundWeightNum,
+            reps: compoundRepsNum,
+            setNumber: newCompletedSets,
+            totalSets,
+            isPr: result?.isNewPR,
+          });
+        }
         onSetComplete?.(newCompletedSets);
 
         // Complete block if last set
@@ -310,9 +320,9 @@ export function PreExhaustionExecutor({
   const loggingInputs = (
     <div className="space-y-4">
       {/* Isolation Exercise */}
-      <GlassCard elevation={1} className="p-4">
+      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
         <div className="mb-4">
-          <h4 className="font-semibold text-blue-800 dark:text-blue-200 text-lg">
+          <h4 className="font-semibold text-lg" style={{ color: "var(--fc-accent-cyan)" }}>
             Isolation:{" "}
             {isolationExercise?.exercise?.name || "Isolation Exercise"}
           </h4>
@@ -325,16 +335,31 @@ export function PreExhaustionExecutor({
           )}
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <LargeInput
-            label="Weight"
-            value={isolationWeight}
-            onChange={setIsolationWeight}
-            placeholder="0"
-            step="0.5"
-            unit="kg"
-            showStepper
-            stepAmount={2.5}
-          />
+          <div className="space-y-2">
+            <LargeInput
+              label="Weight"
+              value={isolationWeight}
+              onChange={setIsolationWeight}
+              placeholder="0"
+              step="0.5"
+              unit="kg"
+              showStepper
+              stepAmount={2.5}
+            />
+            {isolationExercise?.load_percentage != null && (() => {
+              const suggested = calculateSuggestedWeightUtil(
+                isolationExercise.exercise_id,
+                isolationExercise.load_percentage,
+                e1rmMap
+              );
+              return suggested != null && suggested > 0 ? (
+                <ApplySuggestedWeightButton
+                  suggestedKg={Math.round(suggested * 2) / 2}
+                  onApply={() => setIsolationWeight(String(suggested))}
+                />
+              ) : null;
+            })()}
+          </div>
           <LargeInput
             label="Reps"
             value={isolationReps}
@@ -345,24 +370,24 @@ export function PreExhaustionExecutor({
             stepAmount={1}
           />
         </div>
-      </GlassCard>
+      </div>
 
       {/* Timer */}
       {showTimer && (
-        <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-6 border border-orange-200 dark:border-orange-700 text-center">
-          <div className="text-4xl font-bold text-orange-600 dark:text-orange-400 mb-2">
+        <div className="rounded-xl p-5 text-center" style={{ background: "color-mix(in srgb, var(--fc-status-warning) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-status-warning) 25%, transparent)" }}>
+          <div className="text-4xl font-bold mb-2" style={{ color: "var(--fc-status-warning)" }}>
             {formatTime(timerSeconds)}
           </div>
-          <div className="text-sm text-orange-700 dark:text-orange-300">
+          <div className="text-sm fc-text-dim">
             Rest Between Exercises
           </div>
         </div>
       )}
 
       {/* Compound Exercise */}
-      <GlassCard elevation={1} className="p-4">
+      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
         <div className="mb-4">
-          <h4 className="font-semibold text-purple-800 dark:text-purple-200 text-lg">
+          <h4 className="font-semibold text-lg" style={{ color: "var(--fc-accent-purple)" }}>
             Compound: {compoundExercise?.exercise?.name || "Compound Exercise"}
           </h4>
           {compoundExercise && (
@@ -374,16 +399,30 @@ export function PreExhaustionExecutor({
           )}
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <LargeInput
-            label="Weight"
-            value={compoundWeight}
-            onChange={setCompoundWeight}
-            placeholder="0"
-            step="0.5"
-            unit="kg"
-            showStepper
-            stepAmount={2.5}
-          />
+          <div className="space-y-2">
+            <LargeInput
+              label="Weight"
+              value={compoundWeight}
+              onChange={setCompoundWeight}
+              placeholder="0"
+              step="0.5"
+              unit="kg"
+              showStepper
+              stepAmount={2.5}
+            />
+            {(() => {
+              const coachSuggested = getCoachSuggestedWeight(
+                compoundExercise?.load_percentage,
+                compoundExercise?.exercise_id ? (e1rmMap[compoundExercise.exercise_id] ?? null) : null
+              );
+              return coachSuggested != null && coachSuggested > 0 ? (
+                <ApplySuggestedWeightButton
+                  suggestedKg={coachSuggested}
+                  onApply={() => setCompoundWeight(String(coachSuggested))}
+                />
+              ) : null;
+            })()}
+          </div>
           <LargeInput
             label="Reps"
             value={compoundReps}
@@ -394,7 +433,7 @@ export function PreExhaustionExecutor({
             stepAmount={1}
           />
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 
@@ -402,7 +441,8 @@ export function PreExhaustionExecutor({
     <Button
       onClick={handleLog}
       disabled={isLoggingSet}
-      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg py-4"
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <Target className="w-5 h-5 mr-2" />
       {isLoggingSet ? "Logging..." : "LOG PRE-EXHAUSTION SET"}

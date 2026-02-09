@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coach Analytics | Molten Kinetic Forge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --bg-dark: #0A0A0A;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --molten-glow: rgba(239, 68, 68, 0.2);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+            min-height: 100vh;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Molten Glass Effects */
+        .crystal-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            position: relative;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.4s ease;
+        }
+
+        .crystal-card:hover {
+            border-color: rgba(239, 68, 68, 0.3);
+            transform: translateY(-4px);
+        }
+
+        .molten-glow-container::before {
+            content: '';
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, var(--molten-glow) 0%, transparent 70%);
+            filter: blur(40px);
+            z-index: -1;
+            animation: float 8s infinite alternate ease-in-out;
+        }
+
+        @keyframes float {
+            0% { transform: translate(-20%, -20%); }
+            100% { transform: translate(40%, 40%); }
+        }
+
+        /* Kinetic Motion */
+        .btn-primary {
+            height: 52px;
+            background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%);
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-primary:hover { 
+            box-shadow: 0 8px 30px rgba(239, 68, 68, 0.4); 
+            filter: brightness(1.1);
+        }
+
+        .btn-secondary {
+            height: 52px;
+            background: rgba(59, 130, 246, 0.08);
+            border: 1.5px solid rgba(59, 130, 246, 0.3);
+            color: #60A5FA;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover { background: rgba(59, 130, 246, 0.15); color: #93C5FD; }
+
+        /* Progress Elements */
+        .progress-fill {
+            transition: width 1.5s cubic-bezier(0.65, 0, 0.35, 1);
+        }
+
+        .active-tab {
+            background: rgba(239, 68, 68, 0.15);
+            color: #EF4444;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.1);
+        }
+
+        .text-h1 { font-size: 32px; line-height: 1.2; font-weight: 800; }
+        .text-h2 { font-size: 22px; line-height: 1.3; font-weight: 700; }
+        .text-caption { font-size: 14px; font-weight: 500; letter-spacing: 0.025em; }
+
+        .forge-grid {
+            background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 32px 32px;
+        }
+
+        /* Chart Mockups */
+        .chart-bar {
+            transition: height 1s ease-out;
+            border-radius: 6px 6px 2px 2px;
+        }
+
+        .pulse-accent {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .6; }
+        }
+
+        /* Navigation Floating Zone */
+        .nav-blur {
+            background: rgba(10, 10, 10, 0.7);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--glass-border);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 forge-grid pb-32">
+    <!-- Molten Background Elements -->
+    <div class="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-900/10 rounded-full blur-[120px] pointer-events-none"></div>
+    <div class="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-900/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+    <header class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+        <div>
+            <h1 class="text-h1 tracking-tight">Coach Analytics</h1>
+            <p class="text-neutral-400 mt-2 text-sm flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-accent pulse-accent"></span>
+                System synchronization complete. Live data.
+            </p>
+        </div>
+        <button class="btn-primary w-full md:w-auto px-8 rounded-2xl flex items-center justify-center gap-3 font-bold group">
+            <i data-lucide="download" class="w-5 h-5 group-hover:translate-y-0.5 transition-transform"></i>
+            Export Report
+        </button>
+    </header>
+
+    <!-- Time Range Selector -->
+    <section class="max-w-7xl mx-auto mb-10 overflow-x-auto">
+        <div class="flex p-1.5 bg-white/5 rounded-2xl w-fit whitespace-nowrap border border-white/5">
+            <button class="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-white/5">This Week</button>
+            <button class="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all active-tab">This Month</button>
+            <button class="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-white/5">This Quarter</button>
+            <button class="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-white/5">All Time</button>
+        </div>
+    </section>
+
+    <!-- Key Metrics Grid -->
+    <main class="max-w-7xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <!-- Active Clients -->
+            <div class="crystal-card p-6 flex flex-col justify-between h-48">
+                <div class="flex justify-between items-start">
+                    <div class="p-3 bg-accent/10 rounded-2xl text-accent border border-accent/20">
+                        <i data-lucide="users" class="w-6 h-6"></i>
+                    </div>
+                    <span class="text-accent text-sm font-bold mono bg-accent/10 px-2 py-1 rounded">+12% ↑</span>
+                </div>
+                <div>
+                    <div class="text-neutral-400 text-sm font-medium mb-1">Active Clients</div>
+                    <div class="text-4xl font-bold tracking-tight">142</div>
+                </div>
+            </div>
+
+            <!-- Compliance Ring -->
+            <div class="crystal-card p-6 flex items-center gap-6 h-48">
+                <div class="relative w-24 h-24 flex-shrink-0">
+                    <svg viewBox="0 0 100 100" class="w-full h-full transform -rotate-90">
+                        <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="10"></circle>
+                        <circle cx="50" cy="50" r="42" fill="none" stroke="url(#blueGrad)" stroke-width="10" stroke-dasharray="264" stroke-dashoffset="45" stroke-linecap="round" class="progress-fill"></circle>
+                        <defs>
+                            <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#3B82F6" />
+                                <stop offset="100%" style="stop-color:#1D4ED8" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-lg font-bold">83%</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="text-neutral-400 text-sm font-medium mb-1">Compliance</div>
+                    <div class="text-xl font-bold">Excellent</div>
+                    <p class="text-xs text-neutral-500 mt-1 leading-tight">Goal: 90% Avg</p>
+                </div>
+            </div>
+
+            <!-- Sessions Conducted -->
+            <div class="crystal-card p-6 flex flex-col justify-between h-48">
+                <div class="flex justify-between items-start">
+                    <div class="p-3 bg-blue-500/10 rounded-2xl text-blue-400 border border-blue-500/20">
+                        <i data-lucide="calendar-check" class="w-6 h-6"></i>
+                    </div>
+                    <span class="text-blue-400 text-sm font-bold mono">42 Weekly</span>
+                </div>
+                <div>
+                    <div class="text-neutral-400 text-sm font-medium mb-1">Total Sessions</div>
+                    <div class="text-4xl font-bold tracking-tight">842</div>
+                </div>
+            </div>
+
+            <!-- Workouts Assigned -->
+            <div class="crystal-card p-6 flex flex-col justify-between h-48">
+                <div class="flex justify-between items-start">
+                    <div class="p-3 bg-red-500/10 rounded-2xl text-red-400 border border-red-500/20">
+                        <i data-lucide="dumbbell" class="w-6 h-6"></i>
+                    </div>
+                    <span class="text-red-400 text-sm font-bold mono bg-red-500/10 px-2 py-1 rounded">HOT</span>
+                </div>
+                <div>
+                    <div class="text-neutral-400 text-sm font-medium mb-1">Workouts Logged</div>
+                    <div class="text-4xl font-bold tracking-tight">3.1k</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+            <!-- Retention Line Chart Mockup -->
+            <div class="lg:col-span-2 crystal-card p-8">
+                <div class="flex justify-between items-center mb-10">
+                    <h2 class="text-h2">Client Retention Over Time</h2>
+                    <div class="flex gap-4">
+                        <div class="flex items-center gap-2 text-sm text-neutral-400">
+                            <span class="w-3 h-3 rounded-full bg-blue-500"></span> Pro Plan
+                        </div>
+                        <div class="flex items-center gap-2 text-sm text-neutral-400">
+                            <span class="w-3 h-3 rounded-full bg-red-500"></span> Elite Plan
+                        </div>
+                    </div>
+                </div>
+                <div class="h-64 relative flex items-end justify-between px-2 group">
+                    <!-- Fake Line Path -->
+                    <svg class="absolute inset-0 w-full h-full preserve-3d" preserveAspectRatio="none">
+                        <path d="M0 180 Q 150 120 300 150 T 600 80 T 900 40 T 1200 60" fill="none" stroke="rgba(59,130,246,0.5)" stroke-width="4" stroke-linecap="round"></path>
+                        <path d="M0 200 Q 150 180 300 210 T 600 140 T 900 120 T 1200 130" fill="none" stroke="rgba(239,68,68,0.5)" stroke-width="4" stroke-linecap="round"></path>
+                    </svg>
+                    <!-- Interaction zones -->
+                    <div class="flex-1 h-full border-r border-white/5 relative group/col">
+                        <div class="absolute bottom-[-32px] left-1/2 -translate-x-1/2 text-sm text-neutral-500 font-medium">Jan</div>
+                    </div>
+                    <div class="flex-1 h-full border-r border-white/5 relative group/col">
+                        <div class="absolute bottom-[-32px] left-1/2 -translate-x-1/2 text-sm text-neutral-500 font-medium">Feb</div>
+                    </div>
+                    <div class="flex-1 h-full border-r border-white/5 relative group/col">
+                        <div class="absolute bottom-[-32px] left-1/2 -translate-x-1/2 text-sm text-neutral-500 font-medium">Mar</div>
+                    </div>
+                    <div class="flex-1 h-full border-r border-white/5 relative group/col">
+                        <div class="absolute bottom-[-32px] left-1/2 -translate-x-1/2 text-sm text-neutral-500 font-medium">Apr</div>
+                    </div>
+                    <div class="flex-1 h-full border-r border-white/5 relative group/col">
+                        <div class="absolute bottom-[-32px] left-1/2 -translate-x-1/2 text-sm text-neutral-500 font-medium">May</div>
+                    </div>
+                    <div class="flex-1 h-full relative group/col">
+                        <div class="absolute bottom-[-32px] left-1/2 -translate-x-1/2 text-sm text-white font-bold">Jun</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Goal Distribution Pie/Donut -->
+            <div class="crystal-card p-8 flex flex-col">
+                <h2 class="text-h2 mb-10">Client Focus</h2>
+                <div class="relative w-48 h-48 mx-auto mb-10">
+                    <svg viewBox="0 0 100 100" class="w-full h-full">
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#EF4444" stroke-width="20" stroke-dasharray="60 190" stroke-dashoffset="0"></circle>
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#3B82F6" stroke-width="20" stroke-dasharray="80 170" stroke-dashoffset="-60"></circle>
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#10B981" stroke-width="20" stroke-dasharray="110 140" stroke-dashoffset="-140"></circle>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span class="text-2xl font-bold tracking-tighter">142</span>
+                        <span class="text-[10px] uppercase text-neutral-500 font-bold tracking-widest">Total</span>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="w-3 h-3 rounded-sm bg-accent"></div>
+                            <span class="text-sm font-medium">Hypertrophy</span>
+                        </div>
+                        <span class="text-sm mono font-bold">44%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="w-3 h-3 rounded-sm bg-secondary"></div>
+                            <span class="text-sm font-medium">Fat Loss</span>
+                        </div>
+                        <span class="text-sm mono font-bold">32%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="w-3 h-3 rounded-sm bg-primary"></div>
+                            <span class="text-sm font-medium">Powerlifting</span>
+                        </div>
+                        <span class="text-sm mono font-bold">24%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard & Session Chart -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+            <!-- Session Count Bar Chart -->
+            <div class="crystal-card p-8">
+                <h2 class="text-h2 mb-10">Weekly Session Load</h2>
+                <div class="flex items-end justify-between h-48 gap-3">
+                    <div class="flex-1 group relative">
+                        <div class="w-full bg-white/5 rounded-lg h-32 group-hover:bg-red-500/20 transition-all chart-bar flex items-end overflow-hidden">
+                            <div class="w-full bg-red-500/40 h-[60%]"></div>
+                        </div>
+                        <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-sm text-neutral-500">Mon</span>
+                    </div>
+                    <div class="flex-1 group relative">
+                        <div class="w-full bg-white/5 rounded-lg h-40 group-hover:bg-red-500/20 transition-all chart-bar flex items-end overflow-hidden">
+                            <div class="w-full bg-red-500/40 h-[85%]"></div>
+                        </div>
+                        <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-sm text-neutral-500">Tue</span>
+                    </div>
+                    <div class="flex-1 group relative">
+                        <div class="w-full bg-white/5 rounded-lg h-44 group-hover:bg-red-500/20 transition-all chart-bar flex items-end overflow-hidden border-2 border-red-500/50">
+                            <div class="w-full bg-red-500/80 h-[95%]"></div>
+                        </div>
+                        <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-sm text-red-400 font-bold">Wed</span>
+                    </div>
+                    <div class="flex-1 group relative">
+                        <div class="w-full bg-white/5 rounded-lg h-32 group-hover:bg-red-500/20 transition-all chart-bar flex items-end overflow-hidden">
+                            <div class="w-full bg-red-500/40 h-[50%]"></div>
+                        </div>
+                        <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-sm text-neutral-500">Thu</span>
+                    </div>
+                    <div class="flex-1 group relative">
+                        <div class="w-full bg-white/5 rounded-lg h-36 group-hover:bg-red-500/20 transition-all chart-bar flex items-end overflow-hidden">
+                            <div class="w-full bg-red-500/40 h-[70%]"></div>
+                        </div>
+                        <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-sm text-neutral-500">Fri</span>
+                    </div>
+                    <div class="flex-1 group relative">
+                        <div class="w-full bg-white/5 rounded-lg h-24 group-hover:bg-red-500/20 transition-all chart-bar flex items-end overflow-hidden">
+                            <div class="w-full bg-red-500/40 h-[30%]"></div>
+                        </div>
+                        <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-sm text-neutral-500">Sat</span>
+                    </div>
+                    <div class="flex-1 group relative">
+                        <div class="w-full bg-white/5 rounded-lg h-16 group-hover:bg-red-500/20 transition-all chart-bar flex items-end overflow-hidden">
+                            <div class="w-full bg-red-500/40 h-[10%]"></div>
+                        </div>
+                        <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-sm text-neutral-500">Sun</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Performing Clients -->
+            <div class="crystal-card p-8">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-h2">Top Performing Clients</h2>
+                    <button class="text-sm text-neutral-400 hover:text-white underline">View All</button>
+                </div>
+                <div class="space-y-5">
+                    <!-- Client 1 -->
+                    <div class="flex items-center justify-between group cursor-pointer p-2 -m-2 rounded-2xl hover:bg-white/5 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="relative">
+                                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Erik" class="w-12 h-12 rounded-full bg-neutral-800 border-2 border-white/10" alt="Client">
+                                <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center text-[10px] text-black font-black">1</div>
+                            </div>
+                            <div>
+                                <div class="font-bold group-hover:text-red-400 transition-colors">Erik Magnussen</div>
+                                <div class="text-caption text-neutral-500 uppercase tracking-widest">Strength • 98% Score</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-accent font-bold mono">+5.2kg</div>
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold">1RM Gain</div>
+                        </div>
+                    </div>
+
+                    <!-- Client 2 -->
+                    <div class="flex items-center justify-between group cursor-pointer p-2 -m-2 rounded-2xl hover:bg-white/5 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="relative">
+                                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" class="w-12 h-12 rounded-full bg-neutral-800 border-2 border-white/10" alt="Client">
+                                <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-neutral-400 rounded-full flex items-center justify-center text-[10px] text-black font-black">2</div>
+                            </div>
+                            <div>
+                                <div class="font-bold group-hover:text-red-400 transition-colors">Sarah Jenkins</div>
+                                <div class="text-caption text-neutral-500 uppercase tracking-widest">Endurance • 94% Score</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-accent font-bold mono">-2.4kg</div>
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold">Body Fat</div>
+                        </div>
+                    </div>
+
+                    <!-- Client 3 -->
+                    <div class="flex items-center justify-between group cursor-pointer p-2 -m-2 rounded-2xl hover:bg-white/5 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="relative">
+                                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" class="w-12 h-12 rounded-full bg-neutral-800 border-2 border-white/10" alt="Client">
+                                <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-orange-700 rounded-full flex items-center justify-center text-[10px] text-black font-black">3</div>
+                            </div>
+                            <div>
+                                <div class="font-bold group-hover:text-red-400 transition-colors">Marcus Thorne</div>
+                                <div class="text-caption text-neutral-500 uppercase tracking-widest">Hypertrophy • 91% Score</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-accent font-bold mono">+12%</div>
+                            <div class="text-[10px] text-neutral-500 uppercase font-bold">Volume Growth</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Navigation Area -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 nav-blur z-50">
+        <div class="max-w-screen-xl mx-auto flex items-center justify-between gap-4">
+            <div class="flex flex-1 justify-around md:justify-start md:gap-16">
+                <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                    <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Dashboard</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                    <i data-lucide="users-2" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Clients</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-red-500">
+                    <i data-lucide="bar-chart-big" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Analytics</span>
+                </button>
+                <button class="flex flex-col items-center gap-1 text-neutral-500 hover:text-white transition-colors">
+                    <i data-lucide="settings" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Settings</span>
+                </button>
+            </div>
+            
+            <button class="btn-primary w-14 h-14 md:w-auto md:px-8 rounded-2xl flex items-center justify-center gap-2 shadow-2xl">
+                <i data-lucide="plus" class="w-6 h-6"></i>
+                <span class="hidden md:block font-bold">Assign New</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // Initialize Lucide
+        lucide.createIcons();
+
+        // Staggered Entry Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.crystal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(30px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, 100 * index);
+            });
+        });
+
+        // Haptic feedback
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.navigator.vibrate) {
+                    window.navigator.vibrate(15);
+                }
+            });
+        });
+
+        // Tab Switching Logic
+        const tabs = document.querySelectorAll('section button');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active-tab'));
+                tab.classList.add('active-tab');
+            });
+        });
+    </script>
+</body>
+</html>
+</html>

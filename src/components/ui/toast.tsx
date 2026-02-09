@@ -6,14 +6,18 @@ import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const toastVariants = cva(
-  'group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-xl border p-6 pr-8 shadow-lg transition-all',
+  'group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-xl border p-6 pr-8 shadow-lg transition-all backdrop-blur-[var(--fc-blur-card)]',
   {
     variants: {
       variant: {
-        default: 'border bg-background text-foreground',
-        destructive: 'destructive border-destructive bg-destructive text-destructive-foreground',
-        success: 'border-green-200 bg-green-50 text-green-800',
-        warning: 'border-yellow-200 bg-yellow-50 text-yellow-800',
+        default:
+          'bg-[var(--fc-glass-base)] border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)]',
+        destructive:
+          'bg-[color:color-mix(in_srgb,var(--fc-status-error)_12%,transparent)] border-[color:var(--fc-status-error)] text-[color:var(--fc-status-error)]',
+        success:
+          'bg-[color:color-mix(in_srgb,var(--fc-status-success)_15%,transparent)] border-[color:var(--fc-status-success)] text-[color:var(--fc-status-success)]',
+        warning:
+          'bg-[color:color-mix(in_srgb,var(--fc-status-warning)_15%,transparent)] border-[color:var(--fc-status-warning)] text-[color:var(--fc-status-warning)]',
       },
     },
     defaultVariants: {
@@ -41,13 +45,13 @@ const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
             <div className="text-sm font-semibold">{title}</div>
           )}
           {description && (
-            <div className="text-sm opacity-90">{description}</div>
+            <div className="text-sm text-[color:var(--fc-text-dim)]">{description}</div>
           )}
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="absolute right-2 top-2 rounded-lg p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100"
+            className="absolute right-2 top-2 rounded-lg p-1 fc-text-dim opacity-0 transition-opacity hover:fc-text-primary focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100"
           >
             <X className="h-4 w-4" />
           </button>

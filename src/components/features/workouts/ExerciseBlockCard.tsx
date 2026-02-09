@@ -556,7 +556,7 @@ export default function ExerciseBlockCard({
       draggable={draggable}
       onDragStart={(e) => draggable && onDragStart?.(e, exercise.id)}
       onDragEnd={draggable ? onDragEnd : undefined}
-      className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-3 sm:p-4 transition-all duration-200 fc-hover-rise w-full ${
+      className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-3 sm:p-5 transition-all duration-200 fc-hover-rise w-full ${
         draggable ? "cursor-move" : ""
       }`}
     >
@@ -739,7 +739,7 @@ export default function ExerciseBlockCard({
         </div>
       )}
 
-      {children && <div className="mt-4">{children}</div>}
+      {children && <div className="mt-5 pt-5 border-t border-[color:var(--fc-glass-border)]">{children}</div>}
     </div>
   );
 }

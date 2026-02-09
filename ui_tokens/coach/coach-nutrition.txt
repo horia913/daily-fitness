@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutrition Overview | Spectral Thermal Strata</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #EF4444;
+            --secondary: #3B82F6;
+            --accent: #10B981;
+            --warning: #F59E0B;
+            --bg-dark: #070708;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --thermal-hot: rgba(16, 185, 129, 0.15);
+            --thermal-cold: rgba(239, 68, 68, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #FFFFFF;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Spectral Refraction Background */
+        .refraction-container {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% -20%, #1e1e2e 0%, #070708 100%);
+        }
+
+        .spectral-blob {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            filter: blur(120px);
+            opacity: 0.15;
+            border-radius: 50%;
+            animation: move 20s infinite alternate;
+        }
+
+        @keyframes move {
+            from { transform: translate(-10%, -10%) scale(1); }
+            to { transform: translate(20%, 20%) scale(1.2); }
+        }
+
+        /* Thermal Strata Cards */
+        .thermal-card {
+            background: linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px) saturate(150%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .thermal-card:active {
+            transform: scale(0.98);
+            background: rgba(255,255,255,0.08);
+        }
+
+        .compliance-ring {
+            transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        /* Filter Tab System */
+        .filter-tab {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .filter-tab.active {
+            color: white;
+        }
+
+        .filter-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        /* Status Indicators */
+        .status-pill {
+            padding: 4px 12px;
+            border-radius: 100px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .status-green { background: rgba(16, 185, 129, 0.1); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .status-yellow { background: rgba(245, 158, 11, 0.1); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.2); }
+        .status-red { background: rgba(239, 68, 68, 0.1); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.2); }
+
+        .kinetic-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kinetic-shimmer::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -150%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            animation: shimmer 4s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { left: -150%; }
+            100% { left: 150%; }
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="refraction-container">
+        <div class="spectral-blob bg-blue-600 top-[-10%] left-[-10%]"></div>
+        <div class="spectral-blob bg-red-600 bottom-[-10%] right-[-10%]"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-8 max-w-2xl mx-auto">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight">Nutrition</h1>
+            <p class="text-neutral-400 text-sm">Client compliance overview</p>
+        </div>
+        <button class="w-12 h-12 rounded-2xl thermal-card flex items-center justify-center text-neutral-400 hover:text-white transition-colors">
+            <i data-lucide="search" class="w-5 h-5"></i>
+        </button>
+    </header>
+
+    <!-- Hero Compliance Summary -->
+    <section class="mb-10 max-w-2xl mx-auto">
+        <div class="thermal-card kinetic-shimmer p-8 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+                <div class="space-y-4">
+                    <div class="space-y-1">
+                        <span class="text-neutral-400 text-sm uppercase tracking-widest font-semibold">Daily Intake</span>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-5xl font-bold mono">23<span class="text-neutral-600">/</span>24</span>
+                            <span class="text-accent font-bold text-lg">+4%</span>
+                        </div>
+                    </div>
+                    <p class="text-neutral-300 text-sm leading-relaxed max-w-[180px]">
+                        Clients have logged their meals today. Excellent compliance.
+                    </p>
+                </div>
+                
+                <div class="relative w-32 h-32">
+                    <svg viewBox="0 0 100 100" class="w-full h-full">
+                        <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="10"></circle>
+                        <circle cx="50" cy="50" r="42" fill="none" stroke="url(#thermalGradient)" stroke-width="10" stroke-dasharray="264" stroke-dashoffset="10" stroke-linecap="round" class="compliance-ring"></circle>
+                        <defs>
+                            <linearGradient id="thermalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#10B981" />
+                                <stop offset="100%" style="stop-color:#3B82F6" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span class="text-xl font-bold mono">96%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Filter Sticky Bar -->
+    <div class="sticky top-4 z-40 mb-6 max-w-2xl mx-auto">
+        <div class="thermal-card p-1.5 flex gap-1 bg-black/40 backdrop-blur-xl">
+            <button class="filter-tab active flex-1 py-2.5 text-sm font-semibold text-neutral-400">All</button>
+            <button class="filter-tab flex-1 py-2.5 text-sm font-semibold text-neutral-400">Compliant</button>
+            <button class="filter-tab flex-1 py-2.5 text-sm font-semibold text-neutral-400">Alerts</button>
+        </div>
+    </div>
+
+    <!-- Client List -->
+    <main class="space-y-4 max-w-2xl mx-auto pb-24">
+        
+        <!-- Client Card 1 -->
+        <div class="thermal-card p-4 flex items-center gap-4 group cursor-pointer">
+            <div class="relative">
+                <div class="w-16 h-16 rounded-2xl overflow-hidden border border-white/10">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Felix" class="w-full h-full object-cover">
+                </div>
+                <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-accent border-4 border-[#070708] rounded-full"></div>
+            </div>
+            
+            <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-start mb-1">
+                    <h3 class="font-bold text-base truncate">Felix Henderson</h3>
+                    <span class="mono text-accent font-bold">92%</span>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div class="h-full bg-accent w-[92%] rounded-full"></div>
+                    </div>
+                    <span class="text-[11px] mono text-neutral-500 whitespace-nowrap">6/7 DAYS</span>
+                </div>
+            </div>
+            
+            <div class="text-right flex flex-col items-end gap-1">
+                <span class="status-pill status-green">Optimal</span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-600 group-hover:text-white transition-colors"></i>
+            </div>
+        </div>
+
+        <!-- Client Card 2 -->
+        <div class="thermal-card p-4 flex items-center gap-4 group cursor-pointer">
+            <div class="relative">
+                <div class="w-16 h-16 rounded-2xl overflow-hidden border border-white/10">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="Sarah" class="w-full h-full object-cover">
+                </div>
+                <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-warning border-4 border-[#070708] rounded-full"></div>
+            </div>
+            
+            <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-start mb-1">
+                    <h3 class="font-bold text-base truncate">Sarah Jenkins</h3>
+                    <span class="mono text-warning font-bold">74%</span>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div class="h-full bg-warning w-[74%] rounded-full"></div>
+                    </div>
+                    <span class="text-[11px] mono text-neutral-500 whitespace-nowrap">5/7 DAYS</span>
+                </div>
+            </div>
+            
+            <div class="text-right flex flex-col items-end gap-1">
+                <span class="status-pill status-yellow">Unstable</span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-600 group-hover:text-white transition-colors"></i>
+            </div>
+        </div>
+
+        <!-- Client Card 3 -->
+        <div class="thermal-card p-4 flex items-center gap-4 group cursor-pointer border-l-4 border-l-primary">
+            <div class="relative">
+                <div class="w-16 h-16 rounded-2xl overflow-hidden border border-white/10">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus" alt="Marcus" class="w-full h-full object-cover">
+                </div>
+                <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-primary border-4 border-[#070708] rounded-full"></div>
+            </div>
+            
+            <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-start mb-1">
+                    <h3 class="font-bold text-base truncate">Marcus Thorne</h3>
+                    <span class="mono text-primary font-bold">42%</span>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div class="h-full bg-primary w-[42%] rounded-full"></div>
+                    </div>
+                    <span class="text-[11px] mono text-neutral-500 whitespace-nowrap">3/7 DAYS</span>
+                </div>
+            </div>
+            
+            <div class="text-right flex flex-col items-end gap-1">
+                <span class="status-pill status-red">Critical</span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-600 group-hover:text-white transition-colors"></i>
+            </div>
+        </div>
+
+        <!-- Client Card 4 -->
+        <div class="thermal-card p-4 flex items-center gap-4 group cursor-pointer">
+            <div class="relative">
+                <div class="w-16 h-16 rounded-2xl overflow-hidden border border-white/10">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Elena" alt="Elena" class="w-full h-full object-cover">
+                </div>
+                <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-accent border-4 border-[#070708] rounded-full"></div>
+            </div>
+            
+            <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-start mb-1">
+                    <h3 class="font-bold text-base truncate">Elena Rodriguez</h3>
+                    <span class="mono text-accent font-bold">100%</span>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div class="h-full bg-accent w-[100%] rounded-full"></div>
+                    </div>
+                    <span class="text-[11px] mono text-neutral-500 whitespace-nowrap">7/7 DAYS</span>
+                </div>
+            </div>
+            
+            <div class="text-right flex flex-col items-end gap-1">
+                <span class="status-pill status-green">Perfect</span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-600 group-hover:text-white transition-colors"></i>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Nav -->
+    <nav class="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black to-transparent pointer-events-none">
+        <div class="max-w-md mx-auto thermal-card bg-black/80 p-2 flex justify-around items-center pointer-events-auto shadow-2xl">
+            <button class="p-3 text-neutral-500"><i data-lucide="layout-grid" class="w-6 h-6"></i></button>
+            <button class="p-3 text-neutral-500"><i data-lucide="users" class="w-6 h-6"></i></button>
+            <button class="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-500/20 translate-y-[-20px]">
+                <i data-lucide="plus" class="w-8 h-8"></i>
+            </button>
+            <button class="p-3 text-primary"><i data-lucide="utensils" class="w-6 h-6"></i></button>
+            <button class="p-3 text-neutral-500"><i data-lucide="settings" class="w-6 h-6"></i></button>
+        </div>
+    </nav>
+
+    <script>
+        lucide.createIcons();
+
+        // Staggered Entrance Animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.thermal-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 80);
+            });
+        });
+
+        // Tab Switching Logic
+        const tabs = document.querySelectorAll('.filter-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                if (window.navigator.vibrate) window.navigator.vibrate(5);
+            });
+        });
+
+        // Pull to refresh simulation
+        let touchStart = 0;
+        document.addEventListener('touchstart', e => touchStart = e.touches[0].pageY);
+        document.addEventListener('touchend', e => {
+            const touchEnd = e.changedTouches[0].pageY;
+            if (touchEnd - touchStart > 150 && window.scrollY === 0) {
+                location.reload();
+            }
+        });
+    </script>
+</body>
+</html>
