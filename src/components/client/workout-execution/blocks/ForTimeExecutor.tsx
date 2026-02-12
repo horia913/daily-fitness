@@ -2,7 +2,13 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Activity, CheckCircle, Play } from "lucide-react";
+import {
+  Activity,
+  CheckCircle,
+  Play,
+  MoreVertical,
+  Pencil,
+} from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
@@ -16,6 +22,8 @@ import { LoggedSet } from "@/types/workoutBlocks";
 import { supabase } from "@/lib/supabase";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
+import { fetchApi } from "@/lib/apiClient";
+import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 
 export function ForTimeExecutor({
   block,
@@ -38,7 +46,58 @@ export function ForTimeExecutor({
   onVideoClick,
   onAlternativesClick,
   onRestTimerClick,
+  allowSetEditDelete = false,
+  registerSetLogIdResolved,
+  onSetLogUpsert,
+  onSetEditSaved,
+  loggedSets,
 }: BaseBlockExecutorProps) {
+  /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
+  const loggedSetsList = loggedSets ?? [];
+
+  const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
+  const [editingSetId, setEditingSetId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{
+    weight: string;
+    reps: string;
+    set_number?: number;
+  } | null>(null);
+  const loggedSetsRef = useRef<LoggedSet[]>(loggedSetsList);
+  useEffect(() => {
+    loggedSetsRef.current = loggedSetsList;
+  }, [loggedSetsList]);
+  useEffect(() => {
+    if (!registerSetLogIdResolved) return;
+    registerSetLogIdResolved((set_log_id: string) => {
+      const list = loggedSetsRef.current;
+      const idx = list.findLastIndex((s) => s.id.startsWith("temp-"));
+      if (idx === -1) return;
+      const oldEntry = list[idx];
+      const newEntry = { ...oldEntry, id: set_log_id };
+      onSetLogUpsert?.(block.block.id, newEntry, { replaceId: oldEntry.id });
+    });
+    return () => {};
+  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  useEffect(() => {
+    if (viewingSetIndex > loggedSetsList.length)
+      setViewingSetIndex(loggedSetsList.length);
+  }, [loggedSetsList.length, viewingSetIndex]);
+  useEffect(() => {
+    if (viewingSetIndex >= 1) {
+      const entry =
+        loggedSetsList.find((s) => s.set_number === viewingSetIndex) ??
+        loggedSetsList[viewingSetIndex - 1];
+      if (entry) {
+        setWeight(String(entry.weight_kg ?? ""));
+        setReps(String(entry.reps_completed ?? ""));
+      }
+    }
+  }, [viewingSetIndex, loggedSetsList]);
+
+  const isViewingLoggedSet = viewingSetIndex >= 1;
+
   // DEBUG: Log data structure at component initialization
   const exercises = block.block.exercises || [];
   const effectiveIndex =
@@ -47,30 +106,35 @@ export function ForTimeExecutor({
       : 0;
   const currentExercise = exercises[effectiveIndex];
 
-  console.log('ForTimeExecutor DEBUG:', {
+  console.log("ForTimeExecutor DEBUG:", {
     blockId: block?.block?.id,
     blockType: block?.block?.block_type,
     currentExercise: currentExercise,
-    currentExerciseKeys: currentExercise ? Object.keys(currentExercise) : 'null',
+    currentExerciseKeys: currentExercise
+      ? Object.keys(currentExercise)
+      : "null",
     exercises: exercises,
     exercisesLength: exercises?.length || 0,
-    exercisesData: exercises?.map(ex => ({
+    exercisesData: exercises?.map((ex) => ({
       id: ex.id,
       exercise_id: ex.exercise_id,
       name: (ex as any).name || ex.exercise?.name,
-      keys: Object.keys(ex)
+      keys: Object.keys(ex),
     })),
-    allBlockData: block
+    allBlockData: block,
   });
 
   const { addToast } = useToast();
-  
+
   // Read from special table (time_protocols)
-  const timeProtocol = block.block.time_protocols?.find(
-    (tp: any) => tp.protocol_type === 'for_time' && 
-    (tp.exercise_id === currentExercise?.exercise_id || !currentExercise?.exercise_id)
-  ) || block.block.time_protocols?.[0];
-  
+  const timeProtocol =
+    block.block.time_protocols?.find(
+      (tp: any) =>
+        tp.protocol_type === "for_time" &&
+        (tp.exercise_id === currentExercise?.exercise_id ||
+          !currentExercise?.exercise_id),
+    ) || block.block.time_protocols?.[0];
+
   const timeCapMinutes = timeProtocol?.time_cap_minutes || 15;
   const targetReps = timeProtocol?.target_reps;
 
@@ -171,26 +235,39 @@ export function ForTimeExecutor({
   const [isWeightPristine, setIsWeightPristine] = useState(true);
 
   const exerciseId = currentExercise?.exercise_id ?? "";
-  const sessionStickyWeight = exerciseId ? lastPerformedWeightByExerciseId[exerciseId] ?? null : null;
-  const lastSessionWeightVal = exerciseId ? lastSessionWeightByExerciseId[exerciseId] ?? null : null;
+  const sessionStickyWeight = exerciseId
+    ? (lastPerformedWeightByExerciseId[exerciseId] ?? null)
+    : null;
+  const lastSessionWeightVal = exerciseId
+    ? (lastSessionWeightByExerciseId[exerciseId] ?? null)
+    : null;
   const loadPercentage = currentExercise?.load_percentage ?? null;
-  const e1rm = exerciseId ? e1rmMap[exerciseId] ?? null : null;
-  const { default_weight, suggested_weight, source } = getWeightDefaultAndSuggestion({
-    sessionStickyWeight: sessionStickyWeight ?? null,
-    lastSessionWeight: lastSessionWeightVal ?? null,
-    loadPercentage,
-    e1rm: e1rm ?? null,
-  });
+  const e1rm = exerciseId ? (e1rmMap[exerciseId] ?? null) : null;
+  const { default_weight, suggested_weight, source } =
+    getWeightDefaultAndSuggestion({
+      sessionStickyWeight: sessionStickyWeight ?? null,
+      lastSessionWeight: lastSessionWeightVal ?? null,
+      loadPercentage,
+      e1rm: e1rm ?? null,
+    });
 
   useEffect(() => {
     setIsWeightPristine(true);
   }, [currentExerciseIndex, exerciseId]);
 
   useEffect(() => {
+    if (isViewingLoggedSet) return;
     if (!isWeightPristine) return;
-    if (default_weight != null && default_weight > 0) setWeight(String(default_weight));
+    if (default_weight != null && default_weight > 0)
+      setWeight(String(default_weight));
     else setWeight("");
-  }, [isWeightPristine, default_weight, currentExerciseIndex, exerciseId]);
+  }, [
+    isViewingLoggedSet,
+    isWeightPristine,
+    default_weight,
+    currentExerciseIndex,
+    exerciseId,
+  ]);
 
   // Timer logic
   useEffect(() => {
@@ -237,10 +314,11 @@ export function ForTimeExecutor({
   }
 
   if (currentExercise?.load_percentage != null) {
-    const suggestedForDisplay = source === "percent_e1rm" ? suggested_weight : null;
+    const suggestedForDisplay =
+      source === "percent_e1rm" ? suggested_weight : null;
     const loadDisplay = formatLoadPercentage(
       currentExercise.load_percentage,
-      suggestedForDisplay
+      suggestedForDisplay,
     );
     if (loadDisplay) {
       blockDetails.push({
@@ -282,6 +360,92 @@ export function ForTimeExecutor({
     setStartTime(null);
   };
 
+  const handleEditSet = (setEntry: LoggedSet) => {
+    setEditingSetId(setEntry.id);
+    setEditDraft({
+      weight: String(setEntry.weight_kg ?? ""),
+      reps: String(setEntry.reps_completed ?? ""),
+      set_number: setEntry.set_number ?? 1,
+    });
+    setMenuOpenSetId(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSetId || !editDraft) return;
+    if (editingSetId.startsWith("temp-")) {
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[SAVE EDITS guard]", {
+          executor: "ForTimeExecutor",
+          blockTypeFromUI: block.block.block_type,
+          editingSetId,
+          isSavingEdit,
+          timestamp: Date.now(),
+        });
+      }
+      addToast({
+        title: "Set still saving, try again in a moment",
+        variant: "default",
+        duration: 2000,
+      });
+      return;
+    }
+    const weightNum =
+      editDraft.weight.trim() !== "" ? parseFloat(editDraft.weight) : 0;
+    const repsNum = parseInt(editDraft.reps, 10);
+    if (isNaN(repsNum) || repsNum <= 0) return;
+    setIsSavingEdit(true);
+    try {
+      const payload = buildSetEditPatchPayload(block.block.block_type, {
+        exercise_id: exercises[0]?.exercise_id ?? undefined,
+        weight: !isNaN(weightNum) && weightNum >= 0 ? weightNum : undefined,
+        fortime_total_reps: repsNum,
+      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[SAVE EDITS]", {
+          executor: "ForTimeExecutor",
+          setId: editingSetId,
+          blockTypeFromUI: block.block.block_type,
+          payloadKeys: Object.keys(payload),
+        });
+      }
+      const res = await fetchApi(`/api/sets/${editingSetId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      if (res?.ok) {
+        const current = loggedSetsList.find((s) => s.id === editingSetId);
+        const updatedEntry: LoggedSet = {
+          ...current,
+          id: editingSetId,
+          exercise_id:
+            current?.exercise_id ?? currentExercise?.exercise_id ?? "",
+          block_id: block.block.id,
+          set_number: current?.set_number ?? 1,
+          weight_kg: weightNum,
+          reps_completed: repsNum,
+          completed_at: current?.completed_at ?? new Date(),
+        };
+        onSetEditSaved?.(block.block.id, updatedEntry);
+        setEditingSetId(null);
+        setEditDraft(null);
+        addToast({ title: "Set updated", variant: "success", duration: 2000 });
+      } else {
+        addToast({
+          title: "Failed to update set",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSetId(null);
+    setEditDraft(null);
+  };
+
   const handleLog = async () => {
     console.log("ForTimeExecutor handleLog called", {
       currentExercise: !!currentExercise,
@@ -311,10 +475,12 @@ export function ForTimeExecutor({
 
     console.log("ForTimeExecutor handleLog: exercise_id check", {
       exerciseIdToUse,
-      currentExercise: currentExercise ? {
-        id: currentExercise.id,
-        exercise_id: currentExercise.exercise_id,
-      } : null,
+      currentExercise: currentExercise
+        ? {
+            id: currentExercise.id,
+            exercise_id: currentExercise.exercise_id,
+          }
+        : null,
       exercisesCount: exercises.length,
     });
 
@@ -366,11 +532,12 @@ export function ForTimeExecutor({
 
     try {
       // Use the completion time from when timer was stopped, or current elapsed time
-      const completionTimeToLog = completionTime !== null ? completionTime : elapsedSeconds;
+      const completionTimeToLog =
+        completionTime !== null ? completionTime : elapsedSeconds;
 
       // Build the log data - exercise_id is optional for fortime blocks
       const logData: any = {
-        block_type: 'fortime',
+        block_type: "fortime",
         fortime_total_reps: repsNum,
         fortime_time_taken_sec: completionTimeToLog,
         fortime_time_cap_sec: timeCapMinutes * 60,
@@ -392,43 +559,44 @@ export function ForTimeExecutor({
       const result = await logSetToDatabase(logData);
 
       if (result.success) {
-        const loggedSetsArray: LoggedSet[] = [
-          {
-            id: `temp-${Date.now()}`,
-            exercise_id: exerciseIdToUse || "",
-            block_id: block.block.id,
-            set_number: 1,
-            weight_kg: weightNum > 0 ? weightNum : 0,
-            reps_completed: repsNum,
-            completed_at: new Date(),
-          } as LoggedSet,
-        ];
+        const setLogId =
+          (result as { set_log_id?: string }).set_log_id ??
+          `temp-${Date.now()}`;
+        const newEntry: LoggedSet = {
+          id: setLogId,
+          exercise_id: exerciseIdToUse || "",
+          block_id: block.block.id,
+          set_number: 1,
+          weight_kg: weightNum > 0 ? weightNum : 0,
+          reps_completed: repsNum,
+          completed_at: new Date(),
+        } as LoggedSet;
+        onSetLogUpsert?.(block.block.id, newEntry);
 
-        // Update e1RM if available and exercise_id exists
         if (result.e1rm && onE1rmUpdate && exerciseIdToUse) {
           onE1rmUpdate(exerciseIdToUse, result.e1rm);
         }
 
         addToast({
           title: "For Time Logged!",
-          description: weightNum > 0
-            ? `${weightNum}kg × ${repsNum} reps completed in ${formatTime(completionTimeToLog)}`
-            : `${repsNum} reps completed in ${formatTime(completionTimeToLog)}`,
+          description:
+            weightNum > 0
+              ? `${weightNum}kg × ${repsNum} reps completed in ${formatTime(completionTimeToLog)}`
+              : `${repsNum} reps completed in ${formatTime(completionTimeToLog)}`,
           variant: "success",
           duration: 2000,
         });
 
-        // Reset timer state after logging
         setTimerStopped(false);
         setCompletionTime(null);
         setElapsedSeconds(0);
 
-        // Complete block
-        onBlockComplete(block.block.id, loggedSetsArray);
+        onBlockComplete(block.block.id, [...loggedSetsList, newEntry]);
       } else {
         addToast({
           title: "Failed to Save",
-          description: result.error || "Failed to save completion. Please try again.",
+          description:
+            result.error || "Failed to save completion. Please try again.",
           variant: "destructive",
           duration: 5000,
         });
@@ -437,7 +605,10 @@ export function ForTimeExecutor({
       console.error("Error logging for time set:", error);
       addToast({
         title: "Error",
-        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred. Please try again.",
         variant: "destructive",
         duration: 5000,
       });
@@ -448,11 +619,82 @@ export function ForTimeExecutor({
 
   const loggingInputs = (
     <div className="space-y-4">
+      {allowSetEditDelete && loggedSetsList.length > 0 && (
+        <div
+          className="rounded-xl border p-3"
+          style={{
+            borderColor: "var(--fc-surface-card-border)",
+            background: "var(--fc-surface-sunken)",
+          }}
+        >
+          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
+            Logged
+          </div>
+          <ul className="space-y-1.5">
+            {loggedSetsList.map((setEntry) => (
+              <li
+                key={setEntry.id}
+                className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                style={{ background: "var(--fc-surface-elevated)" }}
+              >
+                <span className="text-sm fc-text-primary">
+                  {setEntry.weight_kg != null && setEntry.weight_kg > 0
+                    ? `${setEntry.weight_kg} kg × `
+                    : ""}
+                  {setEntry.reps_completed ?? "—"} reps
+                </span>
+                <div className="relative flex items-center">
+                  <button
+                    type="button"
+                    className="p-1.5 rounded-md hover:bg-black/10"
+                    onClick={() =>
+                      setMenuOpenSetId(
+                        menuOpenSetId === setEntry.id ? null : setEntry.id,
+                      )
+                    }
+                    aria-label="Options"
+                  >
+                    <MoreVertical className="w-4 h-4 fc-text-dim" />
+                  </button>
+                  {menuOpenSetId === setEntry.id && (
+                    <div
+                      className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
+                      style={{
+                        background: "var(--fc-surface-elevated)",
+                        border: "1px solid var(--fc-surface-card-border)",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
+                        onClick={() => handleEditSet(setEntry)}
+                      >
+                        <Pencil className="w-4 h-4" /> Edit
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {/* Timer Display */}
       {!startTime && !timerStopped ? (
         // Initial state - Start Timer button
-        <div className="rounded-xl p-5 text-center" style={{ background: "color-mix(in srgb, var(--fc-status-error) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-status-error) 25%, transparent)" }}>
-          <div className="text-5xl font-bold mb-3" style={{ color: "var(--fc-status-error)" }}>
+        <div
+          className="rounded-xl p-5 text-center"
+          style={{
+            background:
+              "color-mix(in srgb, var(--fc-status-error) 8%, var(--fc-surface-card))",
+            border:
+              "2px solid color-mix(in srgb, var(--fc-status-error) 25%, transparent)",
+          }}
+        >
+          <div
+            className="text-5xl font-bold mb-3"
+            style={{ color: "var(--fc-status-error)" }}
+          >
             {formatTime(0)}
           </div>
           <div className="text-lg fc-text-dim mb-4">
@@ -468,8 +710,19 @@ export function ForTimeExecutor({
         </div>
       ) : startTime && !timerStopped ? (
         // Timer running - Show elapsed time and Stop button
-        <div className="rounded-xl p-5 text-center" style={{ background: "color-mix(in srgb, var(--fc-status-error) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-status-error) 25%, transparent)" }}>
-          <div className="text-5xl font-bold mb-3" style={{ color: "var(--fc-status-error)" }}>
+        <div
+          className="rounded-xl p-5 text-center"
+          style={{
+            background:
+              "color-mix(in srgb, var(--fc-status-error) 8%, var(--fc-surface-card))",
+            border:
+              "2px solid color-mix(in srgb, var(--fc-status-error) 25%, transparent)",
+          }}
+        >
+          <div
+            className="text-5xl font-bold mb-3"
+            style={{ color: "var(--fc-status-error)" }}
+          >
             {formatTime(elapsedSeconds)}
           </div>
           <div className="text-lg fc-text-dim mb-4">
@@ -488,41 +741,73 @@ export function ForTimeExecutor({
         </div>
       ) : timerStopped && completionTime !== null ? (
         // Timer stopped - Show completion time
-        <div className="rounded-xl p-5 text-center" style={{ background: "color-mix(in srgb, var(--fc-status-success) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-status-success) 25%, transparent)" }}>
-          <div className="text-3xl font-bold mb-2" style={{ color: "var(--fc-status-success)" }}>
+        <div
+          className="rounded-xl p-5 text-center"
+          style={{
+            background:
+              "color-mix(in srgb, var(--fc-status-success) 8%, var(--fc-surface-card))",
+            border:
+              "2px solid color-mix(in srgb, var(--fc-status-success) 25%, transparent)",
+          }}
+        >
+          <div
+            className="text-3xl font-bold mb-2"
+            style={{ color: "var(--fc-status-success)" }}
+          >
             {formatTime(completionTime)}
           </div>
-          <div className="text-sm fc-text-dim mb-4">
-            Completion Time
-          </div>
+          <div className="text-sm fc-text-dim mb-4">Completion Time</div>
         </div>
       ) : null}
 
       {/* Weight and Reps Input - Show when timer is stopped or not started */}
       {(!startTime || timerStopped) && (
-        <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
+        <div
+          className="p-4 rounded-xl"
+          style={{ background: "var(--fc-surface-sunken)" }}
+        >
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <LargeInput
                 label="Weight"
                 value={weight}
-                onChange={(val) => { setIsWeightPristine(false); setWeight(val); }}
+                onChange={(val) => {
+                  setIsWeightPristine(false);
+                  setWeight(val);
+                }}
                 placeholder="0"
                 step="0.5"
                 unit="kg"
                 showStepper
                 stepAmount={2.5}
               />
-              {suggested_weight != null && suggested_weight > 0 && (
-                <button type="button" onClick={() => { setWeight(String(suggested_weight)); setIsWeightPristine(false); }} className="text-xs font-medium hover:underline" style={{ color: "var(--fc-accent-cyan)" }}>
-                  {loadPercentage != null ? `${loadPercentage}% → ${suggested_weight} kg` : `Suggested: ${suggested_weight} kg`} (tap to apply)
-                </button>
-              )}
+              {!editDraft &&
+                suggested_weight != null &&
+                suggested_weight > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWeight(String(suggested_weight));
+                      setIsWeightPristine(false);
+                    }}
+                    className="text-xs font-medium hover:underline"
+                    style={{ color: "var(--fc-accent-cyan)" }}
+                  >
+                    {loadPercentage != null
+                      ? `${loadPercentage}% → ${suggested_weight} kg`
+                      : `Suggested: ${suggested_weight} kg`}{" "}
+                    (tap to apply)
+                  </button>
+                )}
             </div>
             <LargeInput
               label="Completed Reps"
-              value={reps}
-              onChange={setReps}
+              value={editDraft ? editDraft.reps : reps}
+              onChange={(val) => {
+                if (editDraft)
+                  setEditDraft((d) => (d ? { ...d, reps: val } : null));
+                else setReps(val);
+              }}
               placeholder="0"
               step="1"
               showStepper
@@ -547,7 +832,8 @@ export function ForTimeExecutor({
     !isNaN(repsNum) &&
     isFinite(repsNum) &&
     repsNum > 0 &&
-    (weightStr === "" || (!isNaN(weightNum) && isFinite(weightNum) && weightNum > 0));
+    (weightStr === "" ||
+      (!isNaN(weightNum) && isFinite(weightNum) && weightNum > 0));
 
   // For "for_time" blocks, exercise_id is optional, so we don't require exercises to be configured
   // The button should work as long as reps are entered
@@ -556,8 +842,8 @@ export function ForTimeExecutor({
   const buttonDisabledReason = !isValidInput
     ? `Invalid input (reps: ${reps || "empty"}, weight: ${weight || "empty"})`
     : isLoggingSet
-    ? "Currently logging"
-    : null;
+      ? "Currently logging"
+      : null;
 
   // Debug button state
   useEffect(() => {
@@ -587,44 +873,70 @@ export function ForTimeExecutor({
     buttonDisabledReason,
   ]);
 
+  const isEditMode = !!editingSetId && !!editDraft;
+  const viewedSetEntry =
+    viewingSetIndex >= 1
+      ? (loggedSetsList.find((s) => s.set_number === viewingSetIndex) ??
+        loggedSetsList[viewingSetIndex - 1])
+      : null;
   // Only show Complete Set button when timer is stopped
   const logButton = timerStopped ? (
-    <div className="w-full">
-      <Button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log("Complete Set button clicked", {
-            isLoggingSet,
-            isValidInput,
-            exercisesCount: exercises.length,
-            weight,
-            reps,
-            timerStopped,
-            completionTime,
-          });
-          if (!isLoggingSet && isValidInput) {
-            handleLog();
-          } else {
-            console.warn("Button click ignored - validation failed:", {
-              isLoggingSet,
-              isValidInput,
-              reason: buttonDisabledReason,
-            });
-          }
-        }}
-        disabled={isLoggingSet || !isValidInput}
-        variant="fc-primary"
-        className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-        title={buttonDisabledReason || undefined}
-      >
-        <CheckCircle className="w-5 h-5 mr-2" />
-        {isLoggingSet ? "Logging..." : "Complete Set"}
-      </Button>
-      {buttonDisabledReason && (
-        <p className="text-xs text-red-500 mt-2 text-center">
-          {buttonDisabledReason}
-        </p>
+    <div className="w-full space-y-2">
+      {allowSetEditDelete && isEditMode ? (
+        <div className="flex gap-2 w-full">
+          <Button
+            variant="outline"
+            onClick={handleCancelEdit}
+            className="flex-1 h-12 text-base font-semibold rounded-xl"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEdit}
+            disabled={
+              isSavingEdit ||
+              !editDraft ||
+              editDraft.reps.trim() === "" ||
+              isNaN(parseInt(editDraft.reps, 10)) ||
+              parseInt(editDraft.reps, 10) <= 0
+            }
+            variant="fc-primary"
+            className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+          >
+            {isSavingEdit ? "Saving…" : "Save edits"}
+          </Button>
+        </div>
+      ) : allowSetEditDelete && viewedSetEntry ? (
+        <Button
+          onClick={() => handleEditSet(viewedSetEntry)}
+          variant="fc-primary"
+          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+        >
+          <Pencil className="w-5 h-5 mr-2" />
+          Edit this set
+        </Button>
+      ) : (
+        <>
+          <Button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!isLoggingSet && isValidInput) handleLog();
+            }}
+            disabled={isLoggingSet || !isValidInput}
+            variant="fc-primary"
+            className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            title={buttonDisabledReason || undefined}
+          >
+            <CheckCircle className="w-5 h-5 mr-2" />
+            {isLoggingSet ? "Logging..." : "Complete Set"}
+          </Button>
+          {buttonDisabledReason && (
+            <p className="text-xs text-red-500 mt-2 text-center">
+              {buttonDisabledReason}
+            </p>
+          )}
+        </>
       )}
     </div>
   ) : null;

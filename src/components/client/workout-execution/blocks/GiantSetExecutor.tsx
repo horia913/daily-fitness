@@ -1,8 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Flame, CheckCircle } from "lucide-react";
+import {
+  Flame,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  Pencil,
+} from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
@@ -14,8 +20,13 @@ import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { useLoggingReset } from "../hooks/useLoggingReset";
-import { getWeightDefaultAndSuggestion, getCoachSuggestedWeight } from "@/lib/weightDefaultService";
+import {
+  getWeightDefaultAndSuggestion,
+  getCoachSuggestedWeight,
+} from "@/lib/weightDefaultService";
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
+import { fetchApi } from "@/lib/apiClient";
+import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 
 export function GiantSetExecutor({
   block,
@@ -40,26 +51,106 @@ export function GiantSetExecutor({
   onRestTimerClick,
   onSetComplete,
   onLastSetLoggedForRest,
+  allowSetEditDelete = false,
+  registerSetLogIdResolved,
+  onSetLogUpsert,
+  onSetEditSaved,
+  loggedSets,
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const exercises = block.block.exercises || [];
   const totalSets = block.block.total_sets || 1;
   const completedSets = block.completedSets || 0;
-  const currentSet = completedSets;
+  const currentSetNumber = completedSets + 1;
+
+  /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
+  const loggedSetsList = loggedSets ?? [];
 
   const [weights, setWeights] = useState<string[]>([]);
   const [reps, setReps] = useState<string[]>([]);
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [weightsPristine, setWeightsPristine] = useState<boolean[]>([]);
+  const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
+  const [editingSetId, setEditingSetId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{
+    round_number: number;
+    weights: string[];
+    reps: string[];
+  } | null>(null);
+
+  const loggedSetsRef = useRef<LoggedSet[]>(loggedSetsList);
+  useEffect(() => {
+    loggedSetsRef.current = loggedSetsList;
+  }, [loggedSetsList]);
+
+  const displaySetNumber =
+    editingSetId && editDraft?.round_number != null
+      ? editDraft.round_number
+      : viewingSetIndex >= 1
+        ? viewingSetIndex
+        : Math.min(currentSetNumber, totalSets);
+
+  useEffect(() => {
+    if (!registerSetLogIdResolved) return;
+    registerSetLogIdResolved((set_log_id: string) => {
+      const list = loggedSetsRef.current;
+      const tempEntries = list.filter((s) => s.id.startsWith("temp-"));
+      if (tempEntries.length === 0) return;
+      const tempId = tempEntries[0].id;
+      tempEntries.forEach((oldEntry) => {
+        const newEntry = { ...oldEntry, id: set_log_id };
+        onSetLogUpsert?.(block.block.id, newEntry, { replaceId: tempId });
+      });
+    });
+    return () => {};
+  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  useEffect(() => {
+    if (viewingSetIndex > loggedSetsList.length)
+      setViewingSetIndex(loggedSetsList.length);
+  }, [loggedSetsList.length, viewingSetIndex]);
+  useEffect(() => {
+    if (viewingSetIndex >= 1 && exercises.length > 0) {
+      const forRound = loggedSetsList.filter(
+        (s) => s.set_number === viewingSetIndex,
+      );
+      const nextWeights = [...weights];
+      const nextReps = [...reps];
+      exercises.forEach((ex, idx) => {
+        const entry =
+          forRound.find((s) => s.exercise_id === ex.exercise_id) ??
+          forRound[idx];
+        if (entry) {
+          if (nextWeights.length <= idx)
+            nextWeights.push(String(entry.weight_kg ?? ""));
+          else nextWeights[idx] = String(entry.weight_kg ?? "");
+          if (nextReps.length <= idx)
+            nextReps.push(String(entry.reps_completed ?? ""));
+          else nextReps[idx] = String(entry.reps_completed ?? "");
+        }
+      });
+      setWeights(
+        nextWeights.length ? nextWeights : new Array(exercises.length).fill(""),
+      );
+      setReps(
+        nextReps.length ? nextReps : new Array(exercises.length).fill(""),
+      );
+    }
+  }, [viewingSetIndex, loggedSetsList, exercises]);
 
   const results = exercises.map((ex) =>
     getWeightDefaultAndSuggestion({
-      sessionStickyWeight: ex.exercise_id ? (lastPerformedWeightByExerciseId[ex.exercise_id] ?? null) : null,
-      lastSessionWeight: ex.exercise_id ? (lastSessionWeightByExerciseId[ex.exercise_id] ?? null) : null,
+      sessionStickyWeight: ex.exercise_id
+        ? (lastPerformedWeightByExerciseId[ex.exercise_id] ?? null)
+        : null,
+      lastSessionWeight: ex.exercise_id
+        ? (lastSessionWeightByExerciseId[ex.exercise_id] ?? null)
+        : null,
       loadPercentage: ex.load_percentage ?? null,
       e1rm: ex.exercise_id ? (e1rmMap[ex.exercise_id] ?? null) : null,
-    })
+    }),
   );
 
   useEffect(() => {
@@ -68,26 +159,44 @@ export function GiantSetExecutor({
     }
   }, [completedSets, exercises.length]);
 
+  const isViewingLoggedSet = viewingSetIndex >= 1;
   useEffect(() => {
-    if (exercises.length === 0) return;
-    const nextWeights: string[] = weights.length !== exercises.length ? [] : [...weights];
+    if (exercises.length === 0 || isViewingLoggedSet) return;
+    const nextWeights: string[] =
+      weights.length !== exercises.length ? [] : [...weights];
     for (let idx = 0; idx < exercises.length; idx++) {
       if (weightsPristine[idx] !== false) {
         const r = results[idx];
-        const val = r?.default_weight != null && r.default_weight > 0 ? String(r.default_weight) : "";
+        const val =
+          r?.default_weight != null && r.default_weight > 0
+            ? String(r.default_weight)
+            : "";
         if (nextWeights.length <= idx) nextWeights.push(val);
         else if (nextWeights[idx] !== val) nextWeights[idx] = val;
       } else if (nextWeights.length <= idx) {
         nextWeights.push("");
       }
     }
-    if (nextWeights.length !== weights.length || nextWeights.some((w, i) => weights[i] !== w)) {
-      setWeights(nextWeights.length ? nextWeights : new Array(exercises.length).fill(""));
+    if (
+      nextWeights.length !== weights.length ||
+      nextWeights.some((w, i) => weights[i] !== w)
+    ) {
+      setWeights(
+        nextWeights.length ? nextWeights : new Array(exercises.length).fill(""),
+      );
     }
     if (reps.length !== exercises.length) {
       setReps(new Array(exercises.length).fill(""));
     }
-  }, [exercises.length, completedSets, lastPerformedWeightByExerciseId, lastSessionWeightByExerciseId, e1rmMap, weightsPristine]);
+  }, [
+    exercises.length,
+    completedSets,
+    isViewingLoggedSet,
+    lastPerformedWeightByExerciseId,
+    lastSessionWeightByExerciseId,
+    e1rmMap,
+    weightsPristine,
+  ]);
 
   // Block details
   const blockDetails: BlockDetail[] = [
@@ -113,11 +222,11 @@ export function GiantSetExecutor({
         const suggestedWeight = calculateSuggestedWeightUtil(
           ex.exercise_id,
           ex.load_percentage,
-          e1rmMap
+          e1rmMap,
         );
         const loadDisplay = formatLoadPercentage(
           ex.load_percentage,
-          suggestedWeight
+          suggestedWeight,
         );
         if (loadDisplay) {
           blockDetails.push({
@@ -131,36 +240,246 @@ export function GiantSetExecutor({
 
   const instructions = block.block.block_notes || undefined;
 
+  const roundNumbersLogged = [
+    ...new Set(loggedSetsList.map((s) => s.set_number)),
+  ].sort((a, b) => a - b);
+  const maxViewableRound =
+    roundNumbersLogged.length === 0 ? 0 : Math.max(...roundNumbersLogged);
+
+  const handleUpdateViewedSet = async () => {
+    if (viewingSetIndex < 1) return;
+    const forRound = loggedSetsList.filter(
+      (s) => s.set_number === viewingSetIndex,
+    );
+    const firstId = forRound[0]?.id;
+    if (!firstId || firstId.startsWith("temp-")) return;
+    const giantSetExercises = exercises
+      .map((ex, idx) => {
+        const w = parseFloat(weights[idx] || "0");
+        const r = parseInt(reps[idx] || "0", 10);
+        if (!ex?.exercise_id || isNaN(w) || isNaN(r)) return null;
+        return {
+          exercise_id: ex.exercise_id,
+          weight: w,
+          reps: r,
+          order: idx + 1,
+        };
+      })
+      .filter(Boolean);
+    if (giantSetExercises.length === 0) return;
+    setIsSavingEdit(true);
+    try {
+      const payload = buildSetEditPatchPayload(block.block.block_type, {
+        round_number: viewingSetIndex,
+        giant_set_exercises: giantSetExercises,
+      });
+      const res = await fetchApi(`/api/sets/${firstId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      if (res?.ok) {
+        const next = loggedSetsList.map((s) => {
+          if (s.set_number !== viewingSetIndex) return s;
+          const idx = exercises.findIndex(
+            (e) => e.exercise_id === s.exercise_id,
+          );
+          if (idx < 0) return s;
+          const w = parseFloat(weights[idx] || "0");
+          const r = parseInt(reps[idx] || "0", 10);
+          return { ...s, weight_kg: w, reps_completed: r };
+        });
+        const toUpsert = next.filter((s) => s.set_number === viewingSetIndex);
+        toUpsert.forEach((e) => onSetEditSaved?.(block.block.id, e));
+        addToast({
+          title: "Round updated",
+          variant: "success",
+          duration: 2000,
+        });
+      } else {
+        addToast({
+          title: "Failed to update round",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  /** Enter edit mode for this round. Populates editDraft with round_number and weights/reps from the round. */
+  const handleEditSet = (setEntry: LoggedSet) => {
+    const roundNum = setEntry.set_number ?? 1;
+    const forRound = loggedSetsList.filter((s) => s.set_number === roundNum);
+    const draftWeights = exercises.map((ex, idx) =>
+      String(
+        (
+          forRound.find((s) => s.exercise_id === ex.exercise_id) ??
+          forRound[idx]
+        )?.weight_kg ?? "",
+      ),
+    );
+    const draftReps = exercises.map((ex, idx) =>
+      String(
+        (
+          forRound.find((s) => s.exercise_id === ex.exercise_id) ??
+          forRound[idx]
+        )?.reps_completed ?? "",
+      ),
+    );
+    setEditingSetId(forRound[0]?.id ?? setEntry.id);
+    setEditDraft({
+      round_number: roundNum,
+      weights: draftWeights,
+      reps: draftReps,
+    });
+    setMenuOpenSetId(null);
+  };
+
+  /** Cancel edit mode. */
+  const handleCancelEdit = () => {
+    setEditingSetId(null);
+    setEditDraft(null);
+  };
+
+  /** Save edits: PATCH round with editDraft data, then exit edit mode. */
+  const handleSaveEdit = async () => {
+    if (!editingSetId || !editDraft) return;
+    if (editingSetId.startsWith("temp-")) {
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[SAVE EDITS guard]", {
+          executor: "GiantSetExecutor",
+          blockTypeFromUI: block.block.block_type,
+          editingSetId,
+          isSavingEdit,
+          timestamp: Date.now(),
+        });
+      }
+      addToast({
+        title: "Round still saving",
+        description: "Try again in a moment.",
+        variant: "default",
+        duration: 2000,
+      });
+      return;
+    }
+    const giantSetExercises = exercises
+      .map((ex, idx) => {
+        const w = parseFloat(editDraft.weights[idx] || "0");
+        const r = parseInt(editDraft.reps[idx] || "0", 10);
+        if (!ex?.exercise_id || isNaN(w) || isNaN(r)) return null;
+        return {
+          exercise_id: ex.exercise_id,
+          weight: w,
+          reps: r,
+          order: idx + 1,
+        };
+      })
+      .filter(Boolean);
+    if (giantSetExercises.length === 0) return;
+    setIsSavingEdit(true);
+    try {
+      const payload = buildSetEditPatchPayload(block.block.block_type, {
+        round_number: editDraft.round_number,
+        giant_set_exercises: giantSetExercises,
+      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[SAVE EDITS]", {
+          executor: "GiantSetExecutor",
+          setId: editingSetId,
+          blockTypeFromUI: block.block.block_type,
+          payloadKeys: Object.keys(payload),
+        });
+      }
+      const res = await fetchApi(`/api/sets/${editingSetId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      if (res?.ok) {
+        const next = loggedSetsList.map((s) => {
+          if (s.set_number !== editDraft.round_number) return s;
+          const idx = exercises.findIndex(
+            (e) => e.exercise_id === s.exercise_id,
+          );
+          const w = parseFloat(editDraft.weights[idx] || "0");
+          const r = parseInt(editDraft.reps[idx] || "0", 10);
+          return { ...s, weight_kg: w, reps_completed: r };
+        });
+        const toUpsert = next.filter(
+          (s) => s.set_number === editDraft.round_number,
+        );
+        toUpsert.forEach((e) => onSetEditSaved?.(block.block.id, e));
+        setEditingSetId(null);
+        setEditDraft(null);
+        addToast({
+          title: "Round updated",
+          variant: "success",
+          duration: 2000,
+        });
+      } else {
+        addToast({
+          title: "Failed to update round",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+    } catch {
+      addToast({
+        title: "Failed to update round",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const handleLog = async () => {
     if (exercises.length === 0 || isLoggingSet) return;
 
     const allValid = exercises.every((_, idx) => {
       const weightStr = weights[idx];
       const repsStr = reps[idx];
-      
+
       // Check weight: must be entered (not empty or undefined), valid number, and >= 0
       // Allow "0" as a valid weight value
-      if (weightStr === undefined || weightStr === null || String(weightStr).trim() === "") {
+      if (
+        weightStr === undefined ||
+        weightStr === null ||
+        String(weightStr).trim() === ""
+      ) {
         console.log(`GiantSet: Exercise ${idx} weight invalid:`, weightStr);
         return false;
       }
       const weight = parseFloat(String(weightStr));
       if (isNaN(weight) || weight < 0) {
-        console.log(`GiantSet: Exercise ${idx} weight parse failed:`, weightStr, weight);
+        console.log(
+          `GiantSet: Exercise ${idx} weight parse failed:`,
+          weightStr,
+          weight,
+        );
         return false;
       }
-      
+
       // Check reps: must be entered (not empty or undefined), valid number, and > 0
-      if (repsStr === undefined || repsStr === null || String(repsStr).trim() === "") {
+      if (
+        repsStr === undefined ||
+        repsStr === null ||
+        String(repsStr).trim() === ""
+      ) {
         console.log(`GiantSet: Exercise ${idx} reps invalid:`, repsStr);
         return false;
       }
       const repsNum = parseInt(String(repsStr));
       if (isNaN(repsNum) || repsNum <= 0) {
-        console.log(`GiantSet: Exercise ${idx} reps parse failed:`, repsStr, repsNum);
+        console.log(
+          `GiantSet: Exercise ${idx} reps parse failed:`,
+          repsStr,
+          repsNum,
+        );
         return false;
       }
-      
+
       return true;
     });
 
@@ -202,30 +521,36 @@ export function GiantSetExecutor({
 
       // Log giant set as a single call
       const logData: any = {
-        block_type: 'giant_set',
+        block_type: "giant_set",
         round_number: completedSets + 1,
       };
-      
+
       if (giantSetExercises.length > 0) {
         logData.giant_set_exercises = giantSetExercises;
       }
-      
+
       const result = await logSetToDatabase(logData);
 
-      // Build logged sets array for UI
-      const loggedSetsArray: LoggedSet[] = exercises.map((exercise, idx) => ({
-        id: `temp-${idx}-${Date.now()}`,
-        exercise_id: exercise.exercise_id,
-        block_id: block.block.id,
-        set_number: completedSets + 1,
-        weight_kg: parseFloat(weights[idx] || "0"),
-        reps_completed: parseInt(reps[idx] || "0"),
-        completed_at: new Date(),
-      } as LoggedSet));
+      const setLogId =
+        (result as { set_log_id?: string }).set_log_id ?? `temp-${Date.now()}`;
+      const roundNumber = completedSets + 1;
+      const newEntries: LoggedSet[] = exercises.map(
+        (exercise, idx) =>
+          ({
+            id: setLogId,
+            exercise_id: exercise.exercise_id,
+            block_id: block.block.id,
+            set_number: roundNumber,
+            weight_kg: parseFloat(weights[idx] || "0"),
+            reps_completed: parseInt(reps[idx] || "0"),
+            completed_at: new Date(),
+          }) as LoggedSet,
+      );
 
-      const allSuccess = result.success;
+      if (result.success) {
+        newEntries.forEach((e) => onSetLogUpsert?.(block.block.id, e));
+        setViewingSetIndex(0);
 
-      if (allSuccess) {
         addToast({
           title: "Giant Set Logged!",
           description: `${exercises.length} exercises completed`,
@@ -234,25 +559,22 @@ export function GiantSetExecutor({
         });
 
         const newCompletedSets = completedSets + 1;
-        const setNumber = completedSets + 1;
+        const updatedLoggedSets = [...loggedSetsList, ...newEntries];
         if (newCompletedSets < totalSets) {
           const firstWeight = parseFloat(weights[0] || "0");
           const firstReps = parseInt(reps[0] || "0", 10);
           onLastSetLoggedForRest?.({
             weight: firstWeight,
             reps: firstReps,
-            setNumber,
+            setNumber: roundNumber,
             totalSets,
             isPr: result.isNewPR,
           });
         }
         onSetComplete?.(newCompletedSets);
 
-        // Complete block if last set
         if (newCompletedSets >= totalSets) {
-          onBlockComplete(block.block.id, loggedSetsArray);
-        } else {
-          // Advancing to next set: parent updates lastPerformedWeightByExerciseId and completedSets; useEffect will apply defaults
+          onBlockComplete(block.block.id, updatedLoggedSets);
         }
       } else {
         addToast({
@@ -269,6 +591,110 @@ export function GiantSetExecutor({
 
   const loggingInputs = (
     <div className="space-y-4">
+      {allowSetEditDelete && roundNumbersLogged.length > 0 && (
+        <div
+          className="rounded-xl border p-3"
+          style={{
+            borderColor: "var(--fc-surface-card-border)",
+            background: "var(--fc-surface-sunken)",
+          }}
+        >
+          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
+            Logged rounds
+          </div>
+          <ul className="space-y-1.5">
+            {roundNumbersLogged.map((roundNum) => {
+              const forRound = loggedSetsList.filter(
+                (s) => s.set_number === roundNum,
+              );
+              const label = forRound
+                .sort(
+                  (a, b) =>
+                    exercises.findIndex(
+                      (e) => e.exercise_id === a.exercise_id,
+                    ) -
+                    exercises.findIndex((e) => e.exercise_id === b.exercise_id),
+                )
+                .map((s) => `${s.weight_kg ?? "—"}×${s.reps_completed ?? "—"}`)
+                .join(", ");
+              const firstId = forRound[0]?.id ?? "";
+              return (
+                <li
+                  key={`round-${roundNum}`}
+                  className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                  style={{ background: "var(--fc-surface-elevated)" }}
+                >
+                  <span className="text-sm fc-text-primary">
+                    Round {roundNum}: {label}
+                  </span>
+                  <div className="relative flex items-center">
+                    <button
+                      type="button"
+                      className="p-1.5 rounded-md hover:bg-black/10"
+                      onClick={() =>
+                        setMenuOpenSetId(
+                          menuOpenSetId === firstId ? null : firstId,
+                        )
+                      }
+                      aria-label="Options"
+                    >
+                      <MoreVertical className="w-4 h-4 fc-text-dim" />
+                    </button>
+                    {menuOpenSetId === firstId && (
+                      <div
+                        className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
+                        style={{
+                          background: "var(--fc-surface-elevated)",
+                          border: "1px solid var(--fc-surface-card-border)",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
+                          onClick={() => handleEditSet(forRound[0])}
+                        >
+                          <Pencil className="w-4 h-4" /> Edit
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {allowSetEditDelete && totalSets > 0 && (
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            onClick={() => setViewingSetIndex((i) => Math.max(0, i - 1))}
+            disabled={viewingSetIndex <= 0}
+            aria-label="Previous round"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <span className="text-sm font-medium fc-text-primary min-w-[100px] text-center">
+            Round {displaySetNumber} of {totalSets}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            onClick={() =>
+              setViewingSetIndex((i) => Math.min(maxViewableRound, i + 1))
+            }
+            disabled={viewingSetIndex >= maxViewableRound}
+            aria-label="Next round"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </Button>
+        </div>
+      )}
       {exercises.map((exercise, idx) => (
         <div
           key={exercise.id || idx}
@@ -290,16 +716,37 @@ export function GiantSetExecutor({
             <div className="space-y-2">
               <LargeInput
                 label="Weight"
-                value={weights[idx] || ""}
+                value={
+                  editDraft
+                    ? (editDraft.weights[idx] ?? "")
+                    : weights[idx] || ""
+                }
                 onChange={(value) => {
-                  setWeightsPristine((prev) => {
-                    const next = [...(prev.length ? prev : new Array(exercises.length).fill(true))];
-                    if (next[idx] !== false) next[idx] = false;
-                    return next;
-                  });
-                  const newWeights = [...weights];
-                  newWeights[idx] = value;
-                  setWeights(newWeights);
+                  if (editDraft) {
+                    setEditDraft((d) =>
+                      d
+                        ? {
+                            ...d,
+                            weights: d.weights.map((w, i) =>
+                              i === idx ? value : w,
+                            ),
+                          }
+                        : null,
+                    );
+                  } else {
+                    setWeightsPristine((prev) => {
+                      const next = [
+                        ...(prev.length
+                          ? prev
+                          : new Array(exercises.length).fill(true)),
+                      ];
+                      if (next[idx] !== false) next[idx] = false;
+                      return next;
+                    });
+                    const newWeights = [...weights];
+                    newWeights[idx] = value;
+                    setWeights(newWeights);
+                  }
                 }}
                 placeholder="0"
                 step="0.5"
@@ -307,32 +754,53 @@ export function GiantSetExecutor({
                 showStepper
                 stepAmount={2.5}
               />
-              {(() => {
-                const coachSuggested = getCoachSuggestedWeight(exercise.load_percentage, exercise.exercise_id ? (e1rmMap[exercise.exercise_id] ?? null) : null);
-                return coachSuggested != null && coachSuggested > 0 ? (
-                  <ApplySuggestedWeightButton
-                    suggestedKg={coachSuggested}
-                    onApply={() => {
-                      setWeightsPristine((prev) => {
-                        const next = [...(prev.length ? prev : new Array(exercises.length).fill(true))];
-                        next[idx] = false;
-                        return next;
-                      });
-                      const newWeights = [...weights];
-                      newWeights[idx] = String(coachSuggested);
-                      setWeights(newWeights);
-                    }}
-                  />
-                ) : null;
-              })()}
+              {!editDraft &&
+                (() => {
+                  const coachSuggested = getCoachSuggestedWeight(
+                    exercise.load_percentage,
+                    exercise.exercise_id
+                      ? (e1rmMap[exercise.exercise_id] ?? null)
+                      : null,
+                  );
+                  return coachSuggested != null && coachSuggested > 0 ? (
+                    <ApplySuggestedWeightButton
+                      suggestedKg={coachSuggested}
+                      onApply={() => {
+                        setWeightsPristine((prev) => {
+                          const next = [
+                            ...(prev.length
+                              ? prev
+                              : new Array(exercises.length).fill(true)),
+                          ];
+                          next[idx] = false;
+                          return next;
+                        });
+                        const newWeights = [...weights];
+                        newWeights[idx] = String(coachSuggested);
+                        setWeights(newWeights);
+                      }}
+                    />
+                  ) : null;
+                })()}
             </div>
             <LargeInput
               label="Reps"
-              value={reps[idx] || ""}
+              value={editDraft ? (editDraft.reps[idx] ?? "") : reps[idx] || ""}
               onChange={(value) => {
-                const newReps = [...reps];
-                newReps[idx] = value;
-                setReps(newReps);
+                if (editDraft) {
+                  setEditDraft((d) =>
+                    d
+                      ? {
+                          ...d,
+                          reps: d.reps.map((r, i) => (i === idx ? value : r)),
+                        }
+                      : null,
+                  );
+                } else {
+                  const newReps = [...reps];
+                  newReps[idx] = value;
+                  setReps(newReps);
+                }
               }}
               placeholder="0"
               step="1"
@@ -345,10 +813,53 @@ export function GiantSetExecutor({
     </div>
   );
 
-  const logButton = (
+  const isEditMode = !!editingSetId && !!editDraft;
+  const forViewedRound =
+    viewingSetIndex >= 1
+      ? loggedSetsList.filter((s) => s.set_number === viewingSetIndex)
+      : [];
+  const viewedSetEntry = forViewedRound[0] ?? null;
+  const logButton = isEditMode ? (
+    <div className="flex gap-2 w-full">
+      <Button
+        variant="outline"
+        onClick={handleCancelEdit}
+        className="flex-1 h-12 text-base font-semibold rounded-xl"
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={handleSaveEdit}
+        disabled={
+          isSavingEdit ||
+          !editDraft ||
+          editDraft.weights.some(
+            (w, i) => !w?.trim() || isNaN(parseFloat(w)) || parseFloat(w) < 0,
+          ) ||
+          editDraft.reps.some(
+            (r, i) =>
+              !r?.trim() || isNaN(parseInt(r, 10)) || parseInt(r, 10) <= 0,
+          )
+        }
+        variant="fc-primary"
+        className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+      >
+        {isSavingEdit ? "Saving…" : "Save edits"}
+      </Button>
+    </div>
+  ) : viewedSetEntry ? (
+    <Button
+      onClick={() => handleEditSet(viewedSetEntry)}
+      variant="fc-primary"
+      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+    >
+      <Pencil className="w-5 h-5 mr-2" />
+      Edit this round
+    </Button>
+  ) : (
     <Button
       onClick={handleLog}
-      disabled={isLoggingSet}
+      disabled={isLoggingSet || completedSets >= totalSets}
       variant="fc-primary"
       className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
     >
@@ -382,7 +893,7 @@ export function GiantSetExecutor({
       exerciseName={`Giant Set: ${exercises.length} Exercises`}
       blockDetails={blockDetails}
       instructions={instructions}
-      currentSet={currentSet}
+      currentSet={displaySetNumber}
       totalSets={totalSets}
       progressLabel="Round"
       loggingInputs={loggingInputs}

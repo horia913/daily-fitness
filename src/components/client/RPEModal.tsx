@@ -1,21 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { preventBackgroundScroll, restoreBackgroundScroll } from '@/lib/mobile-compatibility';
 
 interface RPEModalProps {
   isOpen: boolean;
   onSelect: (rpe: number) => void;
   onSkip: () => void;
-  onClose: () => void;
 }
 
 /**
  * RPE Modal - Rate of Perceived Exertion
  * 
- * Non-blocking modal that appears after a set is logged.
- * User can quickly tap an RPE value (1-10) or skip.
- * The set is already logged - this just adds the RPE data.
+ * BLOCKING modal that appears after a set is logged (Golden Logging Flow).
+ * Cannot be dismissed by tapping outside or pressing back.
+ * User MUST select an RPE value (1-10) or tap "Skip for now".
+ * The set is already logged optimistically — RPE is included in background sync.
  */
 
 const RPE_OPTIONS = [
@@ -39,16 +39,28 @@ function getRpeColor(value: number): string {
   return 'var(--fc-status-error)';
 }
 
-export function RPEModal({ isOpen, onSelect, onSkip, onClose }: RPEModalProps) {
+export function RPEModal({ isOpen, onSelect, onSkip }: RPEModalProps) {
   const [selectedRpe, setSelectedRpe] = useState<number | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
 
-  // Reset state when modal opens
+  // Reset state + scroll lock when modal opens/closes
   useEffect(() => {
     if (isOpen) {
       setSelectedRpe(null);
       setIsAnimating(true);
+      preventBackgroundScroll();
+      // Focus trap: focus the grid on open so keyboard nav works
+      requestAnimationFrame(() => {
+        gridRef.current?.focus();
+      });
+    } else {
+      restoreBackgroundScroll();
     }
+    return () => {
+      // Safety: always restore on unmount
+      restoreBackgroundScroll();
+    };
   }, [isOpen]);
 
   // Handle RPE selection with quick animation
@@ -66,19 +78,12 @@ export function RPEModal({ isOpen, onSelect, onSkip, onClose }: RPEModalProps) {
     onSkip();
   };
 
-  // Handle backdrop click
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   if (!isOpen) return null;
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-      onClick={handleBackdropClick}
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4"
+      /* Blocking modal: no backdrop dismiss, no click-through */
     >
       {/* Backdrop */}
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'color-mix(in srgb, var(--fc-app-bg) 70%, transparent)' }} />
@@ -92,24 +97,17 @@ export function RPEModal({ isOpen, onSelect, onSkip, onClose }: RPEModalProps) {
           ${isAnimating ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-4'}`}
         onAnimationEnd={() => setIsAnimating(false)}
       >
-        {/* Header */}
+        {/* Header — no X button: blocking modal, must select or skip */}
         <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--fc-surface-card-border)' }}>
           <div>
             <h3 className="text-base font-semibold fc-text-primary">How hard was that?</h3>
             <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold">Rate of Perceived Exertion</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 fc-text-dim rounded-full transition-colors"
-            style={{ background: 'var(--fc-surface-sunken)' }}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
         </div>
         
         {/* RPE Grid */}
         <div className="px-3 py-3">
-          <div className="grid grid-cols-5 gap-1.5">
+          <div ref={gridRef} tabIndex={-1} className="grid grid-cols-5 gap-1.5 outline-none">
             {RPE_OPTIONS.map((option) => {
               const isSelected = selectedRpe === option.value;
               const color = getRpeColor(option.value);

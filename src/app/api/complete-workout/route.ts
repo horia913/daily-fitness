@@ -70,6 +70,17 @@ export async function POST(req: NextRequest) {
       }, { status: 200 })
     }
 
+    // Handle week lock rejection
+    if (result.programProgression?.status === 'week_locked') {
+      console.warn('🔒 Completion rejected: week is locked')
+      return NextResponse.json({
+        success: false,
+        error: 'WEEK_LOCKED',
+        message: `Complete all workouts in Week ${result.programProgression.unlockedWeekMax} first.`,
+        unlocked_week_max: result.programProgression.unlockedWeekMax,
+      }, { status: 403 })
+    }
+
     // Build response
     const response: any = {
       success: true,

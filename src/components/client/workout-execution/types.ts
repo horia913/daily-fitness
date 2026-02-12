@@ -45,6 +45,18 @@ export interface BaseBlockExecutorProps {
     isPr?: boolean;
   }) => void;
   progressionSuggestion?: import("@/lib/clientProgressionService").ProgressionSuggestion | null;
+  /** Register undo handler for the last logged set (for "Set saved — Undo" toast). Called with a function that removes last set from local state. */
+  registerUndo?: (undoFn: () => void) => void;
+  /** When true, show Logged Sets list and Edit per set (only while workout is in progress). Delete is not supported. */
+  allowSetEditDelete?: boolean;
+  /** Register callback to replace last temp id with real set_log_id when golden sync succeeds. */
+  registerSetLogIdResolved?: (fn: (set_log_id: string) => void) => void;
+  /** Upsert a set into the block's existingSetLogs so history persists when navigating blocks. replaceId = temp id to replace when real id arrives. */
+  onSetLogUpsert?: (blockId: string, setEntry: LoggedSet, options?: { replaceId?: string }) => void;
+  /** Logged sets for this block (parent-owned source of truth). When provided, executors sync from this so history persists across block navigation. */
+  loggedSets?: LoggedSet[];
+  /** Called after a set is successfully updated via PATCH so parent can replace the set in its store. */
+  onSetEditSaved?: (blockId: string, updatedSet: LoggedSet) => void;
 }
 
 export interface BlockDetail {

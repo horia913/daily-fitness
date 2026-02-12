@@ -18,13 +18,19 @@ import {
 import { supabase } from "@/lib/supabase";
 import VideoPlayerModal from "@/components/VideoPlayerModal";
 import ExerciseAlternativesModal from "@/components/coach/ExerciseAlternativesModal";
-import { RestTimerModal, type RestTimerLastSet, type RestTimerNextSetPreview } from "./workout-execution/RestTimerModal";
+import {
+  RestTimerModal,
+  type RestTimerLastSet,
+  type RestTimerNextSetPreview,
+} from "./workout-execution/RestTimerModal";
 import { BaseBlockExecutorProps } from "./workout-execution/types";
 import {
   formatTime,
   calculateSuggestedWeightUtil,
 } from "./workout-execution/BaseBlockExecutor";
 import { fetchApi } from "@/lib/apiClient";
+import { useSetLoggingOrchestrator } from "@/hooks/useSetLoggingOrchestrator";
+import { RPEModal } from "@/components/client/RPEModal";
 
 // Import type-specific components
 import { StraightSetExecutor } from "./workout-execution/blocks/StraightSetExecutor";
@@ -46,6 +52,8 @@ interface LiveWorkoutBlockExecutorProps {
   onNextBlock: () => void;
   e1rmMap?: Record<string, number>;
   onE1rmUpdate?: (exerciseId: string, e1rm: number) => void;
+  /** When true, show Edit/Delete per set (workout in progress). */
+  allowSetEditDelete?: boolean;
   /** Session-level last performed weight per exercise (sticky default); updated after each log-set */
   lastPerformedWeightByExerciseId?: Record<string, number>;
   /** Last-session weight per exercise (earliest set in most recent completed workout) */
@@ -58,6 +66,16 @@ interface LiveWorkoutBlockExecutorProps {
   currentBlockIndex?: number;
   onBlockChange?: (blockIndex: number) => void;
   onSetLogged?: (blockId: string, newCompletedSets: number) => void;
+  /** Upsert a set into the block's existingSetLogs so history persists when navigating blocks. replaceId = temp id to replace when real id arrives. */
+  onSetLogUpsert?: (
+    blockId: string,
+    setEntry: LoggedSet,
+    options?: { replaceId?: string },
+  ) => void;
+  /** Called after a set is successfully updated via PATCH so parent can replace the set in its store. */
+  onSetEditSaved?: (blockId: string, updatedSet: LoggedSet) => void;
+  /** Logged sets for this block (parent-owned). When provided, executors use this so history persists across block navigation. */
+  loggedSets?: LoggedSet[];
   onExerciseComplete?: (blockId: string) => void;
   progressionSuggestions?: Map<
     string,
@@ -71,6 +89,7 @@ export default function LiveWorkoutBlockExecutor({
   onNextBlock,
   e1rmMap = {},
   onE1rmUpdate,
+  allowSetEditDelete = false,
   lastPerformedWeightByExerciseId = {},
   lastSessionWeightByExerciseId = {},
   onWeightLogged,
@@ -80,6 +99,9 @@ export default function LiveWorkoutBlockExecutor({
   currentBlockIndex = 0,
   onBlockChange,
   onSetLogged,
+  onSetLogUpsert,
+  onSetEditSaved,
+  loggedSets,
   onExerciseComplete,
   progressionSuggestions,
 }: LiveWorkoutBlockExecutorProps) {
@@ -96,21 +118,21 @@ export default function LiveWorkoutBlockExecutor({
   useEffect(() => {
     console.log(
       "🔍 [LiveWorkoutBlockExecutor] assignmentId received:",
-      assignmentId
+      assignmentId,
     );
     console.log(
       "🔍 [LiveWorkoutBlockExecutor] assignmentId type:",
-      typeof assignmentId
+      typeof assignmentId,
     );
     console.log(
       "🔍 [LiveWorkoutBlockExecutor] assignmentId truthy:",
-      !!assignmentId
+      !!assignmentId,
     );
   }, [assignmentId]);
 
   // Sync local exercise index with block's currentExerciseIndex
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(
-    block.currentExerciseIndex || 0
+    block.currentExerciseIndex || 0,
   );
 
   // Update local index when block changes
@@ -136,13 +158,44 @@ export default function LiveWorkoutBlockExecutor({
   const [restDuration, setRestDuration] = useState(0);
   const [restLabel, setRestLabel] = useState("Next Set");
   const [pendingAction, setPendingAction] = useState<"set" | "exercise" | null>(
-    null
+    null,
   );
   const [restModalData, setRestModalData] = useState<{
     lastSet: RestTimerLastSet;
     nextSetPreview: RestTimerNextSetPreview | null;
   } | null>(null);
   const completedBlockRef = useRef<Set<string>>(new Set());
+
+  // --- Golden Logging Flow orchestrator ---
+  // onSyncSuccess callback ref (defined after hook, but ref is stable)
+  const syncSuccessRef = useRef<
+    | ((
+        r: import("@/hooks/useSetLoggingOrchestrator").SyncSuccessResult,
+      ) => void)
+    | null
+  >(null);
+  const orchestrator = useSetLoggingOrchestrator(sessionId, (result) =>
+    syncSuccessRef.current?.(result),
+  );
+
+  // When orchestrator signals "open rest timer", bridge to existing rest timer state
+  useEffect(() => {
+    if (!orchestrator.shouldOpenRestTimer) return;
+    orchestrator.ackRestTimerOpened();
+
+    // Determine rest seconds from current exercise / block
+    const currentEx = block.block.exercises?.[currentExerciseIndex ?? 0];
+    const restSeconds =
+      currentEx?.rest_seconds || block.block.rest_seconds || 0;
+
+    if (restSeconds > 0) {
+      // Rest timer data was already prepared by onLastSetLoggedForRest in the executor
+      setRestDuration(restSeconds);
+      setRestLabel("Next Set");
+      setPendingAction("set");
+      setShowRestTimer(true);
+    }
+  }, [orchestrator.shouldOpenRestTimer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load all exercises for alternatives modal
   useEffect(() => {
@@ -212,7 +265,10 @@ export default function LiveWorkoutBlockExecutor({
   };
 
   const LOG_SET_TIMEOUT_MS = 12_000;
-  const inFlightLogRef = useRef<null | { startedAt: number; abort: () => void }>(null);
+  const inFlightLogRef = useRef<null | {
+    startedAt: number;
+    abort: () => void;
+  }>(null);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -231,10 +287,137 @@ export default function LiveWorkoutBlockExecutor({
     };
   }, []);
 
-  // Log set to database and calculate e1RM
-  // Individual sets go to workout_set_logs, not workout_logs
-  // workout_logs is for session summary only
-  const logSetToDatabase = async (data: any): Promise<{ success: boolean; error?: any; e1rm?: number; set_log_id?: string; isNewPR?: boolean }> => {
+  // Ref for Undo: executor registers its "remove last set" function so we can call it after DELETE
+  const undoFnRef = useRef<(() => void) | null>(null);
+  // Resolve callbacks by blockId so when sync completes (possibly after user navigated away) we
+  // still replace temp id in the correct block's list. Do not clear on unmount so late sync works.
+  const setLogIdResolvedByBlockIdRef = useRef<
+    Map<string, (set_log_id: string) => void>
+  >(new Map());
+
+  // ---- Golden Logging Flow: sync success handler ----
+  // (registered as onSyncSuccess callback in orchestrator)
+  // This runs asynchronously when background sync completes.
+  const handleGoldenSyncSuccess = useCallback(
+    (result: import("@/hooks/useSetLoggingOrchestrator").SyncSuccessResult) => {
+      // e1RM update
+      if (result.e1rm && onE1rmUpdate && result.entry.exerciseId) {
+        onE1rmUpdate(result.entry.exerciseId, result.e1rm);
+      }
+      // Sticky weight update
+      if (onWeightLogged && result.entry.exerciseId) {
+        const w = result.entry.payload.weight;
+        if (w != null && typeof w === "number") {
+          onWeightLogged(result.entry.exerciseId, w);
+        }
+      }
+      // PR notification
+      if (result.isNewPR) {
+        addToast({
+          title: "🎉 New Personal Record!",
+          description: "New PR achieved!",
+          variant: "success",
+          duration: 4000,
+        });
+      }
+      // Replace temp id with real set_log_id in the correct block's list (by blockId so it works after navigation)
+      if (result.set_log_id && result.entry.blockId) {
+        setLogIdResolvedByBlockIdRef.current.get(result.entry.blockId)?.(
+          result.set_log_id,
+        );
+      }
+    },
+    [onE1rmUpdate, onWeightLogged, addToast],
+  );
+
+  // Wire the ref so the orchestrator can call our success handler
+  syncSuccessRef.current = handleGoldenSyncSuccess;
+
+  // ---- Golden Logging Flow: optimistic logSetToDatabase wrapper ----
+  // Executors call this; it returns instantly with { success: true }.
+  // The actual API call happens in the background after RPE confirm/skip.
+  const logSetToDatabase = useCallback(
+    async (
+      data: any,
+    ): Promise<{
+      success: boolean;
+      error?: any;
+      e1rm?: number;
+      set_log_id?: string;
+      isNewPR?: boolean;
+    }> => {
+      // Validate sessionId
+      if (
+        !sessionId ||
+        typeof sessionId !== "string" ||
+        sessionId.trim() === ""
+      ) {
+        console.error("[goldenFlow] sessionId missing", { sessionId });
+        return { success: false, error: "Session ID is missing" };
+      }
+
+      const currentExercise = block.block.exercises?.[currentExerciseIndex];
+      const exerciseId = data.exercise_id || currentExercise?.exercise_id || "";
+
+      // Build the enriched payload (same fields the old function built)
+      const enrichedPayload: Record<string, unknown> = {
+        block_id: block.block.id,
+        block_type:
+          data.block_type ||
+          (block.block as any).type ||
+          block.block.block_type,
+        client_id: authUser?.id || undefined,
+        workout_assignment_id: assignmentId || undefined,
+        session_id: String(sessionId).trim(),
+        template_exercise_id: currentExercise?.id || null,
+        ...data,
+      };
+
+      // Route through golden flow orchestrator (giant_set uses round_number, others use set_number)
+      const setNumber = data.set_number ?? data.round_number ?? 1;
+      const result = orchestrator.logSet({
+        sessionId,
+        blockId: block.block.id,
+        blockType:
+          data.block_type ||
+          (block.block as any).type ||
+          block.block.block_type ||
+          "straight_set",
+        exerciseId,
+        setNumber,
+        payload: enrichedPayload,
+      });
+
+      if (!result.accepted) {
+        console.warn("[goldenFlow] logSet rejected:", result.reason);
+        return { success: false, error: result.reason };
+      }
+
+      console.log("[goldenFlow] logSet accepted (optimistic):", result.key);
+      return { success: true, set_log_id: undefined, isNewPR: false };
+    },
+    [
+      sessionId,
+      block.block,
+      currentExerciseIndex,
+      authUser?.id,
+      assignmentId,
+      orchestrator,
+    ],
+  );
+
+  // ---- LEGACY: Direct sync to server (kept for reference / fallback) ----
+  // The golden flow orchestrator now handles all API calls via syncEntry.
+  // This old function body is preserved but not called in the golden flow.
+  const _legacyLogSetToDatabase = async (
+    data: any,
+  ): Promise<{
+    success: boolean;
+    error?: any;
+    e1rm?: number;
+    set_log_id?: string;
+    isNewPR?: boolean;
+  }> => {
     // Validate sessionId before making API call
     if (
       !sessionId ||
@@ -275,21 +458,29 @@ export default function LiveWorkoutBlockExecutor({
         await Promise.race([
           ensureFreshSession(),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("ensureFreshSession timeout")), 4000)
+            setTimeout(
+              () => reject(new Error("ensureFreshSession timeout")),
+              4000,
+            ),
           ),
         ]);
         console.log("[log-set] ensureFreshSession: done");
       } catch (refreshError) {
-        console.warn("[log-set] ensureFreshSession failed or timed out", refreshError);
+        console.warn(
+          "[log-set] ensureFreshSession failed or timed out",
+          refreshError,
+        );
       }
 
       let resolvedUserId = authUser?.id || null;
       if (!resolvedUserId) {
         try {
-          const { data: { user } } = (await Promise.race([
+          const {
+            data: { user },
+          } = (await Promise.race([
             supabase.auth.getUser(),
             new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("getUser timeout")), 2000)
+              setTimeout(() => reject(new Error("getUser timeout")), 2000),
             ),
           ])) as { data: { user: { id: string } | null } };
           resolvedUserId = user?.id || null;
@@ -304,13 +495,16 @@ export default function LiveWorkoutBlockExecutor({
         } = (await Promise.race([
           supabase.auth.getSession(),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("getSession timeout")), 2000)
+            setTimeout(() => reject(new Error("getSession timeout")), 2000),
           ),
         ])) as { data: { session: any } };
         activeSession = session ?? null;
       } catch (sessionError) {
         // Non-blocking: continue without session details if getSession is slow.
-        console.debug("[log-set] getSession timed out; continuing", sessionError);
+        console.debug(
+          "[log-set] getSession timed out; continuing",
+          sessionError,
+        );
       }
 
       const logSessionInfo = {
@@ -330,22 +524,24 @@ export default function LiveWorkoutBlockExecutor({
         // Debug: Log assignmentId before building request
         console.log(
           "🔍 [logSetToDatabase] assignmentId from closure:",
-          assignmentId
+          assignmentId,
         );
         console.log(
           "🔍 [logSetToDatabase] assignmentId type:",
-          typeof assignmentId
+          typeof assignmentId,
         );
         console.log(
           "🔍 [logSetToDatabase] assignmentId truthy:",
-          !!assignmentId
+          !!assignmentId,
         );
 
         console.log("[log-set] resolvedUserId:", resolvedUserId);
 
         // Build request body with all data passed from executor + required fields
         if (!resolvedUserId) {
-          console.warn("[log-set] No client user id available; relying on cookie auth.");
+          console.warn(
+            "[log-set] No client user id available; relying on cookie auth.",
+          );
         }
 
         const requestBody: any = {
@@ -372,79 +568,82 @@ export default function LiveWorkoutBlockExecutor({
           weight: requestBody.weight,
         });
 
-          const sendLogSet = async (attempt: number) => {
-            console.log("🚀 About to send to /api/log-set:", {
-              requestId,
-              attempt,
-              route: window.location.pathname,
-              session: logSessionInfo,
-              workout_assignment_id: requestBody.workout_assignment_id,
-              block_id: requestBody.block_id,
-              client_id: requestBody.client_id,
-              block_type: requestBody.block_type,
-              exercise_id: requestBody.exercise_id,
-              weight: requestBody.weight,
-              reps: requestBody.reps,
-            });
+        const sendLogSet = async (attempt: number) => {
+          console.log("🚀 About to send to /api/log-set:", {
+            requestId,
+            attempt,
+            route: window.location.pathname,
+            session: logSessionInfo,
+            workout_assignment_id: requestBody.workout_assignment_id,
+            block_id: requestBody.block_id,
+            client_id: requestBody.client_id,
+            block_type: requestBody.block_type,
+            exercise_id: requestBody.exercise_id,
+            weight: requestBody.weight,
+            reps: requestBody.reps,
+          });
 
-            const controller = new AbortController();
-            inFlightLogRef.current = {
-              startedAt: Date.now(),
-              abort: () => controller.abort(),
-            };
-
-            const timeoutError = new Error("timeout");
-            (timeoutError as any).name = "TimeoutError";
-
-            let timeoutId: ReturnType<typeof setTimeout> | null = null;
-            const timeoutPromise = new Promise<never>((_, reject) => {
-              timeoutId = setTimeout(() => {
-                controller.abort();
-                reject(timeoutError);
-              }, LOG_SET_TIMEOUT_MS);
-            });
-
-            const response = (await Promise.race([
-              fetch("/api/log-set", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(requestBody),
-                signal: controller.signal,
-                credentials: "include",
-              }),
-              timeoutPromise,
-            ])) as Response;
-
-            if (timeoutId) {
-              clearTimeout(timeoutId);
-            }
-            inFlightLogRef.current = null;
-
-            const responseText = await response.text().catch(() => "");
-            console.log("[log-set]", {
-              requestId,
-              attempt,
-              status: response.status,
-              payloadSummary,
-              responseText,
-            });
-
-            let parsed: any = {};
-            if (responseText && responseText.trim().length > 0) {
-              try {
-                parsed = JSON.parse(responseText);
-              } catch {
-                parsed = { error: responseText };
-              }
-            }
-
-            return { response, parsed };
+          const controller = new AbortController();
+          inFlightLogRef.current = {
+            startedAt: Date.now(),
+            abort: () => controller.abort(),
           };
+
+          const timeoutError = new Error("timeout");
+          (timeoutError as any).name = "TimeoutError";
+
+          let timeoutId: ReturnType<typeof setTimeout> | null = null;
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => {
+              controller.abort();
+              reject(timeoutError);
+            }, LOG_SET_TIMEOUT_MS);
+          });
+
+          const response = (await Promise.race([
+            fetch("/api/log-set", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(requestBody),
+              signal: controller.signal,
+              credentials: "include",
+            }),
+            timeoutPromise,
+          ])) as Response;
+
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          inFlightLogRef.current = null;
+
+          const responseText = await response.text().catch(() => "");
+          console.log("[log-set]", {
+            requestId,
+            attempt,
+            status: response.status,
+            payloadSummary,
+            responseText,
+          });
+
+          let parsed: any = {};
+          if (responseText && responseText.trim().length > 0) {
+            try {
+              parsed = JSON.parse(responseText);
+            } catch {
+              parsed = { error: responseText };
+            }
+          }
+
+          return { response, parsed };
+        };
 
         let attempt = 1;
         let { response, parsed } = await sendLogSet(attempt);
 
-        if ((response.status === 401 || response.status === 403) && attempt === 1) {
+        if (
+          (response.status === 401 || response.status === 403) &&
+          attempt === 1
+        ) {
           await ensureFreshSession();
           const {
             data: { session: refreshedSession },
@@ -462,52 +661,96 @@ export default function LiveWorkoutBlockExecutor({
           ({ response, parsed } = await sendLogSet(attempt));
         }
 
-          if (response.ok) {
-            const result = parsed;
-            if (result.success) {
-              // Update e1RM in local state (only if exercise_id is present in the data)
+        if (response.ok) {
+          const result = parsed;
+          if (result.success) {
+            // Update e1RM in local state (only if exercise_id is present in the data)
+            if (
+              result.e1rm &&
+              result.e1rm.stored &&
+              onE1rmUpdate &&
+              data.exercise_id
+            ) {
+              onE1rmUpdate(data.exercise_id, result.e1rm.stored);
+            }
+            // Update session-level sticky weight for default on next set
+            if (onWeightLogged) {
               if (
-                result.e1rm &&
-                result.e1rm.stored &&
-                onE1rmUpdate &&
-                data.exercise_id
+                data.exercise_id != null &&
+                data.weight != null &&
+                typeof data.weight === "number"
               ) {
-                onE1rmUpdate(data.exercise_id, result.e1rm.stored);
+                onWeightLogged(data.exercise_id, data.weight);
               }
-              // Update session-level sticky weight for default on next set
-              if (onWeightLogged) {
-                if (data.exercise_id != null && data.weight != null && typeof data.weight === "number") {
-                  onWeightLogged(data.exercise_id, data.weight);
-                }
-                if (data.superset_exercise_a_id != null && data.superset_weight_a != null && typeof data.superset_weight_a === "number") {
-                  onWeightLogged(data.superset_exercise_a_id, data.superset_weight_a);
-                }
-                if (data.superset_exercise_b_id != null && data.superset_weight_b != null && typeof data.superset_weight_b === "number") {
-                  onWeightLogged(data.superset_exercise_b_id, data.superset_weight_b);
-                }
-                if (Array.isArray(data.giant_set_exercises)) {
-                  for (const ex of data.giant_set_exercises) {
-                    if (ex?.exercise_id != null && ex?.weight != null && typeof ex.weight === "number") {
-                      onWeightLogged(ex.exercise_id, ex.weight);
-                    }
+              if (
+                data.superset_exercise_a_id != null &&
+                data.superset_weight_a != null &&
+                typeof data.superset_weight_a === "number"
+              ) {
+                onWeightLogged(
+                  data.superset_exercise_a_id,
+                  data.superset_weight_a,
+                );
+              }
+              if (
+                data.superset_exercise_b_id != null &&
+                data.superset_weight_b != null &&
+                typeof data.superset_weight_b === "number"
+              ) {
+                onWeightLogged(
+                  data.superset_exercise_b_id,
+                  data.superset_weight_b,
+                );
+              }
+              if (Array.isArray(data.giant_set_exercises)) {
+                for (const ex of data.giant_set_exercises) {
+                  if (
+                    ex?.exercise_id != null &&
+                    ex?.weight != null &&
+                    typeof ex.weight === "number"
+                  ) {
+                    onWeightLogged(ex.exercise_id, ex.weight);
                   }
                 }
-                if (data.exercise_id != null && data.dropset_initial_weight != null && typeof data.dropset_initial_weight === "number") {
-                  onWeightLogged(data.exercise_id, data.dropset_initial_weight);
-                }
-                const rpWeight = data.rest_pause_initial_weight;
-                if (data.exercise_id != null && rpWeight != null && typeof rpWeight === "number") {
-                  onWeightLogged(data.exercise_id, rpWeight);
-                }
-                if (data.preexhaust_isolation_exercise_id != null && data.preexhaust_isolation_weight != null && typeof data.preexhaust_isolation_weight === "number") {
-                  onWeightLogged(data.preexhaust_isolation_exercise_id, data.preexhaust_isolation_weight);
-                }
-                if (data.preexhaust_compound_exercise_id != null && data.preexhaust_compound_weight != null && typeof data.preexhaust_compound_weight === "number") {
-                  onWeightLogged(data.preexhaust_compound_exercise_id, data.preexhaust_compound_weight);
-                }
               }
+              if (
+                data.exercise_id != null &&
+                data.dropset_initial_weight != null &&
+                typeof data.dropset_initial_weight === "number"
+              ) {
+                onWeightLogged(data.exercise_id, data.dropset_initial_weight);
+              }
+              const rpWeight = data.rest_pause_initial_weight;
+              if (
+                data.exercise_id != null &&
+                rpWeight != null &&
+                typeof rpWeight === "number"
+              ) {
+                onWeightLogged(data.exercise_id, rpWeight);
+              }
+              if (
+                data.preexhaust_isolation_exercise_id != null &&
+                data.preexhaust_isolation_weight != null &&
+                typeof data.preexhaust_isolation_weight === "number"
+              ) {
+                onWeightLogged(
+                  data.preexhaust_isolation_exercise_id,
+                  data.preexhaust_isolation_weight,
+                );
+              }
+              if (
+                data.preexhaust_compound_exercise_id != null &&
+                data.preexhaust_compound_weight != null &&
+                typeof data.preexhaust_compound_weight === "number"
+              ) {
+                onWeightLogged(
+                  data.preexhaust_compound_exercise_id,
+                  data.preexhaust_compound_weight,
+                );
+              }
+            }
 
-              // Show PR notification if new personal record
+            // Show PR notification if new personal record
             if (result.pr?.any_weight_pr || result.pr?.any_volume_pr) {
               addToast({
                 title: "🎉 New Personal Record!",
@@ -524,43 +767,43 @@ export default function LiveWorkoutBlockExecutor({
               });
             }
 
-              return {
-                success: true,
-                set_log_id: result.set_log_id, // Pass through for RPE modal
-                e1rm: result.e1rm?.stored || result.e1rm?.calculated,
-                isNewPR: !!(result.pr?.any_weight_pr || result.pr?.any_volume_pr),
-              };
-            }
-
-            console.error("API returned error:", parsed?.error);
-            addToast({
-              title: "Error",
-              description: parsed?.error || "Failed to log set",
-              variant: "destructive",
-              duration: 5000,
-            });
-            return { success: false, error: parsed?.error };
+            return {
+              success: true,
+              set_log_id: result.set_log_id, // Pass through for RPE modal
+              e1rm: result.e1rm?.stored || result.e1rm?.calculated,
+              isNewPR: !!(result.pr?.any_weight_pr || result.pr?.any_volume_pr),
+            };
           }
 
-          if (response.status === 401 || response.status === 403) {
-            addToast({
-              title: "Session expired",
-              description: "Please refresh and log in again.",
-              variant: "destructive",
-              duration: 5000,
-            });
-            return { success: false, error: "Session expired" };
-          }
+          console.error("API returned error:", parsed?.error);
+          addToast({
+            title: "Error",
+            description: parsed?.error || "Failed to log set",
+            variant: "destructive",
+            duration: 5000,
+          });
+          return { success: false, error: parsed?.error };
+        }
 
-          if (response.status === 400) {
-            addToast({
-              title: "Error",
-              description: parsed?.error || "Invalid request",
-              variant: "destructive",
-              duration: 5000,
-            });
-            return { success: false, error: parsed?.error || "Invalid request" };
-          }
+        if (response.status === 401 || response.status === 403) {
+          addToast({
+            title: "Session expired",
+            description: "Please refresh and log in again.",
+            variant: "destructive",
+            duration: 5000,
+          });
+          return { success: false, error: "Session expired" };
+        }
+
+        if (response.status === 400) {
+          addToast({
+            title: "Error",
+            description: parsed?.error || "Invalid request",
+            variant: "destructive",
+            duration: 5000,
+          });
+          return { success: false, error: parsed?.error || "Invalid request" };
+        }
 
         addToast({
           title: "Server slow",
@@ -630,7 +873,7 @@ export default function LiveWorkoutBlockExecutor({
       // All sets done for this exercise
       // Check if more exercises exist
       if (nextExerciseIndex < exercises.length) {
-        // More exercises - show rest timer before next exercise
+        // More exercises - rest timer before next exercise is opened by orchestrator after RPE (do not open here)
         const nextExercise = exercises[nextExerciseIndex];
         const restSeconds = nextExercise.rest_seconds || 0;
 
@@ -641,10 +884,10 @@ export default function LiveWorkoutBlockExecutor({
               nextExercise.exercise?.name ||
               (nextExercise as any).name ||
               "Exercise"
-            }`
+            }`,
           );
           setPendingAction("exercise");
-          setShowRestTimer(true);
+          // Rest timer opens only after RPE modal (orchestrator.shouldOpenRestTimer), not on set log
         } else {
           // No rest, advance immediately
           onExerciseComplete?.(block.block.id);
@@ -657,8 +900,7 @@ export default function LiveWorkoutBlockExecutor({
           console.log("[block complete detected]", {
             blockId: block.block.id,
             completedSets: newCompletedSets,
-            totalSets:
-              currentExercise?.sets || block.block.total_sets || 1,
+            totalSets: currentExercise?.sets || block.block.total_sets || 1,
             currentExerciseIndex,
             source: "handleSetComplete-finalExercise",
           });
@@ -666,7 +908,7 @@ export default function LiveWorkoutBlockExecutor({
         }
       }
     } else {
-      // More sets to do in this exercise
+      // More sets to do in this exercise - rest timer opens only after RPE (orchestrator.shouldOpenRestTimer), not on set log
       const restSeconds =
         currentExercise?.rest_seconds || block.block.rest_seconds || 0;
 
@@ -674,8 +916,7 @@ export default function LiveWorkoutBlockExecutor({
         setRestDuration(restSeconds);
         setRestLabel("Next Set");
         setPendingAction("set");
-        setShowRestTimer(true);
-        // Don't advance yet - wait for timer
+        // Do not setShowRestTimer(true) here; orchestrator opens it after RPE modal
       }
       // If no rest, executor should handle immediate advancement
     }
@@ -753,10 +994,17 @@ export default function LiveWorkoutBlockExecutor({
 
   // Called by executor before onSetComplete when rest timer will show; provides completion hero + next set preview
   const handleLastSetLoggedForRest = useCallback(
-    (data: { weight: number; reps: number; setNumber: number; totalSets: number; isPr?: boolean }) => {
+    (data: {
+      weight: number;
+      reps: number;
+      setNumber: number;
+      totalSets: number;
+      isPr?: boolean;
+    }) => {
       const currentEx = block.block.exercises?.[currentExerciseIndex ?? 0];
       const targetWeight =
-        currentEx?.exercise_id && lastPerformedWeightByExerciseId[currentEx.exercise_id] != null
+        currentEx?.exercise_id &&
+        lastPerformedWeightByExerciseId[currentEx.exercise_id] != null
           ? lastPerformedWeightByExerciseId[currentEx.exercise_id]
           : null;
       const repsVal = currentEx?.reps ?? block.block.reps_per_set;
@@ -785,7 +1033,7 @@ export default function LiveWorkoutBlockExecutor({
       block.block.reps_per_set,
       currentExerciseIndex,
       lastPerformedWeightByExerciseId,
-    ]
+    ],
   );
 
   // Get progression suggestion for current exercise
@@ -816,7 +1064,7 @@ export default function LiveWorkoutBlockExecutor({
     formatTime,
     calculateSuggestedWeight: (
       exerciseId: string,
-      loadPercentage: number | null | undefined
+      loadPercentage: number | null | undefined,
     ) => calculateSuggestedWeightUtil(exerciseId, loadPercentage, e1rmMap),
     onVideoClick: openVideoModal,
     onAlternativesClick: (exerciseId: string) => {
@@ -827,6 +1075,17 @@ export default function LiveWorkoutBlockExecutor({
     onSetComplete: handleSetComplete,
     onLastSetLoggedForRest: handleLastSetLoggedForRest,
     progressionSuggestion,
+    registerUndo: (fn) => {
+      undoFnRef.current = fn;
+    },
+    allowSetEditDelete,
+    registerSetLogIdResolved: (fn) => {
+      setLogIdResolvedByBlockIdRef.current.set(block.block.id, fn);
+      return () => {};
+    },
+    onSetLogUpsert: onSetLogUpsert ?? (() => {}),
+    onSetEditSaved: onSetEditSaved ?? (() => {}),
+    loggedSets: loggedSets ?? [],
   };
 
   // Route to appropriate component based on block type
@@ -956,7 +1215,7 @@ export default function LiveWorkoutBlockExecutor({
         alternativesExerciseId &&
         (() => {
           const exerciseData = block.block.exercises?.find(
-            (ex) => ex.exercise_id === alternativesExerciseId
+            (ex) => ex.exercise_id === alternativesExerciseId,
           );
           const exercise = exerciseData?.exercise;
           if (!exercise) return null;
@@ -978,6 +1237,13 @@ export default function LiveWorkoutBlockExecutor({
             />
           );
         })()}
+
+      {/* Golden Logging Flow: RPE Modal (blocking, all executors) */}
+      <RPEModal
+        isOpen={orchestrator.showRpeModal}
+        onSelect={(rpe) => orchestrator.confirmRpe(rpe)}
+        onSkip={() => orchestrator.skipRpe()}
+      />
 
       {/* Rest Timer Modal */}
       <RestTimerModal

@@ -27,8 +27,10 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import {
   getProgramSlots,
+  getCompletedSlots,
   getNextSlot,
   updateProgressCache,
+  assertWeekUnlocked,
 } from './programStateService'
 
 // ============================================================================
@@ -57,12 +59,13 @@ export interface CompleteWorkoutResult {
     duration_minutes: number
   }
   programProgression: {
-    status: 'advanced' | 'program_completed' | 'no_program' | 'already_recorded'
+    status: 'advanced' | 'program_completed' | 'no_program' | 'already_recorded' | 'week_locked'
     currentWeekNumber?: number
     currentDayNumber?: number
     isCompleted?: boolean
     programAssignmentId?: string
     programScheduleId?: string
+    unlockedWeekMax?: number
   } | null
 }
 
@@ -194,53 +197,84 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
     const programAssignmentId = workoutLog.program_assignment_id
     const programScheduleId = workoutLog.program_schedule_id
 
-    console.log('[completeWorkoutService] Recording program day completion:', {
-      programAssignmentId,
-      programScheduleId,
-      completedBy,
-    })
+    // 6-pre. Get program_id, slots, and completions for week lock check + progression
+    const { data: assignment } = await supabaseAdmin
+      .from('program_assignments')
+      .select('program_id')
+      .eq('id', programAssignmentId)
+      .single()
 
-    // 6a. INSERT into ledger (idempotent via ON CONFLICT DO NOTHING)
-    const { error: ledgerError, data: ledgerData } = await supabaseAdmin
-      .from('program_day_completions')
-      .insert({
-        program_assignment_id: programAssignmentId,
-        program_schedule_id: programScheduleId,
-        completed_at: completedAt.toISOString(),
-        completed_by: completedBy,
-        notes: notes || null,
-      })
-      .select('id')
-      .maybeSingle()
+    if (!assignment) {
+      console.error('[completeWorkoutService] Program assignment not found:', programAssignmentId)
+      programProgression = { status: 'no_program' }
+    } else {
+      const [allSlots, completedSlots] = await Promise.all([
+        getProgramSlots(supabaseAdmin, assignment.program_id),
+        getCompletedSlots(supabaseAdmin, programAssignmentId),
+      ])
 
-    if (ledgerError) {
-      // Check for unique violation (already recorded) — this is expected and fine
-      if (ledgerError.code === '23505') {
-        console.log('[completeWorkoutService] Day already recorded in ledger (idempotent)')
-        programProgression = {
-          status: 'already_recorded',
-          programAssignmentId,
-          programScheduleId,
+      // 6-lock. WEEK LOCK: find the target slot's week and enforce sequential week order
+      const targetSlot = allSlots.find(s => s.id === programScheduleId)
+      if (targetSlot) {
+        try {
+          assertWeekUnlocked(targetSlot.week_number, allSlots, completedSlots)
+        } catch (lockErr: any) {
+          if (lockErr.code === 'WEEK_LOCKED') {
+            console.warn('[completeWorkoutService] Week lock rejected completion:', lockErr.message)
+            return {
+              success: false,
+              alreadyCompleted: false,
+              workoutLog,
+              totals: { sets: 0, reps: 0, weight: 0, duration_minutes: 0 },
+              programProgression: {
+                status: 'week_locked' as any,
+                programAssignmentId,
+                programScheduleId,
+                unlockedWeekMax: lockErr.unlockedWeekMax,
+              },
+            }
+          }
+          throw lockErr
         }
-      } else {
-        console.error('[completeWorkoutService] Error writing to ledger:', ledgerError)
-        // Non-fatal: workout is already marked complete, ledger write failed
-        // The ledger can be reconciled later
       }
-    }
 
-    // 6b. Find next uncompleted slot
-    if (!programProgression) {
-      // Get program_id from assignment
-      const { data: assignment } = await supabaseAdmin
-        .from('program_assignments')
-        .select('program_id')
-        .eq('id', programAssignmentId)
-        .single()
+      console.log('[completeWorkoutService] Recording program day completion:', {
+        programAssignmentId,
+        programScheduleId,
+        completedBy,
+      })
 
-      if (assignment) {
+      // 6a. INSERT into ledger (idempotent via ON CONFLICT DO NOTHING)
+      const { error: ledgerError, data: ledgerData } = await supabaseAdmin
+        .from('program_day_completions')
+        .insert({
+          program_assignment_id: programAssignmentId,
+          program_schedule_id: programScheduleId,
+          completed_at: completedAt.toISOString(),
+          completed_by: completedBy,
+          notes: notes || null,
+        })
+        .select('id')
+        .maybeSingle()
+
+      if (ledgerError) {
+        // Check for unique violation (already recorded) — this is expected and fine
+        if (ledgerError.code === '23505') {
+          console.log('[completeWorkoutService] Day already recorded in ledger (idempotent)')
+          programProgression = {
+            status: 'already_recorded',
+            programAssignmentId,
+            programScheduleId,
+          }
+        } else {
+          console.error('[completeWorkoutService] Error writing to ledger:', ledgerError)
+          // Non-fatal: workout is already marked complete, ledger write failed
+        }
+      }
+
+      // 6b. Find next uncompleted slot and update progress cache
+      if (!programProgression) {
         const nextSlotResult = await getNextSlot(supabaseAdmin, programAssignmentId, assignment.program_id)
-        const allSlots = await getProgramSlots(supabaseAdmin, assignment.program_id)
         const lastSlot = allSlots[allSlots.length - 1]
 
         // 6c. Update progress cache

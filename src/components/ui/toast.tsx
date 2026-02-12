@@ -26,21 +26,27 @@ const toastVariants = cva(
   }
 )
 
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 export interface ToastProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof toastVariants> {
   title?: string
   description?: string
   onClose?: () => void
+  action?: ToastAction
 }
 
 const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
-  ({ className, variant, title, description, onClose, ...props }, ref) => {
+  ({ className, variant, title, description, onClose, action, ...props }, ref) => {
     return (
       <div
         ref={ref}
         className={cn(toastVariants({ variant }), className)}
         {...props}
       >
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {title && (
             <div className="text-sm font-semibold">{title}</div>
           )}
@@ -48,14 +54,28 @@ const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
             <div className="text-sm text-[color:var(--fc-text-dim)]">{description}</div>
           )}
         </div>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="absolute right-2 top-2 rounded-lg p-1 fc-text-dim opacity-0 transition-opacity hover:fc-text-primary focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {action && (
+            <button
+              type="button"
+              onClick={() => {
+                action.onClick();
+                onClose?.();
+              }}
+              className="text-sm font-medium underline underline-offset-2 hover:no-underline focus:outline-none focus:ring-2 rounded"
+            >
+              {action.label}
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1 fc-text-dim opacity-0 transition-opacity hover:fc-text-primary focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
     )
   }

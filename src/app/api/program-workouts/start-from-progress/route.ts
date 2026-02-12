@@ -26,6 +26,7 @@ import { validateApiAuth, validateOwnership, createUnauthorizedResponse, createF
 import {
   getProgramState,
   getCompletedSlots,
+  assertWeekUnlocked,
   ProgramScheduleSlot,
 } from '@/lib/programStateService'
 
@@ -129,6 +130,23 @@ export async function POST(request: NextRequest) {
       })
     }
     
+    // ========================================================================
+    // STEP 2b: WEEK LOCK — reject if the chosen slot is in a locked week
+    // ========================================================================
+    try {
+      assertWeekUnlocked(chosenSlot.week_number, state.slots, state.completedSlots)
+    } catch (lockErr: any) {
+      if (lockErr.code === 'WEEK_LOCKED') {
+        console.warn('[start-from-progress] Week lock rejected:', lockErr.message)
+        return NextResponse.json({
+          error: 'WEEK_LOCKED',
+          message: lockErr.message,
+          unlocked_week_max: lockErr.unlockedWeekMax,
+        }, { status: 403 })
+      }
+      throw lockErr
+    }
+
     const templateId = chosenSlot.template_id
     const programScheduleId = chosenSlot.id
     

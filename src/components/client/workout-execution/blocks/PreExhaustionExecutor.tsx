@@ -2,7 +2,13 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Target, CheckCircle } from "lucide-react";
+import {
+  Target,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  Pencil,
+} from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
@@ -17,6 +23,8 @@ import { LoggedSet } from "@/types/workoutBlocks";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { getCoachSuggestedWeight } from "@/lib/weightDefaultService";
+import { fetchApi } from "@/lib/apiClient";
+import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 
 export function PreExhaustionExecutor({
   block,
@@ -39,13 +47,21 @@ export function PreExhaustionExecutor({
   onRestTimerClick,
   onSetComplete,
   onLastSetLoggedForRest,
+  allowSetEditDelete = false,
+  registerSetLogIdResolved,
+  onSetLogUpsert,
+  onSetEditSaved,
+  loggedSets,
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const isolationExercise = block.block.exercises?.[0];
   const compoundExercise = block.block.exercises?.[1];
   const totalSets = block.block.total_sets || 1;
   const completedSets = block.completedSets || 0;
-  const currentSet = completedSets;
+  const currentSetNumber = completedSets + 1;
+
+  /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
+  const loggedSetsList = loggedSets ?? [];
 
   const restBetween = block.block.rest_seconds || 15;
 
@@ -58,14 +74,86 @@ export function PreExhaustionExecutor({
   const [showTimer, setShowTimer] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(restBetween);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
+  const [editingSetId, setEditingSetId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{
+    isolationWeight: string;
+    isolationReps: string;
+    compoundWeight: string;
+    compoundReps: string;
+    set_number: number;
+  } | null>(null);
 
-  // Pre-fill with suggested weights
+  const displaySetNumber =
+    editingSetId && editDraft?.set_number != null
+      ? editDraft.set_number
+      : viewingSetIndex >= 1
+        ? viewingSetIndex
+        : Math.min(currentSetNumber, totalSets);
+
+  const loggedSetsRef = useRef<LoggedSet[]>(loggedSetsList);
   useEffect(() => {
+    loggedSetsRef.current = loggedSetsList;
+  }, [loggedSetsList]);
+  useEffect(() => {
+    if (!registerSetLogIdResolved) return;
+    registerSetLogIdResolved((set_log_id: string) => {
+      const list = loggedSetsRef.current;
+      const tempEntries = list.filter((s) => s.id.startsWith("temp-"));
+      if (tempEntries.length === 0) return;
+      const tempId = tempEntries[0].id;
+      tempEntries.forEach((oldEntry) => {
+        const newEntry = { ...oldEntry, id: set_log_id };
+        onSetLogUpsert?.(block.block.id, newEntry, { replaceId: tempId });
+      });
+    });
+    return () => {};
+  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  useEffect(() => {
+    if (viewingSetIndex > loggedSetsList.length)
+      setViewingSetIndex(loggedSetsList.length);
+  }, [loggedSetsList.length, viewingSetIndex]);
+  useEffect(() => {
+    if (viewingSetIndex >= 1) {
+      const forSet = loggedSetsList.filter(
+        (s) => s.set_number === viewingSetIndex,
+      );
+      const isolationEntry =
+        forSet.find((s) => s.exercise_id === isolationExercise?.exercise_id) ??
+        forSet[0];
+      const compoundEntry =
+        forSet.find((s) => s.exercise_id === compoundExercise?.exercise_id) ??
+        forSet[1] ??
+        forSet[0];
+      if (forSet.length > 0) {
+        if (isolationEntry) {
+          setIsolationWeight(String(isolationEntry.weight_kg ?? ""));
+          setIsolationReps(String(isolationEntry.reps_completed ?? ""));
+        }
+        if (compoundEntry) {
+          setCompoundWeight(String(compoundEntry.weight_kg ?? ""));
+          setCompoundReps(String(compoundEntry.reps_completed ?? ""));
+        }
+      }
+    }
+  }, [
+    viewingSetIndex,
+    loggedSetsList,
+    isolationExercise?.exercise_id,
+    compoundExercise?.exercise_id,
+  ]);
+
+  const isViewingLoggedSet = viewingSetIndex >= 1;
+  // Pre-fill with suggested weights (skip when viewing a previous set)
+  useEffect(() => {
+    if (isViewingLoggedSet) return;
     if (isolationExercise?.load_percentage && !isolationWeight) {
       const suggested = calculateSuggestedWeightUtil(
         isolationExercise.exercise_id,
         isolationExercise.load_percentage,
-        e1rmMap
+        e1rmMap,
       );
       if (suggested) setIsolationWeight(suggested.toString());
     }
@@ -73,11 +161,12 @@ export function PreExhaustionExecutor({
       const suggested = calculateSuggestedWeightUtil(
         compoundExercise.exercise_id,
         compoundExercise.load_percentage,
-        e1rmMap
+        e1rmMap,
       );
       if (suggested) setCompoundWeight(suggested.toString());
     }
   }, [
+    isViewingLoggedSet,
     isolationExercise,
     compoundExercise,
     e1rmMap,
@@ -144,11 +233,11 @@ export function PreExhaustionExecutor({
     const suggestedWeight = calculateSuggestedWeightUtil(
       isolationExercise.exercise_id,
       isolationExercise.load_percentage,
-      e1rmMap
+      e1rmMap,
     );
     const loadDisplay = formatLoadPercentage(
       isolationExercise.load_percentage,
-      suggestedWeight
+      suggestedWeight,
     );
     if (loadDisplay) {
       blockDetails.push({
@@ -162,11 +251,11 @@ export function PreExhaustionExecutor({
     const suggestedWeight = calculateSuggestedWeightUtil(
       compoundExercise.exercise_id,
       compoundExercise.load_percentage,
-      e1rmMap
+      e1rmMap,
     );
     const loadDisplay = formatLoadPercentage(
       compoundExercise.load_percentage,
-      suggestedWeight
+      suggestedWeight,
     );
     if (loadDisplay) {
       blockDetails.push({
@@ -178,6 +267,127 @@ export function PreExhaustionExecutor({
 
   const instructions = block.block.block_notes || undefined;
 
+  const maxViewableSet =
+    loggedSetsList.length === 0
+      ? 0
+      : Math.max(...loggedSetsList.map((s) => s.set_number));
+
+  const handleEditSet = (setEntry: LoggedSet) => {
+    const forSet = loggedSetsList.filter(
+      (s) => s.set_number === setEntry.set_number,
+    );
+    const iso =
+      forSet.find((s) => s.exercise_id === isolationExercise?.exercise_id) ??
+      forSet[0];
+    const comp =
+      forSet.find((s) => s.exercise_id === compoundExercise?.exercise_id) ??
+      forSet[1] ??
+      forSet[0];
+    setEditingSetId(setEntry.id);
+    setEditDraft({
+      isolationWeight: String(iso?.weight_kg ?? ""),
+      isolationReps: String(iso?.reps_completed ?? ""),
+      compoundWeight: String(comp?.weight_kg ?? ""),
+      compoundReps: String(comp?.reps_completed ?? ""),
+      set_number: setEntry.set_number ?? 1,
+    });
+    setMenuOpenSetId(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSetId || !editDraft) return;
+    if (editingSetId.startsWith("temp-")) {
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[SAVE EDITS guard]", {
+          executor: "PreExhaustionExecutor",
+          blockTypeFromUI: block.block.block_type,
+          editingSetId,
+          isSavingEdit,
+          timestamp: Date.now(),
+        });
+      }
+      addToast({
+        title: "Set still saving, try again in a moment",
+        variant: "default",
+        duration: 2000,
+      });
+      return;
+    }
+    const isolationWeightNum = parseFloat(editDraft.isolationWeight);
+    const isolationRepsNum = parseInt(editDraft.isolationReps, 10);
+    const compoundWeightNum = parseFloat(editDraft.compoundWeight);
+    const compoundRepsNum = parseInt(editDraft.compoundReps, 10);
+    if (
+      isNaN(isolationWeightNum) ||
+      isNaN(isolationRepsNum) ||
+      isNaN(compoundWeightNum) ||
+      isNaN(compoundRepsNum)
+    ) {
+      addToast({
+        title: "Invalid values",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+    setIsSavingEdit(true);
+    try {
+      const payload = buildSetEditPatchPayload(block.block.block_type, {
+        set_number: editDraft.set_number,
+        preexhaust_isolation_exercise_id:
+          isolationExercise?.exercise_id ?? undefined,
+        preexhaust_isolation_weight: isolationWeightNum,
+        preexhaust_isolation_reps: isolationRepsNum,
+        preexhaust_compound_exercise_id:
+          compoundExercise?.exercise_id ?? undefined,
+        preexhaust_compound_weight: compoundWeightNum,
+        preexhaust_compound_reps: compoundRepsNum,
+      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[SAVE EDITS]", {
+          executor: "PreExhaustionExecutor",
+          setId: editingSetId,
+          blockTypeFromUI: block.block.block_type,
+          payloadKeys: Object.keys(payload),
+        });
+      }
+      const res = await fetchApi(`/api/sets/${editingSetId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      if (res?.ok) {
+        const setNum = editDraft.set_number;
+        const next = loggedSetsList.map((s) => {
+          if (s.set_number !== setNum) return s;
+          const isIso = s.exercise_id === isolationExercise?.exercise_id;
+          return {
+            ...s,
+            weight_kg: isIso ? isolationWeightNum : compoundWeightNum,
+            reps_completed: isIso ? isolationRepsNum : compoundRepsNum,
+          };
+        });
+        const toUpsert = next.filter((s) => s.set_number === setNum);
+        toUpsert.forEach((e) => onSetEditSaved?.(block.block.id, e));
+        setEditingSetId(null);
+        setEditDraft(null);
+        addToast({ title: "Set updated", variant: "success", duration: 2000 });
+      } else {
+        addToast({
+          title: "Failed to update set",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSetId(null);
+    setEditDraft(null);
+  };
+
   const handleLog = async () => {
     if (!isolationExercise || !compoundExercise || isLoggingSet) return;
 
@@ -186,14 +396,28 @@ export function PreExhaustionExecutor({
     const compoundWeightNum = parseFloat(compoundWeight);
     const compoundRepsNum = parseInt(compoundReps);
 
-    if (!isolationWeight || isolationWeight.trim() === "" || isNaN(isolationWeightNum) || isolationWeightNum < 0 ||
-      !isolationReps || isolationReps.trim() === "" || isNaN(isolationRepsNum) || isolationRepsNum <= 0 ||
-      !compoundWeight || compoundWeight.trim() === "" || isNaN(compoundWeightNum) || compoundWeightNum < 0 ||
-      !compoundReps || compoundReps.trim() === "" || isNaN(compoundRepsNum) || compoundRepsNum <= 0
+    if (
+      !isolationWeight ||
+      isolationWeight.trim() === "" ||
+      isNaN(isolationWeightNum) ||
+      isolationWeightNum < 0 ||
+      !isolationReps ||
+      isolationReps.trim() === "" ||
+      isNaN(isolationRepsNum) ||
+      isolationRepsNum <= 0 ||
+      !compoundWeight ||
+      compoundWeight.trim() === "" ||
+      isNaN(compoundWeightNum) ||
+      compoundWeightNum < 0 ||
+      !compoundReps ||
+      compoundReps.trim() === "" ||
+      isNaN(compoundRepsNum) ||
+      compoundRepsNum <= 0
     ) {
       addToast({
         title: "Invalid Input",
-        description: "Please enter valid weight and reps for both isolation and compound exercises",
+        description:
+          "Please enter valid weight and reps for both isolation and compound exercises",
         variant: "destructive",
         duration: 3000,
       });
@@ -211,43 +435,54 @@ export function PreExhaustionExecutor({
     try {
       // Log pre-exhaustion as a single call with both exercises
       const logData: any = {
-        block_type: 'preexhaust',
+        block_type: "preexhaust",
         set_number: completedSets + 1,
       };
-      
+
       // Only add fields if they're defined
-      if (isolationExercise?.exercise_id) logData.preexhaust_isolation_exercise_id = isolationExercise.exercise_id;
-      if (isolationWeightNum !== undefined && isolationWeightNum !== null) logData.preexhaust_isolation_weight = isolationWeightNum;
-      if (isolationRepsNum !== undefined && isolationRepsNum !== null) logData.preexhaust_isolation_reps = isolationRepsNum;
-      if (compoundExercise?.exercise_id) logData.preexhaust_compound_exercise_id = compoundExercise.exercise_id;
-      if (compoundWeightNum !== undefined && compoundWeightNum !== null) logData.preexhaust_compound_weight = compoundWeightNum;
-      if (compoundRepsNum !== undefined && compoundRepsNum !== null) logData.preexhaust_compound_reps = compoundRepsNum;
-      
+      if (isolationExercise?.exercise_id)
+        logData.preexhaust_isolation_exercise_id =
+          isolationExercise.exercise_id;
+      if (isolationWeightNum !== undefined && isolationWeightNum !== null)
+        logData.preexhaust_isolation_weight = isolationWeightNum;
+      if (isolationRepsNum !== undefined && isolationRepsNum !== null)
+        logData.preexhaust_isolation_reps = isolationRepsNum;
+      if (compoundExercise?.exercise_id)
+        logData.preexhaust_compound_exercise_id = compoundExercise.exercise_id;
+      if (compoundWeightNum !== undefined && compoundWeightNum !== null)
+        logData.preexhaust_compound_weight = compoundWeightNum;
+      if (compoundRepsNum !== undefined && compoundRepsNum !== null)
+        logData.preexhaust_compound_reps = compoundRepsNum;
+
       const result = await logSetToDatabase(logData);
 
       if (result.success) {
-        const loggedSetsArray: LoggedSet[] = [
+        const setLogId =
+          (result as { set_log_id?: string }).set_log_id ??
+          `temp-${Date.now()}`;
+        const setNumber = completedSets + 1;
+        const newEntries: LoggedSet[] = [
           {
-            id: `temp-isolation-${Date.now()}`,
+            id: setLogId,
             exercise_id: isolationExercise.exercise_id,
             block_id: block.block.id,
-            set_number: completedSets + 1,
+            set_number: setNumber,
             weight_kg: isolationWeightNum,
             reps_completed: isolationRepsNum,
             completed_at: new Date(),
           } as LoggedSet,
           {
-            id: `temp-compound-${Date.now()}`,
+            id: setLogId,
             exercise_id: compoundExercise.exercise_id,
             block_id: block.block.id,
-            set_number: completedSets + 1,
+            set_number: setNumber,
             weight_kg: compoundWeightNum,
             reps_completed: compoundRepsNum,
             completed_at: new Date(),
           } as LoggedSet,
         ];
-
-        // Note: Pre-exhaustion doesn't calculate e1RM (no weight+reps for e1RM calculation)
+        newEntries.forEach((e) => onSetLogUpsert?.(block.block.id, e));
+        setViewingSetIndex(0);
 
         addToast({
           title: "Pre-Exhaustion Set Logged!",
@@ -257,6 +492,7 @@ export function PreExhaustionExecutor({
         });
 
         const newCompletedSets = completedSets + 1;
+        const updatedLoggedSets = [...loggedSetsList, ...newEntries];
         if (newCompletedSets < totalSets) {
           onLastSetLoggedForRest?.({
             weight: compoundWeightNum,
@@ -268,41 +504,8 @@ export function PreExhaustionExecutor({
         }
         onSetComplete?.(newCompletedSets);
 
-        // Complete block if last set
         if (newCompletedSets >= totalSets) {
-          onBlockComplete(block.block.id, loggedSetsArray);
-        } else {
-          // Check if rest timer will show - if so, don't clear inputs yet
-          const currentExercise = block.block.exercises?.[currentExerciseIndex];
-          const restSeconds = currentExercise?.rest_seconds || block.block.rest_seconds || 0;
-          if (restSeconds === 0) {
-            // No rest timer, clear inputs immediately
-            const suggestedIsolation = isolationExercise?.load_percentage
-              ? calculateSuggestedWeightUtil(
-                  isolationExercise.exercise_id,
-                  isolationExercise.load_percentage,
-                  e1rmMap
-                )
-              : null;
-            const suggestedCompound = compoundExercise?.load_percentage
-              ? calculateSuggestedWeightUtil(
-                  compoundExercise.exercise_id,
-                  compoundExercise.load_percentage,
-                  e1rmMap
-                )
-              : null;
-
-            if (suggestedIsolation) setIsolationWeight(suggestedIsolation.toString());
-            else setIsolationWeight("");
-            if (suggestedCompound) setCompoundWeight(suggestedCompound.toString());
-            else setCompoundWeight("");
-
-            setIsolationReps("");
-            setCompoundReps("");
-            setShowTimer(false);
-          }
-          // If restSeconds > 0, rest timer will show and inputs will be cleared
-          // when the timer completes and completedSets updates
+          onBlockComplete(block.block.id, updatedLoggedSets);
         }
       } else {
         addToast({
@@ -317,12 +520,123 @@ export function PreExhaustionExecutor({
     }
   };
 
+  const setNumbersLogged = [
+    ...new Set(loggedSetsList.map((s) => s.set_number)),
+  ].sort((a, b) => a - b);
+
   const loggingInputs = (
     <div className="space-y-4">
+      {allowSetEditDelete && setNumbersLogged.length > 0 && (
+        <div
+          className="rounded-xl border p-3"
+          style={{
+            borderColor: "var(--fc-surface-card-border)",
+            background: "var(--fc-surface-sunken)",
+          }}
+        >
+          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
+            Logged sets
+          </div>
+          <ul className="space-y-1.5">
+            {setNumbersLogged.map((setNum) => {
+              const forSet = loggedSetsList.filter(
+                (s) => s.set_number === setNum,
+              );
+              const iso =
+                forSet.find(
+                  (s) => s.exercise_id === isolationExercise?.exercise_id,
+                ) || forSet[0];
+              const comp =
+                forSet.find(
+                  (s) => s.exercise_id === compoundExercise?.exercise_id,
+                ) || forSet[1];
+              const label = `Set ${setNum}: Iso ${iso?.weight_kg ?? "—"}×${iso?.reps_completed ?? "—"}${comp ? `, Comp ${comp.weight_kg ?? "—"}×${comp.reps_completed ?? "—"}` : ""}`;
+              const firstId = forSet[0]?.id ?? "";
+              return (
+                <li
+                  key={`set-${setNum}`}
+                  className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                  style={{ background: "var(--fc-surface-elevated)" }}
+                >
+                  <span className="text-sm fc-text-primary">{label}</span>
+                  <div className="relative flex items-center">
+                    <button
+                      type="button"
+                      className="p-1.5 rounded-md hover:bg-black/10"
+                      onClick={() =>
+                        setMenuOpenSetId(
+                          menuOpenSetId === firstId ? null : firstId,
+                        )
+                      }
+                      aria-label="Options"
+                    >
+                      <MoreVertical className="w-4 h-4 fc-text-dim" />
+                    </button>
+                    {menuOpenSetId === firstId && (
+                      <div
+                        className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
+                        style={{
+                          background: "var(--fc-surface-elevated)",
+                          border: "1px solid var(--fc-surface-card-border)",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
+                          onClick={() => handleEditSet(forSet[0])}
+                        >
+                          <Pencil className="w-4 h-4" /> Edit
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {allowSetEditDelete && totalSets > 0 && (
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            onClick={() => setViewingSetIndex((i) => Math.max(0, i - 1))}
+            disabled={viewingSetIndex <= 0}
+            aria-label="Previous set"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <span className="text-sm font-medium fc-text-primary min-w-[100px] text-center">
+            Set {displaySetNumber} of {totalSets}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            onClick={() =>
+              setViewingSetIndex((i) => Math.min(maxViewableSet, i + 1))
+            }
+            disabled={viewingSetIndex >= maxViewableSet}
+            aria-label="Next set"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </Button>
+        </div>
+      )}
       {/* Isolation Exercise */}
-      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
+      <div
+        className="p-4 rounded-xl"
+        style={{ background: "var(--fc-surface-sunken)" }}
+      >
         <div className="mb-4">
-          <h4 className="font-semibold text-lg" style={{ color: "var(--fc-accent-cyan)" }}>
+          <h4
+            className="font-semibold text-lg"
+            style={{ color: "var(--fc-accent-cyan)" }}
+          >
             Isolation:{" "}
             {isolationExercise?.exercise?.name || "Isolation Exercise"}
           </h4>
@@ -346,24 +660,29 @@ export function PreExhaustionExecutor({
               showStepper
               stepAmount={2.5}
             />
-            {isolationExercise?.load_percentage != null && (() => {
-              const suggested = calculateSuggestedWeightUtil(
-                isolationExercise.exercise_id,
-                isolationExercise.load_percentage,
-                e1rmMap
-              );
-              return suggested != null && suggested > 0 ? (
-                <ApplySuggestedWeightButton
-                  suggestedKg={Math.round(suggested * 2) / 2}
-                  onApply={() => setIsolationWeight(String(suggested))}
-                />
-              ) : null;
-            })()}
+            {isolationExercise?.load_percentage != null &&
+              (() => {
+                const suggested = calculateSuggestedWeightUtil(
+                  isolationExercise.exercise_id,
+                  isolationExercise.load_percentage,
+                  e1rmMap,
+                );
+                return suggested != null && suggested > 0 ? (
+                  <ApplySuggestedWeightButton
+                    suggestedKg={Math.round(suggested * 2) / 2}
+                    onApply={() => setIsolationWeight(String(suggested))}
+                  />
+                ) : null;
+              })()}
           </div>
           <LargeInput
             label="Reps"
-            value={isolationReps}
-            onChange={setIsolationReps}
+            value={editDraft ? editDraft.isolationReps : isolationReps}
+            onChange={(val) => {
+              if (editDraft)
+                setEditDraft((d) => (d ? { ...d, isolationReps: val } : null));
+              else setIsolationReps(val);
+            }}
             placeholder="0"
             step="1"
             showStepper
@@ -374,20 +693,35 @@ export function PreExhaustionExecutor({
 
       {/* Timer */}
       {showTimer && (
-        <div className="rounded-xl p-5 text-center" style={{ background: "color-mix(in srgb, var(--fc-status-warning) 8%, var(--fc-surface-card))", border: "2px solid color-mix(in srgb, var(--fc-status-warning) 25%, transparent)" }}>
-          <div className="text-4xl font-bold mb-2" style={{ color: "var(--fc-status-warning)" }}>
+        <div
+          className="rounded-xl p-5 text-center"
+          style={{
+            background:
+              "color-mix(in srgb, var(--fc-status-warning) 8%, var(--fc-surface-card))",
+            border:
+              "2px solid color-mix(in srgb, var(--fc-status-warning) 25%, transparent)",
+          }}
+        >
+          <div
+            className="text-4xl font-bold mb-2"
+            style={{ color: "var(--fc-status-warning)" }}
+          >
             {formatTime(timerSeconds)}
           </div>
-          <div className="text-sm fc-text-dim">
-            Rest Between Exercises
-          </div>
+          <div className="text-sm fc-text-dim">Rest Between Exercises</div>
         </div>
       )}
 
       {/* Compound Exercise */}
-      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
+      <div
+        className="p-4 rounded-xl"
+        style={{ background: "var(--fc-surface-sunken)" }}
+      >
         <div className="mb-4">
-          <h4 className="font-semibold text-lg" style={{ color: "var(--fc-accent-purple)" }}>
+          <h4
+            className="font-semibold text-lg"
+            style={{ color: "var(--fc-accent-purple)" }}
+          >
             Compound: {compoundExercise?.exercise?.name || "Compound Exercise"}
           </h4>
           {compoundExercise && (
@@ -413,7 +747,9 @@ export function PreExhaustionExecutor({
             {(() => {
               const coachSuggested = getCoachSuggestedWeight(
                 compoundExercise?.load_percentage,
-                compoundExercise?.exercise_id ? (e1rmMap[compoundExercise.exercise_id] ?? null) : null
+                compoundExercise?.exercise_id
+                  ? (e1rmMap[compoundExercise.exercise_id] ?? null)
+                  : null,
               );
               return coachSuggested != null && coachSuggested > 0 ? (
                 <ApplySuggestedWeightButton
@@ -425,8 +761,12 @@ export function PreExhaustionExecutor({
           </div>
           <LargeInput
             label="Reps"
-            value={compoundReps}
-            onChange={setCompoundReps}
+            value={editDraft ? editDraft.compoundReps : compoundReps}
+            onChange={(val) => {
+              if (editDraft)
+                setEditDraft((d) => (d ? { ...d, compoundReps: val } : null));
+              else setCompoundReps(val);
+            }}
             placeholder="0"
             step="1"
             showStepper
@@ -437,16 +777,64 @@ export function PreExhaustionExecutor({
     </div>
   );
 
+  const isEditMode = !!editingSetId && !!editDraft;
+  const forViewedSet =
+    viewingSetIndex >= 1
+      ? loggedSetsList.filter((s) => s.set_number === viewingSetIndex)
+      : [];
+  const viewedSetEntry = forViewedSet[0] ?? null;
   const logButton = (
-    <Button
-      onClick={handleLog}
-      disabled={isLoggingSet}
-      variant="fc-primary"
-      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      <Target className="w-5 h-5 mr-2" />
-      {isLoggingSet ? "Logging..." : "LOG PRE-EXHAUSTION SET"}
-    </Button>
+    <div className="space-y-2">
+      {allowSetEditDelete && isEditMode ? (
+        <div className="flex gap-2 w-full">
+          <Button
+            variant="outline"
+            onClick={handleCancelEdit}
+            className="flex-1 h-12 text-base font-semibold rounded-xl"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEdit}
+            disabled={
+              isSavingEdit ||
+              !editDraft ||
+              editDraft.isolationWeight.trim() === "" ||
+              editDraft.isolationReps.trim() === "" ||
+              editDraft.compoundWeight.trim() === "" ||
+              editDraft.compoundReps.trim() === "" ||
+              isNaN(parseFloat(editDraft.isolationWeight)) ||
+              isNaN(parseInt(editDraft.isolationReps, 10)) ||
+              isNaN(parseFloat(editDraft.compoundWeight)) ||
+              isNaN(parseInt(editDraft.compoundReps, 10))
+            }
+            variant="fc-primary"
+            className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+          >
+            {isSavingEdit ? "Saving…" : "Save edits"}
+          </Button>
+        </div>
+      ) : allowSetEditDelete && viewedSetEntry ? (
+        <Button
+          onClick={() => handleEditSet(viewedSetEntry)}
+          variant="fc-primary"
+          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+        >
+          <Pencil className="w-5 h-5 mr-2" />
+          Edit this set
+        </Button>
+      ) : (
+        <Button
+          onClick={handleLog}
+          disabled={isLoggingSet || completedSets >= totalSets}
+          variant="fc-primary"
+          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Target className="w-5 h-5 mr-2" />
+          {isLoggingSet ? "Logging..." : "LOG PRE-EXHAUSTION SET"}
+        </Button>
+      )}
+    </div>
   );
 
   return (
@@ -476,7 +864,7 @@ export function PreExhaustionExecutor({
       }`}
       blockDetails={blockDetails}
       instructions={instructions}
-      currentSet={currentSet}
+      currentSet={displaySetNumber}
       totalSets={totalSets}
       progressLabel="Set"
       loggingInputs={loggingInputs}

@@ -157,36 +157,77 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
 
         const clientIds = (clients || []).map((c: any) => c.client_id)
         const periodStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+        const placeholderId = '00000000-0000-0000-0000-000000000000'
+        const safeClientIds = clientIds.length ? clientIds : [placeholderId]
 
-        // Completed workouts from workout_logs (not workout_sessions)
+        // Program-week compliance: assigned slots per client (no 4 workouts/week heuristic)
+        const { data: assignments } = await supabase
+          .from('program_assignments')
+          .select('id, program_id, client_id')
+          .in('client_id', safeClientIds)
+          .eq('status', 'active')
+        const assignmentIds = (assignments || []).map((a: any) => a.id)
+        const programIds = [...new Set((assignments || []).map((a: any) => a.program_id))]
+
+        let programSlotsByProgramWeek: Map<string, number> = new Map()
+        let progressByAssignment: Map<string, number> = new Map()
+        let completedByAssignmentWeek: Map<string, number> = new Map()
+        if (assignmentIds.length > 0) {
+          const [slotsRes, progressRes, completionsRes] = await Promise.all([
+            programIds.length > 0
+              ? supabase.from('program_schedule').select('program_id, week_number').in('program_id', programIds)
+              : { data: [] },
+            supabase.from('program_progress').select('program_assignment_id, current_week_number').in('program_assignment_id', assignmentIds),
+            supabase.from('program_day_completions').select('program_assignment_id, program_schedule_id, program_schedule!inner(week_number)').in('program_assignment_id', assignmentIds)
+          ])
+          slotsRes.data?.forEach((r: any) => {
+            const key = `${r.program_id}:${r.week_number}`
+            programSlotsByProgramWeek.set(key, (programSlotsByProgramWeek.get(key) || 0) + 1)
+          })
+          progressRes.data?.forEach((r: any) => {
+            progressByAssignment.set(r.program_assignment_id, r.current_week_number ?? 1)
+          })
+          completionsRes.data?.forEach((r: any) => {
+            const week = r.program_schedule?.week_number ?? 0
+            const key = `${r.program_assignment_id}:${week}`
+            completedByAssignmentWeek.set(key, (completedByAssignmentWeek.get(key) || 0) + 1)
+          })
+        }
+
+        let totalAssigned = 0
+        let totalCompleted = 0
+        const clientWorkoutPct: Map<string, number> = new Map()
+        ;(assignments || []).forEach((a: any) => {
+          const weekNum = progressByAssignment.get(a.id) ?? 1
+          const assigned = programSlotsByProgramWeek.get(`${a.program_id}:${weekNum}`) ?? 0
+          const completed = Math.min(assigned, completedByAssignmentWeek.get(`${a.id}:${weekNum}`) ?? 0)
+          totalAssigned += assigned
+          totalCompleted += completed
+          const pct = assigned > 0 ? Math.round((completed / assigned) * 100) : 0
+          clientWorkoutPct.set(a.client_id, pct)
+        })
+
+        const totalClients = clients?.length || 0
+        const workoutCompliance = totalAssigned > 0 ? Math.round((totalCompleted / totalAssigned) * 100) : totalClients > 0 ? 0 : 0
+
         const { data: workoutLogs } = await supabase
           .from('workout_logs')
           .select('client_id, completed_at')
-          .in('client_id', clientIds.length ? clientIds : ['00000000-0000-0000-0000-000000000000'])
+          .in('client_id', safeClientIds)
           .not('completed_at', 'is', null)
           .gte('completed_at', periodStart)
-
-        // Meal completions (meal_logs does not exist)
         const { data: nutritionRows } = await supabase
           .from('meal_completions')
           .select('client_id, completed_at')
-          .in('client_id', clientIds.length ? clientIds : ['00000000-0000-0000-0000-000000000000'])
+          .in('client_id', safeClientIds)
           .gte('completed_at', periodStart)
-
-        // Habit logs
         const periodStartDate = periodStart.slice(0, 10)
         const { data: habitRows } = await supabase
           .from('habit_logs')
           .select('client_id, log_date')
-          .in('client_id', clientIds.length ? clientIds : ['00000000-0000-0000-0000-000000000000'])
+          .in('client_id', safeClientIds)
           .gte('log_date', periodStartDate)
 
-        const totalClients = clients?.length || 0
-        const workoutCompliance = totalClients > 0 && workoutLogs?.length
-          ? Math.round((workoutLogs.length / (totalClients * 4)) * 100) // rough: 4 workouts per client per month
-          : totalClients > 0
-            ? 0
-            : 0
         const nutritionUniqueDays = nutritionRows ? new Set(nutritionRows.map((n: any) => new Date(n.completed_at).toISOString().slice(0, 10))).size : 0
         const nutritionCompliance = totalClients > 0 ? Math.min(100, Math.round((nutritionUniqueDays / 30) * 100)) : 0
         const habitUniqueDays = habitRows ? new Set(habitRows.map((h: any) => h.log_date)).size : 0
@@ -194,7 +235,13 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
         const overall = totalClients > 0 ? Math.round((workoutCompliance + nutritionCompliance + habitCompliance) / 3) : 0
 
         const weeklyTrend = buildWeeklyTrendFromData(workoutLogs || [], nutritionRows || [], habitRows || [], clientIds)
-        const clientCompliance = await buildClientComplianceData(clients || [], workoutLogs || [], nutritionRows || [], habitRows || [])
+        const clientCompliance = await buildClientComplianceData(
+          clients || [],
+          workoutLogs || [],
+          nutritionRows || [],
+          habitRows || [],
+          clientWorkoutPct
+        )
 
         const realComplianceData: ComplianceData = {
           overallCompliance: overall,
@@ -273,7 +320,8 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
     clients: any[],
     workoutLogs: any[],
     nutritionRows: any[],
-    habitRows: any[]
+    habitRows: any[],
+    clientWorkoutPct?: Map<string, number>
   ) {
     const clientIds = clients.map((c: any) => c.client_id)
     const { data: profilesList } = clientIds.length > 0
@@ -282,10 +330,12 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
     const profileMap = new Map((profilesList || []).map((p: any) => [p.id, p]))
     return clients.map((client: any) => {
       const cid = client.client_id
-      const wCount = workoutLogs.filter((w: any) => w.client_id === cid).length
+      const workoutCompliance = clientWorkoutPct?.get(cid) ?? (() => {
+        const wCount = workoutLogs.filter((w: any) => w.client_id === cid).length
+        return Math.min(100, wCount > 0 ? Math.round((wCount / 4) * 100) : 0)
+      })()
       const nDays = new Set(nutritionRows.filter((n: any) => n.client_id === cid).map((n: any) => new Date(n.completed_at).toISOString().slice(0, 10))).size
       const hDays = new Set(habitRows.filter((h: any) => h.client_id === cid).map((h: any) => h.log_date)).size
-      const workoutCompliance = Math.min(100, Math.round((wCount / 4) * 100))
       const nutritionCompliance = Math.min(100, Math.round((nDays / 30) * 100))
       const habitCompliance = Math.min(100, Math.round((hDays / 30) * 100))
       const overallCompliance = Math.round((workoutCompliance + nutritionCompliance + habitCompliance) / 3)

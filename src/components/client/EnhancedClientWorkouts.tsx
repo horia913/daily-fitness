@@ -37,9 +37,6 @@ import {
   Layers,
   ChevronRight,
   ChevronDown,
-  LayoutGrid,
-  LineChart,
-  Plus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -869,6 +866,7 @@ export default function EnhancedClientWorkouts({
             return {
               ...assignment,
               type: "program",
+              program_id: assignment.program_id,
               workout_templates: programSnapshot
                 ? {
                     id: programSnapshot.id,
@@ -1048,6 +1046,7 @@ export default function EnhancedClientWorkouts({
       }
     } catch (error) {
       console.error("Error loading workout data:", error);
+      setLoadError("Failed to load workouts. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -1367,7 +1366,7 @@ export default function EnhancedClientWorkouts({
     );
   }
 
-  if (loadError && useNewLoader) {
+  if (loadError) {
     return (
       <AnimatedBackground>
         <div className="relative z-10 min-h-screen fc-page flex items-center justify-center">
@@ -1378,7 +1377,7 @@ export default function EnhancedClientWorkouts({
                   Unable to load workouts
                 </h2>
                 <p className="text-sm fc-text-dim">{loadError}</p>
-                <Button variant="fc-primary" onClick={() => loadWorkoutDataFromApi()}>
+                <Button variant="fc-primary" onClick={() => useNewLoader ? loadWorkoutDataFromApi() : loadWorkoutData()}>
                   Refresh
                 </Button>
               </div>
@@ -1500,13 +1499,13 @@ export default function EnhancedClientWorkouts({
               </section>
             ) : (
               <GlassCard elevation={2} className="fc-card p-8 sm:p-16 text-center overflow-hidden">
-                  {todaysWorkout?.weekCompleted ? (
+                  {todaysWorkout?.weekCompleted === true ? (
                     <>
                       <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8 fc-icon-tile fc-icon-meals bg-[color-mix(in_srgb,var(--fc-status-success)_25%,transparent)] border-[color:var(--fc-status-success)]">
                         <Trophy className="w-8 h-8 sm:w-12 sm:h-12 fc-text-success" />
                       </div>
                       <h3 className="text-xl sm:text-2xl font-semibold fc-text-primary mb-3 sm:mb-4">
-                        Week {todaysWorkout.currentWeek} Complete! 🎉
+                        {todaysWorkout.currentWeek != null ? `Week ${todaysWorkout.currentWeek} Complete! 🎉` : 'Week Complete! 🎉'}
                       </h3>
                       <p className="fc-text-dim text-lg sm:text-xl mb-4">
                         {todaysWorkout.message ||
@@ -1603,28 +1602,6 @@ export default function EnhancedClientWorkouts({
               </section>
             )}
 
-            {/* SECONDARY FEATURES - Below main workout */}
-
-            {/* Quick Stats Strip */}
-            <div className="fc-stats-strip">
-              <div className="fc-stats-strip-item">
-                <span className="fc-stats-strip-value fc-text-warning">{dayStreak}</span>
-                <span className="fc-stats-strip-label">Streak</span>
-              </div>
-              <div className="fc-stats-strip-item">
-                <span className="fc-stats-strip-value">{thisMonthWorkouts}</span>
-                <span className="fc-stats-strip-label">Month</span>
-              </div>
-              <div className="fc-stats-strip-item">
-                <span className="fc-stats-strip-value fc-text-success">{successRate}%</span>
-                <span className="fc-stats-strip-label">Rate</span>
-              </div>
-              <div className="fc-stats-strip-item">
-                <span className="fc-stats-strip-value">{allTimeVolume.toLocaleString()}</span>
-                <span className="fc-stats-strip-label">Total kg</span>
-              </div>
-            </div>
-
             {/* This Week's Workouts - dedupe by id to avoid duplicate React keys */}
             {thisWeekAssignments.length > 0 && (
               <section className="mb-8">
@@ -1714,93 +1691,7 @@ export default function EnhancedClientWorkouts({
               </section>
             )}
 
-            {/* Completed Programs */}
-            {completedPrograms.length > 0 && (
-              <GlassCard elevation={2} className="fc-card overflow-hidden">
-                <div className="p-8 border-b border-[color:var(--fc-glass-border)]">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 fc-icon-tile fc-icon-challenges rounded-xl flex items-center justify-center">
-                      <Trophy className="w-5 h-5 fc-text-challenges" />
-                    </div>
-                    <span className="text-2xl font-bold fc-text-primary">
-                      Completed Programs
-                    </span>
-                  </div>
-                </div>
-                <div className="p-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style={{ gap: "var(--fc-gap-cards)" }}>
-                    {completedPrograms.map((program) => (
-                      <GlassCard
-                        key={program.id}
-                        elevation={1}
-                        className="fc-card p-6 border-2 border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-accent-purple)] transition-all duration-300"
-                      >
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 fc-icon-tile fc-icon-challenges rounded-xl flex items-center justify-center">
-                              <Trophy className="w-6 h-6 fc-text-challenges" />
-                            </div>
-                            <Badge className="fc-text-success bg-[color:var(--fc-status-success)] text-white border-0 px-3 py-1">
-                              {(program as any).completion_percentage ||
-                                Math.round(100 * (program.current_week / program.total_weeks))}
-                              % Complete
-                            </Badge>
-                          </div>
-                          <h4 className="font-bold text-lg mb-2 fc-text-primary">
-                            {(program as any).program_name || program.name}
-                          </h4>
-                          <p className="text-sm fc-text-dim mb-4 line-clamp-2">
-                            {(program as any).program_description ||
-                              program.description}
-                          </p>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex items-center justify-between">
-                              <span className="fc-text-dim">Duration:</span>
-                              <span className="fc-text-primary">{program.total_weeks} weeks</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="fc-text-dim">Coach:</span>
-                              <span className="fc-text-primary">{program.coach_name}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="fc-text-dim">Workouts:</span>
-                              <span className="fc-text-primary">{(program as any).total_workouts_completed || 0}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="fc-text-dim">Completed:</span>
-                              <span className="fc-text-primary">
-                                {new Date(
-                                  (program as any).completed_date || new Date()
-                                ).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="mt-4">
-                            <div className="flex items-center justify-between text-sm mb-2">
-                              <span className="fc-text-dim">Progress</span>
-                              <span className="fc-text-primary">
-                                {(program as any).completion_percentage ||
-                                  Math.round(100 * (program.current_week / program.total_weeks))}
-                                %
-                              </span>
-                            </div>
-                            <div className="w-full fc-glass-soft rounded-full h-2 border border-[color:var(--fc-glass-border)]">
-                              <div
-                                className="h-2 rounded-full transition-all duration-500 bg-[color:var(--fc-status-success)]"
-                                style={{
-                                  width: `${(program as any).completion_percentage ||
-                                    Math.round(100 * (program.current_week / program.total_weeks))}%`,
-                                }}
-                              ></div>
-                            </div>
-                          </div>
-                      </GlassCard>
-                    ))}
-                  </div>
-                </div>
-              </GlassCard>
-            )}
-
-            {/* All Assigned Workouts */}
+            {/* My Programs & Assigned Workouts */}
             {allAssignedWorkouts.length > 0 && (
               <section className="space-y-6 mb-8">
                 {/* Header */}
@@ -1809,7 +1700,7 @@ export default function EnhancedClientWorkouts({
                     <Dumbbell className="w-7 h-7" />
                   </div>
                   <h2 className="text-2xl font-bold tracking-tight fc-text-primary">
-                    All Assigned Workouts
+                    My Programs & Workouts
                   </h2>
                 </div>
 
@@ -1862,15 +1753,25 @@ export default function EnhancedClientWorkouts({
                         ? "fc-icon-challenges"
                         : "fc-icon-workouts";
 
+                    const programIdForDetails =
+                      assignment.type === "program"
+                        ? (assignment.program_id ?? assignment.workout_templates?.id)
+                        : null;
+
                     return (
                       <Link
                         key={assignment.id}
                         href={
                           assignment.type === "program"
-                            ? `/client/programs/${assignment.program_id}/details`
+                            ? (programIdForDetails ? `/client/programs/${programIdForDetails}/details` : "#")
                             : `/client/workouts/${assignment.id}/details`
                         }
                         className="group block"
+                        onClick={
+                          assignment.type === "program" && !programIdForDetails
+                            ? (e) => e.preventDefault()
+                            : undefined
+                        }
                       >
                         <div
                           className="fc-surface rounded-2xl p-4 sm:p-5 transition-all duration-200 hover:translate-y-[-1px] active:scale-[0.98]"
@@ -1928,10 +1829,10 @@ export default function EnhancedClientWorkouts({
                                           }
                                         }
                                         // Fallback to program details if API fails
-                                        router.push(`/client/programs/${assignment.program_id}/details`);
+                                        if (programIdForDetails) router.push(`/client/programs/${programIdForDetails}/details`);
                                       } catch (err) {
                                         console.error("Error starting program workout:", err);
-                                        router.push(`/client/programs/${assignment.program_id}/details`);
+                                        if (programIdForDetails) router.push(`/client/programs/${programIdForDetails}/details`);
                                       }
                                     }}
                                     className="h-9 sm:h-10 px-4 rounded-xl font-semibold"
@@ -1944,7 +1845,7 @@ export default function EnhancedClientWorkouts({
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       e.preventDefault();
-                                      router.push(`/client/programs/${assignment.program_id}/details`);
+                                      if (programIdForDetails) router.push(`/client/programs/${programIdForDetails}/details`);
                                     }}
                                     className="h-9 sm:h-10 px-3 rounded-xl font-semibold"
                                     variant="fc-secondary"
@@ -2077,33 +1978,8 @@ export default function EnhancedClientWorkouts({
                 </GlassCard>
               </div>
             )}
-          </div>
         </div>
-
-        {/* Fixed bottom nav — mockup: Dashboard, Workouts (active), Analytics, Quick Log */}
-        <nav className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
-          <div className="h-24 bg-[color:var(--fc-bg-base)]/90 backdrop-blur-xl border-t border-[color:var(--fc-glass-border)]" aria-hidden />
-          <div className="fixed bottom-0 left-0 right-0 z-50 max-w-4xl mx-auto px-6 h-24 flex items-center justify-between gap-4 pointer-events-auto">
-            <div className="flex flex-1 justify-around md:justify-start md:gap-12">
-              <Link href="/client" className="flex flex-col items-center gap-1.5 fc-text-subtle hover:fc-text-primary transition-colors group">
-                <LayoutGrid className="w-7 h-7 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-bold uppercase tracking-widest">Dashboard</span>
-              </Link>
-              <span className="flex flex-col items-center gap-1.5 fc-text-workouts" aria-current="page">
-                <Calendar className="w-7 h-7 scale-110" />
-                <span className="text-[11px] font-bold uppercase tracking-widest">Workouts</span>
-              </span>
-              <Link href="/client/progress/analytics" className="flex flex-col items-center gap-1.5 fc-text-subtle hover:fc-text-primary transition-colors group">
-                <LineChart className="w-7 h-7 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-bold uppercase tracking-widest">Analytics</span>
-              </Link>
-            </div>
-            <Link href="/client/progress/workout-logs" className="fc-btn fc-btn-primary h-14 w-14 md:h-12 md:w-auto md:px-6 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg">
-              <Plus className="w-6 h-6 md:w-5 md:h-5" />
-              <span className="hidden md:inline">Quick Log</span>
-            </Link>
-          </div>
-        </nav>
+      </div>
       </>
     </AnimatedBackground>
   );

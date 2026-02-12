@@ -5,6 +5,7 @@ import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { logAuthEvent } from '@/lib/debugHarness'
 import { subscribeUser, unsubscribeUser } from '@/lib/onesignal'
+import { syncProfileTimezoneOnce, resetTimezoneSyncGuard } from '@/lib/timezoneSync'
 
 export type ClientType = 'online' | 'in_gym';
 
@@ -15,6 +16,7 @@ export interface UserProfile {
   client_type?: ClientType;
   first_name?: string;
   last_name?: string;
+  timezone?: string | null;
 }
 
 interface AuthContextType {
@@ -36,12 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const refreshPromiseRef = useRef<Promise<Session | null> | null>(null)
 
-  // Fetch user profile including client_type
+  // Fetch user profile including client_type and timezone
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, role, client_type, first_name, last_name')
+        .select('id, email, role, client_type, first_name, last_name, timezone')
         .eq('id', userId)
         .single();
 
@@ -124,12 +126,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session ?? null)
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id);
         setProfile(profileData);
+        const didUpdate = await syncProfileTimezoneOnce(session.user.id, profileData?.timezone);
+        if (didUpdate) {
+          const updated = await fetchProfile(session.user.id);
+          if (updated) setProfile(updated);
+        }
       }
-      
+
       setLoading(false);
     });
 
@@ -144,14 +151,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       setSession(session ?? null)
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id);
         setProfile(profileData);
+        const didUpdate = await syncProfileTimezoneOnce(session.user.id, profileData?.timezone);
+        if (didUpdate) {
+          const updated = await fetchProfile(session.user.id);
+          if (updated) setProfile(updated);
+        }
       } else {
         setProfile(null);
       }
-      
+
       setLoading(false);
     });
 
@@ -180,7 +192,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
   const signOut = async () => {
-    await unsubscribeUser() // Unsubscribe before signing out
+    await unsubscribeUser()
+    resetTimezoneSyncGuard()
     await supabase.auth.signOut()
   }
 

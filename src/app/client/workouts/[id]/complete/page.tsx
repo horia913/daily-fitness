@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
@@ -141,6 +141,10 @@ export default function WorkoutComplete() {
   const [personalRecords, setPersonalRecords] = useState<any[]>([]);
   const [nextWorkout, setNextWorkout] = useState<any | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [storedDurationMinutes, setStoredDurationMinutes] = useState<number | undefined>(undefined);
+
+  // Guard: prevent updateWorkoutTotals from running more than once per page load
+  const completionDoneRef = useRef(false);
 
   useEffect(() => {
     if (assignmentId) {
@@ -160,17 +164,32 @@ export default function WorkoutComplete() {
   }, [assignmentId]);
 
   useEffect(() => {
-    const storedWorkoutLogId = localStorage.getItem("workoutLogIdForComplete");
-    if (storedWorkoutLogId) {
-      setWorkoutLogIdOverride(storedWorkoutLogId);
+    // Read and immediately clear ALL completion handoff keys from localStorage.
+    // This prevents stale retries and multi-tab duplicates.
+    try {
+      const storedWorkoutLogId = localStorage.getItem("workoutLogIdForComplete");
+      if (storedWorkoutLogId) {
+        setWorkoutLogIdOverride(storedWorkoutLogId);
+      }
+      const storedWorkoutSessionId = localStorage.getItem(
+        "workoutSessionIdForComplete"
+      );
+      if (storedWorkoutSessionId) {
+        setWorkoutSessionIdOverride(storedWorkoutSessionId);
+      }
+      // Capture duration into state before clearing
+      const rawDuration = localStorage.getItem("workoutDurationMinutes");
+      if (rawDuration) {
+        setStoredDurationMinutes(parseInt(rawDuration, 10) || undefined);
+      }
+
+      // Clear ALL completion handoff keys at once
       localStorage.removeItem("workoutLogIdForComplete");
-    }
-    const storedWorkoutSessionId = localStorage.getItem(
-      "workoutSessionIdForComplete"
-    );
-    if (storedWorkoutSessionId) {
-      setWorkoutSessionIdOverride(storedWorkoutSessionId);
       localStorage.removeItem("workoutSessionIdForComplete");
+      localStorage.removeItem("workoutDurationMinutes");
+      localStorage.removeItem("workoutStartTime");
+    } catch (e) {
+      console.warn("⚠️ Could not clear localStorage completion keys:", e);
     }
   }, []);
 
@@ -191,6 +210,12 @@ export default function WorkoutComplete() {
     assignmentIdOverride: string | null = null,
     workoutLogIdOverrideParam: string | null = null
   ) => {
+    // Guard: only run once per page load to prevent state overwrites
+    if (completionDoneRef.current) {
+      console.log("⏭️ updateWorkoutTotals skipped — already completed this page load");
+      return;
+    }
+
     const effectiveAssignmentId =
       assignmentIdOverride || resolvedAssignmentId || assignment?.id || null;
     const effectiveWorkoutLogId =
@@ -269,24 +294,14 @@ export default function WorkoutComplete() {
         setWorkoutLogIdForSummary(workoutLogId);
       }
 
-      if (!workoutLogId && effectiveAssignmentId) {
-          const { data: newLog, error: createError } = await supabase
-          .from("workout_logs")
-          .insert([
-            {
-              client_id: user.id,
-                workout_assignment_id: effectiveAssignmentId,
-              started_at: new Date().toISOString(),
-              completed_at: null,
-            },
-          ])
-          .select("id")
-          .single();
-
-        if (!createError && newLog) {
-          workoutLogId = newLog.id;
-          setWorkoutLogIdForSummary(workoutLogId);
-        }
+      // If no workout_log found at all, show error instead of creating a new one.
+      // workout_logs are created by the set-logging flow (/api/log-set) during the
+      // workout. Creating one here would cause duplicates on refresh/retry.
+      if (!workoutLogId) {
+        console.error("❌ No workout_log found for assignment:", effectiveAssignmentId);
+        setLoadError("Could not find workout data. Please go back and try again.");
+        setLoading(false);
+        return;
       }
 
       if (workoutLogId) {
@@ -300,29 +315,23 @@ export default function WorkoutComplete() {
           });
           setWorkoutLog(workoutLog);
           await loadBlocksAndSets(workoutLogId, user.id);
-              await loadBlocksAndSets(workoutLogId, user.id);
+          completionDoneRef.current = true;
         } else {
-          // Complete the workout
-          const storedDuration = localStorage.getItem("workoutDurationMinutes");
-          const durationMinutes = storedDuration
-            ? parseInt(storedDuration, 10)
-            : undefined;
-
-          const completeResponse = await fetchApi("/api/complete-workout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              workout_log_id: workoutLogId,
-              client_id: user.id,
-              duration_minutes: durationMinutes,
-              session_id: workoutSessionIdOverride, // M2: Link to workout_sessions for status update
+          // Complete the workout — duration already captured in state from localStorage
+          const completeResponse = await withTimeout(
+            fetchApi("/api/complete-workout", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                workout_log_id: workoutLogId,
+                client_id: user.id,
+                duration_minutes: storedDurationMinutes,
+                session_id: workoutSessionIdOverride,
+              }),
             }),
-          });
-
-          if (storedDuration) {
-            localStorage.removeItem("workoutDurationMinutes");
-            localStorage.removeItem("workoutStartTime");
-          }
+            15000,
+            "timeout"
+          );
 
           if (completeResponse.ok) {
             const result = await completeResponse.json();
@@ -350,6 +359,9 @@ export default function WorkoutComplete() {
 
               // Load blocks and sets
               await loadBlocksAndSets(workoutLogId, user.id);
+
+              // Mark completion as done so duplicate effects don't overwrite state
+              completionDoneRef.current = true;
 
               // Fetch personal records for this workout (optional)
               // Note: personal_records uses workout_assignment_id, not workout_log_id
@@ -401,11 +413,23 @@ export default function WorkoutComplete() {
                 console.log('Could not fetch next workout:', err);
               }
             }
+          } else {
+            // API returned non-ok status
+            console.error("❌ complete-workout API error:", completeResponse.status);
+            setLoadError("Failed to complete workout. Please try again.");
+            setLoading(false);
+            return;
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Error in updateWorkoutTotals:", error);
+      setLoadError(
+        error?.message === "timeout"
+          ? "Completing workout took too long. Please try again."
+          : (error?.message || "Failed to complete workout")
+      );
+      setLoading(false);
     }
   };
 
@@ -723,6 +747,13 @@ export default function WorkoutComplete() {
   const markWorkoutComplete = async () => {
     const targetAssignmentId = assignment?.id || resolvedAssignmentId || null;
     if (!assignment || !targetAssignmentId) return;
+
+    // Idempotent: if assignment is already completed, just navigate
+    if (assignment.status === "completed") {
+      console.log("⏭️ Assignment already completed, navigating to workouts");
+      router.push("/client/workouts");
+      return;
+    }
 
     setCompleting(true);
     try {

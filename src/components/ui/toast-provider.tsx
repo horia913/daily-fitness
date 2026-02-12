@@ -3,12 +3,18 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
 import { Toast } from './toast'
 
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 export interface ToastData {
   id: string
   title?: string
   description?: string
   variant?: 'default' | 'destructive' | 'success' | 'warning'
   duration?: number
+  action?: ToastAction
 }
 
 interface ToastContextType {
@@ -56,6 +62,7 @@ function ToastContainer({ toasts, removeToast }: { toasts: ToastData[], removeTo
           variant={toast.variant}
           title={toast.title}
           description={toast.description}
+          action={toast.action}
           onClose={() => removeToast(toast.id)}
           className="animate-in slide-in-from-right-full"
         />

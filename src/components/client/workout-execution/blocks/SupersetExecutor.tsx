@@ -1,8 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Zap, CheckCircle } from "lucide-react";
+import {
+  Zap,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  Pencil,
+} from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   BaseBlockExecutorLayout,
@@ -14,8 +20,13 @@ import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
 import { useLoggingReset } from "../hooks/useLoggingReset";
-import { getWeightDefaultAndSuggestion, getCoachSuggestedWeight } from "@/lib/weightDefaultService";
+import {
+  getWeightDefaultAndSuggestion,
+  getCoachSuggestedWeight,
+} from "@/lib/weightDefaultService";
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
+import { fetchApi } from "@/lib/apiClient";
+import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 
 export function SupersetExecutor({
   block,
@@ -40,13 +51,21 @@ export function SupersetExecutor({
   onRestTimerClick,
   onSetComplete,
   onLastSetLoggedForRest,
+  allowSetEditDelete = false,
+  registerSetLogIdResolved,
+  onSetLogUpsert,
+  onSetEditSaved,
+  loggedSets,
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const exerciseA = block.block.exercises?.[0];
   const exerciseB = block.block.exercises?.[1];
   const totalSets = block.block.total_sets || 1;
   const completedSets = block.completedSets || 0;
-  const currentSet = completedSets;
+  const currentSetNumber = completedSets + 1;
+
+  /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
+  const loggedSetsList = loggedSets ?? [];
 
   const [weightA, setWeightA] = useState("");
   const [repsA, setRepsA] = useState("");
@@ -56,39 +75,130 @@ export function SupersetExecutor({
   useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [isWeightAPristine, setIsWeightAPristine] = useState(true);
   const [isWeightBPristine, setIsWeightBPristine] = useState(true);
+  const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
+  const [editingSetId, setEditingSetId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{
+    weightA: string;
+    repsA: string;
+    weightB: string;
+    repsB: string;
+    set_number: number;
+  } | null>(null);
+
+  const loggedSetsRef = useRef<LoggedSet[]>(loggedSetsList);
+  useEffect(() => {
+    loggedSetsRef.current = loggedSetsList;
+  }, [loggedSetsList]);
+
+  const displaySetNumber =
+    editingSetId && editDraft?.set_number != null
+      ? editDraft.set_number
+      : viewingSetIndex >= 1
+        ? viewingSetIndex
+        : Math.min(currentSetNumber, totalSets);
+
+  useEffect(() => {
+    if (!registerSetLogIdResolved) return;
+    registerSetLogIdResolved((set_log_id: string) => {
+      const list = loggedSetsRef.current;
+      if (list.length === 0) return;
+      const lastId = list[list.length - 1].id;
+      if (!lastId.startsWith("temp-")) return;
+      const oldEntry = list[list.length - 1];
+      const newEntry = { ...oldEntry, id: set_log_id };
+      onSetLogUpsert?.(block.block.id, newEntry, { replaceId: lastId });
+    });
+    return () => {};
+  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
+  useEffect(() => {
+    if (viewingSetIndex > loggedSetsList.length)
+      setViewingSetIndex(loggedSetsList.length);
+  }, [loggedSetsList.length, viewingSetIndex]);
+  useEffect(() => {
+    if (viewingSetIndex >= 1) {
+      const forSet = loggedSetsList.filter(
+        (s) => s.set_number === viewingSetIndex,
+      );
+      const entryA =
+        forSet.find((s) => s.exercise_id === exerciseA?.exercise_id) ||
+        forSet[0];
+      const entryB =
+        forSet.find((s) => s.exercise_id === exerciseB?.exercise_id) ||
+        forSet[1] ||
+        forSet[0];
+      if (entryA) {
+        setWeightA(String(entryA.weight_kg ?? ""));
+        setRepsA(String(entryA.reps_completed ?? ""));
+      }
+      if (entryB) {
+        setWeightB(String(entryB.weight_kg ?? ""));
+        setRepsB(String(entryB.reps_completed ?? ""));
+      }
+    }
+  }, [
+    viewingSetIndex,
+    loggedSetsList,
+    exerciseA?.exercise_id,
+    exerciseB?.exercise_id,
+  ]);
 
   const resultA = getWeightDefaultAndSuggestion({
-    sessionStickyWeight: exerciseA?.exercise_id ? (lastPerformedWeightByExerciseId[exerciseA.exercise_id] ?? null) : null,
-    lastSessionWeight: exerciseA?.exercise_id ? (lastSessionWeightByExerciseId[exerciseA.exercise_id] ?? null) : null,
+    sessionStickyWeight: exerciseA?.exercise_id
+      ? (lastPerformedWeightByExerciseId[exerciseA.exercise_id] ?? null)
+      : null,
+    lastSessionWeight: exerciseA?.exercise_id
+      ? (lastSessionWeightByExerciseId[exerciseA.exercise_id] ?? null)
+      : null,
     loadPercentage: exerciseA?.load_percentage ?? null,
-    e1rm: exerciseA?.exercise_id ? (e1rmMap[exerciseA.exercise_id] ?? null) : null,
+    e1rm: exerciseA?.exercise_id
+      ? (e1rmMap[exerciseA.exercise_id] ?? null)
+      : null,
   });
   const resultB = getWeightDefaultAndSuggestion({
-    sessionStickyWeight: exerciseB?.exercise_id ? (lastPerformedWeightByExerciseId[exerciseB.exercise_id] ?? null) : null,
-    lastSessionWeight: exerciseB?.exercise_id ? (lastSessionWeightByExerciseId[exerciseB.exercise_id] ?? null) : null,
+    sessionStickyWeight: exerciseB?.exercise_id
+      ? (lastPerformedWeightByExerciseId[exerciseB.exercise_id] ?? null)
+      : null,
+    lastSessionWeight: exerciseB?.exercise_id
+      ? (lastSessionWeightByExerciseId[exerciseB.exercise_id] ?? null)
+      : null,
     loadPercentage: exerciseB?.load_percentage ?? null,
-    e1rm: exerciseB?.exercise_id ? (e1rmMap[exerciseB.exercise_id] ?? null) : null,
+    e1rm: exerciseB?.exercise_id
+      ? (e1rmMap[exerciseB.exercise_id] ?? null)
+      : null,
   });
-  const coachSuggestedA = getCoachSuggestedWeight(exerciseA?.load_percentage ?? null, exerciseA?.exercise_id ? (e1rmMap[exerciseA.exercise_id] ?? null) : null);
-  const coachSuggestedB = getCoachSuggestedWeight(exerciseB?.load_percentage ?? null, exerciseB?.exercise_id ? (e1rmMap[exerciseB.exercise_id] ?? null) : null);
+  const coachSuggestedA = getCoachSuggestedWeight(
+    exerciseA?.load_percentage ?? null,
+    exerciseA?.exercise_id ? (e1rmMap[exerciseA.exercise_id] ?? null) : null,
+  );
+  const coachSuggestedB = getCoachSuggestedWeight(
+    exerciseB?.load_percentage ?? null,
+    exerciseB?.exercise_id ? (e1rmMap[exerciseB.exercise_id] ?? null) : null,
+  );
 
   useEffect(() => {
     setIsWeightAPristine(true);
     setIsWeightBPristine(true);
   }, [completedSets]);
 
+  const isViewingLoggedSet = viewingSetIndex >= 1;
   useEffect(() => {
+    if (isViewingLoggedSet) return;
     if (isWeightAPristine) {
-      if (resultA.default_weight != null && resultA.default_weight > 0) setWeightA(String(resultA.default_weight));
+      if (resultA.default_weight != null && resultA.default_weight > 0)
+        setWeightA(String(resultA.default_weight));
       else setWeightA("");
     }
-  }, [isWeightAPristine, resultA.default_weight]);
+  }, [isViewingLoggedSet, isWeightAPristine, resultA.default_weight]);
   useEffect(() => {
+    if (isViewingLoggedSet) return;
     if (isWeightBPristine) {
-      if (resultB.default_weight != null && resultB.default_weight > 0) setWeightB(String(resultB.default_weight));
+      if (resultB.default_weight != null && resultB.default_weight > 0)
+        setWeightB(String(resultB.default_weight));
       else setWeightB("");
     }
-  }, [isWeightBPristine, resultB.default_weight]);
+  }, [isViewingLoggedSet, isWeightBPristine, resultB.default_weight]);
 
   // Block details
   const blockDetails: BlockDetail[] = [
@@ -115,8 +225,12 @@ export function SupersetExecutor({
       });
     }
     if (exerciseA.load_percentage != null) {
-      const suggestedForDisplay = resultA.source === "percent_e1rm" ? resultA.suggested_weight : null;
-      const loadDisplay = formatLoadPercentage(exerciseA.load_percentage, suggestedForDisplay);
+      const suggestedForDisplay =
+        resultA.source === "percent_e1rm" ? resultA.suggested_weight : null;
+      const loadDisplay = formatLoadPercentage(
+        exerciseA.load_percentage,
+        suggestedForDisplay,
+      );
       if (loadDisplay) {
         blockDetails.push({ label: "LOAD (A)", value: loadDisplay });
       }
@@ -135,8 +249,12 @@ export function SupersetExecutor({
       });
     }
     if (exerciseB.load_percentage != null) {
-      const suggestedForDisplay = resultB.source === "percent_e1rm" ? resultB.suggested_weight : null;
-      const loadDisplay = formatLoadPercentage(exerciseB.load_percentage, suggestedForDisplay);
+      const suggestedForDisplay =
+        resultB.source === "percent_e1rm" ? resultB.suggested_weight : null;
+      const loadDisplay = formatLoadPercentage(
+        exerciseB.load_percentage,
+        suggestedForDisplay,
+      );
       if (loadDisplay) {
         blockDetails.push({ label: "LOAD (B)", value: loadDisplay });
       }
@@ -144,6 +262,124 @@ export function SupersetExecutor({
   }
 
   const instructions = block.block.block_notes || undefined;
+
+  const maxViewableSet =
+    loggedSetsList.length === 0
+      ? 0
+      : Math.max(...loggedSetsList.map((s) => s.set_number));
+
+  const handleEditSet = (setEntry: LoggedSet) => {
+    const forSet = loggedSetsList.filter(
+      (s) => s.set_number === setEntry.set_number,
+    );
+    const entryA =
+      forSet.find((s) => s.exercise_id === exerciseA?.exercise_id) ?? forSet[0];
+    const entryB =
+      forSet.find((s) => s.exercise_id === exerciseB?.exercise_id) ??
+      forSet[1] ??
+      forSet[0];
+    setEditingSetId(setEntry.id);
+    setEditDraft({
+      weightA: String(entryA?.weight_kg ?? ""),
+      repsA: String(entryA?.reps_completed ?? ""),
+      weightB: String(entryB?.weight_kg ?? ""),
+      repsB: String(entryB?.reps_completed ?? ""),
+      set_number: setEntry.set_number ?? 1,
+    });
+    setMenuOpenSetId(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSetId || !editDraft) return;
+    if (editingSetId.startsWith("temp-")) {
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[SAVE EDITS guard]", {
+          executor: "SupersetExecutor",
+          blockTypeFromUI: block.block.block_type,
+          editingSetId,
+          isSavingEdit,
+          timestamp: Date.now(),
+        });
+      }
+      addToast({
+        title: "Set still saving, try again in a moment",
+        variant: "default",
+        duration: 2000,
+      });
+      return;
+    }
+    const weightANum = parseFloat(editDraft.weightA);
+    const repsANum = parseInt(editDraft.repsA, 10);
+    const weightBNum = parseFloat(editDraft.weightB);
+    const repsBNum = parseInt(editDraft.repsB, 10);
+    if (
+      isNaN(weightANum) ||
+      isNaN(repsANum) ||
+      isNaN(weightBNum) ||
+      isNaN(repsBNum)
+    ) {
+      addToast({
+        title: "Invalid values",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+    setIsSavingEdit(true);
+    try {
+      const payload = buildSetEditPatchPayload(block.block.block_type, {
+        set_number: editDraft.set_number,
+        superset_exercise_a_id: exerciseA?.exercise_id ?? undefined,
+        superset_weight_a: weightANum,
+        superset_reps_a: repsANum,
+        superset_exercise_b_id: exerciseB?.exercise_id ?? undefined,
+        superset_weight_b: weightBNum,
+        superset_reps_b: repsBNum,
+      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[SAVE EDITS]", {
+          executor: "SupersetExecutor",
+          setId: editingSetId,
+          blockTypeFromUI: block.block.block_type,
+          payloadKeys: Object.keys(payload),
+        });
+      }
+      const res = await fetchApi(`/api/sets/${editingSetId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      if (res?.ok) {
+        const setNum = editDraft.set_number;
+        const next = loggedSetsList.map((s) => {
+          if (s.set_number !== setNum) return s;
+          const isA = s.exercise_id === exerciseA?.exercise_id;
+          return {
+            ...s,
+            weight_kg: isA ? weightANum : weightBNum,
+            reps_completed: isA ? repsANum : repsBNum,
+          };
+        });
+        const toUpsert = next.filter((s) => s.set_number === setNum);
+        toUpsert.forEach((e) => onSetEditSaved?.(block.block.id, e));
+        setEditingSetId(null);
+        setEditDraft(null);
+        addToast({ title: "Set updated", variant: "success", duration: 2000 });
+      } else {
+        addToast({
+          title: "Failed to update set",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSetId(null);
+    setEditDraft(null);
+  };
 
   const handleLog = async () => {
     if (!exerciseA || !exerciseB || isLoggingSet) return;
@@ -153,10 +389,24 @@ export function SupersetExecutor({
     const weightBNum = parseFloat(weightB);
     const repsBNum = parseInt(repsB);
 
-    if (!weightA || weightA.trim() === "" || isNaN(weightANum) || weightANum < 0 || 
-        !repsA || repsA.trim() === "" || isNaN(repsANum) || repsANum <= 0 || 
-        !weightB || weightB.trim() === "" || isNaN(weightBNum) || weightBNum < 0 || 
-        !repsB || repsB.trim() === "" || isNaN(repsBNum) || repsBNum <= 0) {
+    if (
+      !weightA ||
+      weightA.trim() === "" ||
+      isNaN(weightANum) ||
+      weightANum < 0 ||
+      !repsA ||
+      repsA.trim() === "" ||
+      isNaN(repsANum) ||
+      repsANum <= 0 ||
+      !weightB ||
+      weightB.trim() === "" ||
+      isNaN(weightBNum) ||
+      weightBNum < 0 ||
+      !repsB ||
+      repsB.trim() === "" ||
+      isNaN(repsBNum) ||
+      repsBNum <= 0
+    ) {
       addToast({
         title: "Invalid Input",
         description: "Please enter valid weight and reps for both exercises",
@@ -178,26 +428,35 @@ export function SupersetExecutor({
       // Log superset as a single call with both exercises
       // Calculate set number from current state
       const setNumber = completedSets + 1;
-      
+
       const logData: any = {
-        block_type: 'superset',
+        block_type: "superset",
         set_number: setNumber,
       };
-      
+
       // Only add fields if they're defined
-      if (exerciseA?.exercise_id) logData.superset_exercise_a_id = exerciseA.exercise_id;
-      if (weightANum !== undefined && weightANum !== null) logData.superset_weight_a = weightANum;
-      if (repsANum !== undefined && repsANum !== null) logData.superset_reps_a = repsANum;
-      if (exerciseB?.exercise_id) logData.superset_exercise_b_id = exerciseB.exercise_id;
-      if (weightBNum !== undefined && weightBNum !== null) logData.superset_weight_b = weightBNum;
-      if (repsBNum !== undefined && repsBNum !== null) logData.superset_reps_b = repsBNum;
-      
+      if (exerciseA?.exercise_id)
+        logData.superset_exercise_a_id = exerciseA.exercise_id;
+      if (weightANum !== undefined && weightANum !== null)
+        logData.superset_weight_a = weightANum;
+      if (repsANum !== undefined && repsANum !== null)
+        logData.superset_reps_a = repsANum;
+      if (exerciseB?.exercise_id)
+        logData.superset_exercise_b_id = exerciseB.exercise_id;
+      if (weightBNum !== undefined && weightBNum !== null)
+        logData.superset_weight_b = weightBNum;
+      if (repsBNum !== undefined && repsBNum !== null)
+        logData.superset_reps_b = repsBNum;
+
       const result = await logSetToDatabase(logData);
 
       if (result.success) {
-        const loggedSetsArray: LoggedSet[] = [
+        const setLogId =
+          (result as { set_log_id?: string }).set_log_id ??
+          `temp-${Date.now()}`;
+        const newEntries: LoggedSet[] = [
           {
-            id: `temp-a-${Date.now()}`,
+            id: setLogId,
             exercise_id: exerciseA.exercise_id,
             block_id: block.block.id,
             set_number: setNumber,
@@ -206,7 +465,7 @@ export function SupersetExecutor({
             completed_at: new Date(),
           } as LoggedSet,
           {
-            id: `temp-b-${Date.now()}`,
+            id: setLogId,
             exercise_id: exerciseB.exercise_id,
             block_id: block.block.id,
             set_number: setNumber,
@@ -215,6 +474,8 @@ export function SupersetExecutor({
             completed_at: new Date(),
           } as LoggedSet,
         ];
+        newEntries.forEach((e) => onSetLogUpsert?.(block.block.id, e));
+        setViewingSetIndex(0);
 
         // Update e1RM for exercise A (API calculates e1RM for exercise A in superset)
         if (result.e1rm && onE1rmUpdate) {
@@ -229,6 +490,7 @@ export function SupersetExecutor({
         });
 
         const newCompletedSets = completedSets + 1;
+        const updatedLoggedSets = [...loggedSetsList, ...newEntries];
         if (newCompletedSets < totalSets) {
           onLastSetLoggedForRest?.({
             weight: weightANum,
@@ -242,9 +504,7 @@ export function SupersetExecutor({
 
         // Complete block if last set
         if (newCompletedSets >= totalSets) {
-          onBlockComplete(block.block.id, loggedSetsArray);
-        } else {
-          // Advancing to next set: parent updates lastPerformedWeightByExerciseId and completedSets; useEffect will apply defaults
+          onBlockComplete(block.block.id, updatedLoggedSets);
         }
       } else {
         addToast({
@@ -259,110 +519,303 @@ export function SupersetExecutor({
     }
   };
 
-  const loggingInputs = (
-    <div className="space-y-6">
-      {/* Exercise A */}
-      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
-        <div className="mb-4">
-          <h4 className="font-semibold text-lg" style={{ color: "var(--fc-accent-cyan)" }}>
-            Exercise A: {exerciseA?.exercise?.name || "Exercise A"}
-          </h4>
-          {exerciseA && (
-            <ExerciseActionButtons
-              exercise={exerciseA}
-              onVideoClick={onVideoClick}
-              onAlternativesClick={onAlternativesClick}
-            />
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <LargeInput
-              label="Weight"
-              value={weightA}
-              onChange={(val) => { setIsWeightAPristine(false); setWeightA(val); }}
-              placeholder="0"
-              step="0.5"
-              unit="kg"
-              showStepper
-              stepAmount={2.5}
-            />
-            {coachSuggestedA != null && coachSuggestedA > 0 && (
-              <ApplySuggestedWeightButton
-                suggestedKg={coachSuggestedA}
-                onApply={() => { setWeightA(String(coachSuggestedA)); setIsWeightAPristine(false); }}
-              />
-            )}
-          </div>
-          <LargeInput
-            label="Reps"
-            value={repsA}
-            onChange={setRepsA}
-            placeholder="0"
-            step="1"
-            showStepper
-            stepAmount={1}
-          />
-        </div>
-      </div>
+  const setNumbersLogged = [
+    ...new Set(loggedSetsList.map((s) => s.set_number)),
+  ].sort((a, b) => a - b);
 
-      {/* Exercise B */}
-      <div className="p-4 rounded-xl" style={{ background: "var(--fc-surface-sunken)" }}>
-        <div className="mb-4">
-          <h4 className="font-semibold text-lg" style={{ color: "var(--fc-accent-purple)" }}>
-            Exercise B: {exerciseB?.exercise?.name || "Exercise B"}
-          </h4>
-          {exerciseB && (
-            <ExerciseActionButtons
-              exercise={exerciseB}
-              onVideoClick={onVideoClick}
-              onAlternativesClick={onAlternativesClick}
-            />
-          )}
+  const loggingInputs = (
+    <div className="space-y-4">
+      {allowSetEditDelete && setNumbersLogged.length > 0 && (
+        <div
+          className="rounded-xl border p-3"
+          style={{
+            borderColor: "var(--fc-surface-card-border)",
+            background: "var(--fc-surface-sunken)",
+          }}
+        >
+          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
+            Logged sets
+          </div>
+          <ul className="space-y-1.5">
+            {setNumbersLogged.map((setNum) => {
+              const forSet = loggedSetsList.filter(
+                (s) => s.set_number === setNum,
+              );
+              const entryA =
+                forSet.find((s) => s.exercise_id === exerciseA?.exercise_id) ||
+                forSet[0];
+              const entryB =
+                forSet.find((s) => s.exercise_id === exerciseB?.exercise_id) ||
+                forSet[1];
+              const label = `Set ${setNum}: A ${entryA?.weight_kg ?? "—"}×${entryA?.reps_completed ?? "—"}${entryB ? `, B ${entryB.weight_kg ?? "—"}×${entryB.reps_completed ?? "—"}` : ""}`;
+              const firstId = forSet[0]?.id ?? "";
+              return (
+                <li
+                  key={`set-${setNum}`}
+                  className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                  style={{ background: "var(--fc-surface-elevated)" }}
+                >
+                  <span className="text-sm fc-text-primary">{label}</span>
+                  <div className="relative flex items-center">
+                    <button
+                      type="button"
+                      className="p-1.5 rounded-md hover:bg-black/10"
+                      onClick={() =>
+                        setMenuOpenSetId(
+                          menuOpenSetId === firstId ? null : firstId,
+                        )
+                      }
+                      aria-label="Options"
+                    >
+                      <MoreVertical className="w-4 h-4 fc-text-dim" />
+                    </button>
+                    {menuOpenSetId === firstId && (
+                      <div
+                        className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
+                        style={{
+                          background: "var(--fc-surface-elevated)",
+                          border: "1px solid var(--fc-surface-card-border)",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
+                          onClick={() => handleEditSet(forSet[0])}
+                        >
+                          <Pencil className="w-4 h-4" /> Edit
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <LargeInput
-              label="Weight"
-              value={weightB}
-              onChange={(val) => { setIsWeightBPristine(false); setWeightB(val); }}
-              placeholder="0"
-              step="0.5"
-              unit="kg"
-              showStepper
-              stepAmount={2.5}
-            />
-            {coachSuggestedB != null && coachSuggestedB > 0 && (
-              <ApplySuggestedWeightButton
-                suggestedKg={coachSuggestedB}
-                onApply={() => { setWeightB(String(coachSuggestedB)); setIsWeightBPristine(false); }}
+      )}
+      {allowSetEditDelete && totalSets > 0 && (
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            onClick={() => setViewingSetIndex((i) => Math.max(0, i - 1))}
+            disabled={viewingSetIndex <= 0}
+            aria-label="Previous set"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <span className="text-sm font-medium fc-text-primary min-w-[100px] text-center">
+            Set {displaySetNumber} of {totalSets}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            onClick={() =>
+              setViewingSetIndex((i) => Math.min(maxViewableSet, i + 1))
+            }
+            disabled={viewingSetIndex >= maxViewableSet}
+            aria-label="Next set"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </Button>
+        </div>
+      )}
+      <div className="space-y-6">
+        {/* Exercise A */}
+        <div
+          className="p-4 rounded-xl"
+          style={{ background: "var(--fc-surface-sunken)" }}
+        >
+          <div className="mb-4">
+            <h4
+              className="font-semibold text-lg"
+              style={{ color: "var(--fc-accent-cyan)" }}
+            >
+              Exercise A: {exerciseA?.exercise?.name || "Exercise A"}
+            </h4>
+            {exerciseA && (
+              <ExerciseActionButtons
+                exercise={exerciseA}
+                onVideoClick={onVideoClick}
+                onAlternativesClick={onAlternativesClick}
               />
             )}
           </div>
-          <LargeInput
-            label="Reps"
-            value={repsB}
-            onChange={setRepsB}
-            placeholder="0"
-            step="1"
-            showStepper
-            stepAmount={1}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <LargeInput
+                label="Weight"
+                value={editDraft ? editDraft.weightA : weightA}
+                onChange={(val) => {
+                  if (editDraft)
+                    setEditDraft((d) => (d ? { ...d, weightA: val } : null));
+                  else {
+                    setIsWeightAPristine(false);
+                    setWeightA(val);
+                  }
+                }}
+                placeholder="0"
+                step="0.5"
+                unit="kg"
+                showStepper
+                stepAmount={2.5}
+              />
+              {!editDraft && coachSuggestedA != null && coachSuggestedA > 0 && (
+                <ApplySuggestedWeightButton
+                  suggestedKg={coachSuggestedA}
+                  onApply={() => {
+                    setWeightA(String(coachSuggestedA));
+                    setIsWeightAPristine(false);
+                  }}
+                />
+              )}
+            </div>
+            <LargeInput
+              label="Reps"
+              value={editDraft ? editDraft.repsA : repsA}
+              onChange={(val) => {
+                if (editDraft)
+                  setEditDraft((d) => (d ? { ...d, repsA: val } : null));
+                else setRepsA(val);
+              }}
+              placeholder="0"
+              step="1"
+              showStepper
+              stepAmount={1}
+            />
+          </div>
+        </div>
+
+        {/* Exercise B */}
+        <div
+          className="p-4 rounded-xl"
+          style={{ background: "var(--fc-surface-sunken)" }}
+        >
+          <div className="mb-4">
+            <h4
+              className="font-semibold text-lg"
+              style={{ color: "var(--fc-accent-purple)" }}
+            >
+              Exercise B: {exerciseB?.exercise?.name || "Exercise B"}
+            </h4>
+            {exerciseB && (
+              <ExerciseActionButtons
+                exercise={exerciseB}
+                onVideoClick={onVideoClick}
+                onAlternativesClick={onAlternativesClick}
+              />
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <LargeInput
+                label="Weight"
+                value={editDraft ? editDraft.weightB : weightB}
+                onChange={(val) => {
+                  if (editDraft)
+                    setEditDraft((d) => (d ? { ...d, weightB: val } : null));
+                  else {
+                    setIsWeightBPristine(false);
+                    setWeightB(val);
+                  }
+                }}
+                placeholder="0"
+                step="0.5"
+                unit="kg"
+                showStepper
+                stepAmount={2.5}
+              />
+              {!editDraft && coachSuggestedB != null && coachSuggestedB > 0 && (
+                <ApplySuggestedWeightButton
+                  suggestedKg={coachSuggestedB}
+                  onApply={() => {
+                    setWeightB(String(coachSuggestedB));
+                    setIsWeightBPristine(false);
+                  }}
+                />
+              )}
+            </div>
+            <LargeInput
+              label="Reps"
+              value={editDraft ? editDraft.repsB : repsB}
+              onChange={(val) => {
+                if (editDraft)
+                  setEditDraft((d) => (d ? { ...d, repsB: val } : null));
+                else setRepsB(val);
+              }}
+              placeholder="0"
+              step="1"
+              showStepper
+              stepAmount={1}
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 
+  const isEditMode = !!editingSetId && !!editDraft;
+  const forViewedSet =
+    viewingSetIndex >= 1
+      ? loggedSetsList.filter((s) => s.set_number === viewingSetIndex)
+      : [];
+  const viewedSetEntry = forViewedSet[0] ?? null;
   const logButton = (
-    <Button
-      onClick={handleLog}
-      disabled={isLoggingSet}
-      variant="fc-primary"
-      className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      <Zap className="w-5 h-5 mr-2" />
-      {isLoggingSet ? "Logging..." : "LOG SUPERSET"}
-    </Button>
+    <div className="space-y-2">
+      {allowSetEditDelete && isEditMode ? (
+        <div className="flex gap-2 w-full">
+          <Button
+            variant="outline"
+            onClick={handleCancelEdit}
+            className="flex-1 h-12 text-base font-semibold rounded-xl"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEdit}
+            disabled={
+              isSavingEdit ||
+              !editDraft ||
+              editDraft.weightA.trim() === "" ||
+              editDraft.repsA.trim() === "" ||
+              editDraft.weightB.trim() === "" ||
+              editDraft.repsB.trim() === "" ||
+              isNaN(parseFloat(editDraft.weightA)) ||
+              isNaN(parseInt(editDraft.repsA, 10)) ||
+              isNaN(parseFloat(editDraft.weightB)) ||
+              isNaN(parseInt(editDraft.repsB, 10))
+            }
+            variant="fc-primary"
+            className="flex-1 h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+          >
+            {isSavingEdit ? "Saving…" : "Save edits"}
+          </Button>
+        </div>
+      ) : allowSetEditDelete && viewedSetEntry ? (
+        <Button
+          onClick={() => handleEditSet(viewedSetEntry)}
+          variant="fc-primary"
+          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl"
+        >
+          <Pencil className="w-5 h-5 mr-2" />
+          Edit this set
+        </Button>
+      ) : (
+        <Button
+          onClick={handleLog}
+          disabled={isLoggingSet || completedSets >= totalSets}
+          variant="fc-primary"
+          className="w-full h-12 text-base font-bold uppercase tracking-wider rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Zap className="w-5 h-5 mr-2" />
+          {isLoggingSet ? "Logging..." : "LOG SUPERSET"}
+        </Button>
+      )}
+    </div>
   );
 
   return (
@@ -392,7 +845,7 @@ export function SupersetExecutor({
       }`}
       blockDetails={blockDetails}
       instructions={instructions}
-      currentSet={currentSet}
+      currentSet={displaySetNumber}
       totalSets={totalSets}
       progressLabel="Set"
       loggingInputs={loggingInputs}

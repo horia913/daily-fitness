@@ -237,6 +237,8 @@ export interface LiveWorkoutBlock {
   endTime?: Date
   completedSets: number
   totalSets: number
+  /** Set logs already persisted for this block (from restore); used to hydrate executor so arrows and edit work */
+  existingSetLogs?: LoggedSet[]
 }
 
 export interface LiveWorkoutExercise {

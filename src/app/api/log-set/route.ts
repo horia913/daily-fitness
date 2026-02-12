@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
       workout_assignment_id,
       session_id, // workout_sessions.id - used to link workout_logs
       template_exercise_id,
+      rpe: incomingRpe, // Golden Logging Flow: RPE included with set log
+      idempotency_key, // Golden Logging Flow: client-generated dedup key
     } = body
 
     // Validate session_id is a valid UUID if provided
@@ -710,6 +712,50 @@ export async function POST(req: NextRequest) {
         }
       }
 
+    // Golden Logging Flow: include RPE in the insert if provided (1-10)
+    if (incomingRpe !== undefined && incomingRpe !== null) {
+      const rpeNum = Number(incomingRpe)
+      if (!isNaN(rpeNum) && Number.isInteger(rpeNum) && rpeNum >= 1 && rpeNum <= 10) {
+        insertData.rpe = rpeNum
+      }
+    }
+
+    // Golden Logging Flow: Server-side dedupe by natural key
+    // If idempotency_key is provided, check for an existing row matching
+    // (workout_log_id, block_id, exercise_id, set_number) before inserting.
+    if (idempotency_key && workoutLogId && insertData.set_number != null) {
+      const dedupeQuery = supabaseAdmin
+        .from('workout_set_logs')
+        .select('id')
+        .eq('workout_log_id', workoutLogId)
+        .eq('block_id', block_id)
+        .eq('set_number', insertData.set_number)
+
+      // exercise_id may be null for some block types
+      if (insertData.exercise_id) {
+        dedupeQuery.eq('exercise_id', insertData.exercise_id)
+      }
+
+      const { data: existingRows } = await dedupeQuery.limit(1)
+
+      if (existingRows && existingRows.length > 0) {
+        console.log('🔁 [dedupe] Existing set found, returning without duplicate insert:', {
+          idempotency_key,
+          existing_id: existingRows[0].id,
+        })
+        return NextResponse.json({
+          success: true,
+          set_log_id: existingRows[0].id,
+          workout_log_id: workoutLogId ?? null,
+          deduplicated: true,
+          message: 'Set already logged (deduplicated)',
+        }, {
+          status: 200,
+          headers: perf.getHeaders(),
+        })
+      }
+    }
+
     // Log the insert data for debugging
     console.log('💾 Step 3: Inserting to workout_set_logs:', {
       block_type: blockType,
@@ -717,6 +763,8 @@ export async function POST(req: NextRequest) {
       workout_log_id: workoutLogId || 'null',
       client_id: userId,
       has_exercise_id: !!insertData.exercise_id,
+      has_rpe: insertData.rpe !== undefined,
+      idempotency_key: idempotency_key || 'none',
       insert_keys: Object.keys(insertData),
       insert_data_sample: {
         ...insertData,
@@ -728,7 +776,8 @@ export async function POST(req: NextRequest) {
     const { data: insertedData, error: logError } = await supabaseAdmin
       .from('workout_set_logs')
       .insert([insertData])
-      .select()
+      .select('id')
+      .single()
 
     if (logError) {
       console.error('❌ Error logging set to workout_set_logs:', {
@@ -760,8 +809,7 @@ export async function POST(req: NextRequest) {
     console.log('✅ Successfully inserted to workout_set_logs');
 
     console.log('API log-set: Successfully inserted set log:', {
-      inserted_count: insertedData?.length || 0,
-      inserted_id: insertedData?.[0]?.id,
+      inserted_id: insertedData?.id,
     })
 
     // Step 3: Calculate estimated 1RM using Epley formula for supported block types
@@ -1041,12 +1089,13 @@ export async function POST(req: NextRequest) {
       : null
 
     // Step 7: Return success (set logging succeeded, metrics update may have warnings)
-    // Include set_log_id for RPE modal to use
-    const setLogId = insertedData?.[0]?.id || null;
+    // Include set_log_id and workout_log_id at top level for RPE modal and Undo (set correction)
+    const setLogId = insertedData?.id ?? null;
     
     const response: any = {
       success: true,
-      set_log_id: setLogId, // For RPE modal to update this set
+      set_log_id: setLogId,
+      workout_log_id: workoutLogId ?? null,
       block_type: blockType,
       set_logged: insertData || {
         workout_log_id: workoutLogId || null,

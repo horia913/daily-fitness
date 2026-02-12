@@ -4,10 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Play, Pause, RotateCcw, Heart } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
-import {
-  BaseBlockExecutorLayout,
-  formatTime,
-} from "../BaseBlockExecutor";
+import { BaseBlockExecutorLayout, formatTime } from "../BaseBlockExecutor";
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
@@ -33,15 +30,30 @@ export function HRSetExecutor({
   onAlternativesClick,
   onRestTimerClick,
   progressionSuggestion,
+  registerSetLogIdResolved,
+  onSetLogUpsert,
+  onSetEditSaved,
+  loggedSets: loggedSetsProp,
 }: BaseBlockExecutorProps) {
   const { addToast } = useToast();
   const currentExercise = block.block.exercises?.[currentExerciseIndex];
-  
+
+  /** Parent-owned logged sets; single source of truth. Persists across block navigation. */
+  const loggedSetsList = loggedSetsProp ?? [];
+
+  const loggedSetsRef = useRef<LoggedSet[]>(loggedSetsList);
+  useEffect(() => {
+    loggedSetsRef.current = loggedSetsList;
+  }, [loggedSetsList]);
+
   // Read from special table (hr_sets)
-  const hrSet = block.block.hr_sets?.find(
-    (hr: any) => hr.exercise_id === currentExercise?.exercise_id || !currentExercise?.exercise_id
-  ) || block.block.hr_sets?.[0];
-  
+  const hrSet =
+    block.block.hr_sets?.find(
+      (hr: any) =>
+        hr.exercise_id === currentExercise?.exercise_id ||
+        !currentExercise?.exercise_id,
+    ) || block.block.hr_sets?.[0];
+
   const isIntervals = hrSet?.is_intervals ?? false;
   const hrZone = hrSet?.hr_zone;
   const hrPercentageMin = hrSet?.hr_percentage_min;
@@ -55,24 +67,37 @@ export function HRSetExecutor({
   const [timeRemaining, setTimeRemaining] = useState(durationSeconds);
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  
+
   // Interval mode state
   const [currentRound, setCurrentRound] = useState(1);
   const [isWorkPhase, setIsWorkPhase] = useState(true);
-  const [intervalTimeRemaining, setIntervalTimeRemaining] = useState(workDurationSeconds);
-  
+  const [intervalTimeRemaining, setIntervalTimeRemaining] =
+    useState(workDurationSeconds);
+
   // HR input state
   const [currentHRZone, setCurrentHRZone] = useState("");
   const [currentHRPercentage, setCurrentHRPercentage] = useState("");
   const [distanceMeters, setDistanceMeters] = useState("");
   const [averageHRPercentage, setAverageHRPercentage] = useState("");
-  
+
   // Logging state
   const [isLoggingSet, setIsLoggingSet] = useState(false);
   useLoggingReset(isLoggingSet, setIsLoggingSet);
-  const [loggedSets, setLoggedSets] = useState<LoggedSet[]>([]);
-  
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!registerSetLogIdResolved) return;
+    registerSetLogIdResolved((set_log_id: string) => {
+      const list = loggedSetsRef.current;
+      const idx = list.findLastIndex((s) => s.id.startsWith("temp-"));
+      if (idx === -1) return;
+      const oldEntry = list[idx];
+      const newEntry = { ...oldEntry, id: set_log_id };
+      onSetLogUpsert?.(block.block.id, newEntry, { replaceId: oldEntry.id });
+    });
+    return () => {};
+  }, [registerSetLogIdResolved, onSetLogUpsert, block.block.id]);
 
   // Timer logic for continuous mode
   useEffect(() => {
@@ -139,11 +164,21 @@ export function HRSetExecutor({
         clearInterval(timerRef.current);
       }
     };
-  }, [isActive, intervalTimeRemaining, isPaused, isIntervals, isWorkPhase, currentRound, targetRounds, workDurationSeconds, restDurationSeconds]);
+  }, [
+    isActive,
+    intervalTimeRemaining,
+    isPaused,
+    isIntervals,
+    isWorkPhase,
+    currentRound,
+    targetRounds,
+    workDurationSeconds,
+    restDurationSeconds,
+  ]);
 
   // Block details
   const blockDetails: BlockDetail[] = [];
-  
+
   if (hrZone) {
     blockDetails.push({
       label: "HR ZONE",
@@ -155,7 +190,7 @@ export function HRSetExecutor({
       value: `${hrPercentageMin}-${hrPercentageMax}%`,
     });
   }
-  
+
   if (isIntervals) {
     blockDetails.push({
       label: "ROUNDS",
@@ -234,17 +269,25 @@ export function HRSetExecutor({
       const logData: any = {
         workout_log_id: sessionId,
         exercise_id: currentExercise.exercise_id,
-        set_number: isIntervals ? currentRound : loggedSets.length + 1,
+        set_number: isIntervals ? currentRound : loggedSetsList.length + 1,
         hr_zone: currentHRZone ? parseInt(currentHRZone) : null,
-        hr_percentage: currentHRPercentage ? parseFloat(currentHRPercentage) : null,
+        hr_percentage: currentHRPercentage
+          ? parseFloat(currentHRPercentage)
+          : null,
         hr_distance_meters: distanceMeters ? parseFloat(distanceMeters) : null,
       };
 
       if (isIntervals) {
         logData.hr_interval_round = currentRound;
-        logData.hr_work_duration_seconds = isWorkPhase ? workDurationSeconds - intervalTimeRemaining : workDurationSeconds;
-        logData.hr_rest_duration_seconds = !isWorkPhase ? restDurationSeconds - intervalTimeRemaining : restDurationSeconds;
-        logData.hr_average_percentage = averageHRPercentage ? parseFloat(averageHRPercentage) : null;
+        logData.hr_work_duration_seconds = isWorkPhase
+          ? workDurationSeconds - intervalTimeRemaining
+          : workDurationSeconds;
+        logData.hr_rest_duration_seconds = !isWorkPhase
+          ? restDurationSeconds - intervalTimeRemaining
+          : restDurationSeconds;
+        logData.hr_average_percentage = averageHRPercentage
+          ? parseFloat(averageHRPercentage)
+          : null;
       } else {
         logData.hr_duration_seconds = durationSeconds - timeRemaining;
       }
@@ -252,17 +295,19 @@ export function HRSetExecutor({
       const result = await logSetToDatabase(logData);
 
       if (result.success) {
+        const setLogId =
+          (result as { set_log_id?: string }).set_log_id ??
+          `temp-${Date.now()}`;
         const newLoggedSet: LoggedSet = {
-          id: `temp-${Date.now()}`,
+          id: setLogId,
           exercise_id: currentExercise.exercise_id,
           block_id: block.block.id,
-          set_number: isIntervals ? currentRound : loggedSets.length + 1,
+          set_number: isIntervals ? currentRound : loggedSetsList.length + 1,
           completed_at: new Date(),
         };
 
-        setLoggedSets([...loggedSets, newLoggedSet]);
+        onSetLogUpsert?.(block.block.id, newLoggedSet);
 
-        // Clear inputs
         setCurrentHRZone("");
         setCurrentHRPercentage("");
         setDistanceMeters("");
@@ -270,15 +315,14 @@ export function HRSetExecutor({
 
         addToast({
           title: "Set Logged",
-          description: `HR set ${isIntervals ? `round ${currentRound}` : loggedSets.length + 1} logged successfully`,
+          description: `HR set ${isIntervals ? `round ${currentRound}` : loggedSetsList.length + 1} logged successfully`,
           variant: "success",
         });
 
-        // If intervals and all rounds logged, or continuous and time is up, complete block
         if (isIntervals && currentRound >= targetRounds) {
-          onBlockComplete(block.block.id, loggedSets);
+          onBlockComplete(block.block.id, [...loggedSetsList, newLoggedSet]);
         } else if (!isIntervals && timeRemaining === 0) {
-          onBlockComplete(block.block.id, loggedSets);
+          onBlockComplete(block.block.id, [...loggedSetsList, newLoggedSet]);
         }
       } else {
         addToast({
@@ -306,7 +350,9 @@ export function HRSetExecutor({
       {/* HR Input - Zone or Percentage */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-2">HR Zone (1-5)</label>
+          <label className="block text-sm font-medium mb-2">
+            HR Zone (1-5)
+          </label>
           <LargeInput
             type="number"
             value={currentHRZone}
@@ -337,7 +383,9 @@ export function HRSetExecutor({
 
       {/* Distance (optional) */}
       <div>
-        <label className="block text-sm font-medium mb-2">Distance (meters, optional)</label>
+        <label className="block text-sm font-medium mb-2">
+          Distance (meters, optional)
+        </label>
         <LargeInput
           type="number"
           value={distanceMeters}
@@ -350,7 +398,9 @@ export function HRSetExecutor({
       {/* Average HR for intervals */}
       {isIntervals && isWorkPhase && (
         <div>
-          <label className="block text-sm font-medium mb-2">Average HR % (for this interval)</label>
+          <label className="block text-sm font-medium mb-2">
+            Average HR % (for this interval)
+          </label>
           <LargeInput
             type="number"
             value={averageHRPercentage}
@@ -388,7 +438,7 @@ export function HRSetExecutor({
       exerciseName={exerciseName}
       blockDetails={blockDetails}
       instructions={instructions}
-      currentSet={isIntervals ? currentRound : loggedSets.length + 1}
+      currentSet={isIntervals ? currentRound : loggedSetsList.length + 1}
       totalSets={isIntervals ? targetRounds : 1}
       progressLabel={isIntervals ? "Round" : "Set"}
       loggingInputs={loggingInputs}

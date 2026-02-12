@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -20,8 +20,34 @@ import {
   Activity,
   ChevronRight,
   Trophy,
+  CheckCircle,
+  Clock,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+// Type for the program week API response
+interface ProgramWeekDay {
+  scheduleId: string;
+  dayNumber: number;
+  dayLabel: string;
+  templateId: string;
+  workoutName: string;
+  estimatedDuration: number;
+  isCompleted: boolean;
+}
+
+interface ProgramWeekData {
+  hasProgram: boolean;
+  programName: string | null;
+  programAssignmentId: string | null;
+  currentUnlockedWeek: number;
+  totalWeeks: number;
+  unlockedWeekMax: number;
+  isCompleted: boolean;
+  days: ProgramWeekDay[];
+}
 
 // Type for the dashboard API response
 interface DashboardData {
@@ -138,43 +164,105 @@ function formatDate(): string {
 export default function ClientDashboard() {
   const { user, profile } = useAuth();
   const { isDark, performanceSettings } = useTheme();
+  const router = useRouter();
 
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [programWeek, setProgramWeek] = useState<ProgramWeekData | null>(null);
+  const [startingSlot, setStartingSlot] = useState<string | null>(null);
+  const startingRef = useRef(false);
 
   useEffect(() => {
     if (user) {
-      fetchDashboardData();
+      fetchAllData();
     }
   }, [user]);
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const fetchAllData = async () => {
+    setLoading(true);
+    setError(null);
 
-      const response = await fetch('/api/client/dashboard', {
+    // Fetch dashboard + program week in parallel
+    const [dashResult, weekResult] = await Promise.allSettled([
+      fetchDashboardData(),
+      fetchProgramWeekData(),
+    ]);
+
+    if (dashResult.status === 'rejected') {
+      setError(dashResult.reason?.message || 'An error occurred');
+    }
+
+    setLoading(false);
+  };
+
+  const fetchDashboardData = async () => {
+    const response = await fetch('/api/client/dashboard', {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (errorData.code === 'RPC_NOT_FOUND') {
+        console.warn('[Dashboard] RPC not found, migration needed');
+        throw new Error('Dashboard optimization pending. Please run database migrations.');
+      }
+      throw new Error(errorData.error || 'Failed to fetch dashboard data');
+    }
+
+    const data = await response.json();
+    setDashboardData(data);
+  };
+
+  const fetchProgramWeekData = async () => {
+    try {
+      const response = await fetch('/api/client/program-week', {
         credentials: 'include'
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.code === 'RPC_NOT_FOUND') {
-          console.warn('[Dashboard] RPC not found, migration needed');
-          setError('Dashboard optimization pending. Please run database migrations.');
-          return;
-        }
-        throw new Error(errorData.error || 'Failed to fetch dashboard data');
+      if (response.ok) {
+        const data: ProgramWeekData = await response.json();
+        setProgramWeek(data);
       }
+    } catch (err) {
+      // Non-fatal: program week data is optional
+      console.warn('[Dashboard] Could not fetch program week:', err);
+    }
+  };
+
+  const handleStartDay = async (scheduleId: string) => {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    setStartingSlot(scheduleId);
+
+    try {
+      const response = await fetch('/api/program-workouts/start-from-progress', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ program_schedule_id: scheduleId }),
+      });
 
       const data = await response.json();
-      setDashboardData(data);
+
+      if (!response.ok) {
+        if (data.error === 'WEEK_LOCKED') {
+          alert(data.message || 'Complete the current week first.');
+        } else {
+          alert(data.message || data.error || 'Could not start workout.');
+        }
+        return;
+      }
+
+      // Navigate using the returned workout_assignment_id
+      if (data.workout_assignment_id) {
+        router.push(`/client/workouts/${data.workout_assignment_id}/start`);
+      }
     } catch (err: any) {
-      console.error("Error fetching dashboard data:", err);
-      setError(err.message || 'An error occurred');
+      console.error('[Dashboard] Error starting day:', err);
+      alert('Could not start workout. Check your connection.');
     } finally {
-      setLoading(false);
+      startingRef.current = false;
+      setStartingSlot(null);
     }
   };
 
@@ -348,10 +436,97 @@ export default function ClientDashboard() {
                   </section>
                 </AnimatedEntry>
 
-                {/* ===== TODAY'S WORKOUT HERO ===== */}
+                {/* ===== TODAY'S WORKOUT / PROGRAM WEEK ===== */}
                 <AnimatedEntry delay={200} animation="fade-up">
                   <section className="mb-6">
-                    {workoutDisplay ? (
+                    {programWeek?.hasProgram && !programWeek.isCompleted && programWeek.days.length > 0 ? (
+                      /* ── PROGRAM WEEK: Swipeable day cards ── */
+                      <div>
+                        {/* Week label */}
+                        <div className="flex items-center justify-between mb-3 px-1">
+                          <h2 className="text-sm font-bold uppercase tracking-widest fc-text-dim">
+                            Week {programWeek.currentUnlockedWeek} of {programWeek.totalWeeks}
+                          </h2>
+                          <span className="text-[11px] fc-text-subtle">
+                            {programWeek.days.filter(d => d.isCompleted).length}/{programWeek.days.length} done
+                          </span>
+                        </div>
+
+                        {/* Horizontal scroll-snap container */}
+                        <div
+                          className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
+                          style={{
+                            scrollSnapType: "x mandatory",
+                            WebkitOverflowScrolling: "touch",
+                            scrollbarWidth: "none",
+                          }}
+                        >
+                          {programWeek.days.map((day) => {
+                            const isStarting = startingSlot === day.scheduleId;
+                            return (
+                              <div
+                                key={day.scheduleId}
+                                className="flex-shrink-0 fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] p-4 flex flex-col justify-between"
+                                style={{
+                                  scrollSnapAlign: "center",
+                                  width: "min(72vw, 260px)",
+                                  minHeight: "170px",
+                                  opacity: day.isCompleted ? 0.7 : 1,
+                                }}
+                              >
+                                {/* Day header */}
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[11px] font-bold uppercase tracking-widest fc-text-dim">
+                                      {day.dayLabel}
+                                    </span>
+                                    {day.isCompleted && (
+                                      <CheckCircle className="w-4 h-4 fc-text-success" />
+                                    )}
+                                  </div>
+                                  <h3 className="text-base font-bold fc-text-primary leading-snug mb-1 line-clamp-2">
+                                    {day.workoutName}
+                                  </h3>
+                                  {day.estimatedDuration > 0 && (
+                                    <div className="flex items-center gap-1 fc-text-dim">
+                                      <Clock className="w-3 h-3" />
+                                      <span className="text-[11px]">~{day.estimatedDuration} min</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Action */}
+                                <div className="mt-3">
+                                  {day.isCompleted ? (
+                                    <div className="flex items-center justify-center gap-1.5 h-10 rounded-xl fc-text-success text-xs font-semibold"
+                                      style={{ background: "color-mix(in srgb, var(--fc-status-success) 10%, transparent)" }}
+                                    >
+                                      <CheckCircle className="w-3.5 h-3.5" />
+                                      Completed
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      disabled={isStarting}
+                                      onClick={() => handleStartDay(day.scheduleId)}
+                                      className="fc-btn fc-btn-primary fc-press w-full h-10 flex items-center justify-center gap-2 text-sm font-bold rounded-xl"
+                                    >
+                                      {isStarting ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Play className="w-4 h-4 fill-current" />
+                                      )}
+                                      {isStarting ? "Starting..." : "Start"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : workoutDisplay ? (
+                      /* ── SINGLE WORKOUT HERO (non-program or fallback) ── */
                       <div className="fc-hero-card" style={{ padding: "var(--fc-card-padding)" }}>
                         <div className="flex items-center gap-2 mb-3">
                           <span className="fc-pill fc-pill-glass fc-text-workouts">
@@ -393,6 +568,7 @@ export default function ClientDashboard() {
                         </Link>
                       </div>
                     ) : (
+                      /* ── NO WORKOUT ── */
                       <div className="fc-hero-card text-center" style={{ padding: "var(--fc-card-padding)" }}>
                         <div className="fc-icon-tile fc-icon-workouts w-14 h-14 mx-auto mb-4">
                           <Dumbbell className="w-7 h-7" />

@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useRef } from "react";
 import { SkipForward, Plus, Trophy, Layers } from "lucide-react";
+import { preventBackgroundScroll, restoreBackgroundScroll } from "@/lib/mobile-compatibility";
 
 export interface RestTimerLastSet {
   weight: number;
@@ -92,6 +93,18 @@ export function RestTimerModal({
       }
     };
   }, [isOpen, restSeconds]);
+
+  // Lock background scroll while rest timer is visible
+  useEffect(() => {
+    if (isOpen) {
+      preventBackgroundScroll();
+    } else {
+      restoreBackgroundScroll();
+    }
+    return () => {
+      restoreBackgroundScroll();
+    };
+  }, [isOpen]);
 
   const handleAdd30 = () => {
     setTimeLeft((prev) => prev + 30);

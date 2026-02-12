@@ -336,3 +336,65 @@ export async function updateProgressCache(
     // Non-fatal: the ledger is the source of truth, progress is just a cache
   }
 }
+
+// ============================================================================
+// WEEK LOCK HELPERS
+// Pure functions — no DB calls. Reused by start and complete server paths.
+// ============================================================================
+
+/**
+ * Compute the max unlocked week number.
+ *
+ * - Week 1 is always unlocked.
+ * - Week W+1 is unlocked only if ALL slots in week W (and all prior) are complete.
+ * - The returned value is the lowest week that still has incomplete slots,
+ *   i.e. the "current unlocked week" the client should be working on.
+ * - If every slot is complete, returns the last week number.
+ */
+export function computeUnlockedWeekMax(
+  slots: ProgramScheduleSlot[],
+  completedSlots: CompletedSlot[]
+): number {
+  if (slots.length === 0) return 1
+
+  // Distinct week numbers in ascending order
+  const weekNumbers = [...new Set(slots.map(s => s.week_number))].sort((a, b) => a - b)
+
+  const completedScheduleIds = new Set(completedSlots.map(c => c.program_schedule_id))
+
+  for (const weekNum of weekNumbers) {
+    const slotsInWeek = slots.filter(s => s.week_number === weekNum)
+    const allComplete = slotsInWeek.every(s => completedScheduleIds.has(s.id))
+
+    if (!allComplete) {
+      // This week has incomplete slots — it is the current unlocked week
+      return weekNum
+    }
+  }
+
+  // All weeks fully complete — return the last week number
+  return weekNumbers[weekNumbers.length - 1]
+}
+
+/**
+ * Assert that a target week is unlocked (i.e. <= unlockedWeekMax).
+ * Throws a structured error if the week is locked.
+ *
+ * @throws {{ code: 'WEEK_LOCKED', message: string, unlockedWeekMax: number }}
+ */
+export function assertWeekUnlocked(
+  targetWeekNumber: number,
+  slots: ProgramScheduleSlot[],
+  completedSlots: CompletedSlot[]
+): void {
+  const unlockedWeekMax = computeUnlockedWeekMax(slots, completedSlots)
+
+  if (targetWeekNumber > unlockedWeekMax) {
+    const err: any = new Error(
+      `Cannot access Week ${targetWeekNumber}. Complete all workouts in Week ${unlockedWeekMax} first.`
+    )
+    err.code = 'WEEK_LOCKED'
+    err.unlockedWeekMax = unlockedWeekMax
+    throw err
+  }
+}

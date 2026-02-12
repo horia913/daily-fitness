@@ -1125,12 +1125,20 @@ export class WorkoutTemplateService {
       const schedule = await this.getProgramSchedule(programId)
       const totalDays = schedule?.length || 0
 
+      const { data: clientProfile } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', clientId)
+        .single()
+      const timezoneSnapshot = (clientProfile?.timezone as string) ?? 'UTC'
+
       const insertPayload: any = {
         client_id: clientId,
         program_id: programId,
         start_date: startDate,
         total_days: totalDays,
-        status: 'active', // Explicitly set to active
+        status: 'active',
+        timezone_snapshot: timezoneSnapshot,
       }
 
       if (coachId) {
@@ -1148,10 +1156,14 @@ export class WorkoutTemplateService {
         if (insertResponse.error) throw insertResponse.error
         data = insertResponse.data
       } else {
-        // Update existing assignment to active
         const updateResponse = await supabase
           .from('program_assignments')
-          .update({ status: 'active', start_date: startDate, updated_at: new Date().toISOString() })
+          .update({
+            status: 'active',
+            start_date: startDate,
+            updated_at: new Date().toISOString(),
+            timezone_snapshot: timezoneSnapshot,
+          })
           .eq('id', existing.id)
           .select('*')
           .single()

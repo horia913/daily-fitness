@@ -148,6 +148,17 @@ export default function WorkoutDetailsPage() {
     new Set()
   );
 
+  // Expand all blocks by default when blocks load (client came to see the workout)
+  useEffect(() => {
+    if (blocks.length > 0) {
+      setExpandedExercises((prev) => {
+        const next = new Set(prev);
+        blocks.forEach((b) => next.add(b.id));
+        return next;
+      });
+    }
+  }, [blocks.length]);
+
   useEffect(() => {
     if (!id) return;
 
@@ -209,6 +220,7 @@ export default function WorkoutDetailsPage() {
               .eq("workout_template_id", assignmentId)
               .eq("client_id", user.id)
               .order("created_at", { ascending: false })
+              .limit(1)
               .maybeSingle();
 
           if (fallbackError) {
@@ -1311,16 +1323,6 @@ export default function WorkoutDetailsPage() {
       <style
         dangerouslySetInnerHTML={{
           __html: `
-        @keyframes shine {
-          to { background-position: 200% center; }
-        }
-        .shimmer-text {
-          background: linear-gradient(90deg, var(--fc-text-primary) 0%, var(--fc-accent-indigo) 50%, var(--fc-text-primary) 100%);
-          background-size: 200% auto;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          animation: shine 8s linear infinite;
-        }
         .exercise-item {
           max-height: 120px;
           overflow: hidden;
@@ -1374,7 +1376,7 @@ export default function WorkoutDetailsPage() {
                   </span>
                 )}
               </div>
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter mb-6 shimmer-text">
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter mb-6 fc-text-primary">
                 {assignment.name}
               </h1>
               {assignment.description && (
@@ -1392,16 +1394,16 @@ export default function WorkoutDetailsPage() {
                   <span className="fc-stats-strip-label">Minutes</span>
                 </div>
                 <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value">{blocks.reduce((s, b) => s + (b.rawBlock?.total_sets ?? 0), 0)}</span>
+                  <span className="fc-stats-strip-value">{totalSets}</span>
                   <span className="fc-stats-strip-label">Sets</span>
                 </div>
                 <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value">{blocks.reduce((s, b) => s + (b.exercises?.length ?? 0), 0)}</span>
+                  <span className="fc-stats-strip-value">{totalExercises}</span>
                   <span className="fc-stats-strip-label">Exercises</span>
                 </div>
                 <div className="fc-stats-strip-item">
-                  <span className="fc-stats-strip-value fc-text-success">{blocks.filter(b => (b.blockType || "").toLowerCase() === "drop_set" || (b.blockType || "").toLowerCase() === "dropset").length}</span>
-                  <span className="fc-stats-strip-label">Drop Sets</span>
+                  <span className="fc-stats-strip-value">{blocks.length}</span>
+                  <span className="fc-stats-strip-label">Blocks</span>
                 </div>
               </div>
             </section>
@@ -1498,6 +1500,19 @@ export default function WorkoutDetailsPage() {
                               );
                             })()}
                           </h4>
+                          {!isExpanded && block.exercises.length > 0 && (
+                            <p className="text-xs fc-text-dim mt-1 m-0">
+                              {block.exercises.length} exercise{block.exercises.length !== 1 ? "s" : ""}
+                              {(() => {
+                                const sets = block.rawBlock?.total_sets;
+                                const reps = block.exercises[0]?.reps || block.rawBlock?.reps_per_set;
+                                if (sets != null && reps) return ` — ${sets}×${reps}`;
+                                if (sets != null) return ` — ${sets} sets`;
+                                if (reps) return ` — ${reps} reps`;
+                                return "";
+                              })()}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <ChevronDown className="rotate-icon w-5 h-5 fc-text-dim" />
@@ -1583,105 +1598,82 @@ export default function WorkoutDetailsPage() {
                                   </div>
                                 </div>
 
-                                {/* Exercise Card Fields - from special tables based on block type */}
+                                {/* Exercise Card Fields — hierarchy: primary (Sets/Reps/Rest) > secondary (Weight/Load) > tertiary (RIR/Tempo/Notes) */}
                                 {(() => {
                                   const blockType = (block.blockType || "").toLowerCase();
                                   const isTimeBased = ["amrap", "emom", "for_time", "tabata", "circuit"].includes(blockType);
-                                  
-                                  // For time-based blocks, use getTimeBasedParameters
+                                  const primaryLabels = ["Sets", "Reps", "Rest"];
+                                  const secondaryLabels = ["Weight", "Load %"];
+                                  const tertiaryLabels = ["RIR", "Tempo", "Notes"];
+
                                   if (isTimeBased) {
                                     const timeParams = getTimeBasedParameters(block, exercise);
                                     if (timeParams.length > 0) {
+                                      const primary = timeParams.filter((p) => ["Duration", "Work time", "Rest time", "Time cap", "Rounds"].includes(p.label));
+                                      const rest = timeParams.filter((p) => !primary.some((x) => x.label === p.label));
                                       return (
-                                        <div className="flex items-center gap-4 gap-y-6 flex-wrap">
-                                          {timeParams.map((param, idx) => (
-                                            <div key={idx} className="text-center min-w-[60px]">
-                                              <div className="fc-micro text-[9px] mb-0.5">{param.label}</div>
-                                              <div className="font-mono font-medium text-xl fc-text-primary">{param.value}</div>
-                                            </div>
-                                          ))}
+                                        <div className="space-y-3 mt-3">
+                                          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                                            {timeParams.map((param, idx) => (
+                                              <div key={idx} className="flex items-baseline gap-2">
+                                                <span className="text-xs uppercase tracking-wider fc-text-dim">{param.label}</span>
+                                                <span className="font-mono font-bold text-xl fc-text-primary">{param.value}</span>
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
                                       );
                                     }
                                     return null;
                                   }
-                                  
-                                  // For all other blocks, use getExerciseCardFields
+
                                   const exerciseFields = getExerciseCardFields(block, exercise);
-                                  if (exerciseFields.length > 0) {
-                                      return (
-                                        <div className="flex items-center gap-4 gap-y-6 flex-wrap">
-                                          {exerciseFields.map((field, idx) => (
-                                            <div key={idx} className="text-center min-w-[60px]">
-                                              <div className="fc-micro text-[9px] mb-0.5">{field.label}</div>
-                                              <div className={`font-mono font-medium text-xl ${field.label === "Rest" ? "text-[color:var(--fc-accent-cyan)]" : "fc-text-primary"}`}>
+                                  if (exerciseFields.length === 0) return null;
+
+                                  const primary = exerciseFields.filter((f) => primaryLabels.includes(f.label));
+                                  const secondary = exerciseFields.filter((f) => secondaryLabels.includes(f.label));
+                                  const tertiary = exerciseFields.filter((f) => tertiaryLabels.includes(f.label));
+                                  const other = exerciseFields.filter((f) => !primaryLabels.includes(f.label) && !secondaryLabels.includes(f.label) && !tertiaryLabels.includes(f.label));
+
+                                  return (
+                                    <div className="space-y-3 mt-3">
+                                      {/* Primary: Sets, Reps, Rest — gym-floor essentials, largest */}
+                                      {primary.length > 0 && (
+                                        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                                          {primary.map((field, idx) => (
+                                            <div key={idx} className="flex items-baseline gap-2">
+                                              <span className="text-xs uppercase tracking-wider fc-text-dim">{field.label}</span>
+                                              <span className={`font-mono font-bold text-xl ${field.label === "Rest" ? "text-[color:var(--fc-accent-cyan)]" : "fc-text-primary"}`}>
                                                 {field.value || "—"}
-                                              </div>
+                                              </span>
                                             </div>
                                           ))}
                                         </div>
-                                      );
-                                  }
-                                  return null;
-                                })()}
-                                
-                                {/* Optional fields: Weight, Load % (only for blocks that support them) */}
-                                {(() => {
-                                  const blockType = (block.blockType || "").toLowerCase();
-                                  // Show weight/load% for blocks that support them
-                                  const supportsWeight = ["straight_set", "superset", "giant_set", "pre_exhaustion", "tabata", "circuit"].includes(blockType);
-                                  if (!supportsWeight) return null;
-                                  
-                                  const optionalFields: { label: string; value: string }[] = [];
-                                  
-                                  // Weight (from workout_block_exercises.weight_kg) - OPTIONAL
-                                  if (exercise.raw?.weight_kg !== null && exercise.raw?.weight_kg !== undefined) {
-                                    optionalFields.push({
-                                      label: "Weight",
-                                      value: `${exercise.raw.weight_kg} kg`
-                                    });
-                                  }
-                                  
-                                  // Load Percentage (from workout_block_exercises.load_percentage) - OPTIONAL
-                                  // Show for: giant_set, tabata, circuit (individual per exercise)
-                                  // For superset: shown in getExerciseCardFields for second exercise
-                                  // For pre_exhaustion: shown in getExerciseCardFields for compound exercise
-                                  if (blockType === "giant_set" || blockType === "tabata" || blockType === "circuit") {
-                                    if (exercise.raw?.load_percentage !== null && exercise.raw?.load_percentage !== undefined) {
-                                      optionalFields.push({
-                                        label: "Load %",
-                                        value: `${exercise.raw.load_percentage}%`
-                                      });
-                                    }
-                                  } else if (blockType === "straight_set" || blockType === "superset" || blockType === "pre_exhaustion") {
-                                    // For straight_set, superset (first exercise), pre_exhaustion (isolation exercise)
-                                    if (exercise.raw?.load_percentage !== null && exercise.raw?.load_percentage !== undefined) {
-                                      optionalFields.push({
-                                        label: "Load %",
-                                        value: `${exercise.raw.load_percentage}%`
-                                      });
-                                    }
-                                  }
-                                  
-                                  if (optionalFields.length > 0) {
-                                    return (
-                                      <div
-                                        className="grid gap-3 mt-3"
-                                        style={{
-                                          gridTemplateColumns: `repeat(${Math.min(optionalFields.length, 3)}, 1fr)`,
-                                          marginBottom: previousBest ? "12px" : "0",
-                                        }}
-                                      >
-                                        {optionalFields.map((field, idx) => (
-                                          <div key={idx}>
-                                            <div className="fc-micro mb-1">{field.label}</div>
-                                            <div className="font-mono font-bold text-base fc-text-primary">{field.value}</div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    );
-                                  }
-                                  return null;
+                                      )}
+                                      {/* Secondary: Weight, Load % */}
+                                      {(secondary.length > 0 || other.length > 0) && (
+                                        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+                                          {[...secondary, ...other].map((field, idx) => (
+                                            <div key={idx} className="flex items-baseline gap-1.5">
+                                              <span className="text-[10px] uppercase fc-text-dim">{field.label}</span>
+                                              <span className="font-mono font-medium fc-text-primary">{field.value || "—"}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {/* Tertiary: RIR, Tempo, Notes — small, muted */}
+                                      {tertiary.length > 0 && (
+                                        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs fc-text-dim">
+                                          {tertiary.map((field, idx) => (
+                                            <div key={idx} className="flex items-baseline gap-1.5">
+                                              <span className="uppercase">{field.label}</span>
+                                              <span className="font-mono">{field.value || "—"}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
                                 })()}
 
                                 {/* Previous Best */}
