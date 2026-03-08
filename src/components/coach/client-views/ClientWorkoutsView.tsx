@@ -11,9 +11,11 @@ import {
   X,
   Star
 } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { useToast } from '@/components/ui/toast-provider'
 
-// Data mapping: workout_assignments -> workout_templates -> workout_blocks ->
-// workout_block_exercises -> protocol tables (workout_time_protocols,
+// Data mapping: workout_assignments -> workout_templates -> workout_set_entries ->
+// workout_set_entry_exercises -> protocol tables (workout_time_protocols,
 // workout_cluster_sets, workout_rest_pause_sets, workout_drop_sets, workout_hr_sets)
 interface ClientWorkoutsViewProps {
   clientId: string
@@ -47,6 +49,7 @@ interface ProgramAssignment {
 
 export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps) {
   const router = useRouter()
+  const { addToast } = useToast()
   const [workouts, setWorkouts] = useState<WorkoutAssignment[]>([])
   const [programs, setPrograms] = useState<ProgramAssignment[]>([])
   const [loading, setLoading] = useState(true)
@@ -128,6 +131,8 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
     } catch {
       // Silently handle error and show empty state
       setWorkouts([])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -175,7 +180,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       await loadWorkouts()
     } catch (error) {
       console.error('Error unassigning workout:', error)
-      alert('Failed to unassign workout. Please try again.')
+      addToast({ title: "Couldn't unassign workout. Please try again.", variant: "destructive" })
     }
   }
 
@@ -225,12 +230,12 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       console.log('Activated workout:', activatedWorkout)
       if (error) throw error
 
-      alert('This workout is now the ONLY in-progress workout for this client!')
+      addToast({ title: "This workout is now the only in-progress workout for this client.", variant: "success" })
       await loadWorkouts()
       await loadPrograms()
     } catch (error) {
       console.error('Error setting active workout:', error)
-      alert('Failed to set active workout. Please try again.')
+      addToast({ title: "Couldn't set active workout. Please try again.", variant: "destructive" })
     }
   }
 
@@ -249,7 +254,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
       await loadPrograms()
     } catch (error) {
       console.error('Error unassigning program:', error)
-      alert('Failed to unassign program. Please try again.')
+      addToast({ title: "Couldn't unassign program. Please try again.", variant: "destructive" })
     }
   }
 
@@ -289,19 +294,19 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
       if (error) throw error
 
-      alert('This program is now the ONLY active program for this client!')
+      addToast({ title: "This program is now the only active program for this client.", variant: "success" })
       await loadWorkouts()
       await loadPrograms()
     } catch (error) {
       console.error('Error setting active program:', error)
-      alert('Failed to set active program. Please try again.')
+      addToast({ title: "Couldn't set active program. Please try again.", variant: "destructive" })
     }
   }
 
   // Navigation handlers - navigate to client-specific detail pages
   const handleWorkoutClick = (workout: any) => {
     if (!workout?.workout_templates?.id) {
-      alert('Workout template data not available')
+      addToast({ title: "Workout template data not available", variant: "destructive" })
       return
     }
     // Navigate to the workout template details page
@@ -310,7 +315,7 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
 
   const handleProgramClick = (program: any) => {
     if (!program?.workout_programs?.id) {
-      alert('Program data not available')
+      addToast({ title: "Program data not available", variant: "destructive" })
       return
     }
     // Navigate to the CLIENT-SPECIFIC program details page
@@ -504,23 +509,16 @@ export default function ClientWorkoutsView({ clientId }: ClientWorkoutsViewProps
         </div>
         <div className="p-4 sm:p-6 space-y-4">
           {workouts.length === 0 && programs.length === 0 ? (
-            <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl text-center px-6 py-12">
-              <div className="mx-auto mb-4 fc-icon-tile fc-icon-workouts w-16 h-16">
-                <Dumbbell className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold fc-text-primary mb-2">
-                No Workouts Assigned
-              </h3>
-              <p className="text-sm fc-text-dim">
-                This client doesn't have any workout or program assignments yet.
-              </p>
-            </div>
+            <EmptyState
+              icon={Dumbbell}
+              title="No workouts assigned"
+              description="Assign a program to this client to get started."
+            />
           ) : workouts.length === 0 ? (
-            <div className="fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl text-center px-6 py-8">
-              <p className="text-sm fc-text-dim">
-                No individual workouts assigned.
-              </p>
-            </div>
+            <EmptyState
+              variant="compact"
+              title="No individual workouts assigned."
+            />
           ) : (
             workouts.map((workout) => {
               const workoutStatus = getWorkoutStatusMeta(workout.status)

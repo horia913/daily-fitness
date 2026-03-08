@@ -16,6 +16,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { fetchPersonalRecords } from "@/lib/personalRecords";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ClientPageShell, ClientGlassCard, SectionHeader, PrimaryButton, SecondaryButton } from "@/components/client-ui";
 import { withTimeout } from "@/lib/withTimeout";
 
 interface AssignmentInfo {
@@ -98,10 +99,10 @@ type ClientBlockExerciseRecord = {
 
 type ClientBlockRecord = {
   id: string;
-  block_order: number | null;
-  block_type: string | null;
-  block_name: string | null;
-  block_notes: string | null;
+  set_order: number | null;
+  set_type: string | null;
+  set_name: string | null;
+  set_notes: string | null;
   total_sets: number | null;
   reps_per_set: string | null;
   rest_seconds: number | null;
@@ -175,9 +176,6 @@ export default function WorkoutDetailsPage() {
         if (!user) {
           throw new Error("User not authenticated");
         }
-
-        console.log("WorkoutDetailsPage -> assignmentId param", assignmentId);
-        console.log("WorkoutDetailsPage -> authenticated user", user?.id);
 
         let { data: assignmentRow, error: assignmentError } = await supabase
           .from("workout_assignments")
@@ -307,7 +305,7 @@ export default function WorkoutDetailsPage() {
             blocksCount: workoutBlocks.length,
             firstBlock: workoutBlocks[0] ? {
               id: workoutBlocks[0].id,
-              block_type: workoutBlocks[0].block_type,
+              set_type: workoutBlocks[0].set_type,
               exercisesCount: workoutBlocks[0].exercises?.length || 0,
               firstExercise: workoutBlocks[0].exercises?.[0] ? {
                 id: workoutBlocks[0].exercises[0].id,
@@ -334,16 +332,14 @@ export default function WorkoutDetailsPage() {
             drop_sets?: any[];
             cluster_sets?: any[];
             rest_pause_sets?: any[];
-            pyramid_sets?: any[];
-            ladder_sets?: any[];
           }>;
         })[] = workoutBlocks.map(
           (block) => ({
           id: block.id,
-          block_order: block.block_order,
-          block_type: block.block_type,
-          block_name: block.block_name ?? null,
-          block_notes: block.block_notes ?? null,
+          set_order: block.set_order,
+          set_type: block.set_type,
+          set_name: block.set_name ?? null,
+          set_notes: block.set_notes ?? null,
           total_sets: block.total_sets ?? null,
           reps_per_set: block.reps_per_set ?? null,
           rest_seconds: block.rest_seconds ?? null,
@@ -372,8 +368,6 @@ export default function WorkoutDetailsPage() {
             drop_sets: ex.drop_sets ?? [],
             cluster_sets: ex.cluster_sets ?? [],
             rest_pause_sets: ex.rest_pause_sets ?? [],
-            pyramid_sets: (ex as any).pyramid_sets ?? [],
-            ladder_sets: (ex as any).ladder_sets ?? [],
             time_protocols: (ex as any).time_protocols ?? [], // For tabata/amrap/emom/for_time blocks
           })) as any[],
           })
@@ -481,8 +475,8 @@ export default function WorkoutDetailsPage() {
                   loadPercentage: exercise.load_percentage ?? null,
                   weight: exercise.weight_kg ?? null,
                   orderIndex,
-                  blockName: block.block_name,
-                  blockType: block.block_type,
+                  blockName: block.set_name,
+                  blockType: block.set_type,
                   exerciseLetter: exercise.exercise_letter,
                   notes: filterTestValue(exercise.notes), // Filter out "test"
                   tempo: exercise.tempo ?? null,
@@ -495,7 +489,7 @@ export default function WorkoutDetailsPage() {
 
             // Filter exercises for pre_exhaustion (only 2: isolation + compound)
             let finalExercises = exercises;
-            if (block.block_type === "pre_exhaustion") {
+            if (block.set_type === "pre_exhaustion") {
               // Pre exhaustion should only have 2 exercises: isolation (order 1) and compound (order 2)
               finalExercises = exercises
                 .filter((ex) => ex.orderIndex < 2) // Only first 2 exercises
@@ -504,12 +498,12 @@ export default function WorkoutDetailsPage() {
 
             return {
               id: block.id,
-              blockName: block.block_name,
-              blockType: block.block_type,
+              blockName: block.set_name,
+              blockType: block.set_type,
               blockOrder:
-                typeof block.block_order === "number" &&
-                Number.isFinite(block.block_order)
-                  ? block.block_order
+                typeof block.set_order === "number" &&
+                Number.isFinite(block.set_order)
+                  ? block.set_order
                   : Number.MAX_SAFE_INTEGER,
               notes: (() => {
                 const filterTestValue = (
@@ -525,7 +519,7 @@ export default function WorkoutDetailsPage() {
                   }
                   return trimmed;
                 };
-                return filterTestValue(block.block_notes);
+                return filterTestValue(block.set_notes);
               })(),
               exercises: finalExercises,
               rawBlock: {
@@ -551,8 +545,7 @@ export default function WorkoutDetailsPage() {
         try {
           const records = await fetchPersonalRecords(user.id);
           setPersonalRecords(records);
-        } catch (prError) {
-          console.log("Error loading personal records:", prError);
+        } catch {
           setPersonalRecords([]);
         }
       })(),
@@ -668,7 +661,7 @@ export default function WorkoutDetailsPage() {
                 </Button>
                 <Button
                   variant="fc-secondary"
-                  onClick={() => router.push("/client/workouts")}
+                  onClick={() => router.push("/client/train")}
                   className="gap-2 fc-btn"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -770,7 +763,7 @@ export default function WorkoutDetailsPage() {
     const result: { label: string; value: string }[] = [];
     const exerciseRaw = exercise.raw;
     
-    // 1. STRAIGHT SET, SUPERSET, GIANT SET, PRE-EXHAUSTION: from workout_block_exercises
+    // 1. STRAIGHT SET, SUPERSET, GIANT SET, PRE-EXHAUSTION: from workout_set_entry_exercises
     if (blockType === "straight_set" || blockType === "superset" || blockType === "giant_set" || blockType === "pre_exhaustion") {
       // USED: sets, reps
       // NOTE: rest_seconds is NOT shown on exercise cards for superset/giant_set/pre_exhaustion
@@ -953,17 +946,17 @@ export default function WorkoutDetailsPage() {
       
       // If cluster_sets is empty array or missing, just show the main sets (no warning needed)
     }
-    // 4. REST-PAUSE: from workout_rest_pause_sets (weight, duration, max_pauses) and workout_blocks (reps)
+    // 4. REST-PAUSE: from workout_rest_pause_sets (weight, duration, max_pauses) and workout_set_entries (reps)
     else if (blockType === "rest_pause") {
       // Check if rest_pause_sets data exists (must be array with at least one item)
       const restPauseSets = exerciseRaw?.rest_pause_sets;
       if (Array.isArray(restPauseSets) && restPauseSets.length > 0) {
         const restPauseSet = restPauseSets[0];
-        // USED: weight_kg (from workout_rest_pause_sets), reps (from workout_blocks.reps_per_set), rest_pause_duration, max_rest_pauses
+        // USED: weight_kg (from workout_rest_pause_sets), reps (from workout_set_entries.reps_per_set), rest_pause_duration, max_rest_pauses
         if (restPauseSet.weight_kg !== null && restPauseSet.weight_kg !== undefined) {
           result.push({ label: "Initial weight", value: `${restPauseSet.weight_kg} kg` });
         }
-        // Reps are stored in workout_blocks.reps_per_set, not in workout_rest_pause_sets
+        // Reps are stored in workout_set_entries.reps_per_set, not in workout_rest_pause_sets
         const rawBlock = block.rawBlock;
         if (rawBlock?.reps_per_set) {
           result.push({ label: "Initial reps", value: formatReps(rawBlock.reps_per_set) });
@@ -984,91 +977,41 @@ export default function WorkoutDetailsPage() {
       }
       // If rest_pause_sets is empty array or missing, show basic info from block (no warning needed)
     }
-    // 5. PYRAMID SET: from workout_pyramid_sets (N rows - show all steps)
-    else if (blockType === "pyramid_set" && exerciseRaw?.pyramid_sets && exerciseRaw.pyramid_sets.length > 0) {
-      const pyramidSets = exerciseRaw.pyramid_sets;
-      // Sort by pyramid_order
-      const sortedSteps = [...pyramidSets].sort((a: any, b: any) => 
-        (a.pyramid_order || 0) - (b.pyramid_order || 0)
-      );
-      // Show all pyramid steps
-      sortedSteps.forEach((pyramidStep: any) => {
-        // USED: pyramid_order, weight_kg, reps, rest_seconds
-        if (pyramidStep.pyramid_order !== null && pyramidStep.pyramid_order !== undefined) {
-          result.push({ label: `Step ${pyramidStep.pyramid_order}`, value: "" });
-        }
-        if (pyramidStep.weight_kg !== null && pyramidStep.weight_kg !== undefined) {
-          result.push({ label: `Weight`, value: `${pyramidStep.weight_kg} kg` });
-        }
-        if (pyramidStep.reps) {
-          result.push({ label: `Reps`, value: formatReps(pyramidStep.reps) });
-        }
-        if (pyramidStep.rest_seconds !== null && pyramidStep.rest_seconds !== undefined) {
-          result.push({ label: `Rest`, value: `${pyramidStep.rest_seconds}s` });
-        }
-      });
-    }
-    // 6. LADDER SET: from workout_ladder_sets (N rows - show all steps)
-    else if (blockType === "ladder" && exerciseRaw?.ladder_sets && exerciseRaw.ladder_sets.length > 0) {
-      const ladderSets = exerciseRaw.ladder_sets;
-      // Sort by ladder_order
-      const sortedSteps = [...ladderSets].sort((a: any, b: any) => 
-        (a.ladder_order || 0) - (b.ladder_order || 0)
-      );
-      // Show all ladder steps
-      sortedSteps.forEach((ladderStep: any) => {
-        // USED: ladder_order, weight_kg, reps, rest_seconds
-        if (ladderStep.ladder_order !== null && ladderStep.ladder_order !== undefined) {
-          result.push({ label: `Step ${ladderStep.ladder_order}`, value: "" });
-        }
-        if (ladderStep.weight_kg !== null && ladderStep.weight_kg !== undefined) {
-          result.push({ label: `Weight`, value: `${ladderStep.weight_kg} kg` });
-        }
-        if (ladderStep.reps) {
-          result.push({ label: `Reps`, value: formatReps(ladderStep.reps) });
-        }
-        if (ladderStep.rest_seconds !== null && ladderStep.rest_seconds !== undefined) {
-          result.push({ label: `Rest`, value: `${ladderStep.rest_seconds}s` });
-        }
-      });
-    }
-    // 7-12. TIME-BASED BLOCKS: from workout_time_protocols (handled by getTimeBasedParameters)
+    // TIME-BASED BLOCKS: from workout_time_protocols (handled by getTimeBasedParameters)
     // These are handled separately below
     
     return result;
   };
 
   // Get block-specific parameters for display (shown in block header)
-  // Shows ALL USED fields from workout_blocks ONLY (except relational IDs: id, template_id, block_order)
-  // OPTIONAL fields (block_name, block_notes) only if they have values
-  // According to BLOCK_STORAGE_SCHEMA.md: Block header shows workout_blocks data ONLY
+  // Shows ALL USED fields from workout_set_entries ONLY (except relational IDs: id, template_id, set_order)
+  // OPTIONAL fields (set_name, set_notes) only if they have values
+  // According to BLOCK_STORAGE_SCHEMA.md: Block header shows workout_set_entries data ONLY
   const getBlockParameters = (block: StructuredBlock) => {
     const blockType = (block.blockType || "").toLowerCase();
     const result: { label: string; value: string }[] = [];
     const rawBlock = block.rawBlock;
     
-    // OPTIONAL: block_name (only if set)
-    if (rawBlock?.block_name) {
-      // block_name is displayed in the block title, not in parameters
+    // OPTIONAL: set_name (only if set)
+    if (rawBlock?.set_name) {
+      // set_name is displayed in the block title, not in parameters
     }
     
-    // OPTIONAL: block_notes (only if set)
-    // block_notes is displayed separately, not in parameters
+    // OPTIONAL: set_notes (only if set)
+    // set_notes is displayed separately, not in parameters
     
     // USED: total_sets - for most blocks (except amrap, emom, for_time)
     if (rawBlock?.total_sets !== null && rawBlock?.total_sets !== undefined) {
       if (blockType === "tabata") {
         // For tabata, total_sets represents rounds
         result.push({ label: "Rounds", value: `${rawBlock.total_sets}` });
-      } else if (blockType === "circuit") {
-        result.push({ label: "Rounds", value: `${rawBlock.total_sets}` });
       } else if (blockType !== "amrap" && blockType !== "emom" && blockType !== "for_time") {
         result.push({ label: "Sets", value: `${rawBlock.total_sets}` });
       }
     }
     
-    // USED: reps_per_set - for straight_set, drop_set, pyramid_set
-    if (rawBlock?.reps_per_set && (blockType === "straight_set" || blockType === "drop_set" || blockType === "pyramid_set")) {
+    // USED: reps_per_set - for straight_set, drop_set
+    if (rawBlock?.reps_per_set && (blockType === "straight_set" || blockType === "drop_set")) {
       result.push({ label: "Reps", value: formatReps(rawBlock.reps_per_set) });
     }
     
@@ -1078,13 +1021,11 @@ export default function WorkoutDetailsPage() {
         result.push({ label: "Rest after set", value: `${rawBlock.rest_seconds}s` });
       } else if (blockType === "cluster_set" || blockType === "drop_set") {
         result.push({ label: "Rest after set", value: `${rawBlock.rest_seconds}s` });
-      } else if (blockType === "straight_set" || blockType === "pyramid_set" || blockType === "ladder") {
+      } else if (blockType === "straight_set") {
         result.push({ label: "Rest between sets", value: `${rawBlock.rest_seconds}s` });
-      } else if (blockType === "circuit") {
-        result.push({ label: "Rest between rounds", value: `${rawBlock.rest_seconds}s` });
       }
-      // rest_pause: rest_seconds is NOT SET in workout_blocks
-      // amrap, emom, for_time: rest_seconds is NOT SET in workout_blocks
+      // rest_pause: rest_seconds is NOT SET in workout_set_entries
+      // amrap, emom, for_time: rest_seconds is NOT SET in workout_set_entries
     }
     
     // For TABATA: Show rest_after_set from time_protocols (block-level field)
@@ -1282,37 +1223,6 @@ export default function WorkoutDetailsPage() {
           value: `${setNumber}`,
         });
       }
-    } else if (blockType === "circuit") {
-      // OPTIONAL: work_seconds (only if set)
-      // OPTIONAL: rest_seconds (only if set)
-      // USED: set
-      // NOTE: rounds is shown in block header as total_sets
-      const workSeconds = exerciseProtocol?.work_seconds || 
-        params.work_seconds;
-      if (workSeconds !== null && workSeconds !== undefined) {
-        result.push({
-          label: "Work time",
-          value: `${workSeconds}s`,
-        });
-      }
-      const restSeconds = exerciseProtocol?.rest_seconds ||
-        params.rest_after_exercise ||
-        params.rest_after_set ||
-        params.rest_after;
-      if (restSeconds !== null && restSeconds !== undefined) {
-        result.push({
-          label: "Rest time",
-          value: `${restSeconds}s`,
-        });
-      }
-      // USED: set (which set/round this exercise belongs to)
-      const setNumber = exerciseProtocol?.set;
-      if (setNumber !== null && setNumber !== undefined) {
-        result.push({
-          label: "Set",
-          value: `${setNumber}`,
-        });
-      }
     }
 
     return result;
@@ -1341,11 +1251,11 @@ export default function WorkoutDetailsPage() {
         }}
       />
       <div className="relative fc-app-bg isolate">
-        <div className="relative z-10 min-h-screen pb-32 fc-page">
+        <ClientPageShell className="min-h-screen pb-32">
           {/* Navigation */}
           <nav className="flex justify-between items-center mb-6" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
             <button
-              onClick={() => router.push("/client/workouts")}
+              onClick={() => router.push("/client/train")}
               className="w-9 h-9 flex items-center justify-center rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] transition-all active:scale-95"
             >
               <ChevronLeft className="w-5 h-5 fc-text-primary" />
@@ -1376,7 +1286,7 @@ export default function WorkoutDetailsPage() {
                   </span>
                 )}
               </div>
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter mb-6 fc-text-primary">
+              <h1 className="text-2xl font-bold tracking-tight mb-6 fc-text-primary">
                 {assignment.name}
               </h1>
               {assignment.description && (
@@ -1403,7 +1313,7 @@ export default function WorkoutDetailsPage() {
                 </div>
                 <div className="fc-stats-strip-item">
                   <span className="fc-stats-strip-value">{blocks.length}</span>
-                  <span className="fc-stats-strip-label">Blocks</span>
+                  <span className="fc-stats-strip-label">Sets</span>
                 </div>
               </div>
             </section>
@@ -1601,7 +1511,7 @@ export default function WorkoutDetailsPage() {
                                 {/* Exercise Card Fields — hierarchy: primary (Sets/Reps/Rest) > secondary (Weight/Load) > tertiary (RIR/Tempo/Notes) */}
                                 {(() => {
                                   const blockType = (block.blockType || "").toLowerCase();
-                                  const isTimeBased = ["amrap", "emom", "for_time", "tabata", "circuit"].includes(blockType);
+                                  const isTimeBased = ["amrap", "emom", "for_time", "tabata"].includes(blockType);
                                   const primaryLabels = ["Sets", "Reps", "Rest"];
                                   const secondaryLabels = ["Weight", "Load %"];
                                   const tertiaryLabels = ["RIR", "Tempo", "Notes"];
@@ -1711,17 +1621,16 @@ export default function WorkoutDetailsPage() {
         {/* Fixed Bottom Action Bar */}
         <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
           <div className="max-w-3xl mx-auto">
-            <Button
-              variant="fc-primary"
-              className="w-full h-14 rounded-2xl gap-3 text-base font-bold uppercase tracking-wider shadow-lg"
-              onClick={() => router.push(`/client/workouts/${assignment.id}/start`)}
+            <PrimaryButton
+              className="h-14 rounded-2xl gap-3 text-base uppercase tracking-wider"
+              onClick={() => { window.location.href = `/client/workouts/${assignment.id}/start`; }}
             >
               <Play className="w-5 h-5 fill-current" />
               Begin Workout
-            </Button>
+            </PrimaryButton>
           </div>
         </div>
-      </div>
+      </ClientPageShell>
     </div>
     </AnimatedBackground>
   );

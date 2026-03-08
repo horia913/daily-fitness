@@ -5,6 +5,37 @@
 
 import { supabase } from './supabase';
 
+/** DB uses NUMERIC(5,1) on some columns — max absolute value 9999.9. Round and clamp to avoid overflow. */
+function sanitizeNumeric(value: number | null | undefined): number | undefined {
+  if (value == null || typeof value !== 'number' || Number.isNaN(value)) return undefined;
+  const rounded = Math.round(value * 10) / 10;
+  if (rounded > 9999.9) return 9999.9;
+  if (rounded < -9999.9) return -9999.9;
+  return rounded;
+}
+
+function sanitizeMeasurementPayload<T extends Record<string, unknown>>(payload: T): T {
+  const numericKeys = [
+    'weight_kg', 'body_fat_percentage', 'muscle_mass_kg', 'waist_circumference',
+    'hips_circumference', 'torso_circumference', 'left_arm_circumference', 'right_arm_circumference',
+    'left_thigh_circumference', 'right_thigh_circumference', 'left_calf_circumference', 'right_calf_circumference',
+  ] as const;
+  const out = { ...payload };
+  for (const key of numericKeys) {
+    if (key in out && (out as Record<string, unknown>)[key] != null) {
+      const v = (out as Record<string, unknown>)[key] as number;
+      const s = sanitizeNumeric(v);
+      (out as Record<string, unknown>)[key] = s ?? null;
+    }
+  }
+  if ('visceral_fat_level' in out && (out as Record<string, unknown>).visceral_fat_level != null) {
+    const v = (out as Record<string, unknown>).visceral_fat_level as number;
+    const n = Number.isFinite(v) ? Math.round(v) : null;
+    (out as Record<string, unknown>).visceral_fat_level = n != null && n >= 0 && n <= 25 ? n : null;
+  }
+  return out;
+}
+
 // ============================================================================
 // Type Definitions
 // ============================================================================
@@ -37,6 +68,8 @@ export interface BodyMeasurement {
   // Context
   measurement_method?: string | null;
   notes?: string | null;
+  /** Storage paths in progress-photos bucket (use signed URLs for display) */
+  photos?: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -181,9 +214,10 @@ export async function createMeasurement(
   measurement: Omit<BodyMeasurement, 'id' | 'created_at' | 'updated_at'>
 ): Promise<BodyMeasurement | null> {
   try {
+    const sanitized = sanitizeMeasurementPayload(measurement as Record<string, unknown>) as Omit<BodyMeasurement, 'id' | 'created_at' | 'updated_at'>;
     const { data, error } = await supabase
       .from('body_metrics')
-      .insert([measurement])
+      .insert([sanitized])
       .select()
       .single();
 
@@ -222,6 +256,43 @@ export async function updateMeasurement(
     return data;
   } catch (error) {
     console.error('Error in updateMeasurement:', error);
+    return null;
+  }
+}
+
+/**
+ * Upsert measurement: update if a row exists for (client_id, measured_date), otherwise create.
+ * Avoids unique constraint violations when client has already logged (e.g. daily quick-weight).
+ */
+export async function upsertMeasurement(
+  measurement: Omit<BodyMeasurement, 'id' | 'created_at' | 'updated_at'>
+): Promise<BodyMeasurement | null> {
+  try {
+    const existing = await getMeasurementForDate(measurement.client_id, measurement.measured_date);
+    if (existing?.id) {
+      const updates: Partial<Omit<BodyMeasurement, 'id' | 'client_id' | 'created_at'>> = {
+        weight_kg: measurement.weight_kg,
+        body_fat_percentage: measurement.body_fat_percentage,
+        muscle_mass_kg: measurement.muscle_mass_kg,
+        visceral_fat_level: measurement.visceral_fat_level,
+        left_arm_circumference: measurement.left_arm_circumference,
+        right_arm_circumference: measurement.right_arm_circumference,
+        torso_circumference: measurement.torso_circumference,
+        waist_circumference: measurement.waist_circumference,
+        hips_circumference: measurement.hips_circumference,
+        left_thigh_circumference: measurement.left_thigh_circumference,
+        right_thigh_circumference: measurement.right_thigh_circumference,
+        left_calf_circumference: measurement.left_calf_circumference,
+        right_calf_circumference: measurement.right_calf_circumference,
+        measurement_method: measurement.measurement_method,
+        notes: measurement.notes,
+      };
+      const sanitizedUpdates = sanitizeMeasurementPayload(updates as Record<string, unknown>) as Partial<Omit<BodyMeasurement, 'id' | 'client_id' | 'created_at'>>;
+      return updateMeasurement(existing.id, sanitizedUpdates);
+    }
+    return createMeasurement(measurement);
+  } catch (error) {
+    console.error('Error in upsertMeasurement:', error);
     return null;
   }
 }

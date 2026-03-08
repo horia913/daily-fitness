@@ -5,14 +5,11 @@ type SupportedBlockType =
   | "straight_sets"
   | "superset"
   | "drop_set"
-  | "circuit"
   | "density"
   | "density_training"
   | "giant_set"
   | "rest_pause"
   | "cluster_set"
-  | "pyramid_set"
-  | "ladder"
   | "amrap"
   | "emom"
   | "tabata"
@@ -42,11 +39,6 @@ const TYPE_STYLES: Record<
     className:
       "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
   },
-  circuit: {
-    label: "CIRCUITS",
-    className:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-  },
   density: {
     label: "DENSITY",
     className:
@@ -71,16 +63,6 @@ const TYPE_STYLES: Record<
     label: "CLUSTER SET",
     className:
       "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
-  },
-  pyramid_set: {
-    label: "PYRAMID SET",
-    className:
-      "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300",
-  },
-  ladder: {
-    label: "LADDER",
-    className:
-      "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
   },
   amrap: {
     label: "AMRAP",

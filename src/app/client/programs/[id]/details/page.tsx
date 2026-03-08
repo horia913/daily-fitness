@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { withTimeout } from "@/lib/withTimeout";
@@ -55,7 +56,7 @@ function buildInlineExerciseLines(blocks: any[]): InlineExerciseLine[] {
   if (!blocks || blocks.length === 0) return lines;
 
   for (const block of blocks) {
-    const blockType = (block.block_type || "").toLowerCase();
+    const blockType = (block.set_type || "").toLowerCase();
     const restBlock = block.rest_seconds != null ? `${block.rest_seconds}s` : null;
 
     if (block.exercises && block.exercises.length > 0) {
@@ -89,9 +90,6 @@ function buildInlineExerciseLines(blocks: any[]): InlineExerciseLine[] {
           setsReps = "For time";
         } else if (blockType === "tabata") {
           setsReps = "Tabata";
-        } else if (blockType === "circuit") {
-          const rounds = block.total_sets ?? "";
-          setsReps = rounds ? `${rounds} rounds` : "Circuit";
         } else {
           const sets = ex.sets ?? block.total_sets;
           const reps = ex.reps ?? block.reps_per_set ?? "";
@@ -106,10 +104,10 @@ function buildInlineExerciseLines(blocks: any[]): InlineExerciseLine[] {
       const reps = block.reps_per_set;
       if (blockType === "amrap" || blockType === "emom") {
         const dur = block.duration_seconds ? Math.floor(block.duration_seconds / 60) : null;
-        lines.push({ name: block.block_name || blockType, setsReps: dur ? `${dur} min` : blockType, rest: null });
+        lines.push({ name: block.set_name || blockType, setsReps: dur ? `${dur} min` : blockType, rest: null });
       } else {
         lines.push({
-          name: block.block_name || blockType,
+          name: block.set_name || blockType,
           setsReps: sets != null && reps ? `${sets}×${reps}` : (reps || String(sets) || "—"),
           rest: restBlock,
         });
@@ -300,19 +298,13 @@ function ProgramDetailsContent() {
   if (loading) {
     return (
       <AnimatedBackground>
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <GlassCard elevation={2} className="p-8 text-center">
-            <div
-              className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
-              style={{
-                borderColor: `${getSemanticColor("trust").primary}40`,
-                borderTopColor: "transparent",
-              }}
-            />
-            <p style={{ color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)" }}>
-              Loading program details...
-            </p>
-          </GlassCard>
+        <div className="min-h-screen p-4 max-w-4xl mx-auto">
+          <div className="animate-pulse space-y-4">
+            <div className="h-10 w-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-8 w-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+          </div>
         </div>
       </AnimatedBackground>
     );
@@ -322,25 +314,17 @@ function ProgramDetailsContent() {
     return (
       <AnimatedBackground>
         <div className="min-h-screen flex items-center justify-center p-4">
-          <GlassCard elevation={2} className="p-8 text-center">
-            <p className="text-red-500 mb-4">{error || "Program not found"}</p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {error && (
-                <Button
-                  type="button"
-                  onClick={() => id && loadProgramDetails(id as string)}
-                  variant="default"
-                  className="fc-btn fc-btn-primary"
-                >
-                  Retry
-                </Button>
-              )}
-              <Button onClick={() => router.back()} variant="ghost">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Go Back
-              </Button>
-            </div>
-          </GlassCard>
+          <div className="w-full max-w-md space-y-3">
+            <ErrorBanner
+              title={error ? "Couldn't load program" : "Program not found"}
+              message="Please check your connection and try again."
+              onRetry={error && id ? () => loadProgramDetails(id as string) : undefined}
+            />
+            <Button onClick={() => router.back()} variant="outline" className="w-full">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Go back
+            </Button>
+          </div>
         </div>
       </AnimatedBackground>
     );
@@ -560,15 +544,6 @@ function ProgramDetailsContent() {
             <div className="fixed left-0 right-0 p-4 sm:p-6 z-[9999] bg-gradient-to-t from-[color:var(--fc-bg-base)] via-[color:var(--fc-bg-base)]/95 to-transparent backdrop-blur-sm border-t border-[color:var(--fc-glass-border)]" style={{ bottom: "76px" }}>
               <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4">
                 <Button
-                  onClick={() => router.push("/client/scheduling")}
-                  variant="outline"
-                  className="flex-1 rounded-2xl h-14 fc-glass border border-[color:var(--fc-glass-border)] font-bold gap-2 fc-text-primary"
-                >
-                  <Calendar className="w-5 h-5" />
-                  <span className="hidden sm:inline">View Schedule</span>
-                  <span className="sm:hidden">Schedule</span>
-                </Button>
-                <Button
                   onClick={() => {
                     if (firstWorkoutOfUnlockedWeek) {
                       router.push(`/client/workouts/${firstWorkoutOfUnlockedWeek.id}/details`);
@@ -577,7 +552,7 @@ function ProgramDetailsContent() {
                     }
                   }}
                   disabled={!firstWorkoutOfUnlockedWeek}
-                  className="flex-[2] rounded-2xl h-14 font-bold gap-2 bg-[color:var(--fc-status-error)] hover:opacity-90 text-white border-0 uppercase tracking-widest disabled:opacity-50"
+                  className="flex-1 rounded-2xl h-14 font-bold gap-2 bg-[color:var(--fc-status-error)] hover:opacity-90 text-white border-0 uppercase tracking-widest disabled:opacity-50"
                 >
                   <Play className="w-5 h-5 fill-current" />
                   Continue Program

@@ -22,6 +22,7 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import {
   getWeightDefaultAndSuggestion,
@@ -51,9 +52,12 @@ export function RestPauseExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
+  onPlateCalculatorClick,
   onRestTimerClick,
   onSetComplete,
   onLastSetLoggedForRest,
+  progressionSuggestion,
+  previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -83,6 +87,8 @@ export function RestPauseExecutor({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [isWeightPristine, setIsWeightPristine] = useState(true);
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  /** Collapsible set history: show all sets or only last 2 */
+  const [showAllSets, setShowAllSets] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -222,7 +228,7 @@ export function RestPauseExecutor({
   }
 
   const instructions =
-    currentExercise?.notes || block.block.block_notes || undefined;
+    currentExercise?.notes || block.block.set_notes || undefined;
 
   const handleAddRestPause = () => {
     if (restPauseAttempts.length < maxRestPauses) {
@@ -252,7 +258,7 @@ export function RestPauseExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "RestPauseExecutor",
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -278,7 +284,7 @@ export function RestPauseExecutor({
     }
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.block_type, {
+      const payload = buildSetEditPatchPayload(block.block.set_type, {
         rest_pause_initial_weight: w,
         rest_pause_initial_reps: r,
         rest_pause_reps_after: 0,
@@ -295,7 +301,7 @@ export function RestPauseExecutor({
         console.log("[SAVE EDITS]", {
           executor: "RestPauseExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -311,7 +317,7 @@ export function RestPauseExecutor({
           id: editingSetId,
           exercise_id:
             current?.exercise_id ?? currentExercise?.exercise_id ?? "",
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: editDraft.set_number,
           weight_kg: w,
           reps_completed: r,
@@ -387,7 +393,7 @@ export function RestPauseExecutor({
       );
 
       const logData: any = {
-        block_type: "rest_pause",
+        set_type: "rest_pause",
         set_number: completedSets + 1,
         rest_pause_number: 1, // First rest-pause set
       };
@@ -416,7 +422,7 @@ export function RestPauseExecutor({
         const newLoggedSet: LoggedSet = {
           id: result.set_log_id || `temp-${currentSetNumber}-${Date.now()}`,
           exercise_id: currentExercise?.exercise_id || "",
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: currentSetNumber,
           weight_kg: weightNum,
           reps_completed: totalReps,
@@ -492,60 +498,126 @@ export function RestPauseExecutor({
             background: "var(--fc-surface-sunken)",
           }}
         >
-          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
-            Logged sets
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+              Logged sets
+            </div>
+            {loggedSetsList.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSets(!showAllSets)}
+                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
+              >
+                {showAllSets ? (
+                  <>Show less ▲</>
+                ) : (
+                  <>Show all {loggedSetsList.length} sets ▼</>
+                )}
+              </button>
+            )}
           </div>
           <ul className="space-y-1.5">
-            {loggedSetsList.map((setEntry) => (
+            {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
+              // Calculate the actual index in the full list for isLatestSet
+              const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
+              const isLatestSet = actualIndex === loggedSetsList.length - 1;
+              return (
               <li
                 key={setEntry.id}
-                className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
                 style={{ background: "var(--fc-surface-elevated)" }}
               >
-                <span className="text-sm fc-text-primary">
-                  Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"} kg ×{" "}
-                  {setEntry.reps_completed ?? "—"} reps
-                </span>
-                <div className="relative flex items-center">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMenuOpenSetId(
-                        menuOpenSetId === setEntry.id ? null : setEntry.id,
-                      )
-                    }
-                    className="p-1.5 rounded-lg fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
-                    aria-label="Options"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                  {menuOpenSetId === setEntry.id && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setMenuOpenSetId(null)}
-                        aria-hidden
-                      />
-                      <div
-                        className="absolute right-0 top-full mt-1 z-20 py-1 rounded-lg shadow-lg min-w-[120px]"
-                        style={{
-                          background: "var(--fc-surface-elevated)",
-                          border: "1px solid var(--fc-surface-card-border)",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleEditSet(setEntry)}
-                          className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm hover:opacity-80"
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm fc-text-primary">
+                    Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"} kg ×{" "}
+                    {setEntry.reps_completed ?? "—"} reps
+                  </span>
+                  <div className="relative flex items-center">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMenuOpenSetId(
+                          menuOpenSetId === setEntry.id ? null : setEntry.id,
+                        )
+                      }
+                      className="p-1.5 rounded-lg fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
+                      aria-label="Options"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                    {menuOpenSetId === setEntry.id && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setMenuOpenSetId(null)}
+                          aria-hidden
+                        />
+                        <div
+                          className="absolute right-0 top-full mt-1 z-20 py-1 rounded-lg shadow-lg min-w-[120px]"
+                          style={{
+                            background: "var(--fc-surface-elevated)",
+                            border: "1px solid var(--fc-surface-card-border)",
+                          }}
                         >
-                          <Pencil className="w-3.5 h-3.5" /> Edit
-                        </button>
-                      </div>
-                    </>
-                  )}
+                          <button
+                            type="button"
+                            onClick={() => handleEditSet(setEntry)}
+                            className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm hover:opacity-80"
+                          >
+                            <Pencil className="w-3.5 h-3.5" /> Edit
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
+                <InlineRPERow
+                  setLogId={setEntry.id.startsWith("temp-") ? null : setEntry.id}
+                  currentRPE={setEntry.rpe ?? null}
+                  onRPESelect={async (rpe) => {
+                    const updatedEntry: LoggedSet = {
+                      ...setEntry,
+                      rpe,
+                    };
+                    onSetLogUpsert?.(block.block.id, updatedEntry, {
+                      replaceId: setEntry.id,
+                    });
+
+                    if (!setEntry.id.startsWith("temp-")) {
+                      try {
+                        const res = await fetch(`/api/sets/${setEntry.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ rpe }),
+                          credentials: "include",
+                        });
+                        if (!res.ok) {
+                          console.error("Failed to update RPE:", await res.text());
+                          const revertedEntry: LoggedSet = {
+                            ...setEntry,
+                            rpe: setEntry.rpe ?? undefined,
+                          };
+                          onSetLogUpsert?.(block.block.id, revertedEntry, {
+                            replaceId: setEntry.id,
+                          });
+                        }
+                      } catch (err) {
+                        console.error("Error updating RPE:", err);
+                        const revertedEntry: LoggedSet = {
+                          ...setEntry,
+                          rpe: setEntry.rpe ?? undefined,
+                        };
+                        onSetLogUpsert?.(block.block.id, revertedEntry, {
+                          replaceId: setEntry.id,
+                        });
+                      }
+                    }
+                  }}
+                  isLatestSet={isLatestSet}
+                />
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}
@@ -784,7 +856,10 @@ export function RestPauseExecutor({
         calculateSuggestedWeight,
         onVideoClick,
         onAlternativesClick,
+        onPlateCalculatorClick,
         onRestTimerClick,
+        progressionSuggestion,
+        previousPerformanceMap,
       }}
       exerciseName={currentExercise?.exercise?.name || "Exercise"}
       blockDetails={blockDetails}
@@ -797,6 +872,10 @@ export function RestPauseExecutor({
       showNavigation={true}
       currentExercise={currentExercise}
       showRestTimer={!!block.block.rest_seconds}
+      onApplySuggestion={(w, r) => {
+        if (w != null) setWeight(String(w));
+        if (r != null) setInitialReps(String(r));
+      }}
     />
   );
 }

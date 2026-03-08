@@ -47,7 +47,7 @@ export default function ResponsiveModal({
 
   return (
     <div 
-      className={`fixed inset-0 z-[9999] flex items-start justify-center p-4 ${isDark ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/50 backdrop-blur-sm'}`}
+      className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 ${isDark ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/50 backdrop-blur-sm'}`}
       onClick={(e) => e.target === e.currentTarget && onClose()}
       data-theme={isDark ? 'dark' : 'light'}
     >
@@ -89,7 +89,7 @@ export default function ResponsiveModal({
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className="p-2 rounded-xl transition-all duration-200 fc-text-dim hover:fc-text-primary fc-glass-soft hover:opacity-90"
+                className="p-2 min-w-11 min-h-11 flex items-center justify-center rounded-xl transition-all duration-200 fc-text-dim hover:fc-text-primary fc-glass-soft hover:opacity-90"
                 aria-label="Close modal"
               >
                 <X className="w-5 h-5" />

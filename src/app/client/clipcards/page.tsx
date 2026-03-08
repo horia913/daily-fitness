@@ -277,7 +277,7 @@ export default function ClientClipCards() {
                 <ChevronRight className="w-4 h-4" />
                 <span className="fc-text-primary">Clipcards</span>
               </nav>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight fc-text-primary mb-2">
+              <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">
                 Session Packages
               </h1>
               <p className="fc-text-dim text-lg">
@@ -396,10 +396,10 @@ export default function ClientClipCards() {
                                 className="w-16 h-16 rounded-full flex items-center justify-center text-sm font-bold"
                                 style={{
                                   background: `conic-gradient(from 0deg, ${
-                                    usagePercentage >= 100 ? '#EF4444' :
-                                    usagePercentage >= 80 ? '#F59E0B' :
-                                    '#10B981'
-                                  } ${usagePercentage * 3.6}deg, #E5E7EB 0deg)`
+                                    usagePercentage >= 100 ? 'var(--fc-status-error)' :
+                                    usagePercentage >= 80 ? 'var(--fc-status-warning)' :
+                                    'var(--fc-status-success)'
+                                  } ${usagePercentage * 3.6}deg, var(--fc-glass-soft) 0deg)`
                                 }}
                               >
                                 <div className="w-12 h-12 bg-[color:var(--fc-glass-highlight)] rounded-full flex items-center justify-center">
@@ -422,12 +422,10 @@ export default function ClientClipCards() {
                           {/* Action Buttons */}
                           <div className="flex flex-col sm:flex-row gap-2">
                             {status === 'active' && clipcard.sessions_remaining > 0 && (
-                              <Link href="/client/scheduling">
-                                <Button className="fc-btn fc-btn-primary w-full sm:w-auto">
-                                  <BookOpen className="w-4 h-4 mr-2" />
-                                  Book Session
-                                </Button>
-                              </Link>
+                              <Button className="fc-btn fc-btn-primary w-full sm:w-auto" disabled>
+                                <BookOpen className="w-4 h-4 mr-2" />
+                                Book Session
+                              </Button>
                             )}
                             <Button variant="outline" className="fc-btn fc-btn-secondary w-full sm:w-auto">
                               <Eye className="w-4 h-4 mr-2" />
@@ -461,12 +459,10 @@ export default function ClientClipCards() {
                     }
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Link href="/client/scheduling">
-                      <Button className="fc-btn fc-btn-primary">
-                        <BookOpen className="w-5 h-5 mr-2" />
-                        Book a Session
-                      </Button>
-                    </Link>
+                    <Button className="fc-btn fc-btn-primary" disabled>
+                      <BookOpen className="w-5 h-5 mr-2" />
+                      Book a Session
+                    </Button>
                     <Button variant="outline" className="fc-btn fc-btn-secondary">
                       <Plus className="w-5 h-5 mr-2" />
                       Contact Coach

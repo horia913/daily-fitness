@@ -86,7 +86,7 @@ function ProgressHubContent() {
     return (
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl fc-page pb-24 px-4">
+        <div className="relative z-10 mx-auto w-full max-w-6xl fc-page pb-32 px-4">
           <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
             <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
             <button
@@ -106,7 +106,7 @@ function ProgressHubContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl fc-page pb-24">
+      <div className="relative z-10 mx-auto w-full max-w-6xl fc-page pb-32">
         <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-8">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 flex-1 min-w-0">

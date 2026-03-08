@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { withTimeout } from "@/lib/withTimeout";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -16,10 +17,12 @@ import {
   Edit,
   Trash2,
   ArrowRight,
+  ArrowLeft,
   Activity,
   Layers,
   Star,
 } from "lucide-react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import CategoryForm from "@/components/CategoryForm";
 
@@ -62,111 +65,125 @@ export default function WorkoutCategories() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingCategory, setEditingCategory] =
     useState<WorkoutCategory | null>(null);
+  const loadingRef = useRef(false);
+
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    loadCategories();
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setLoading(false);
+    }, 20_000);
+    loadCategories().finally(() => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
   }, []);
 
   const loadCategories = async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      try {
-        // Load categories
-        const { data, error } = await supabase
-          .from("workout_categories")
-          .select("*")
-          .eq("coach_id", user.id)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false });
-
-        if (error) throw error;
-
-        // Get workout template count for each category
-        // workout_templates.category is a text column that stores category names, not UUIDs
-        const processedCategories = await Promise.all(
-          (data || []).map(async (category) => {
-            const { count, error } = await supabase
-              .from("workout_templates")
-              .select("*", { count: "exact", head: true })
-              .eq("category", category.name)
-              .eq("coach_id", user.id);
-
-            if (error) {
-              throw error;
-            }
-
-            return {
-              ...category,
-              exercise_count: count || 0,
-            };
-          })
-        );
-
-        setCategories(processedCategories);
-      } catch {
-        console.log("Database not ready, using localStorage fallback");
-        const savedCategories = localStorage.getItem(
-          `workout_categories_${user.id}`
-        );
-        if (savedCategories) {
-          const categoriesWithCount = JSON.parse(savedCategories).map(
-            (cat: WorkoutCategory) => ({
-              ...cat,
-              exercise_count: Math.floor(Math.random() * 20) + 1, // Mock exercise count
+      setLoading(true);
+      await withTimeout(
+        (async () => {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (!user) return;
+          const { data, error } = await supabase
+            .from("workout_categories")
+            .select("*")
+            .eq("coach_id", user.id)
+            .eq("is_active", true)
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          const processedCategories = await Promise.all(
+            (data || []).map(async (category) => {
+              const { count, error: countErr } = await supabase
+                .from("workout_templates")
+                .select("*", { count: "exact", head: true })
+                .eq("category", category.name)
+                .eq("coach_id", user.id);
+              if (countErr) throw countErr;
+              return { ...category, exercise_count: count || 0 };
             })
           );
-          setCategories(categoriesWithCount);
-        } else {
-          const sampleCategories: WorkoutCategory[] = [
-            {
-              id: "1",
-              name: "Upper Body",
-              description: "Chest, shoulders, arms, and back exercises",
-              color: "#EF4444",
-              icon: "Dumbbell",
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              exercise_count: 15,
-            },
-            {
-              id: "2",
-              name: "Lower Body",
-              description: "Legs, glutes, and lower body exercises",
-              color: "#10B981",
-              icon: "Zap",
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              exercise_count: 12,
-            },
-            {
-              id: "3",
-              name: "Cardio",
-              description: "Cardiovascular and endurance training",
-              color: "#F59E0B",
-              icon: "Heart",
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              exercise_count: 8,
-            },
-          ];
-          setCategories(sampleCategories);
-          localStorage.setItem(
-            `workout_categories_${user.id}`,
-            JSON.stringify(sampleCategories)
+          setCategories(processedCategories);
+        })().catch(async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          const savedCategories = localStorage.getItem(
+            `workout_categories_${user.id}`
           );
-        }
-      }
+          if (savedCategories) {
+            const categoriesWithCount = JSON.parse(savedCategories).map(
+              (cat: WorkoutCategory) => ({
+                ...cat,
+                exercise_count: Math.floor(Math.random() * 20) + 1,
+              })
+            );
+            setCategories(categoriesWithCount);
+          } else {
+            const sampleCategories: WorkoutCategory[] = [
+              {
+                id: "1",
+                name: "Upper Body",
+                description: "Chest, shoulders, arms, and back exercises",
+                color: "#EF4444",
+                icon: "Dumbbell",
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                exercise_count: 15,
+              },
+              {
+                id: "2",
+                name: "Lower Body",
+                description: "Legs, glutes, and lower body exercises",
+                color: "#10B981",
+                icon: "Zap",
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                exercise_count: 12,
+              },
+              {
+                id: "3",
+                name: "Cardio",
+                description: "Cardiovascular and endurance training",
+                color: "#F59E0B",
+                icon: "Heart",
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                exercise_count: 8,
+              },
+            ];
+            setCategories(sampleCategories);
+            localStorage.setItem(
+              `workout_categories_${user.id}`,
+              JSON.stringify(sampleCategories)
+            );
+          }
+        }),
+        45000,
+        "loadCategories"
+      );
     } catch (error) {
       console.error("Error loading categories:", error);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
@@ -193,7 +210,6 @@ export default function WorkoutCategories() {
 
         if (error) throw error;
       } catch {
-        console.log("Database not ready, using localStorage fallback");
         const savedCategories = localStorage.getItem(
           `workout_categories_${user.id}`
         );
@@ -218,51 +234,15 @@ export default function WorkoutCategories() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div
-          style={{
-            backgroundColor: isDark ? "#0A0A0A" : "#E8E9F3",
-            backgroundImage: isDark
-              ? "linear-gradient(to bottom right, #0A0A0A, #1A1A1A)"
-              : "linear-gradient(to bottom right, #E8E9F3, #F5F5FF)",
-            minHeight: "100vh",
-          }}
-        >
-          <div style={{ padding: "24px 20px" }}>
-            <div
-              className="max-w-7xl mx-auto"
-              style={{ display: "flex", flexDirection: "column", gap: "24px" }}
-            >
-              <div
-                style={{
-                  backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                  borderRadius: "24px",
-                  padding: "32px",
-                  boxShadow: isDark
-                    ? "0 4px 12px rgba(0, 0, 0, 0.4)"
-                    : "0 2px 8px rgba(0, 0, 0, 0.08)",
-                }}
-              >
-                <div className="animate-pulse">
-                  <div
-                    className={`h-8 ${
-                      isDark ? "bg-slate-700" : "bg-slate-200"
-                    } rounded-xl mb-4`}
-                  ></div>
-                  <div
-                    className={`h-4 ${
-                      isDark ? "bg-slate-700" : "bg-slate-200"
-                    } rounded-lg w-3/4 mb-2`}
-                  ></div>
-                  <div
-                    className={`h-4 ${
-                      isDark ? "bg-slate-700" : "bg-slate-200"
-                    } rounded-lg w-1/2`}
-                  ></div>
-                </div>
-              </div>
+        <AnimatedBackground>
+          <div className="min-h-screen p-6 max-w-7xl mx-auto">
+            <div className="rounded-2xl p-8 fc-surface animate-pulse">
+              <div className="h-8 rounded-xl mb-4 bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-4 rounded-lg w-3/4 mb-2 bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-4 rounded-lg w-1/2 bg-[color:var(--fc-glass-highlight)]" />
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     );
   }
@@ -275,12 +255,16 @@ export default function WorkoutCategories() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen relative z-10 p-6 md:p-12 pb-32">
           <div className="max-w-5xl mx-auto space-y-8">
+            <Link href="/coach/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-4">
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              Back to Training
+            </Link>
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div>
                 <nav className="flex items-center gap-2 text-sm fc-text-dim mb-4 font-mono uppercase tracking-widest">
                   Coach <ArrowRight className="w-3 h-3 inline" /> Management
                 </nav>
-                <h1 className="text-4xl font-bold tracking-tight fc-text-primary mb-2">Categories</h1>
+                <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">Categories</h1>
                 <p className="text-lg fc-text-dim">Organize your forge with custom tags and classifications.</p>
               </div>
               <button
@@ -329,17 +313,7 @@ export default function WorkoutCategories() {
                   return (
                     <div
                       key={category.id}
-                      style={{
-                        backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "24px",
-                        boxShadow: isDark
-                          ? "0 4px 12px rgba(0, 0, 0, 0.4)"
-                          : "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        transition: "all 0.3s ease",
-                        overflow: "hidden",
-                      }}
-                      className="group"
+                      className="group fc-surface rounded-2xl p-6 overflow-hidden transition-all duration-300"
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = "scale(1.02)";
                         e.currentTarget.style.boxShadow = isDark
@@ -391,27 +365,11 @@ export default function WorkoutCategories() {
                               </div>
                               <div style={{ flex: 1 }}>
                                 <h3
-                                  style={{
-                                    fontSize: "18px",
-                                    fontWeight: "600",
-                                    color: isDark ? "#FFFFFF" : "#1A1A1A",
-                                    margin: 0,
-                                    marginBottom: "4px",
-                                    lineHeight: "1.4",
-                                  }}
-                                  className="group-hover:text-purple-600 transition-colors"
+                                  className="text-lg font-semibold fc-text-primary mb-1 leading-snug group-hover:text-purple-600 transition-colors m-0"
                                 >
                                   {category.name}
                                 </h3>
-                                <p
-                                  style={{
-                                    fontSize: "14px",
-                                    fontWeight: "400",
-                                    color: isDark ? "#9CA3AF" : "#6B7280",
-                                    margin: 0,
-                                    lineHeight: "1.5",
-                                  }}
-                                >
+                                <p className="text-sm font-normal fc-text-dim m-0 leading-normal">
                                   {category.description}
                                 </p>
                               </div>
@@ -424,47 +382,14 @@ export default function WorkoutCategories() {
                                 justifyContent: "space-between",
                               }}
                             >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                  color: isDark ? "#9CA3AF" : "#6B7280",
-                                }}
-                              >
-                                <Activity
-                                  style={{
-                                    width: "16px",
-                                    height: "16px",
-                                    color: "#10B981",
-                                  }}
-                                />
-                                <span
-                                  style={{
-                                    fontSize: "14px",
-                                    fontWeight: "500",
-                                  }}
-                                >
+                              <div className="flex items-center gap-2 fc-text-dim">
+                                <Activity className="w-4 h-4 text-[color:var(--fc-status-success)]" />
+                                <span className="text-sm font-medium">
                                   {category.exercise_count || 0} exercises
                                 </span>
                               </div>
-                              <div
-                                style={{
-                                  border: `2px solid ${
-                                    isDark ? "#2A2A2A" : "#E5E7EB"
-                                  }`,
-                                  borderRadius: "16px",
-                                  padding: "4px 12px",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  fontSize: "12px",
-                                  color: isDark ? "#9CA3AF" : "#6B7280",
-                                }}
-                              >
-                                <Star
-                                  style={{ width: "12px", height: "12px" }}
-                                />
+                              <div className="flex items-center gap-1 rounded-2xl py-1 px-3 text-xs border-2 border-[color:var(--fc-glass-border)] fc-text-dim">
+                                <Star className="w-3 h-3" />
                                 Active
                               </div>
                             </div>
@@ -486,42 +411,16 @@ export default function WorkoutCategories() {
                               setEditingCategory(category);
                               setShowCreateForm(true);
                             }}
-                            style={{
-                              flex: 1,
-                              backgroundColor: "transparent",
-                              border: `2px solid ${
-                                isDark ? "#2A2A2A" : "#E5E7EB"
-                              }`,
-                              borderRadius: "16px",
-                              padding: "8px 16px",
-                              fontSize: "14px",
-                              fontWeight: "600",
-                              color: isDark ? "#FFFFFF" : "#1A1A1A",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "8px",
-                              transition: "all 0.2s ease",
-                            }}
+                            className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-2xl text-sm font-semibold border-2 border-[color:var(--fc-glass-border)] bg-transparent fc-text-primary cursor-pointer transition-all duration-200"
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = isDark
-                                ? "#8B5CF6"
-                                : "#F3E8FF";
-                              e.currentTarget.style.borderColor = "#8B5CF6";
-                              e.currentTarget.style.color = isDark
-                                ? "#FFFFFF"
-                                : "#7C3AED";
+                              e.currentTarget.style.backgroundColor = "var(--fc-accent-primary)";
+                              e.currentTarget.style.borderColor = "var(--fc-accent-primary)";
+                              e.currentTarget.style.color = "white";
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor =
-                                "transparent";
-                              e.currentTarget.style.borderColor = isDark
-                                ? "#2A2A2A"
-                                : "#E5E7EB";
-                              e.currentTarget.style.color = isDark
-                                ? "#FFFFFF"
-                                : "#1A1A1A";
+                              e.currentTarget.style.backgroundColor = "transparent";
+                              e.currentTarget.style.borderColor = "";
+                              e.currentTarget.style.color = "";
                             }}
                           >
                             <Edit style={{ width: "16px", height: "16px" }} />
@@ -529,34 +428,14 @@ export default function WorkoutCategories() {
                           </button>
                           <button
                             onClick={() => deleteCategory(category.id)}
-                            style={{
-                              backgroundColor: "transparent",
-                              border: `2px solid ${
-                                isDark ? "#2A2A2A" : "#E5E7EB"
-                              }`,
-                              borderRadius: "16px",
-                              padding: "8px 16px",
-                              fontSize: "14px",
-                              fontWeight: "600",
-                              color: "#EF4444",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              transition: "all 0.2s ease",
-                            }}
+                            className="flex items-center justify-center py-2 px-4 rounded-2xl text-sm font-semibold border-2 border-[color:var(--fc-glass-border)] bg-transparent text-[color:var(--fc-status-error)] cursor-pointer transition-all duration-200"
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = isDark
-                                ? "#7F1D1D"
-                                : "#FEE2E2";
-                              e.currentTarget.style.borderColor = "#EF4444";
+                              e.currentTarget.style.backgroundColor = "color-mix(in srgb, var(--fc-status-error) 20%, transparent)";
+                              e.currentTarget.style.borderColor = "var(--fc-status-error)";
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor =
-                                "transparent";
-                              e.currentTarget.style.borderColor = isDark
-                                ? "#2A2A2A"
-                                : "#E5E7EB";
+                              e.currentTarget.style.backgroundColor = "transparent";
+                              e.currentTarget.style.borderColor = "";
                             }}
                           >
                             <Trash2 style={{ width: "16px", height: "16px" }} />
@@ -570,100 +449,39 @@ export default function WorkoutCategories() {
 
               {/* Enhanced Empty State */}
               {filteredCategories.length === 0 && (
-                <div
-                  style={{
-                    backgroundColor: isDark ? "#1E1E1E" : "#FFFFFF",
-                    borderRadius: "24px",
-                    padding: "48px",
-                    boxShadow: isDark
-                      ? "0 4px 12px rgba(0, 0, 0, 0.4)"
-                      : "0 2px 8px rgba(0, 0, 0, 0.08)",
-                    textAlign: "center",
-                  }}
-                >
+                <div className="fc-surface rounded-2xl p-12 text-center">
                   <div
+                    className="w-24 h-24 mx-auto mb-6 flex items-center justify-center rounded-[18px] shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                     style={{
-                      padding: "24px",
-                      borderRadius: "18px",
                       background:
                         "linear-gradient(135deg, #F093FB 0%, #F5576C 100%)",
-                      width: "96px",
-                      height: "96px",
-                      margin: "0 auto 24px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: isDark
-                        ? "0 4px 12px rgba(249, 115, 22, 0.3)"
-                        : "0 2px 8px rgba(0, 0, 0, 0.08)",
                     }}
                   >
-                    <Layers
-                      style={{
-                        width: "48px",
-                        height: "48px",
-                        color: "#FFFFFF",
-                      }}
-                    />
+                    <Layers className="w-12 h-12 text-white" />
                   </div>
-                  <h3
-                    style={{
-                      fontSize: "28px",
-                      fontWeight: "700",
-                      color: isDark ? "#FFFFFF" : "#1A1A1A",
-                      margin: "0 0 16px 0",
-                      lineHeight: "1.3",
-                    }}
-                  >
+                  <h3 className="text-3xl font-bold fc-text-primary m-0 mb-4 leading-tight">
                     {categories.length === 0
                       ? "No categories yet"
                       : "No categories found"}
                   </h3>
-                  <p
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: "400",
-                      color: isDark ? "#9CA3AF" : "#6B7280",
-                      margin: "0 auto 32px",
-                      maxWidth: "448px",
-                      lineHeight: "1.5",
-                    }}
-                  >
+                  <p className="text-base font-normal fc-text-dim mx-auto mb-8 max-w-[448px] leading-normal m-0">
                     {categories.length === 0
                       ? "Start organizing your workout templates by creating your first category."
                       : "Try adjusting your search criteria."}
                   </p>
                   <button
                     onClick={() => setShowCreateForm(true)}
-                    style={{
-                      backgroundColor: "#F97316",
-                      color: "#FFFFFF",
-                      fontSize: "16px",
-                      fontWeight: "600",
-                      padding: "16px 32px",
-                      borderRadius: "20px",
-                      border: "none",
-                      boxShadow: isDark
-                        ? "0 4px 12px rgba(249, 115, 22, 0.3)"
-                        : "0 2px 4px rgba(0, 0, 0, 0.1)",
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      transition: "all 0.2s ease",
-                    }}
+                    className="inline-flex items-center gap-3 py-4 px-8 rounded-[20px] border-none text-base font-semibold text-white bg-[color:var(--fc-accent-primary)] cursor-pointer transition-all duration-200 shadow-[0_2px_4px_rgba(0,0,0,0.1)]"
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = "scale(1.05)";
-                      e.currentTarget.style.backgroundColor = "#EA580C";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = "scale(1)";
-                      e.currentTarget.style.backgroundColor = "#F97316";
                     }}
                   >
-                    <Plus style={{ width: "20px", height: "20px" }} />
+                    <Plus className="w-5 h-5" />
                     Create Category
-                    <ArrowRight style={{ width: "20px", height: "20px" }} />
+                    <ArrowRight className="w-5 h-5" />
                   </button>
                 </div>
               )}

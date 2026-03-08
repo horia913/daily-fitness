@@ -111,7 +111,7 @@ function ChallengesPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <div className="fc-glass fc-card p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -132,7 +132,7 @@ function ChallengesPageContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
               <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadChallenges(); }} className="fc-btn fc-btn-primary">
@@ -149,15 +149,15 @@ function ChallengesPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-8 sm:px-6 lg:px-10 fc-page space-y-8">
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-8 sm:px-6 lg:px-10 fc-page space-y-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <nav className="flex items-center gap-2 text-sm fc-text-subtle mb-2 font-mono">
-              <Link href="/client/menu" className="hover:fc-text-primary">Menu</Link>
+              <Link href="/client/me" className="hover:fc-text-primary">Me</Link>
               <span>/</span>
               <span className="fc-text-primary">Challenges</span>
             </nav>
-            <h1 className="text-4xl font-bold tracking-tight fc-text-primary">
+            <h1 className="text-2xl font-bold tracking-tight fc-text-primary">
               Challenges
             </h1>
             <p className="fc-text-dim mt-2">

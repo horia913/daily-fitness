@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,14 +19,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ExerciseDetailForm from "@/components/features/workouts/ExerciseDetailForm";
+import { TrainingBlockService } from "@/lib/trainingBlockService";
+import type { TrainingBlock } from "@/types/trainingBlock";
+import { generateProgression, type GenerationResult } from "@/lib/progressionGenerator";
+import { ProgressionPreview } from "@/components/coach/ProgressionPreview";
 
 interface ProgramProgressionRulesEditorProps {
   programId: string;
   programScheduleId: string;
   weekNumber: number;
+  /** True when the selected week is the first week of the active block (needed for progression preview). */
+  isFirstWeekOfBlock?: boolean;
+  trainingBlockId?: string;
   exercises: Exercise[];
   templates?: WorkoutTemplate[];
   onUpdate?: () => void;
+  /**
+   * Called after a progression is successfully applied (distinct from onUpdate which fires
+   * for any change). The parent can use this to auto-navigate to Week 2 so the coach
+   * immediately sees the generated values.
+   */
+  onApplied?: () => void;
+  /**
+   * All program_schedule entries that share the same program_day and training_block_id as
+   * the currently selected schedule. Passed from the parent (which already has the full
+   * schedule loaded) to avoid re-querying Supabase inside the Apply handler.
+   */
+  blockSchedules?: Array<{ id: string; week_number: number }>;
 }
 
 interface GroupedRules {
@@ -60,9 +79,13 @@ export default function ProgramProgressionRulesEditor({
   programId,
   programScheduleId,
   weekNumber,
+  isFirstWeekOfBlock = weekNumber === 1,
+  trainingBlockId,
   exercises,
   templates = [],
   onUpdate,
+  onApplied,
+  blockSchedules = [],
 }: ProgramProgressionRulesEditorProps) {
   const [blockForms, setBlockForms] = useState<BlockFormState[]>([]);
   const [isPlaceholder, setIsPlaceholder] = useState(false);
@@ -70,10 +93,52 @@ export default function ProgramProgressionRulesEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showReplaceWorkout, setShowReplaceWorkout] = useState(false);
+  const [activeBlock, setActiveBlock] = useState<TrainingBlock | null>(null);
+  const [isApplyingProgression, setIsApplyingProgression] = useState(false);
+  const [hasExistingWeeks, setHasExistingWeeks] = useState(false);
+  const [applySummary, setApplySummary] = useState<string | null>(null);
+
+  // Fetch active training block when block context is available (for progression profile / Mode 1)
+  useEffect(() => {
+    if (!trainingBlockId) {
+      setActiveBlock(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const block = await TrainingBlockService.getTrainingBlock(trainingBlockId);
+      if (cancelled) return;
+      setActiveBlock(block ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [trainingBlockId]);
+
+  // Check if Week 2+ already have rules (for overwrite warning).
+  // Query by training_block_id + week > current to avoid the schedule-ID mismatch
+  // that exists across weeks of the same block.
+  useEffect(() => {
+    if (!trainingBlockId || !programId || !isFirstWeekOfBlock) return;
+    if (!activeBlock || activeBlock.progression_profile === "none") return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("program_progression_rules")
+        .select("id")
+        .eq("training_block_id", trainingBlockId)
+        .gt("week_number", weekNumber)
+        .limit(1);
+      if (!cancelled) setHasExistingWeeks((data?.length ?? 0) > 0);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [programId, trainingBlockId, weekNumber, isFirstWeekOfBlock, activeBlock?.progression_profile]);
 
   useEffect(() => {
     loadRules();
-  }, [programId, programScheduleId, weekNumber]);
+  }, [programId, programScheduleId, weekNumber, trainingBlockId]);
 
   const loadRules = async () => {
     try {
@@ -84,7 +149,8 @@ export default function ProgramProgressionRulesEditor({
         await ProgramProgressionService.getProgressionRules(
           programId,
           weekNumber,
-          programScheduleId
+          programScheduleId,
+          trainingBlockId
         );
 
       // If no rules exist and we have a schedule ID, try to copy workout data
@@ -102,22 +168,13 @@ export default function ProgramProgressionRulesEditor({
             .single();
 
           if (scheduleData?.template_id) {
-            console.log(
-              "[ProgressionDebug] Invoking copyWorkoutToProgram from ProgramProgressionRulesEditor",
-              {
-                programId,
-                weekNumber,
-                programScheduleId,
-                templateId: scheduleData.template_id,
-                source: "ProgramProgressionRulesEditor.loadRules",
-              }
-            );
             const success =
               await ProgramProgressionService.copyWorkoutToProgram(
                 programId,
                 programScheduleId,
                 scheduleData.template_id,
-                weekNumber
+                weekNumber,
+                trainingBlockId ?? undefined
               );
 
             if (success) {
@@ -146,53 +203,18 @@ export default function ProgramProgressionRulesEditor({
               });
               setBlockForms(blockState);
               return;
-            } else {
-              console.warn("⚠️ Failed to copy workout data");
             }
           }
         } catch (copyError) {
-          console.error("❌ Error copying workout data:", copyError);
-          // Continue to show empty state rather than error
+          console.error("Error copying workout data to progression rules:", copyError);
         }
       }
 
       setIsPlaceholder(isPlaceholderData);
 
-      // Debug: Log what we received
-      console.log("[ProgressionRulesEditor] Loaded rules:", {
-        count: rules.length,
-        sample: rules.slice(0, 2).map((r) => ({
-          id: r.id,
-          block_type: r.block_type,
-          exercise_id: r.exercise_id,
-          load_percentage: r.load_percentage,
-          weight_kg: r.weight_kg,
-          sets: r.sets,
-          reps: r.reps,
-          tempo: r.tempo,
-          rir: r.rir,
-          notes: r.notes,
-        })),
-      });
-
-      // Group rules by block
       const grouped = groupRulesByBlock(rules);
       const blockState = grouped.map((group) => {
         const formValue = createFormValueForGroup(group);
-        
-        // Debug: Log what we're creating
-        console.log(`[ProgressionRulesEditor] Created formValue for ${group.blockType}:`, {
-          blockOrder: group.blockOrder,
-          exercise_id: formValue.exercise_id,
-          load_percentage: formValue.load_percentage,
-          weight_kg: formValue.weight_kg,
-          sets: formValue.sets,
-          reps: formValue.reps,
-          tempo: formValue.tempo,
-          rir: formValue.rir,
-          notes: formValue.notes,
-        });
-        
         return {
           key: `block-${group.blockOrder}-${group.blockType}-${
             group.rules[0]?.exercise_order || 0
@@ -206,20 +228,125 @@ export default function ProgramProgressionRulesEditor({
           hasChanges: false,
         } as BlockFormState;
       });
+
       setBlockForms(blockState);
     } catch (err: any) {
-      console.error("❌ Error loading progression rules:", err);
-      console.error("❌ Error details:", {
-        message: err?.message,
-        code: err?.code,
-        details: err?.details,
-        hint: err?.hint,
-      });
+      console.error("Error loading progression rules:", err);
       setError(
         `Failed to load progression rules: ${err?.message || "Unknown error"}`
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Empty result used for early-return cases in the useMemo below
+  const EMPTY_GENERATION_RESULT: GenerationResult = {
+    weekRules: [],
+    summary: { autoProgressed: 0, unchanged: 0, unchangedTypes: [] },
+  };
+
+  // Generated Weeks 2–N for preview when in profile-based mode (Week 1 only)
+  const generationResult = useMemo((): GenerationResult => {
+    if (!isFirstWeekOfBlock) return EMPTY_GENERATION_RESULT;
+    if (!activeBlock) return EMPTY_GENERATION_RESULT;
+    if (activeBlock.progression_profile === "none") return EMPTY_GENERATION_RESULT;
+    if (blockForms.length === 0) return EMPTY_GENERATION_RESULT;
+    const week1Rules: ProgramProgressionRule[] = blockForms.flatMap((b) =>
+      b.rules.map((r) => ({ ...r, week_number: 1 }))
+    );
+    if (week1Rules.length === 0) return EMPTY_GENERATION_RESULT;
+    return generateProgression({
+      week1Rules,
+      profile: activeBlock.progression_profile,
+      durationWeeks: activeBlock.duration_weeks,
+      goal: activeBlock.goal,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFirstWeekOfBlock, activeBlock, blockForms]);
+
+  const handleApplyProgression = async () => {
+    if (!trainingBlockId || generationResult.weekRules.length === 0) return;
+    setIsApplyingProgression(true);
+    try {
+      // weekNumber is the absolute program week of this block's Week 1.
+      // The generator produces block-relative week numbers (2, 3, 4...).
+      // weekOffset converts block-relative → absolute: absolute = blockRelative + (weekNumber - 1).
+      const weekOffset = weekNumber - 1;
+
+      // Delete all existing Week 2+ rows for the days in this block.
+      // We delete by program_schedule_id (day-specific) rather than training_block_id so
+      // that rules whose training_block_id is NULL (auto-filled template copies) are also
+      // removed — otherwise they survive the delete and create duplicate rows that hide
+      // the newly generated values in the editor.
+      const scheduleIdsToDelete = blockSchedules
+        .filter((s) => s.week_number >= weekNumber + 1)
+        .map((s) => s.id);
+      const ok = await ProgramProgressionService.deleteProgressionRulesForSchedules(
+        scheduleIdsToDelete
+      );
+      if (!ok) throw new Error("Failed to clear existing Week 2+ rules");
+
+      const flatRules = generationResult.weekRules.flatMap((gw) => gw.rules);
+      const firstRule = blockForms[0]?.rules[0];
+      const programIdVal = firstRule?.program_id ?? programId;
+
+      // The generated rules are cloned from the current week's rules, so they carry this
+      // week's program_schedule_id. Each target week has its own schedule entry (same
+      // program_day, different week_number). We use the pre-loaded blockSchedules prop
+      // (supplied by the parent) to map each target week → its schedule ID, avoiding
+      // a redundant Supabase query here.
+      const weekToScheduleId = new Map<number, string>();
+      blockSchedules.forEach((s) => weekToScheduleId.set(s.week_number, s.id));
+
+      const withMeta = flatRules.map((r) => {
+        const absoluteWeek = r.week_number + weekOffset;
+        return {
+          ...r,
+          program_id: r.program_id ?? programIdVal,
+          // Use the schedule ID that belongs to this specific target week, not the
+          // source week's schedule ID that the cloned rule carries.
+          program_schedule_id: weekToScheduleId.get(absoluteWeek) ?? programScheduleId,
+          training_block_id: r.training_block_id ?? trainingBlockId,
+          week_number: absoluteWeek,
+        };
+      });
+
+      const inserted = await ProgramProgressionService.bulkCreateProgressionRules(withMeta);
+      if (!inserted) throw new Error("Failed to insert generated rules");
+
+      // Build and store the apply summary message
+      const { autoProgressed, unchanged, unchangedTypes } = generationResult.summary;
+      const unchangedNote =
+        unchanged > 0
+          ? `, ${unchanged} unchanged (${unchangedTypes.map((t) => t.toUpperCase()).join(", ")})`
+          : "";
+      setApplySummary(
+        `Applied: ${autoProgressed} exercise${autoProgressed !== 1 ? "s" : ""} progressed${unchangedNote}.`
+      );
+
+      // Notify parent of any data change first, then signal the apply-specific callback
+      // so the parent can auto-navigate to Week 2.
+      onUpdate?.();
+      onApplied?.();
+    } catch (err) {
+      console.error("[ProgramProgressionRulesEditor] Apply progression failed:", err);
+    } finally {
+      setIsApplyingProgression(false);
+    }
+  };
+
+  const handleEditManually = async () => {
+    if (!activeBlock || !trainingBlockId) return;
+    try {
+      await TrainingBlockService.updateTrainingBlock(trainingBlockId, {
+        progression_profile: "none",
+      });
+      const updated = await TrainingBlockService.getTrainingBlock(trainingBlockId);
+      setActiveBlock(updated);
+      onUpdate?.();
+    } catch (err) {
+      console.error("[ProgramProgressionRulesEditor] Switch to manual failed:", err);
     }
   };
 
@@ -229,15 +356,15 @@ export default function ProgramProgressionRulesEditor({
     const grouped = new Map<number, GroupedRules>();
 
     rules.forEach((rule) => {
-      if (!grouped.has(rule.block_order)) {
-        grouped.set(rule.block_order, {
-          blockOrder: rule.block_order,
-          blockType: rule.block_type,
-          blockName: rule.block_name,
+      if (!grouped.has(rule.set_order)) {
+        grouped.set(rule.set_order, {
+          blockOrder: rule.set_order,
+          blockType: rule.set_type,
+          blockName: rule.set_name,
           rules: [],
         });
       }
-      grouped.get(rule.block_order)!.rules.push(rule);
+      grouped.get(rule.set_order)!.rules.push(rule);
     });
 
     return Array.from(grouped.values()).sort(
@@ -254,6 +381,14 @@ export default function ProgramProgressionRulesEditor({
     if (value === null || value === undefined || value === "") return null;
     const parsed =
       typeof value === "number" ? value : parseInt(String(value), 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  /** Float-aware version for weight_kg (preserves decimals like 62.5). */
+  const toFloatOrNull = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed =
+      typeof value === "number" ? value : parseFloat(String(value));
     return Number.isNaN(parsed) ? null : parsed;
   };
 
@@ -317,28 +452,6 @@ export default function ProgramProgressionRulesEditor({
       weight_kg: numberToString(primaryRule?.weight_kg ?? null),
       notes: primaryRule?.notes || "",
     };
-    
-    // Debug log for baseForm
-    console.log(`[createFormValueForGroup] baseForm for ${blockType}:`, {
-      exercise_id: baseForm.exercise_id,
-      sets: baseForm.sets,
-      reps: baseForm.reps,
-      load_percentage: baseForm.load_percentage,
-      weight_kg: baseForm.weight_kg,
-      tempo: baseForm.tempo,
-      rir: baseForm.rir,
-      notes: baseForm.notes,
-      primaryRuleData: {
-        sets: primaryRule?.sets,
-        reps: primaryRule?.reps,
-        load_percentage: primaryRule?.load_percentage,
-        weight_kg: primaryRule?.weight_kg,
-        tempo: primaryRule?.tempo,
-        rir: primaryRule?.rir,
-        notes: primaryRule?.notes,
-      },
-    });
-
     switch (blockType) {
       case "superset": {
         const ruleA =
@@ -530,20 +643,6 @@ export default function ProgramProgressionRulesEditor({
           notes: primaryRule?.notes || baseForm.notes || "",
         };
       }
-      case "pyramid_set": {
-        return {
-          ...baseForm,
-          pyramid_order: numberToString(primaryRule?.pyramid_order ?? null),
-        };
-      }
-      case "ladder": {
-        return {
-          ...baseForm,
-          ladder_order: numberToString(primaryRule?.ladder_order ?? null),
-          rounds: numberToString(primaryRule?.rounds ?? null),
-          start_reps: numberToString(primaryRule?.target_reps ?? null),
-        };
-      }
       default:
         return baseForm;
     }
@@ -603,6 +702,7 @@ export default function ProgramProgressionRulesEditor({
           rest_between_pairs: restPairs,
           tempo: toStringOrNull(form.tempo),
           rir: toNumberOrNull(form.rir),
+          weight_kg: toFloatOrNull(form.weight_kg),
           load_percentage: toNumberOrNull(form.load_percentage),
           notes: toStringOrNull(form.notes),
         });
@@ -617,6 +717,7 @@ export default function ProgramProgressionRulesEditor({
           rest_between_pairs: restPairs,
           tempo: toStringOrNull(form.superset_tempo ?? form.tempo),
           rir: toNumberOrNull(form.superset_rir ?? form.rir),
+          weight_kg: toFloatOrNull(form.superset_weight_kg ?? form.weight_kg),
           load_percentage: toNumberOrNull(form.load_percentage),
           notes: toStringOrNull(form.superset_notes ?? form.notes),
         });
@@ -643,6 +744,7 @@ export default function ProgramProgressionRulesEditor({
             rest_between_pairs: restPairs,
             tempo: toStringOrNull(entry.tempo ?? form.tempo),
             rir: toNumberOrNull(entry.rir ?? form.rir),
+            weight_kg: toFloatOrNull(entry.weight_kg ?? form.weight_kg),
             load_percentage: toNumberOrNull(form.load_percentage),
             notes: toStringOrNull(form.notes ?? entry.notes),
           });
@@ -662,7 +764,7 @@ export default function ProgramProgressionRulesEditor({
           tempo: toStringOrNull(form.tempo),
           rir: toNumberOrNull(form.rir),
           load_percentage: toNumberOrNull(form.load_percentage),
-          weight_kg: toNumberOrNull(form.weight_kg),
+          weight_kg: toFloatOrNull(form.weight_kg),
           notes: toStringOrNull(form.notes),
         });
         break;
@@ -679,6 +781,7 @@ export default function ProgramProgressionRulesEditor({
           rest_seconds: toNumberOrNull(form.rest_seconds),
           tempo: toStringOrNull(form.tempo),
           rir: toNumberOrNull(form.rir),
+          weight_kg: toFloatOrNull(form.weight_kg),
           load_percentage: toNumberOrNull(form.load_percentage),
           notes: toStringOrNull(form.notes),
         });
@@ -695,6 +798,8 @@ export default function ProgramProgressionRulesEditor({
           max_rest_pauses: toNumberOrNull(form.max_rest_pauses),
           rest_seconds: toNumberOrNull(form.rest_seconds),
           tempo: toStringOrNull(form.tempo),
+          rir: toNumberOrNull(form.rir),
+          weight_kg: toFloatOrNull(form.weight_kg),
           load_percentage: toNumberOrNull(form.load_percentage),
           notes: toStringOrNull(form.notes),
         });
@@ -716,6 +821,7 @@ export default function ProgramProgressionRulesEditor({
           rest_between_pairs: restPairs,
           tempo: toStringOrNull(form.tempo),
           rir: toNumberOrNull(form.rir),
+          weight_kg: toFloatOrNull(form.weight_kg),
           load_percentage: toNumberOrNull(form.load_percentage),
           notes: toStringOrNull(form.notes),
         });
@@ -730,6 +836,7 @@ export default function ProgramProgressionRulesEditor({
           rest_between_pairs: restPairs,
           tempo: toStringOrNull(form.compound_tempo ?? form.tempo),
           rir: toNumberOrNull(form.compound_rir ?? form.rir),
+          weight_kg: toFloatOrNull(form.compound_weight_kg ?? form.weight_kg),
           load_percentage: toNumberOrNull(form.load_percentage),
           notes: toStringOrNull(form.notes),
         });
@@ -743,7 +850,10 @@ export default function ProgramProgressionRulesEditor({
           duration_minutes: toNumberOrNull(form.amrap_duration),
           target_reps: toNumberOrNull(form.target_reps ?? form.reps),
           reps: toStringOrNull(form.reps),
+          rest_seconds: toNumberOrNull(form.rest_seconds),
           tempo: toStringOrNull(form.tempo),
+          rir: toNumberOrNull(form.rir),
+          weight_kg: toFloatOrNull(form.weight_kg),
           load_percentage: toNumberOrNull(form.load_percentage),
           notes: toStringOrNull(form.notes),
         });
@@ -758,7 +868,10 @@ export default function ProgramProgressionRulesEditor({
           duration_minutes: toNumberOrNull(form.emom_duration),
           target_reps: toNumberOrNull(form.emom_reps ?? form.target_reps),
           work_seconds: toNumberOrNull(form.work_seconds),
+          rest_seconds: toNumberOrNull(form.rest_seconds),
           tempo: toStringOrNull(form.tempo),
+          rir: toNumberOrNull(form.rir),
+          weight_kg: toFloatOrNull(form.weight_kg),
           load_percentage: toNumberOrNull(form.load_percentage),
           notes: toStringOrNull(form.notes),
         });
@@ -786,35 +899,10 @@ export default function ProgramProgressionRulesEditor({
             toStringOrNull(form.exercise_id) ?? rule?.exercise_id ?? undefined,
           target_reps: toNumberOrNull(form.target_reps),
           time_cap_minutes: toNumberOrNull(form.time_cap),
+          rest_seconds: toNumberOrNull(form.rest_seconds),
           tempo: toStringOrNull(form.tempo),
-          load_percentage: toNumberOrNull(form.load_percentage),
-          notes: toStringOrNull(form.notes),
-        });
-        break;
-      }
-      case "pyramid_set": {
-        const rule = rulesSorted[0];
-        pushCandidate(rule, {
-          exercise_id:
-            toStringOrNull(form.exercise_id) ?? rule?.exercise_id ?? undefined,
-          pyramid_order: toNumberOrNull(form.pyramid_order),
-          sets: toNumberOrNull(form.sets),
-          reps: toStringOrNull(form.reps),
-          tempo: toStringOrNull(form.tempo),
-          load_percentage: toNumberOrNull(form.load_percentage),
-          notes: toStringOrNull(form.notes),
-        });
-        break;
-      }
-      case "ladder": {
-        const rule = rulesSorted[0];
-        pushCandidate(rule, {
-          exercise_id:
-            toStringOrNull(form.exercise_id) ?? rule?.exercise_id ?? undefined,
-          ladder_order: toNumberOrNull(form.ladder_order),
-          rounds: toNumberOrNull(form.rounds),
-          target_reps: toNumberOrNull(form.start_reps ?? form.target_reps),
-          tempo: toStringOrNull(form.tempo),
+          rir: toNumberOrNull(form.rir),
+          weight_kg: toFloatOrNull(form.weight_kg),
           load_percentage: toNumberOrNull(form.load_percentage),
           notes: toStringOrNull(form.notes),
         });
@@ -840,6 +928,7 @@ export default function ProgramProgressionRulesEditor({
             ),
             tempo: toStringOrNull(perExercise.tempo ?? form.tempo),
             rir: toNumberOrNull(perExercise.rir ?? form.rir),
+            weight_kg: toFloatOrNull(perExercise.weight_kg ?? form.weight_kg),
             load_percentage: toNumberOrNull(form.load_percentage),
             notes: toStringOrNull(perExercise.notes ?? form.notes),
           });
@@ -981,7 +1070,8 @@ export default function ProgramProgressionRulesEditor({
         programId,
         programScheduleId,
         scheduleData.template_id,
-        weekNumber
+        weekNumber,
+        trainingBlockId ?? undefined
       );
 
       if (success) {
@@ -1021,8 +1111,8 @@ export default function ProgramProgressionRulesEditor({
     const exerciseData: any = {
       ...block.formValue,
       exercise_type: block.blockType,
-      block_name: block.blockName,
-      block_order: block.blockOrder,
+      set_name: block.blockName,
+      set_order: block.blockOrder,
     };
 
     if (!exerciseData.exercise && exerciseData.exercise_id) {
@@ -1087,6 +1177,37 @@ export default function ProgramProgressionRulesEditor({
         </div>
       </div>
 
+      {/* Progression Preview (profile-based, first week of block only) — collapsed by default */}
+      {isFirstWeekOfBlock &&
+        activeBlock &&
+        activeBlock.progression_profile !== "none" &&
+        blockForms.length > 0 &&
+        generationResult.weekRules.length > 0 && (
+          <ProgressionPreview
+            weekRules={generationResult.weekRules}
+            summary={generationResult.summary}
+            profile={activeBlock.progression_profile}
+            hasExistingWeeks={hasExistingWeeks}
+            onApply={handleApplyProgression}
+            onEditManually={handleEditManually}
+            isApplying={isApplyingProgression}
+          />
+        )}
+
+      {/* Post-apply success summary */}
+      {applySummary && (
+        <div
+          className="rounded-lg px-4 py-3 text-sm"
+          style={{
+            background: "rgba(34,197,94,0.10)",
+            border: "1px solid rgba(34,197,94,0.25)",
+            color: "rgb(22,163,74)",
+          }}
+        >
+          ✓ {applySummary}
+        </div>
+      )}
+
       {blockForms.length === 0 ? (
         <div className="p-8 text-center fc-text-dim fc-glass-soft border border-dashed border-[color:var(--fc-glass-border)] rounded-2xl">
           <p>
@@ -1113,15 +1234,7 @@ export default function ProgramProgressionRulesEditor({
                     load_percentage: block.formValue.load_percentage || undefined,
                     weight_kg: block.formValue.weight_kg || undefined,
                   }}
-                  onChange={(updated) => {
-                    console.log(`[ProgressionRulesEditor] Form changed for ${block.blockType}:`, {
-                      load_percentage: updated.load_percentage,
-                      weight_kg: updated.weight_kg,
-                      sets: updated.sets,
-                      reps: updated.reps,
-                    });
-                    handleBlockChange(block.key, updated);
-                  }}
+                  onChange={(updated) => handleBlockChange(block.key, updated)}
                   availableExercises={exercises}
                   mode="inline"
                   allowTypeChange={false}

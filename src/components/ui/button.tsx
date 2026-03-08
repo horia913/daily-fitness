@@ -20,8 +20,9 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
-        "fc-primary": "fc-btn fc-btn-primary fc-press",
-        "fc-secondary": "fc-btn fc-btn-secondary fc-press",
+        // fc-primary and fc-secondary variants use h-11 (44px) minimum via fc-btn classes
+        "fc-primary": "fc-btn fc-btn-primary fc-press h-11",
+        "fc-secondary": "fc-btn fc-btn-secondary fc-press h-11",
         "fc-ghost": "fc-btn fc-btn-ghost fc-press",
         "fc-destructive": "fc-btn fc-btn-destructive fc-press",
         // New gradient variants
@@ -35,11 +36,13 @@ const buttonVariants = cva(
           "bg-gradient-to-r from-[#FFA726] to-[#FF9800] text-white shadow-md hover:shadow-xl hover:from-[#FFB74D] hover:to-[#FFA726]",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
+        // Default: h-11 (44px) for touch target compliance
+        default: "h-11 px-4 py-2 has-[>svg]:px-3",
+        // sm: h-8 (32px) - Note: below 44px minimum, use only for non-primary actions (icon-only, tags, etc.)
         sm: "h-8 rounded-xl gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-xl px-6 has-[>svg]:px-4",
+        lg: "h-11 rounded-xl px-6 has-[>svg]:px-4",
         xl: "h-12 rounded-xl px-8 text-base has-[>svg]:px-6",
-        icon: "size-9",
+        icon: "size-11",
       },
     },
     defaultVariants: {

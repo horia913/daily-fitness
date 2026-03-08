@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -12,8 +12,6 @@ import { supabase } from "@/lib/supabase";
 import { withTimeout } from "@/lib/withTimeout";
 import {
   ChevronLeft,
-  Share2,
-  Star,
   Zap,
   Edit3,
   Trash2,
@@ -59,30 +57,7 @@ const getFoodIcon = (category: string) => {
   }
 };
 
-const getFoodColor = (category: string) => {
-  switch (category.toLowerCase()) {
-    case "fruits":
-      return "from-orange-500 to-red-500";
-    case "vegetables":
-      return "from-green-500 to-emerald-500";
-    case "grains":
-      return "from-yellow-500 to-amber-500";
-    case "protein":
-      return "from-red-500 to-pink-500";
-    case "dairy":
-      return "from-blue-500 to-cyan-500";
-    case "snacks":
-      return "from-purple-500 to-violet-500";
-    case "beverages":
-      return "from-cyan-500 to-blue-500";
-    case "condiments":
-      return "from-neutral-500 to-neutral-500";
-    case "desserts":
-      return "from-pink-500 to-rose-500";
-    default:
-      return "from-neutral-500 to-neutral-500";
-  }
-};
+const headerGradient = "fc-surface";
 
 const calculateNutritionForServing = (food: Food, servingSize: number) => {
   const multiplier = servingSize / food.serving_size;
@@ -106,10 +81,28 @@ export default function FoodDetailPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [foodServingSize, setFoodServingSize] = useState(1);
 
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (foodId) {
-      loadFood();
-    }
+    if (!foodId) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setLoading(false);
+      setLoadError("Loading took too long. Tap Retry to try again.");
+    }, 20_000);
+    loadFood().finally(() => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
   }, [foodId]);
 
   const loadFood = async () => {
@@ -134,23 +127,11 @@ export default function FoodDetailPage() {
     }
   };
 
-  const handleAddToLog = () => {
-    // Store food in sessionStorage to pass to nutrition page
-    sessionStorage.setItem(
-      "selectedFood",
-      JSON.stringify({
-        food,
-        quantity: foodServingSize,
-      })
-    );
-    router.push("/client/nutrition?tab=manual-log");
-  };
-
   if (loadError) {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10 flex items-center justify-center">
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10 flex items-center justify-center">
             <div className="fc-surface rounded-2xl p-8 text-center max-w-md">
               <p className="fc-text-dim mb-4">{loadError}</p>
               <div className="flex gap-2 justify-center flex-wrap">
@@ -169,7 +150,7 @@ export default function FoodDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-4xl">
               <div className="fc-surface p-6 sm:p-10">
                 <div className="animate-pulse space-y-4">
@@ -190,7 +171,7 @@ export default function FoodDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-4xl">
               <div className="fc-surface p-10 text-center">
                 <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
@@ -228,18 +209,10 @@ export default function FoodDetailPage() {
           <div className="mx-auto w-full max-w-xl space-y-6">
             <nav className="flex items-center justify-between mb-6">
               <Link href="/client/nutrition">
-                <button type="button" className="w-10 h-10 rounded-full fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-subtle hover:fc-text-primary transition-colors" aria-label="Back">
+                <button type="button" className="min-h-[44px] min-w-[44px] rounded-full fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-subtle hover:fc-text-primary transition-colors" aria-label="Back">
                   <ChevronLeft className="w-6 h-6" />
                 </button>
               </Link>
-              <div className="flex gap-3">
-                <button type="button" className="w-10 h-10 rounded-full fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-subtle" aria-label="Share">
-                  <Share2 className="w-5 h-5" />
-                </button>
-                <button type="button" className="w-10 h-10 rounded-full fc-glass border border-[color:var(--fc-glass-border)] flex items-center justify-center fc-text-subtle" aria-label="Favorite">
-                  <Star className="w-5 h-5" />
-                </button>
-              </div>
             </nav>
 
             <header className="mb-6">
@@ -249,9 +222,9 @@ export default function FoodDetailPage() {
                 <span className="font-mono text-sm font-bold fc-text-workouts">{foodServingSize} {food.serving_unit}</span>
               </div>
               <div className="flex items-center gap-2 mt-2">
-                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setFoodServingSize(Math.max(0.1, foodServingSize - 0.1))}>−</Button>
+                <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px] p-0" onClick={() => setFoodServingSize(Math.max(0.1, foodServingSize - 0.1))}>−</Button>
                 <span className="w-16 text-center font-mono text-sm font-bold fc-text-primary">{foodServingSize}</span>
-                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setFoodServingSize(foodServingSize + 0.1)}>+</Button>
+                <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px] p-0" onClick={() => setFoodServingSize(foodServingSize + 0.1)}>+</Button>
                 <span className="text-sm fc-text-dim">{food.serving_unit}</span>
               </div>
             </header>

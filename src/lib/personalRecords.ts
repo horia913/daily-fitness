@@ -24,6 +24,73 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
     const { ensureAuthenticated } = await import('./supabase');
     await ensureAuthenticated();
 
+    // Try to fetch from stored personal_records table first
+    const { data: storedPRs, error: storedError } = await supabase
+      .from('personal_records')
+      .select(`
+        *,
+        exercises (
+          id,
+          name
+        )
+      `)
+      .eq('client_id', userId)
+      .eq('is_current_record', true)
+      .order('achieved_date', { ascending: false })
+      .limit(50)
+
+    if (!storedError && storedPRs && storedPRs.length > 0) {
+      // Convert stored PRs to PersonalRecord format
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      const personalRecords: PersonalRecord[] = storedPRs
+        .filter((pr: any) => pr.record_type === 'weight' || pr.record_type === 'reps') // Only show weight/reps PRs
+        .map((pr: any) => {
+          const exerciseName = pr.exercises?.name || 'Unknown Exercise'
+          const isRecent = new Date(pr.achieved_date + 'T12:00:00') >= thirtyDaysAgo
+          
+          // Extract weight and reps from record_value based on record_type
+          let weight = 0
+          let reps = 0
+          let record = ''
+          
+          if (pr.record_type === 'weight') {
+            weight = pr.record_value || 0
+            // For weight PRs, we don't store reps separately, so use 0 or try to infer from notes
+            record = `${weight}${pr.record_unit || 'kg'}`
+          } else if (pr.record_type === 'reps') {
+            reps = pr.record_value || 0
+            // For reps PRs, weight might be in notes or we don't have it
+            record = `${reps} ${pr.record_unit || 'reps'}`
+          }
+          
+          return {
+            id: pr.id,
+            exerciseName,
+            record: record || 'PR',
+            date: pr.achieved_date,
+            weight,
+            reps,
+            isRecent
+          }
+        })
+      
+      return personalRecords.slice(0, 10)
+    }
+
+    // Fallback: compute PRs on-the-fly from workout_set_logs (legacy behavior)
+    console.log('No stored PRs found, falling back to computed PRs')
+    return await fetchPersonalRecordsLegacy(userId)
+
+  } catch (error) {
+    console.error('Error fetching personal records:', error)
+    // Fallback to legacy computation
+    return await fetchPersonalRecordsLegacy(userId)
+  }
+}
+
+// Legacy function: compute PRs on-the-fly (kept as fallback)
+async function fetchPersonalRecordsLegacy(userId: string): Promise<PersonalRecord[]> {
+  try {
     // Query workout_logs directly using client_id (workout_sessions is optional/unused)
     const { data: workoutLogs, error: logsError } = await supabase
       .from('workout_logs')
@@ -133,7 +200,7 @@ export async function fetchPersonalRecords(userId: string): Promise<PersonalReco
       .slice(0, 10)
 
   } catch (error) {
-    console.error('Error fetching personal records:', error)
+    console.error('Error fetching personal records (legacy):', error)
     return []
   }
 }

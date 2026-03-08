@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { withTimeout } from '@/lib/withTimeout'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -67,6 +68,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
 
   const [clients, setClients] = useState<ComplianceDashboardData[]>([])
   const [loading, setLoading] = useState(true)
+  const loadingRef = useRef(false)
   const [selectedClient, setSelectedClient] = useState<string>('all')
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'quarter'>('week')
   const [sortBy, setSortBy] = useState<'compliance' | 'engagement' | 'name'>('compliance')
@@ -79,23 +81,26 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
 
   const loadClientData = async () => {
     if (!coachId) return
+    if (loadingRef.current) return
+    loadingRef.current = true
     try {
       setLoading(true)
-      const { getCoachClientIds, getPeriodBounds } = await import('@/lib/metrics')
-      const period = getPeriodBounds(selectedPeriod === 'week' ? 'this_week' : selectedPeriod === 'month' ? 'this_month' : 'last_4_weeks')
-      const periodStart = period.start
-      const periodEnd = period.end
-      const periodStartDate = periodStart.slice(0, 10)
-      const periodEndDate = periodEnd.slice(0, 10)
+      await withTimeout(
+        (async () => {
+          const { getCoachClientIds, getPeriodBounds } = await import('@/lib/metrics')
+          const period = getPeriodBounds(selectedPeriod === 'week' ? 'this_week' : selectedPeriod === 'month' ? 'this_month' : 'last_4_weeks')
+          const periodStart = period.start
+          const periodEnd = period.end
+          const periodStartDate = periodStart.slice(0, 10)
+          const periodEndDate = periodEnd.slice(0, 10)
 
-      const clientIds = await getCoachClientIds(coachId, true)
-      if (clientIds.length === 0) {
-        setClients([])
-        setLoading(false)
-        return
-      }
+          const clientIds = await getCoachClientIds(coachId, true)
+          if (clientIds.length === 0) {
+            setClients([])
+            return
+          }
 
-      const { data: clientsRows, error: clientsError } = await supabase
+          const { data: clientsRows, error: clientsError } = await supabase
         .from('clients')
         .select('id, client_id, status, created_at, updated_at')
         .eq('coach_id', coachId)
@@ -203,12 +208,17 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
         }
       })
 
-      setClients(clientsWithData)
+          setClients(clientsWithData)
+        })(),
+        45000,
+        'loadClientData'
+      )
     } catch (error) {
       console.error('Error loading client compliance data:', error)
       setClients([])
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
   }
 
@@ -315,9 +325,10 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen">
-        {/* Enhanced Header */}
-        <div className={`p-6 ${theme.background} relative overflow-hidden`}>
+      <div className="min-h-screen flex flex-col gap-0 sm:gap-6">
+        {/* Enhanced Header - hidden on mobile to save vertical space */}
+        <div className="hidden sm:block shrink-0">
+        <div className={`p-4 sm:p-6 ${theme.background} relative overflow-hidden`}>
           {/* Floating background elements */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-domain-habits)]/10 rounded-full blur-3xl"></div>
@@ -331,7 +342,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div className="space-y-2">
                     <Badge className="fc-badge">Compliance Overview</Badge>
-                    <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       Client Compliance Dashboard 📊
                     </h1>
                     <p className="text-lg text-[color:var(--fc-text-dim)]">
@@ -359,15 +370,15 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                 </div>
 
                 {/* Overall Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
                   <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
-                          <Users className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-workouts)]" />
                         </div>
-                        <div>
-                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.totalClients}</p>
+                        <div className="min-w-0">
+                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.totalClients}</p>
                           <p className="text-sm text-[color:var(--fc-text-dim)]">Active Clients</p>
                         </div>
                       </div>
@@ -375,13 +386,13 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                   </Card>
 
                   <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
-                          <Target className="w-5 h-5 text-[color:var(--fc-status-success)]" />
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                          <Target className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-success)]" />
                         </div>
-                        <div>
-                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.avgCompliance.toFixed(1)}%</p>
+                        <div className="min-w-0">
+                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{(stats.avgCompliance ?? 0).toFixed(1)}%</p>
                           <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Compliance</p>
                         </div>
                       </div>
@@ -389,13 +400,13 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                   </Card>
 
                   <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
-                          <Activity className="w-5 h-5 text-[color:var(--fc-accent-purple)]" />
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                          <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-purple)]" />
                         </div>
-                        <div>
-                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.avgEngagement.toFixed(1)}%</p>
+                        <div className="min-w-0">
+                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{(stats.avgEngagement ?? 0).toFixed(1)}%</p>
                           <p className="text-sm text-[color:var(--fc-text-dim)]">Avg Engagement</p>
                         </div>
                       </div>
@@ -403,13 +414,13 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                   </Card>
 
                   <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
-                          <AlertTriangle className="w-5 h-5 text-[color:var(--fc-status-warning)]" />
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl flex-shrink-0">
+                          <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-warning)]" />
                         </div>
-                        <div>
-                          <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.criticalAlerts}</p>
+                        <div className="min-w-0">
+                          <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{stats.criticalAlerts}</p>
                           <p className="text-sm text-[color:var(--fc-text-dim)]">Critical Alerts</p>
                         </div>
                       </div>
@@ -420,10 +431,11 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
             </Card>
           </div>
         </div>
+        </div>
 
-      {/* Main Content */}
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto space-y-8">
+      {/* Main Content - no top spacing on mobile when hero is hidden */}
+      <div className="p-4 sm:p-6 pt-0 sm:pt-6 min-w-0">
+        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-8">
           {/* Filters */}
           <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
             <CardContent className="p-6">
@@ -558,7 +570,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className={`text-lg font-bold ${getComplianceColor(client.compliance.workout_compliance)}`}>
-                              {client.compliance.workout_compliance.toFixed(1)}%
+                              {(client.compliance?.workout_compliance ?? 0).toFixed(1)}%
                             </span>
                             {getTrendIcon(client.trends.workout_trend)}
                           </div>
@@ -574,7 +586,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className={`text-lg font-bold ${getComplianceColor(client.compliance.nutrition_compliance)}`}>
-                              {client.compliance.nutrition_compliance.toFixed(1)}%
+                              {(client.compliance?.nutrition_compliance ?? 0).toFixed(1)}%
                             </span>
                             {getTrendIcon(client.trends.nutrition_trend)}
                           </div>
@@ -590,7 +602,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className={`text-lg font-bold ${getComplianceColor(client.compliance.habit_compliance)}`}>
-                              {client.compliance.habit_compliance.toFixed(1)}%
+                              {(client.compliance?.habit_compliance ?? 0).toFixed(1)}%
                             </span>
                           <Minus className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                           </div>
@@ -606,7 +618,7 @@ export default function OptimizedComplianceDashboard({ coachId }: OptimizedCompl
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className={`text-lg font-bold ${getComplianceColor(client.compliance.session_attendance)}`}>
-                              {client.compliance.session_attendance.toFixed(1)}%
+                              {(client.compliance?.session_attendance ?? 0).toFixed(1)}%
                             </span>
                             <Minus className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
                           </div>

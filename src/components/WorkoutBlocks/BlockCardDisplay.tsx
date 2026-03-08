@@ -13,7 +13,6 @@ const DISPLAY_COMPONENTS: Record<string, BlockVariantComponent> = {
   straight_sets: StraightSetsDisplay,
   superset: SupersetsDisplay,
   drop_set: DropsetsDisplay,
-  circuit: CircuitsDisplay,
   tabata: CircuitsDisplay,
   density: DensityTrainingDisplay,
   density_training: DensityTrainingDisplay,

@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import { X } from "lucide-react";
 
+export type Pillar = "training" | "nutrition" | "lifestyle" | "checkins" | "general";
+
 interface CreateCustomGoalInput {
   title: string;
   description?: string;
@@ -25,6 +27,7 @@ interface CreateCustomGoalInput {
   current_value: number;
   category: string;
   type: "target" | "habit" | "milestone";
+  pillar: Pillar;
 }
 
 interface CustomGoalFormProps {
@@ -43,6 +46,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
     priority: "medium" as "low" | "medium" | "high",
     category: "other",
     type: "target" as "target" | "habit" | "milestone",
+    pillar: "general" as Pillar,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -65,6 +69,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
         current_value: 0,
         category: formData.category,
         type: formData.type,
+        pillar: formData.pillar,
       });
       // Reset form
       setFormData({
@@ -76,6 +81,7 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
         priority: "medium",
         category: "other",
         type: "target",
+        pillar: "general",
       });
       onClose();
     } catch (error) {
@@ -116,6 +122,30 @@ export function CustomGoalForm({ isOpen, onClose, onSubmit }: CustomGoalFormProp
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Pillar */}
+          <div>
+            <Label className="text-sm font-medium mb-2 block fc-text-subtle">
+              Pillar
+            </Label>
+            <Select
+              value={formData.pillar}
+              onValueChange={(value: Pillar) =>
+                setFormData({ ...formData, pillar: value })
+              }
+            >
+              <SelectTrigger className="w-full fc-glass-soft border border-[color:var(--fc-glass-border)]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="training">Training</SelectItem>
+                <SelectItem value="nutrition">Nutrition</SelectItem>
+                <SelectItem value="checkins">Check-ins (Body Metrics)</SelectItem>
+                <SelectItem value="lifestyle">Lifestyle (Sleep, Wellness)</SelectItem>
+                <SelectItem value="general">General</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Title */}
           <div>
             <Label className="text-sm font-medium mb-2 block fc-text-subtle">

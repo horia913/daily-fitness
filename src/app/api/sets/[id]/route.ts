@@ -13,8 +13,8 @@ import { recomputeUserExerciseMetrics } from '@/lib/recomputeUserExerciseMetrics
 const FORBIDDEN_KEYS = new Set([
   'client_id',
   'workout_log_id',
-  'block_id',
-  'block_type',
+  'set_entry_id',
+  'set_type',
   'completed_at',
   'created_at',
 ])
@@ -277,7 +277,7 @@ export async function PATCH(
     if (result instanceof NextResponse) return result
     const { set } = result
 
-    const blockType = (set.block_type as string) || ''
+    const blockType = (set.set_type as string) || ''
     const allowed = WHITELIST[blockType] ?? WHITELIST.hr_sets
     const allowedKeys = Array.from(allowed)
 
@@ -285,25 +285,22 @@ export async function PATCH(
     try {
       body = await request.json()
     } catch {
-      console.log('[sets PATCH]', { setId: setLogId, block_type_from_db: blockType, allowedKeys, receivedKeys: [], updateData: null, error: 'Invalid JSON body' })
       return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
     }
 
     const receivedKeys = Object.keys(body)
-    const debugPayload = { block_type_from_db: blockType, receivedKeys, allowedKeys }
+    const debugPayload = { set_type_from_db: blockType, receivedKeys, allowedKeys }
 
     for (const key of receivedKeys) {
       if (FORBIDDEN_KEYS.has(key)) {
-        console.log('[sets PATCH]', { setId: setLogId, block_type_from_db: blockType, allowedKeys, receivedKeys, updateData: null, error: `forbidden key: ${key}` })
         return NextResponse.json(
           { success: false, error: `Cannot update forbidden field: ${key}`, ...debugPayload },
           { status: 400 }
         )
       }
       if (!allowed.has(key)) {
-        console.log('[sets PATCH]', { setId: setLogId, block_type_from_db: blockType, allowedKeys, receivedKeys, updateData: null, error: `field not allowed: ${key}` })
         return NextResponse.json(
-          { success: false, error: `Field not allowed for block_type ${blockType}: ${key}`, ...debugPayload },
+          { success: false, error: `Field not allowed for set_type ${blockType}: ${key}`, ...debugPayload },
           { status: 400 }
         )
       }
@@ -313,7 +310,6 @@ export async function PATCH(
     const updateData = payload as Record<string, unknown>
 
     if (Object.keys(payload).length === 0) {
-      console.log('[sets PATCH]', { setId: setLogId, block_type_from_db: blockType, allowedKeys, receivedKeys, updateData: {}, success: true })
       return NextResponse.json({ success: true })
     }
 
@@ -323,7 +319,7 @@ export async function PATCH(
       .eq('id', setLogId)
 
     if (updateError) {
-      console.error('[sets PATCH]', { setId: setLogId, block_type_from_db: blockType, allowedKeys, receivedKeys, updateData, error: updateError.message })
+      console.error('[sets PATCH]', { setId: setLogId, set_type_from_db: blockType, allowedKeys, receivedKeys, updateData, error: updateError.message })
       return NextResponse.json(
         { success: false, error: 'Failed to update set', ...debugPayload },
         { status: 500 }
@@ -336,7 +332,6 @@ export async function PATCH(
       await recomputeUserExerciseMetrics(user.id, exerciseIds, supabaseAdmin)
     }
 
-    console.log('[sets PATCH]', { setId: setLogId, block_type_from_db: blockType, allowedKeys, receivedKeys, updateData, success: true })
     return NextResponse.json({ success: true })
   } catch (err) {
     if (err instanceof Error && err.message === 'User not authenticated') {
@@ -363,7 +358,7 @@ export async function DELETE(
     if (result instanceof NextResponse) return result
     const { set } = result
 
-    const blockType = (set.block_type as string) || ''
+    const blockType = (set.set_type as string) || ''
     const exerciseIds = getAffectedExerciseIds(set, blockType)
 
     if (blockType === 'giant_set') {

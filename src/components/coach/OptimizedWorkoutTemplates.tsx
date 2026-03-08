@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { withTimeout } from '@/lib/withTimeout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,6 +74,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
   const [categories, setCategories] = useState<WorkoutCategory[]>([])
   const [loading, setLoading] = useState(true)
+  const loadingRef = useRef(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedDifficulty, setSelectedDifficulty] = useState('all')
@@ -112,12 +114,16 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
   }, [])
 
   const loadTemplates = async () => {
+    if (loadingRef.current) return
+    loadingRef.current = true
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      setLoading(true)
+      await withTimeout(
+        (async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
 
-      try {
-        const { data, error } = await supabase
+          const { data, error } = await supabase
           .from('workout_templates')
           .select(`
             *,
@@ -134,12 +140,14 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
           setTemplates(data || [])
           return
         }
-        const { data: blocks } = await supabase.from('workout_blocks').select('id, template_id').in('template_id', templateIds)
-        const blockIds = (blocks || []).map((b: { id: string }) => b.id)
-        const [assignmentsRes, exercisesRes] = await Promise.all([
-          supabase.from('workout_assignments').select('workout_template_id, assigned_date, scheduled_date').in('workout_template_id', templateIds),
-          blockIds.length > 0 ? supabase.from('workout_block_exercises').select('block_id').in('block_id', blockIds) : { data: [] }
+        const [{ data: blocks }, assignmentsRes] = await Promise.all([
+          supabase.from('workout_set_entries').select('id, template_id').in('template_id', templateIds),
+          supabase.from('workout_assignments').select('workout_template_id, assigned_date, scheduled_date').in('workout_template_id', templateIds)
         ])
+        const blockIds = (blocks || []).map((b: { id: string }) => b.id)
+        const exercisesRes = blockIds.length > 0
+          ? await supabase.from('workout_set_entry_exercises').select('set_entry_id').in('set_entry_id', blockIds)
+          : { data: [] }
         const blocksByTemplate: Record<string, string[]> = {}
         ;(blocks || []).forEach((b: { id: string; template_id: string }) => {
           if (!blocksByTemplate[b.template_id]) blocksByTemplate[b.template_id] = []
@@ -149,8 +157,8 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
         ;(blocks || []).forEach((b: { id: string; template_id: string }) => { blockToTemplate[b.id] = b.template_id })
         const exerciseCountByTemplate: Record<string, number> = {}
         templateIds.forEach(id => (exerciseCountByTemplate[id] = 0))
-        ;((exercisesRes as { data?: { block_id: string }[] }).data || []).forEach((r: { block_id: string }) => {
-          const tid = blockToTemplate[r.block_id]
+        ;((exercisesRes as { data?: { set_entry_id: string }[] }).data || []).forEach((r: { set_entry_id: string }) => {
+          const tid = blockToTemplate[r.set_entry_id]
           if (tid) exerciseCountByTemplate[tid] = (exerciseCountByTemplate[tid] || 0) + 1
         })
         const usageByTemplate: Record<string, { count: number; lastDate: string }> = {}
@@ -173,10 +181,11 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
           } as WorkoutTemplate
         })
 
-        setTemplates(templatesWithStats)
-      } catch {
-        console.log('Database not ready, using localStorage fallback')
-        const savedTemplates = localStorage.getItem(`workout_templates_${user.id}`)
+          setTemplates(templatesWithStats)
+        })().catch(async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
+          const savedTemplates = localStorage.getItem(`workout_templates_${user.id}`)
         if (savedTemplates) {
           setTemplates(JSON.parse(savedTemplates))
         } else {
@@ -233,11 +242,15 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
           setTemplates(sampleTemplates)
           localStorage.setItem(`workout_templates_${user.id}`, JSON.stringify(sampleTemplates))
         }
-      }
+      }),
+        45000,
+        'loadTemplates'
+      )
     } catch (error) {
       console.error('Error loading templates:', error)
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
   }
 
@@ -314,7 +327,6 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
 
         if (error) throw error
       } catch {
-        console.log('Database not ready, using localStorage fallback')
         const savedTemplates = localStorage.getItem(`workout_templates_${user.id}`)
         let templates = savedTemplates ? JSON.parse(savedTemplates) : []
         templates = templates.filter((template: WorkoutTemplate) => template.id !== templateId)
@@ -403,7 +415,7 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] mb-1 sm:mb-2">
+                <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1 sm:mb-2">
                   Workout Templates 🏋️
                 </h1>
                 <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)]">
@@ -1004,7 +1016,6 @@ export default function OptimizedWorkoutTemplates({ }: OptimizedWorkoutTemplates
               setSelectedTemplateForAssignment(null)
             }}
             onSuccess={() => {
-              console.log('Workout assigned successfully!')
               setShowAssignmentModal(false)
               setSelectedTemplateForAssignment(null)
             }}

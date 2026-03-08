@@ -62,35 +62,6 @@ export async function notifyWorkoutAssigned(
   })
 }
 
-export async function notifySessionBooked(
-  coachId: string,
-  clientName: string,
-  sessionDate: string,
-  sessionTime: string,
-  appUrl: string
-) {
-  return sendNotification({
-    userIds: [coachId],
-    title: 'New Session Booked! 📅',
-    message: `${clientName} booked a session on ${sessionDate} at ${sessionTime}`,
-    url: `${appUrl}/coach/sessions`,
-    emailSubject: 'New Session Booking',
-    emailHtml: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #10B981;">New Session Booked!</h1>
-        <p><strong>${clientName}</strong> has booked a training session with you.</p>
-        <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; margin: 20px 0;">
-          <p style="margin: 5px 0;"><strong>Date:</strong> ${sessionDate}</p>
-          <p style="margin: 5px 0;"><strong>Time:</strong> ${sessionTime}</p>
-        </div>
-        <a href="${appUrl}/coach/sessions" style="display: inline-block; background: #10B981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Session Details</a>
-      </div>
-    `,
-    sendPush: true,
-    sendEmail: true
-  })
-}
-
 export async function notifyWorkoutCompleted(
   coachId: string,
   clientName: string,
@@ -116,7 +87,7 @@ export async function notifyAchievementEarned(
     userIds: [clientId],
     title: 'Achievement Unlocked! 🏆',
     message: `You earned: ${achievementName}`,
-    url: `${appUrl}/client/achievements`,
+    url: `${appUrl}/client/progress/achievements`,
     emailSubject: 'New Achievement Unlocked!',
     emailHtml: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; text-align: center;">
@@ -125,7 +96,7 @@ export async function notifyAchievementEarned(
           <h2 style="color: white; font-size: 24px; margin: 0;">${achievementName}</h2>
         </div>
         <p style="font-size: 18px; color: #1f2937;">Congratulations on reaching this milestone!</p>
-        <a href="${appUrl}/client/achievements" style="display: inline-block; background: #F59E0B; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 20px;">View All Achievements</a>
+        <a href="${appUrl}/client/progress/achievements" style="display: inline-block; background: #F59E0B; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 20px;">View All Achievements</a>
       </div>
     `,
     sendPush: true,

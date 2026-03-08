@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,10 +28,27 @@ function CoachChallengeDetailContent() {
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
+  const challengeDetailTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (user && !authLoading && challengeId) {
-      loadChallenge();
-    }
+    if (!user || authLoading || !challengeId) return;
+    if (challengeDetailTimeoutRef.current) clearTimeout(challengeDetailTimeoutRef.current);
+    challengeDetailTimeoutRef.current = setTimeout(() => {
+      challengeDetailTimeoutRef.current = null;
+      setLoading(false);
+    }, 20_000);
+    loadChallenge().finally(() => {
+      if (challengeDetailTimeoutRef.current) {
+        clearTimeout(challengeDetailTimeoutRef.current);
+        challengeDetailTimeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (challengeDetailTimeoutRef.current) {
+        clearTimeout(challengeDetailTimeoutRef.current);
+        challengeDetailTimeoutRef.current = null;
+      }
+    };
   }, [user, authLoading, challengeId]);
 
   const loadChallenge = async () => {
@@ -105,8 +122,8 @@ function CoachChallengeDetailContent() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 container mx-auto px-4 py-8">
             <div className="animate-pulse space-y-6">
-              <div className="h-24 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-              <div className="h-96 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+              <div className="h-24 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
+              <div className="h-96 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
             </div>
           </div>
         </AnimatedBackground>

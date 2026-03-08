@@ -1,0 +1,4 @@
+-- TO BE RUN MANUALLY IN SUPABASE DASHBOARD
+-- Only run after confirming no code references remain
+-- DROP TABLE IF EXISTS workout_pyramid_sets;
+-- DROP TABLE IF EXISTS workout_ladder_sets;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,9 @@ import { Client } from "@/lib/database";
 import { MealPlanService } from "@/lib/mealPlanService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useToast } from "@/components/ui/toast-provider";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import { supabase } from "@/lib/supabase";
 import { Users, Check, Search } from "lucide-react";
 
 interface MealPlanAssignmentModalProps {
@@ -32,8 +34,26 @@ export default function MealPlanAssignmentModal({
   const { user } = useAuth();
   const { getThemeStyles } = useTheme();
   const theme = getThemeStyles();
+  const { addToast } = useToast();
   const [assigning, setAssigning] = useState(false);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [label, setLabel] = useState("");
+  const [existingActiveCount, setExistingActiveCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (selectedClients.length === 0) {
+      setExistingActiveCount(0);
+      return;
+    }
+    (async () => {
+      const { count, error } = await supabase
+        .from("meal_plan_assignments")
+        .select("id", { count: "exact", head: true })
+        .in("client_id", selectedClients)
+        .eq("is_active", true);
+      if (!error) setExistingActiveCount(count ?? 0);
+    })();
+  }, [selectedClients]);
 
   const filteredClients = clients.filter((client) => {
     if (!clientSearchQuery.trim()) return true;
@@ -58,7 +78,7 @@ export default function MealPlanAssignmentModal({
 
   const handleAssign = async () => {
     if (selectedClients.length === 0) {
-      alert("Please select at least one client.");
+      addToast({ title: "Select clients", description: "Please select at least one client.", variant: "destructive" });
       return;
     }
 
@@ -67,15 +87,18 @@ export default function MealPlanAssignmentModal({
       await MealPlanService.assignMealPlanToClients(
         mealPlan.id,
         selectedClients,
-        user?.id || ""
+        user?.id || "",
+        label.trim() || undefined
       );
-      alert(
-        `Meal plan assigned to ${selectedClients.length} client(s) successfully!`
-      );
+      addToast({
+        title: "Assigned",
+        description: `Meal plan assigned to ${selectedClients.length} client(s) successfully!`,
+        variant: "success",
+      });
       onComplete();
     } catch (error) {
       console.error("Error assigning meal plan:", error);
-      alert("Error assigning meal plan. Please try again.");
+      addToast({ title: "Error", description: "Error assigning meal plan. Please try again.", variant: "destructive" });
     } finally {
       setAssigning(false);
     }
@@ -89,9 +112,23 @@ export default function MealPlanAssignmentModal({
       subtitle={mealPlan.name}
     >
       <div className="space-y-4">
+        {/* Optional label (e.g. Training Day, Rest Day) */}
+        <div>
+          <label className={`text-sm font-medium ${theme.text} block mb-1`}>
+            Label (optional)
+          </label>
+          <Input
+            type="text"
+            placeholder="e.g. Training Day, Rest Day"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            className="rounded-xl"
+          />
+        </div>
+
         {/* Client Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[color:var(--fc-text-subtle)]" />
           <Input
             type="text"
             placeholder="Search clients..."
@@ -101,20 +138,27 @@ export default function MealPlanAssignmentModal({
           />
         </div>
 
-        {/* Selected Count Badge */}
+        {/* Selected Count Badge + note when clients already have active plans */}
         {selectedClients.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-              {selectedClients.length} client
-              {selectedClients.length !== 1 ? "s" : ""} selected
-            </Badge>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-[color:var(--fc-status-success)]/10 text-[color:var(--fc-status-success)]">
+                {selectedClients.length} client
+                {selectedClients.length !== 1 ? "s" : ""} selected
+              </Badge>
+            </div>
+            {existingActiveCount > 0 && (
+              <p className={`text-sm ${theme.textSecondary}`}>
+                Selected client(s) already have {existingActiveCount} active plan(s). The new plan will be added alongside them.
+              </p>
+            )}
           </div>
         )}
 
         {/* Client List */}
         {filteredClients.length === 0 ? (
           <div className="text-center py-12">
-            <Users className="w-16 h-16 mx-auto text-slate-400 mb-4" />
+            <Users className="w-16 h-16 mx-auto text-[color:var(--fc-text-subtle)] mb-4" />
             <h3 className={`text-lg font-semibold ${theme.text} mb-2`}>
               No clients found
             </h3>
@@ -136,8 +180,8 @@ export default function MealPlanAssignmentModal({
                     flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all
                     ${
                       isSelected
-                        ? "bg-green-50 dark:bg-green-900/20 border-2 border-green-500"
-                        : `${theme.card} fc-glass fc-card border-2 border-slate-200 dark:border-slate-700`
+                        ? "bg-[color:var(--fc-status-success)]/10 border-2 border-[color:var(--fc-status-success)]"
+                        : `${theme.card} fc-glass fc-card border-2 border-[color:var(--fc-surface-card-border)]`
                     }
                   `}
                 >
@@ -146,8 +190,8 @@ export default function MealPlanAssignmentModal({
                       w-5 h-5 rounded flex items-center justify-center flex-shrink-0
                       ${
                         isSelected
-                          ? "bg-green-500 text-white"
-                          : "border-2 border-slate-300 dark:border-slate-600"
+                          ? "bg-[color:var(--fc-status-success)] text-white"
+                          : "border-2 border-[color:var(--fc-glass-border-strong)]"
                       }
                     `}
                   >
@@ -168,7 +212,7 @@ export default function MealPlanAssignmentModal({
         )}
 
         {/* Actions */}
-        <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="flex gap-3 pt-4 border-t border-[color:var(--fc-surface-card-border)]">
           <Button
             onClick={onClose}
             variant="outline"
@@ -179,7 +223,7 @@ export default function MealPlanAssignmentModal({
           <Button
             onClick={handleAssign}
             disabled={selectedClients.length === 0 || assigning}
-            className="flex-1 rounded-xl bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white disabled:opacity-50"
+            className="flex-1 rounded-xl bg-[color:var(--fc-status-success)] hover:opacity-90 text-white disabled:opacity-50"
           >
             {assigning
               ? "Assigning..."

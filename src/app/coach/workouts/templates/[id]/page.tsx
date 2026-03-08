@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
@@ -34,10 +34,13 @@ import Link from "next/link";
 import ExerciseBlockCard from "@/components/features/workouts/ExerciseBlockCard";
 import { WorkoutBlockService } from "@/lib/workoutBlockService";
 import { WorkoutBlock } from "@/types/workoutBlocks";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ui/toast-provider";
 
 export default function WorkoutTemplateDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const { addToast } = useToast();
   const templateId = useMemo(() => String(params?.id || ""), [params]);
   const { getSemanticColor, performanceSettings } = useTheme();
   const { user, loading: authLoading } = useAuth();
@@ -90,15 +93,31 @@ export default function WorkoutTemplateDetailsPage() {
     }
   }, [templateId]);
 
+  const templateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (!authLoading && templateId) {
-      if (user?.id) {
-        loadTemplate();
-        loadWorkoutBlocks();
-      } else {
-        setError("User not authenticated");
+    if (!authLoading && templateId && user?.id) {
+      if (templateTimeoutRef.current) clearTimeout(templateTimeoutRef.current);
+      templateTimeoutRef.current = setTimeout(() => {
+        templateTimeoutRef.current = null;
         setLoading(false);
-      }
+      }, 20_000);
+      Promise.all([loadTemplate(), loadWorkoutBlocks()]).finally(() => {
+        if (templateTimeoutRef.current) {
+          clearTimeout(templateTimeoutRef.current);
+          templateTimeoutRef.current = null;
+        }
+      });
+      return () => {
+        if (templateTimeoutRef.current) {
+          clearTimeout(templateTimeoutRef.current);
+          templateTimeoutRef.current = null;
+        }
+      };
+    }
+    if (!authLoading && templateId && !user?.id) {
+      setError("User not authenticated");
+      setLoading(false);
     } else if (!authLoading && !user) {
       setLoading(false);
     }
@@ -152,7 +171,7 @@ export default function WorkoutTemplateDetailsPage() {
       }
     } catch (error) {
       console.error("Error duplicating template:", error);
-      alert("Failed to duplicate template");
+      addToast({ title: "Couldn't duplicate template", variant: "destructive" });
     }
   };
 
@@ -170,7 +189,7 @@ export default function WorkoutTemplateDetailsPage() {
       router.push("/coach/workouts/templates");
     } catch (error) {
       console.error("Error deleting template:", error);
-      alert("Failed to delete template");
+      addToast({ title: "Couldn't delete template", variant: "destructive" });
     }
   };
 
@@ -236,31 +255,36 @@ export default function WorkoutTemplateDetailsPage() {
       <div className="relative z-10 p-4 sm:p-6 pt-10">
         <div className="max-w-5xl mx-auto space-y-8">
           <nav className="flex flex-wrap items-center justify-between gap-4">
-            <Link
-              href="/coach/workouts/templates"
-              className="flex items-center gap-2 fc-text-dim hover:fc-text-primary transition-colors group"
-            >
-              <span className="p-2 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] group-hover:bg-white/10 transition-colors">
-                <ArrowLeft className="w-5 h-5" />
-              </span>
-              <span className="font-medium">Back to Templates</span>
-            </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href="/coach/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                Back to Training
+              </Link>
+              <Link
+                href="/coach/workouts/templates"
+                className="flex items-center gap-2 fc-text-dim hover:fc-text-primary transition-colors group"
+              >
+                <span className="p-2 rounded-xl fc-glass border border-[color:var(--fc-glass-border)] group-hover:bg-white/10 transition-colors">
+                  <ArrowLeft className="w-5 h-5" />
+                </span>
+                <span className="font-medium">Back to Templates</span>
+              </Link>
+            </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost" onClick={handleDuplicate}>
-                <CopyIcon className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Duplicate</span>
+              <Button variant="fc-ghost" onClick={handleDuplicate}>
+                <CopyIcon className="w-4 h-4 mr-2" />
+                <span>Duplicate</span>
               </Button>
               <Button
                 variant="outline"
-                size="sm"
                 className="fc-btn border-red-500/30 text-red-500 hover:bg-red-500/10"
                 onClick={handleDelete}
               >
-                <Trash2 className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Delete</span>
+                <Trash2 className="w-4 h-4 mr-2" />
+                <span>Delete</span>
               </Button>
               <Link href={`/coach/workouts/templates/${template.id}/edit`}>
-                <Button size="sm" className="fc-btn fc-btn-primary">
+                <Button className="fc-btn fc-btn-primary">
                   <Edit className="w-4 h-4 mr-2" />
                   Edit Template
                 </Button>
@@ -291,7 +315,7 @@ export default function WorkoutTemplateDetailsPage() {
                 {template.difficulty_level}
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight fc-text-primary">
+            <h1 className="text-2xl font-bold tracking-tight fc-text-primary">
               {template.name}
             </h1>
             {template.description && (
@@ -431,12 +455,12 @@ export default function WorkoutTemplateDetailsPage() {
                 Workout Flow
               </h2>
               <span className="text-sm fc-text-dim font-mono">
-                {workoutBlocks.length} block{workoutBlocks.length !== 1 ? "s" : ""}
+                {exerciseCount} {exerciseCount !== 1 ? "exercises" : "exercise"}
               </span>
             </div>
 
             {workoutBlocks.length > 0 ? (
-              <div className="space-y-3 max-h-[600px] sm:max-h-[700px] overflow-y-auto">
+              <div className="space-y-3">
                 {workoutBlocks.map((block, index) => {
                   // Get first exercise and its special table data
                   const firstExercise = block.exercises?.[0];
@@ -456,15 +480,15 @@ export default function WorkoutTemplateDetailsPage() {
                   // Convert block to exercise format (same as edit page)
                   const exercise: any = {
                     id: block.id || `block-${index}-${Date.now()}`,
-                    exercise_type: block.block_type,
-                    block_type: block.block_type,
+                    exercise_type: block.set_type,
+                    set_type: block.set_type,
                     exercise_id: firstExerciseId,
                     order_index: index + 1,
                     sets: block.total_sets?.toString() || "",
                     reps: block.reps_per_set || "",
                     rest_seconds: block.rest_seconds?.toString() || "",
-                    notes: block.block_notes || "",
-                    block_name: block.block_name,
+                    notes: block.set_notes || "",
+                    set_name: block.set_name,
                     // Read from workout_time_protocols (block_parameters removed)
                     rounds: timeProtocol?.rounds
                       ? String(timeProtocol.rounds)
@@ -519,12 +543,12 @@ export default function WorkoutTemplateDetailsPage() {
                   };
 
                   // Handle complex block types with nested exercises
-                  const blockType = block.block_type as string;
-                  if (blockType === "circuit" || blockType === "tabata") {
+                  const blockType = block.set_type as string;
+                  if (blockType === "tabata") {
                     // Get time protocols for each exercise (for individual work_seconds, rest_after)
                     const exerciseProtocols =
                       block.time_protocols?.filter(
-                        (tp: any) => tp.protocol_type === blockType
+                        (tp: any) => tp.protocol_type === "tabata"
                       ) || [];
 
                     const exercisesArray =
@@ -555,72 +579,56 @@ export default function WorkoutTemplateDetailsPage() {
                         };
                       }) || [];
 
-                    if (blockType === "tabata") {
-                      // Read from workout_time_protocols (one per exercise)
-                      const tabataProtocol = block.time_protocols?.find(
-                        (tp: any) => tp.protocol_type === 'tabata'
-                      ) || timeProtocol;
-                      
-                      const restAfter = tabataProtocol?.rest_seconds?.toString() ||
-                        block.rest_seconds?.toString() ||
-                        "10";
-                      exercise.rest_after = String(restAfter);
-                      
-                      // Load rest_after_set from time_protocols (block-level field)
-                      const restAfterSet =
-                        tabataProtocol?.rest_after_set?.toString() || "10";
-                      (exercise as any).rest_after_set = String(restAfterSet);
-                      
-                      exercise.rounds = tabataProtocol?.rounds?.toString() ||
-                        block.total_sets?.toString() ||
-                        "8";
-                      exercise.work_seconds = tabataProtocol?.work_seconds?.toString() || "20";
+                    // Read from workout_time_protocols (one per exercise)
+                    const tabataProtocol = block.time_protocols?.find(
+                      (tp: any) => tp.protocol_type === 'tabata'
+                    ) || timeProtocol;
+                    
+                    const restAfter = tabataProtocol?.rest_seconds?.toString() ||
+                      block.rest_seconds?.toString() ||
+                      "10";
+                    exercise.rest_after = String(restAfter);
+                    
+                    // Load rest_after_set from time_protocols (block-level field)
+                    const restAfterSet =
+                      tabataProtocol?.rest_after_set?.toString() || "10";
+                    (exercise as any).rest_after_set = String(restAfterSet);
+                    
+                    exercise.rounds = tabataProtocol?.rounds?.toString() ||
+                      block.total_sets?.toString() ||
+                      "8";
+                    exercise.work_seconds = tabataProtocol?.work_seconds?.toString() || "20";
 
-                      // Build tabata_sets from exercises and their time protocols
-                      // Group exercises by set number from time_protocols
-                      const setsMap = new Map<number, any[]>();
-                      exercisesArray.forEach((ex: any, exIdx: number) => {
-                        const exProtocol = exerciseProtocols.find(
-                          (tp: any) =>
-                            tp.exercise_id === ex.exercise_id &&
-                            tp.exercise_order === exIdx + 1
-                        );
-                        const setNumber = exProtocol?.set || 1; // Default to set 1 if not found
-                        if (!setsMap.has(setNumber)) {
-                          setsMap.set(setNumber, []);
-                        }
-                        setsMap.get(setNumber)!.push({
-                          ...ex,
-                          work_seconds:
-                            exProtocol?.work_seconds?.toString() ||
-                            exercise.work_seconds,
-                          rest_after: exProtocol?.rest_seconds?.toString() || restAfter,
-                        });
-                      });
-
-                      // Convert map to array of sets
-                      exercise.tabata_sets = Array.from(setsMap.entries())
-                        .sort(([a], [b]) => a - b)
-                        .map(([setNum, exercises]) => ({
-                          exercises,
-                          rest_between_sets: String(restAfter),
-                        }));
-                      exercise.circuit_sets = exercise.tabata_sets;
-                    } else {
-                      // circuit_sets should come from relational tables, not block_parameters
-                      const numSets = block.total_sets || 1;
-                      exercise.circuit_sets = Array.from(
-                        { length: numSets },
-                        (_, setIdx) => ({
-                          exercises: exercisesArray.map((ex: any) => ({
-                            ...ex,
-                          })),
-                          rest_between_sets:
-                            block.rest_seconds?.toString() || "60",
-                        })
+                    // Build tabata_sets from exercises and their time protocols
+                    // Group exercises by set number from time_protocols
+                    const setsMap = new Map<number, any[]>();
+                    exercisesArray.forEach((ex: any, exIdx: number) => {
+                      const exProtocol = exerciseProtocols.find(
+                        (tp: any) =>
+                          tp.exercise_id === ex.exercise_id &&
+                          tp.exercise_order === exIdx + 1
                       );
-                    }
-                  } else if (block.block_type === "giant_set") {
+                      const setNumber = exProtocol?.set || 1; // Default to set 1 if not found
+                      if (!setsMap.has(setNumber)) {
+                        setsMap.set(setNumber, []);
+                      }
+                      setsMap.get(setNumber)!.push({
+                        ...ex,
+                        work_seconds:
+                          exProtocol?.work_seconds?.toString() ||
+                          exercise.work_seconds,
+                        rest_after: exProtocol?.rest_seconds?.toString() || restAfter,
+                      });
+                    });
+
+                    // Convert map to array of sets
+                    exercise.tabata_sets = Array.from(setsMap.entries())
+                      .sort(([a], [b]) => a - b)
+                      .map(([setNum, exercises]) => ({
+                        exercises,
+                        rest_between_sets: String(restAfter),
+                      }));
+                  } else if (block.set_type === "giant_set") {
                     exercise.giant_set_exercises =
                       block.exercises?.map((ex) => ({
                         exercise_id: ex.exercise_id,
@@ -633,7 +641,7 @@ export default function WorkoutTemplateDetailsPage() {
                         load_percentage: ex.load_percentage?.toString() || "",
                         exercise: ex.exercise,
                       })) || [];
-                  } else if (block.block_type === "superset") {
+                  } else if (block.set_type === "superset") {
                     if (block.exercises && block.exercises.length >= 2) {
                       exercise.superset_exercise_id =
                         block.exercises[1].exercise_id;
@@ -644,7 +652,7 @@ export default function WorkoutTemplateDetailsPage() {
                       (exercise as any).superset_load_percentage =
                         block.exercises[1].load_percentage?.toString() || "";
                     }
-                  } else if (block.block_type === "pre_exhaustion") {
+                  } else if (block.set_type === "pre_exhaustion") {
                     if (block.exercises && block.exercises.length >= 2) {
                       exercise.compound_exercise_id =
                         block.exercises[1].exercise_id;
@@ -679,7 +687,7 @@ export default function WorkoutTemplateDetailsPage() {
                       ? "var(--fc-accent-indigo, #6366f1)"
                       : blockType === "superset"
                         ? "var(--fc-accent-amber, #f59e0b)"
-                        : blockType === "amrap" || blockType === "emom" || blockType === "for_time" || blockType === "tabata" || blockType === "circuit"
+                        : blockType === "amrap" || blockType === "emom" || blockType === "for_time" || blockType === "tabata"
                           ? "var(--fc-accent-success, #10b981)"
                           : "var(--fc-glass-border)";
                   return (
@@ -697,23 +705,13 @@ export default function WorkoutTemplateDetailsPage() {
                 })}
               </div>
             ) : (
-              <div className="text-center py-12">
-                <Dumbbell
-                  className="w-24 h-24 mx-auto mb-4 fc-text-dim"
-                />
-                <h4 className="text-xl font-bold mb-2 text-[color:var(--fc-text-primary)]">
-                  No exercises yet
-                </h4>
-                <p className="text-sm mb-6 text-[color:var(--fc-text-dim)]">
-                  Add exercises to this template to get started
-                </p>
-                <Link href={`/coach/workouts/templates/${template.id}/edit`}>
-                  <Button className="fc-btn fc-btn-primary">
-                    <Edit className="w-4 h-4 mr-2" />
-                    Add Exercises
-                  </Button>
-                </Link>
-              </div>
+              <EmptyState
+                icon={Dumbbell}
+                title="No exercises yet"
+                description="Add exercises to this template to get started."
+                actionLabel="Add exercises"
+                actionHref={`/coach/workouts/templates/${template.id}/edit`}
+              />
             )}
           </section>
         </div>

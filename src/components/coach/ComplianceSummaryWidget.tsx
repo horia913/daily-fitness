@@ -87,17 +87,17 @@ export default function ComplianceSummaryWidget({ clients, selectedPeriod }: Com
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Compliance Distribution */}
       <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-        <CardHeader>
-          <CardTitle className={`flex items-center gap-2 ${theme.text}`}>
+        <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
+          <CardTitle className={`flex items-center gap-2 text-base sm:text-lg ${theme.text}`}>
             <Target className="w-5 h-5 text-purple-600 dark:text-purple-400" />
             Compliance Distribution
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="p-3 sm:p-4 md:p-6 pt-2">
+          <div className="space-y-3 sm:space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
@@ -139,32 +139,32 @@ export default function ComplianceSummaryWidget({ clients, selectedPeriod }: Com
 
       {/* Top Performers */}
       <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-        <CardHeader>
-          <CardTitle className={`flex items-center gap-2 ${theme.text}`}>
-            <Trophy className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+        <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
+          <CardTitle className={`flex items-center gap-2 text-base sm:text-lg ${theme.text}`}>
+            <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
             Top Performers
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
+        <CardContent className="p-3 sm:p-4 md:p-6 pt-2">
+          <div className="space-y-2 sm:space-y-3">
             {stats.topPerformers.map((client, index) => (
-              <div key={client.client.id} className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+              <div key={client.client.id} className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 gap-2">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm flex-shrink-0">
                     {index + 1}
                   </div>
-                  <div>
-                    <p className={`font-medium ${theme.text}`}>
+                  <div className="min-w-0">
+                    <p className={`font-medium text-sm sm:text-base truncate ${theme.text}`}>
                       {client.client.first_name} {client.client.last_name}
                     </p>
                     <p className={`text-xs ${theme.textSecondary}`}>
-                      {client.compliance.overall_compliance.toFixed(1)}% compliance
+                      {(client.compliance?.overall_compliance ?? 0).toFixed(1)}% compliance
                     </p>
                   </div>
                 </div>
-                <Badge className={`${getComplianceBgColor(client.compliance.overall_compliance)} ${getComplianceColor(client.compliance.overall_compliance)} border-0`}>
+                <Badge className={`${getComplianceBgColor(client.compliance.overall_compliance)} ${getComplianceColor(client.compliance.overall_compliance)} border-0 flex-shrink-0`}>
                   <Star className="w-3 h-3 mr-1" />
-                  {client.compliance.overall_compliance.toFixed(1)}%
+                  {(client.compliance?.overall_compliance ?? 0).toFixed(1)}%
                 </Badge>
               </div>
             ))}
@@ -174,32 +174,32 @@ export default function ComplianceSummaryWidget({ clients, selectedPeriod }: Com
 
       {/* Bottom Performers */}
       <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-        <CardHeader>
-          <CardTitle className={`flex items-center gap-2 ${theme.text}`}>
-            <Shield className="w-5 h-5 text-red-600 dark:text-red-400" />
+        <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
+          <CardTitle className={`flex items-center gap-2 text-base sm:text-lg ${theme.text}`}>
+            <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
             Needs Attention
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
+        <CardContent className="p-3 sm:p-4 md:p-6 pt-2">
+          <div className="space-y-2 sm:space-y-3">
             {stats.bottomPerformers.map((client, index) => (
-              <div key={client.client.id} className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-red-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+              <div key={client.client.id} className="flex items-center justify-between p-2 sm:p-3 rounded-xl bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 gap-2">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <div className="w-8 h-8 bg-gradient-to-br from-red-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm flex-shrink-0">
                     {index + 1}
                   </div>
-                  <div>
-                    <p className={`font-medium ${theme.text}`}>
+                  <div className="min-w-0">
+                    <p className={`font-medium text-sm sm:text-base truncate ${theme.text}`}>
                       {client.client.first_name} {client.client.last_name}
                     </p>
                     <p className={`text-xs ${theme.textSecondary}`}>
-                      {client.compliance.overall_compliance.toFixed(1)}% compliance
+                      {(client.compliance?.overall_compliance ?? 0).toFixed(1)}% compliance
                     </p>
                   </div>
                 </div>
-                <Badge className={`${getComplianceBgColor(client.compliance.overall_compliance)} ${getComplianceColor(client.compliance.overall_compliance)} border-0`}>
+                <Badge className={`${getComplianceBgColor(client.compliance.overall_compliance)} ${getComplianceColor(client.compliance.overall_compliance)} border-0 flex-shrink-0`}>
                   <Shield className="w-3 h-3 mr-1" />
-                  {client.compliance.overall_compliance.toFixed(1)}%
+                  {(client.compliance?.overall_compliance ?? 0).toFixed(1)}%
                 </Badge>
               </div>
             ))}
@@ -209,15 +209,15 @@ export default function ComplianceSummaryWidget({ clients, selectedPeriod }: Com
 
       {/* Quick Actions */}
       <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-        <CardHeader>
-          <CardTitle className={`flex items-center gap-2 ${theme.text}`}>
-            <Flame className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+        <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
+          <CardTitle className={`flex items-center gap-2 text-base sm:text-lg ${theme.text}`}>
+            <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
             Quick Actions
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-3">
-            <div className={`${theme.card} rounded-xl p-4 border-2 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer`}>
+        <CardContent className="p-3 sm:p-4 md:p-6 pt-2">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer min-h-[44px]`}>
               <div className="flex items-center gap-2 mb-2">
                 <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span className={`text-sm font-medium ${theme.text}`}>Message All</span>
@@ -225,7 +225,7 @@ export default function ComplianceSummaryWidget({ clients, selectedPeriod }: Com
               <p className={`text-xs ${theme.textSecondary}`}>Send group message</p>
             </div>
             
-            <div className={`${theme.card} rounded-xl p-4 border-2 border-green-200 dark:border-green-800 hover:border-green-300 dark:hover:border-green-700 transition-colors cursor-pointer`}>
+            <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2 border-green-200 dark:border-green-800 hover:border-green-300 dark:hover:border-green-700 transition-colors cursor-pointer min-h-[44px]`}>
               <div className="flex items-center gap-2 mb-2">
                 <Award className="w-4 h-4 text-green-600 dark:text-green-400" />
                 <span className={`text-sm font-medium ${theme.text}`}>Celebrate</span>
@@ -233,7 +233,7 @@ export default function ComplianceSummaryWidget({ clients, selectedPeriod }: Com
               <p className={`text-xs ${theme.textSecondary}`}>Acknowledge wins</p>
             </div>
             
-            <div className={`${theme.card} rounded-xl p-4 border-2 border-orange-200 dark:border-orange-800 hover:border-orange-300 dark:hover:border-orange-700 transition-colors cursor-pointer`}>
+            <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2 border-orange-200 dark:border-orange-800 hover:border-orange-300 dark:hover:border-orange-700 transition-colors cursor-pointer min-h-[44px]`}>
               <div className="flex items-center gap-2 mb-2">
                 <Target className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                 <span className={`text-sm font-medium ${theme.text}`}>Set Goals</span>
@@ -241,7 +241,7 @@ export default function ComplianceSummaryWidget({ clients, selectedPeriod }: Com
               <p className={`text-xs ${theme.textSecondary}`}>Update targets</p>
             </div>
             
-            <div className={`${theme.card} rounded-xl p-4 border-2 border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 transition-colors cursor-pointer`}>
+            <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2 border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 transition-colors cursor-pointer min-h-[44px]`}>
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <span className={`text-sm font-medium ${theme.text}`}>Report</span>

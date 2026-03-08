@@ -2,10 +2,18 @@
  * Meal Photo Service
  * Handles meal photo uploads to Supabase storage with DB logging
  * Enforces "1 photo per meal per day" constraint
- * 
+ *
  * IMPORTANT: The rule is 1 photo per MEAL per day, NOT 1 photo per option.
  * meal_option_id is INFORMATIONAL ONLY - it records which option the client chose.
  * The unique constraint remains: UNIQUE (client_id, meal_id, log_date)
+ *
+ * Phase N5 — Completion/compliance source of truth:
+ * For "did the client log this meal?" and compliance reporting (coach or client),
+ * use meal_completions (nutritionLogService, metrics/nutrition). This service
+ * reads/writes meal_photo_logs for photo storage and legacy duplicate checks only.
+ * getMealPhotosForDay, getMealPhotoHistory, getMealAdherenceStats, isMealLoggedToday,
+ * getTodayAdherence use meal_photo_logs and are legacy for compliance; prefer
+ * meal_completions-based APIs for new compliance UI.
  */
 
 import { supabase } from './supabase';
@@ -231,8 +239,8 @@ export async function getMealPhotoForDate(
 }
 
 /**
- * Get all meal photo logs for a client on a specific date
- * Useful for "today's meals" view
+ * Get all meal photo logs for a client on a specific date (meal_photo_logs).
+ * Legacy: for "today's meals" / compliance use meal_completions instead.
  */
 export async function getMealPhotosForDay(
   clientId: string,
@@ -259,7 +267,8 @@ export async function getMealPhotosForDay(
 }
 
 /**
- * Get meal photo history for date range
+ * Get meal photo history for date range (meal_photo_logs).
+ * Legacy: for compliance/history use meal_completions-based APIs.
  * @param startDate - Start date (YYYY-MM-DD)
  * @param endDate - End date (YYYY-MM-DD)
  */
@@ -431,7 +440,8 @@ function sanitizeFilename(filename: string): string {
 // ============================================================================
 
 /**
- * Check if meal has been logged today
+ * Check if meal has been logged today (meal_photo_logs).
+ * Legacy: for compliance use meal_completions (e.g. nutritionLogService).
  * @returns { logged: boolean, photoLog?: MealPhotoLog }
  */
 export async function isMealLoggedToday(
@@ -448,7 +458,8 @@ export async function isMealLoggedToday(
 }
 
 /**
- * Get today's adherence rate (for dashboard widget)
+ * Get today's adherence rate from meal_photo_logs (legacy).
+ * For compliance use meal_completions-based APIs.
  */
 export async function getTodayAdherence(
   clientId: string,

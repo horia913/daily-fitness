@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
@@ -41,6 +41,7 @@ import {
   Calendar,
 } from "lucide-react";
 import MealPlanBuilder from "@/components/MealPlanBuilder";
+import { withTimeout } from "@/lib/withTimeout";
 
 interface Food {
   id: string;
@@ -147,127 +148,103 @@ export default function CoachMealsPage() {
     target_fat: "",
   });
 
+  const loadingRef = useRef(false);
+
   const loadData = useCallback(async () => {
     if (!user) return;
-
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     try {
-      // Load foods
-      const { data: foodsData } = await supabase
-        .from("foods")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
-
-      // Load meal plans
-      const { data: mealPlansData } = await supabase
-        .from("meal_plans")
-        .select("*")
-        .eq("coach_id", user.id)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
-
-      // Load clients - simplified approach
-      const { data: clientsData } = await supabase
-        .from("clients")
-        .select("client_id")
-        .eq("coach_id", user.id)
-        .eq("status", "active");
-
-      // Create client list directly from client data (avoiding RLS issues)
-      const clientsList =
-        clientsData?.map((client) => ({
-          id: client.client_id,
-          first_name: "Client",
-          last_name: "Popescu",
-          email: "client@test.com",
-        })) || [];
-
-      console.log("Loaded clients:", clientsList);
-      setClients(clientsList);
-
-      // Load assignments (if table exists)
-      let assignmentsData = [];
-      let tableName = "meal_plan_assignments"; // Default table name
-
-      try {
-        // First check if the table exists by trying a simple query
-        let { data, error } = await supabase
-          .from("meal_plan_assignments")
-          .select("id")
-          .limit(1);
-
-        // If meal_plan_assignments doesn't exist, try assigned_meal_plans
-        if (error && error.code === "PGRST116") {
-          console.log(
-            "meal_plan_assignments table not found, trying assigned_meal_plans..."
-          );
-          const { data: altData, error: altError } = await supabase
-            .from("assigned_meal_plans")
-            .select("id")
-            .limit(1);
-
-          if (!altError) {
-            tableName = "assigned_meal_plans";
-            data = altData;
-            error = altError;
-          }
-        }
-
-        if (!error && data !== null) {
-          // Table exists, now load full assignments
-          const { data: fullData, error: fullError } = await supabase
-            .from(tableName)
+      await withTimeout(
+        (async () => {
+          const { data: foodsData } = await supabase
+            .from("foods")
+            .select("*")
+            .eq("is_active", true)
+            .order("name");
+          const { data: mealPlansData } = await supabase
+            .from("meal_plans")
             .select("*")
             .eq("coach_id", user.id)
+            .eq("is_active", true)
             .order("created_at", { ascending: false });
-
-          if (!fullError) {
-            assignmentsData = fullData || [];
-            console.log("Loaded assignments:", assignmentsData);
-
-            // Enhance assignments with client and meal plan data
-            for (let i = 0; i < assignmentsData.length; i++) {
-              const assignment = assignmentsData[i];
-
-              // Use hardcoded client data to avoid RLS issues
-              const clientData = {
-                first_name: "Client",
-                last_name: "Popescu",
-                email: "client@test.com",
-              };
-
-              // Get meal plan data
-              const { data: mealPlanData } = await supabase
-                .from("meal_plans")
-                .select("name, target_calories")
-                .eq("id", assignment.meal_plan_id)
-                .single();
-
-              assignmentsData[i] = {
-                ...assignment,
-                client: clientData,
-                meal_plan: mealPlanData,
-              };
+          const { data: clientsData } = await supabase
+            .from("clients")
+            .select("client_id")
+            .eq("coach_id", user.id)
+            .eq("status", "active");
+          const clientsList =
+            clientsData?.map((client) => ({
+              id: client.client_id,
+              first_name: "Client",
+              last_name: "Popescu",
+              email: "client@test.com",
+            })) || [];
+          setClients(clientsList);
+          let assignmentsData: any[] = [];
+          let tableName = "meal_plan_assignments";
+          try {
+            let { data, error } = await supabase
+              .from("meal_plan_assignments")
+              .select("id")
+              .limit(1);
+            if (error && error.code === "PGRST116") {
+              const { data: altData, error: altError } = await supabase
+                .from("assigned_meal_plans")
+                .select("id")
+                .limit(1);
+              if (!altError) {
+                tableName = "assigned_meal_plans";
+                data = altData;
+                error = altError;
+              }
             }
-          } else {
-            console.error("Error loading assignments:", fullError);
+            if (!error && data !== null) {
+              const { data: fullData, error: fullError } = await supabase
+                .from(tableName)
+                .select("*")
+                .eq("coach_id", user.id)
+                .order("created_at", { ascending: false });
+              if (!fullError) {
+                assignmentsData = fullData || [];
+                for (let i = 0; i < assignmentsData.length; i++) {
+                  const assignment = assignmentsData[i];
+                  const clientData = {
+                    first_name: "Client",
+                    last_name: "Popescu",
+                    email: "client@test.com",
+                  };
+                  const { data: mealPlanData } = await supabase
+                    .from("meal_plans")
+                    .select("name, target_calories")
+                    .eq("id", assignment.meal_plan_id)
+                    .single();
+                  assignmentsData[i] = {
+                    ...assignment,
+                    client: clientData,
+                    meal_plan: mealPlanData,
+                  };
+                }
+              } else {
+                console.error("Error loading assignments:", fullError);
+              }
+            }
+          } catch {
+            assignmentsData = [];
           }
-        }
-      } catch {
-        console.log(
-          "Meal plan assignments table not ready yet - this is normal for new setups"
-        );
-        assignmentsData = [];
-      }
-
-      setFoods(foodsData || []);
-      setMealPlans(mealPlansData || []);
-      setAssignments(assignmentsData || []);
+          setFoods(foodsData || []);
+          setMealPlans(mealPlansData || []);
+          setAssignments(assignmentsData || []);
+        })(),
+        45000,
+        "loadData"
+      );
     } catch {
       console.error("Error loading meal planning data");
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, [user]);
 
@@ -398,15 +375,6 @@ export default function CoachMealsPage() {
 
     setLoading(true);
     try {
-      console.log("Creating meal plan assignment:", {
-        coach_id: user.id,
-        client_id: assignmentForm.client_id,
-        meal_plan_id: assignmentForm.meal_plan_id,
-        start_date: assignmentForm.start_date,
-        end_date: assignmentForm.end_date || null,
-        notes: assignmentForm.notes || null,
-      });
-
       // Enforce single active meal plan: Deactivate existing active meal plans for this client
       await supabase
         .from("meal_plan_assignments")
@@ -430,9 +398,6 @@ export default function CoachMealsPage() {
 
       // If meal_plan_assignments doesn't exist, try assigned_meal_plans
       if (error && error.code === "PGRST116") {
-        console.log(
-          "meal_plan_assignments table not found, trying assigned_meal_plans..."
-        );
         const { data: altData, error: altError } = await supabase
           .from("assigned_meal_plans")
           .insert({
@@ -455,8 +420,6 @@ export default function CoachMealsPage() {
         console.error("Assignment creation error:", error);
         throw error;
       }
-
-      console.log("Assignment created successfully:", data);
 
       // Reset form and close modal
       setAssignmentForm({
@@ -608,7 +571,7 @@ export default function CoachMealsPage() {
                       <ChefHat className="h-6 w-6" />
                     </div>
                     <div>
-                      <h1 className="text-3xl font-semibold text-[color:var(--fc-text-primary)]">
+                      <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                         Nutrition Studio
                       </h1>
                       <p className="text-sm text-[color:var(--fc-text-dim)]">

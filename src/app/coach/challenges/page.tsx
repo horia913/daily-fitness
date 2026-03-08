@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -23,10 +23,27 @@ function CoachChallengesPageContent() {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"all" | "draft" | "active" | "completed">("all");
 
+  const challengesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (user && !authLoading) {
-      loadChallenges();
-    }
+    if (!user || authLoading) return;
+    if (challengesTimeoutRef.current) clearTimeout(challengesTimeoutRef.current);
+    challengesTimeoutRef.current = setTimeout(() => {
+      challengesTimeoutRef.current = null;
+      setLoading(false);
+    }, 20_000);
+    loadChallenges().finally(() => {
+      if (challengesTimeoutRef.current) {
+        clearTimeout(challengesTimeoutRef.current);
+        challengesTimeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (challengesTimeoutRef.current) {
+        clearTimeout(challengesTimeoutRef.current);
+        challengesTimeoutRef.current = null;
+      }
+    };
   }, [user, authLoading]);
 
   const loadChallenges = async () => {
@@ -59,11 +76,11 @@ function CoachChallengesPageContent() {
           {performanceSettings.floatingParticles && <FloatingParticles />}
           <div className="relative z-10 container mx-auto px-4 py-8">
             <div className="animate-pulse space-y-6">
-              <div className="h-24 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+              <div className="h-24 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="h-48 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-                <div className="h-48 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
-                <div className="h-48 bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>
+                <div className="h-48 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
+                <div className="h-48 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
+                <div className="h-48 bg-[color:var(--fc-glass-highlight)] rounded-2xl"></div>
               </div>
             </div>
           </div>
@@ -85,7 +102,7 @@ function CoachChallengesPageContent() {
               <span className="w-8 h-0.5 rounded-full bg-[color:var(--fc-accent-success)]" />
               <span className="text-sm font-bold tracking-widest uppercase fc-text-dim">Coach Portal</span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Challenges Management</h1>
+            <h1 className="text-2xl font-bold tracking-tight fc-text-primary">Challenges Management</h1>
           </div>
           <div className="flex gap-3">
             <Button variant="outline" size="sm" className="fc-btn fc-btn-ghost rounded-xl hidden md:inline-flex">

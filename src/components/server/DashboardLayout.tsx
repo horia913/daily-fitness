@@ -85,12 +85,12 @@ export function DashboardLayout({
               </Card>
             </Link>
 
-            <Link href="/client/progress">
+            <Link href="/client/check-ins">
               <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="p-4 text-center">
                   <BarChart3 className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-                  <h3 className="font-semibold text-purple-800">Progress</h3>
-                  <p className="text-sm text-purple-600">Track results</p>
+                  <h3 className="font-semibold text-purple-800">Check-ins</h3>
+                  <p className="text-sm text-purple-600">Body metrics, mobility</p>
                 </CardContent>
               </Card>
             </Link>
@@ -202,7 +202,7 @@ export function DashboardLayout({
             </Card>
           </Link>
 
-          <Link href="/coach/programs-workouts">
+          <Link href="/coach/programs">
             <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-4 text-center">
                 <Target className="w-8 h-8 text-purple-600 mx-auto mb-2" />
@@ -212,7 +212,7 @@ export function DashboardLayout({
             </Card>
           </Link>
 
-          <Link href="/coach/meals">
+          <Link href="/coach/nutrition">
             <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-4 text-center">
                 <Utensils className="w-8 h-8 text-orange-600 mx-auto mb-2" />

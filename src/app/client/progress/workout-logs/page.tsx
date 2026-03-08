@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -8,19 +8,18 @@ import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import {
   ArrowLeft,
+  ChevronRight,
   FileText,
   Clock,
-  ChevronRight,
   TrendingUp,
   Search,
   Trophy,
   Layers,
-  ChevronDown,
   Download,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { WorkoutLogCard } from "@/components/client/WorkoutLogCard";
 
 interface WorkoutLog {
   id: string;
@@ -58,23 +57,42 @@ interface WorkoutSet {
 export default function WorkoutLogsPage() {
   const { user, loading: authLoading } = useAuth();
   const { performanceSettings } = useTheme();
-  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [timeFilter, setTimeFilter] = useState<"all" | "this_month" | "this_week">("all");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset state when user changes
   useEffect(() => {
     setLoading(true);
     setWorkoutLogs([]);
+    setError(null);
   }, [user]);
 
   useEffect(() => {
     if (user && !authLoading) {
-      loadWorkoutLogs();
-    } else if (!authLoading && !user) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        timeoutRef.current = null;
+        setLoading(false);
+        setError("Loading took too long. Tap Retry to try again.");
+      }, 20_000);
+      loadWorkoutLogs().finally(() => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      });
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      };
+    }
+    if (!authLoading && !user) {
       setLoading(false);
     }
   }, [user, authLoading]);
@@ -88,8 +106,6 @@ export default function WorkoutLogsPage() {
       // Ensure user is authenticated before querying
       const { ensureAuthenticated } = await import('@/lib/supabase');
       await ensureAuthenticated();
-
-      console.log("🔍 Loading workout logs for user:", user.id);
 
       // Get ALL workout_logs for this user (not grouped by assignment)
       const { data: workoutLogs, error } = await supabase
@@ -118,12 +134,9 @@ export default function WorkoutLogsPage() {
       }
 
       if (!workoutLogs || workoutLogs.length === 0) {
-        console.log("ℹ️ No workout logs found for user");
         setWorkoutLogs([]);
         return;
       }
-
-      console.log("✅ Found workout logs:", workoutLogs.length);
 
       // Get unique assignment IDs to fetch template names
       const assignmentIds = [
@@ -133,8 +146,6 @@ export default function WorkoutLogsPage() {
             .filter(Boolean) as string[]
         ),
       ];
-
-      console.log("📋 Found assignment IDs:", assignmentIds.length);
 
       // Fetch workout template names via assignments
       const assignmentTemplateMap = new Map<string, string>();
@@ -158,12 +169,10 @@ export default function WorkoutLogsPage() {
         }
 
         if (assignments) {
-          console.log("📋 Fetched assignments:", assignments.length);
           assignments.forEach((assignment: any) => {
             const templateName =
               assignment.workout_templates?.name || "Workout";
             assignmentTemplateMap.set(assignment.id, templateName);
-            console.log(`  - Assignment ${assignment.id}: "${templateName}"`);
           });
         }
       }
@@ -255,7 +264,6 @@ export default function WorkoutLogsPage() {
           } as WorkoutLog;
         });
 
-      console.log("✅ Processed workout logs:", processedLogs.length);
       setWorkoutLogs(processedLogs);
     } catch (error) {
       console.error("❌ Error loading workout logs:", error);
@@ -300,12 +308,32 @@ export default function WorkoutLogsPage() {
       .reduce((sum, log) => sum + log.totalWeight, 0);
   }, [workoutLogs]);
 
+  if (error) {
+    return (
+      <ProtectedRoute>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-6xl">
+              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+                <p className="text-[color:var(--fc-text-dim)] mb-4">{error}</p>
+                <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">
+                  Retry
+                </button>
+              </div>
+            </div>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
+
   if (authLoading || loading) {
     return (
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-6xl">
               <div className="fc-surface p-8">
                 <div className="animate-pulse space-y-4">
@@ -325,7 +353,7 @@ export default function WorkoutLogsPage() {
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen px-4 pb-28 pt-8 sm:px-6 lg:px-10 fc-page">
+        <div className="relative z-10 min-h-screen px-4 pb-32 pt-8 sm:px-6 lg:px-10 fc-page">
           <div className="mx-auto w-full max-w-6xl space-y-6">
             <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-6">
               <div className="flex items-center justify-between gap-4">
@@ -363,7 +391,7 @@ export default function WorkoutLogsPage() {
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <span className="text-[10px] font-bold font-mono uppercase tracking-widest fc-text-warning">This month</span>
-                    <h2 className="text-3xl font-black fc-text-primary mt-2">
+                    <h2 className="text-2xl font-bold fc-text-primary mt-2">
                       {thisMonthCount} <span className="text-lg font-medium fc-text-subtle">workouts</span>
                     </h2>
                   </div>
@@ -442,104 +470,9 @@ export default function WorkoutLogsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredLogs.map((log) => {
-                  const workoutName = log.workoutName || "Workout";
-                  const completedDate = log.completed_at
-                    ? new Date(log.completed_at)
-                    : log.started_at
-                    ? new Date(log.started_at)
-                    : null;
-                  let duration: number | null = null;
-                  if (log.total_duration_minutes) {
-                    duration = Math.round(log.total_duration_minutes);
-                  } else if (log.completed_at && log.started_at) {
-                    const started = new Date(log.started_at);
-                    const completed = new Date(log.completed_at);
-                    duration = Math.round((completed.getTime() - started.getTime()) / 60000);
-                  }
-                  const isExpanded = expandedId === log.id;
-                  const sets = (log.workout_set_logs || []) as { exercise_id?: string; weight?: number; reps?: number }[];
-
-                  return (
-                    <div
-                      key={log.id}
-                      className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] overflow-hidden transition-all hover:shadow-lg"
-                    >
-                      <div
-                        className="flex items-stretch gap-4 p-4 sm:p-5 cursor-pointer"
-                        onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                      >
-                        {/* Date tile */}
-                        {completedDate && (
-                          <div className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] flex flex-col items-center justify-center">
-                            <span className="text-[10px] font-bold font-mono uppercase tracking-wider fc-text-subtle">
-                              {completedDate.toLocaleDateString("en-US", { month: "short" })}
-                            </span>
-                            <span className="text-lg font-bold font-mono fc-text-primary leading-tight">
-                              {completedDate.getDate()}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                          <h3 className="text-lg font-bold fc-text-primary truncate">
-                            {workoutName}
-                          </h3>
-                          <div className="flex flex-wrap gap-3 mt-1 text-sm fc-text-dim">
-                            {duration != null && <span>{duration} min</span>}
-                            <span>{log.totalSets} sets</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/client/progress/workout-logs/${log.id}`);
-                            }}
-                            className="text-sm font-medium fc-text-subtle hover:fc-text-primary px-3 py-2 rounded-lg"
-                          >
-                            View
-                          </button>
-                          <ChevronDown
-                            className={`w-5 h-5 fc-text-subtle transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Expanded: exercise rows */}
-                      {isExpanded && sets.length > 0 && (
-                        <div
-                          className="border-t border-[color:var(--fc-glass-border)] bg-[color:var(--fc-bg-base)]/50 px-4 py-3"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <p className="text-xs font-semibold uppercase tracking-wider fc-text-subtle mb-2">
-                            Exercises
-                          </p>
-                          <ul className="space-y-2">
-                            {sets.slice(0, 10).map((set, i) => (
-                              <li
-                                key={i}
-                                className="text-sm fc-text-dim flex justify-between"
-                              >
-                                <span>Set {i + 1}</span>
-                                {set.weight != null && set.reps != null && (
-                                  <span className="font-mono">
-                                    {set.weight} kg × {set.reps} reps
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                            {sets.length > 10 && (
-                              <li className="text-sm fc-text-subtle">
-                                +{sets.length - 10} more…
-                              </li>
-                            )}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {filteredLogs.map((log) => (
+                  <WorkoutLogCard key={log.id} log={log} />
+                ))}
               </div>
             )}
 

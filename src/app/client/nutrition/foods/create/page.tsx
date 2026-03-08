@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/toast-provider";
 import { X, Utensils, Save } from "lucide-react";
 import Link from "next/link";
 
@@ -26,6 +27,7 @@ export default function AddCustomFoodPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
+  const { addToast } = useToast();
 
   const SUBMIT_TIMEOUT_MS = 25000;
 
@@ -49,7 +51,7 @@ export default function AddCustomFoodPage() {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      alert("Please enter a food name.");
+      addToast({ title: "Required", description: "Please enter a food name.", variant: "destructive" });
       return;
     }
 
@@ -75,14 +77,14 @@ export default function AddCustomFoodPage() {
 
       if (error) throw error;
 
-      alert("Custom food added successfully!");
+      addToast({ title: "Saved", description: "Custom food added successfully!", variant: "success" });
       router.push("/client/nutrition");
     } catch (err: unknown) {
       console.error("Error adding custom food:", err);
       if (err instanceof Error && err.message === "timeout") {
-        alert("Request took too long. Check your connection and try again.");
+        addToast({ title: "Timeout", description: "Request took too long. Check your connection and try again.", variant: "destructive" });
       } else {
-        alert("Could not save food. Please try again.");
+        addToast({ title: "Error", description: "Could not save food. Please try again.", variant: "destructive" });
       }
     } finally {
       setLoading(false);

@@ -8,6 +8,7 @@ import {
   Pencil,
   ChevronLeft,
   ChevronRight,
+  Calculator,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import { LargeInput } from "../ui/LargeInput";
@@ -26,6 +27,7 @@ import {
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
+import { InlineRPERow } from "../ui/InlineRPERow";
 
 interface StraightSetExecutorProps extends BaseBlockExecutorProps {}
 
@@ -49,10 +51,13 @@ export function StraightSetExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
+  onPlateCalculatorClick,
   onRestTimerClick,
   onSetComplete,
   onLastSetLoggedForRest,
   progressionSuggestion,
+  progressionSuggestionsMap,
+  previousPerformanceMap,
   registerUndo,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
@@ -75,6 +80,12 @@ export function StraightSetExecutor({
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   /** 0 = current set (form for logging next), 1..n = viewing logged set 1..n (same form, edit) */
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  /** Collapsible set history: show all sets or only last 2 */
+  const [showAllSets, setShowAllSets] = useState(false);
+  /** Visual feedback: green flash on Log Set button */
+  const [showLogSuccessFlash, setShowLogSuccessFlash] = useState(false);
+  /** Track newly logged set IDs for slide-in animation */
+  const [newlyLoggedSetIds, setNewlyLoggedSetIds] = useState<Set<string>>(new Set());
   // Use exercise.sets if available, otherwise fall back to block.total_sets, then default to 1
   const totalSets =
     currentExercise?.sets !== null && currentExercise?.sets !== undefined
@@ -195,7 +206,7 @@ export function StraightSetExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "StraightSetExecutor",
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -232,7 +243,7 @@ export function StraightSetExecutor({
         console.log("[SAVE EDITS]", {
           executor: "StraightSetExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           payloadKeys: Object.keys(body),
         });
       }
@@ -248,7 +259,7 @@ export function StraightSetExecutor({
           id: editingSetId,
           exercise_id:
             current?.exercise_id ?? currentExercise?.exercise_id ?? "",
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: editDraft.set_number,
           weight_kg: w,
           reps_completed: r,
@@ -308,7 +319,7 @@ export function StraightSetExecutor({
     }
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.block_type, {
+      const payload = buildSetEditPatchPayload(block.block.set_type, {
         weight: w,
         reps: r,
         set_number: setEntry.set_number ?? viewingSetIndex,
@@ -402,7 +413,7 @@ export function StraightSetExecutor({
 
   // Instructions
   const instructions =
-    currentExercise?.notes || block.block.block_notes || undefined;
+    currentExercise?.notes || block.block.set_notes || undefined;
 
   // Handle logging one set at a time
   const handleLog = async () => {
@@ -442,7 +453,7 @@ export function StraightSetExecutor({
     try {
       // Log the current set
       const logData: any = {
-        block_type: "straight_set",
+        set_type: "straight_set",
         set_number: currentSetNumber,
       };
 
@@ -457,10 +468,14 @@ export function StraightSetExecutor({
       const result = await logSetToDatabase(logData);
 
       if (result.success) {
+        // Trigger green flash animation
+        setShowLogSuccessFlash(true);
+        setTimeout(() => setShowLogSuccessFlash(false), 200);
+
         const loggedSet: LoggedSet = {
           id: result.set_log_id || `temp-${currentSetNumber}-${Date.now()}`,
           exercise_id: currentExercise.exercise_id,
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: currentSetNumber,
           weight_kg: weightNum,
           reps_completed: repsNum,
@@ -468,6 +483,18 @@ export function StraightSetExecutor({
         } as LoggedSet;
 
         onSetLogUpsert?.(block.block.id, loggedSet);
+
+        // Mark this set as newly logged for slide-in animation
+        const finalSetId = result.set_log_id || loggedSet.id;
+        setNewlyLoggedSetIds((prev) => new Set([...prev, finalSetId]));
+        // Remove from animation set after animation completes
+        setTimeout(() => {
+          setNewlyLoggedSetIds((prev) => {
+            const next = new Set(prev);
+            next.delete(finalSetId);
+            return next;
+          });
+        }, 300);
 
         console.log("[StraightSetExecutor] set logged", {
           currentSetNumber,
@@ -561,60 +588,135 @@ export function StraightSetExecutor({
             background: "var(--fc-surface-sunken)",
           }}
         >
-          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
-            Logged sets
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+              Logged sets
+            </div>
+            {loggedSetsList.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSets(!showAllSets)}
+                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
+              >
+                {showAllSets ? (
+                  <>Show less ▲</>
+                ) : (
+                  <>Show all {loggedSetsList.length} sets ▼</>
+                )}
+              </button>
+            )}
           </div>
           <ul className="space-y-1.5">
-            {loggedSetsList.map((setEntry) => (
+            {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
+              // Calculate the actual index in the full list for isLatestSet
+              const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
+              const isLatestSet = actualIndex === loggedSetsList.length - 1;
+              const isNewlyLogged = newlyLoggedSetIds.has(setEntry.id);
+              return (
               <li
                 key={setEntry.id}
-                className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                className={`flex flex-col gap-1.5 py-1.5 px-2 rounded-lg transition-all duration-300 ${
+                  isNewlyLogged ? "animate-slideInRight" : ""
+                }`}
                 style={{ background: "var(--fc-surface-elevated)" }}
               >
-                <span className="text-sm fc-text-primary">
-                  Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"} kg ×{" "}
-                  {setEntry.reps_completed ?? "—"} reps
-                </span>
-                <div className="relative flex items-center">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMenuOpenSetId(
-                        menuOpenSetId === setEntry.id ? null : setEntry.id,
-                      )
-                    }
-                    className="p-1.5 rounded-lg fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
-                    aria-label="Options"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                  {menuOpenSetId === setEntry.id && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setMenuOpenSetId(null)}
-                        aria-hidden
-                      />
-                      <div
-                        className="absolute right-0 top-full mt-1 z-20 py-1 rounded-lg shadow-lg min-w-[120px]"
-                        style={{
-                          background: "var(--fc-surface-elevated)",
-                          border: "1px solid var(--fc-surface-card-border)",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleEditSet(setEntry)}
-                          className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm hover:opacity-80"
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm fc-text-primary">
+                    Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"} kg ×{" "}
+                    {setEntry.reps_completed ?? "—"} reps
+                  </span>
+                  <div className="relative flex items-center">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMenuOpenSetId(
+                          menuOpenSetId === setEntry.id ? null : setEntry.id,
+                        )
+                      }
+                      className="p-1.5 rounded-lg fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
+                      aria-label="Options"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                    {menuOpenSetId === setEntry.id && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setMenuOpenSetId(null)}
+                          aria-hidden
+                        />
+                        <div
+                          className="absolute right-0 top-full mt-1 z-20 py-1 rounded-lg shadow-lg min-w-[120px]"
+                          style={{
+                            background: "var(--fc-surface-elevated)",
+                            border: "1px solid var(--fc-surface-card-border)",
+                          }}
                         >
-                          <Pencil className="w-3.5 h-3.5" /> Edit
-                        </button>
-                      </div>
-                    </>
-                  )}
+                          <button
+                            type="button"
+                            onClick={() => handleEditSet(setEntry)}
+                            className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm hover:opacity-80"
+                          >
+                            <Pencil className="w-3.5 h-3.5" /> Edit
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
+                <InlineRPERow
+                  setLogId={setEntry.id.startsWith("temp-") ? null : setEntry.id}
+                  currentRPE={setEntry.rpe ?? null}
+                  onRPESelect={async (rpe) => {
+                    // Update RPE optimistically
+                    const updatedEntry: LoggedSet = {
+                      ...setEntry,
+                      rpe,
+                    };
+                    onSetLogUpsert?.(block.block.id, updatedEntry, {
+                      replaceId: setEntry.id,
+                    });
+
+                    // If set is synced (has real ID), update via API
+                    if (!setEntry.id.startsWith("temp-")) {
+                      try {
+                        const res = await fetch(`/api/sets/${setEntry.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ rpe }),
+                          credentials: "include",
+                        });
+                        if (!res.ok) {
+                          console.error("Failed to update RPE:", await res.text());
+                          // Revert optimistic update on error
+                          const revertedEntry: LoggedSet = {
+                            ...setEntry,
+                            rpe: setEntry.rpe ?? undefined,
+                          };
+                          onSetLogUpsert?.(block.block.id, revertedEntry, {
+                            replaceId: setEntry.id,
+                          });
+                        }
+                      } catch (err) {
+                        console.error("Error updating RPE:", err);
+                        // Revert optimistic update on error
+                        const revertedEntry: LoggedSet = {
+                          ...setEntry,
+                          rpe: setEntry.rpe ?? undefined,
+                        };
+                        onSetLogUpsert?.(block.block.id, revertedEntry, {
+                          replaceId: setEntry.id,
+                        });
+                      }
+                    }
+                    // If set is still optimistic (temp ID), the RPE will be included
+                    // in the next sync via the orchestrator's pending entry
+                  }}
+                  isLatestSet={isLatestSet}
+                />
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}
@@ -664,23 +766,37 @@ export function StraightSetExecutor({
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <LargeInput
-              label="Weight"
-              value={editDraft ? editDraft.weight : weight}
-              onChange={(val) => {
-                if (editDraft) {
-                  setEditDraft((d) => (d ? { ...d, weight: val } : null));
-                } else {
-                  setIsWeightPristine(false);
-                  setWeight(val);
-                }
-              }}
-              placeholder="0"
-              step="0.5"
-              unit="kg"
-              showStepper
-              stepAmount={2.5}
-            />
+            <div className="relative">
+              <LargeInput
+                label="Weight"
+                value={editDraft ? editDraft.weight : weight}
+                onChange={(val) => {
+                  if (editDraft) {
+                    setEditDraft((d) => (d ? { ...d, weight: val } : null));
+                  } else {
+                    setIsWeightPristine(false);
+                    setWeight(val);
+                  }
+                }}
+                placeholder="0"
+                step="0.5"
+                unit="kg"
+                showStepper
+                stepAmount={2.5}
+              />
+              {onPlateCalculatorClick && (
+                <button
+                  type="button"
+                  onClick={() => onPlateCalculatorClick()}
+                  className="absolute right-2 top-[1.75rem] p-1.5 rounded-lg transition-colors hover:bg-white/10 focus:outline-none focus:ring-2"
+                  style={{ color: "var(--fc-domain-workouts)" }}
+                  title="Plate Calculator"
+                  aria-label="Open plate calculator"
+                >
+                  <Calculator className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             {!editDraft &&
               coachSuggestedWeight != null &&
               coachSuggestedWeight > 0 && (
@@ -799,8 +915,10 @@ export function StraightSetExecutor({
           calculateSuggestedWeight,
           onVideoClick,
           onAlternativesClick,
+          onPlateCalculatorClick,
           onRestTimerClick,
           progressionSuggestion,
+          previousPerformanceMap,
         }}
         exerciseName={currentExercise?.exercise?.name || "Exercise"}
         blockDetails={blockDetails}
@@ -816,6 +934,10 @@ export function StraightSetExecutor({
           !!(block.block.rest_seconds || currentExercise?.rest_seconds)
         }
         progressionSuggestion={progressionSuggestion}
+        onApplySuggestion={(w, r) => {
+          if (w != null) { setWeight(String(w)); setIsWeightPristine(false); }
+          if (r != null) setReps(String(r));
+        }}
       />
       {/* Edit mode is inline (same form + Save edits / Cancel); no dialog so list stays visible. */}
       {/* RPE Modal moved to parent LiveWorkoutBlockExecutor (Golden Logging Flow) */}

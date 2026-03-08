@@ -45,6 +45,8 @@
 }
 
 :root {
+  --font-geist-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-geist-mono: "JetBrains Mono", ui-monospace, monospace;
   --radius: 0.875rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -346,7 +348,38 @@
     }
   }
 
-  @keyframes pulse-red {
+  @keyframes logSuccessFlash {
+  0% {
+    background-color: var(--fc-accent-cyan);
+  }
+  50% {
+    background-color: #22C55E;
+  }
+  100% {
+    background-color: var(--fc-accent-cyan);
+  }
+}
+
+@keyframes slideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-logSuccessFlash {
+  animation: logSuccessFlash 200ms ease-in-out;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 300ms ease-out;
+}
+
+@keyframes pulse-red {
     0% {
       box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
     }

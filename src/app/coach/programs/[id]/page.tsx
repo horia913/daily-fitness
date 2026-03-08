@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -27,8 +27,12 @@ import {
   Share2,
   MoreHorizontal,
   Settings2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { TrainingBlockService } from "@/lib/trainingBlockService";
+import { TrainingBlock, TRAINING_BLOCK_GOALS } from "@/types/trainingBlock";
 
 interface Program {
   id: string;
@@ -56,6 +60,9 @@ function ProgramDetailsContent() {
     {}
   );
   const [loading, setLoading] = useState(true);
+  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [trainingBlocks, setTrainingBlocks] = useState<TrainingBlock[]>([]);
+  const [activeDetailBlockId, setActiveDetailBlockId] = useState<string | null>(null);
 
   const loadProgram = useCallback(async () => {
     if (!programId) return;
@@ -81,6 +88,12 @@ function ProgramDetailsContent() {
     if (!programId) return;
     try {
       const sched = await WorkoutTemplateService.getProgramSchedule(programId);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(
+          "[ProgramDetails] Loaded schedule data:",
+          JSON.stringify(sched || [], null, 2)
+        );
+      }
       if (Array.isArray(sched)) setSchedule(sched as ProgramSchedule[]);
 
       // Collect template ids and load their basic info for display
@@ -100,30 +113,45 @@ function ProgramDetailsContent() {
     } catch {}
   }, [programId]);
 
+  const programTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    loadProgram();
-    loadSchedule();
+    if (programTimeoutRef.current) clearTimeout(programTimeoutRef.current);
+    programTimeoutRef.current = setTimeout(() => {
+      programTimeoutRef.current = null;
+      setLoading(false);
+    }, 20_000);
+    Promise.all([loadProgram(), loadSchedule()]).finally(() => {
+      if (programTimeoutRef.current) {
+        clearTimeout(programTimeoutRef.current);
+        programTimeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (programTimeoutRef.current) {
+        clearTimeout(programTimeoutRef.current);
+        programTimeoutRef.current = null;
+      }
+    };
   }, [loadProgram, loadSchedule]);
+
+  useEffect(() => {
+    if (!programId) return;
+    TrainingBlockService.getTrainingBlocks(programId).then((blocks) => {
+      setTrainingBlocks(blocks);
+      if (blocks.length > 0) setActiveDetailBlockId(blocks[0].id);
+    });
+  }, [programId]);
 
   if (loading) {
     return (
       <AnimatedBackground>
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
-            <div
-              className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
-              style={{
-                borderColor: `${getSemanticColor("trust").primary}40`,
-                borderTopColor: "transparent",
-              }}
-            />
-            <p
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
-            >
-              Loading program...
-            </p>
+        <div className="min-h-screen p-4 max-w-5xl mx-auto">
+          <div className="animate-pulse space-y-4">
+            <div className="h-10 w-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-8 w-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
           </div>
         </div>
       </AnimatedBackground>
@@ -156,7 +184,34 @@ function ProgramDetailsContent() {
   }
 
   const dayNames = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"];
-  const week1 = (schedule || []).filter((s) => (s.week_number || 1) === 1);
+  const activeDetailBlock = trainingBlocks.find((b) => b.id === activeDetailBlockId) ?? null;
+  const totalWeeks = activeDetailBlock?.duration_weeks ?? program?.duration_weeks ?? 1;
+
+  // Cumulative week offset before the active block — converts the relative selectedWeek
+  // (1..totalWeeks shown in the UI) to the absolute week_number stored in program_schedule.
+  // Block 1 starts at week 1, Block 2 starts at Block1.duration + 1, etc.
+  const detailBlockStartWeek = (() => {
+    let offset = 0;
+    for (const block of trainingBlocks) {
+      if (block.id === activeDetailBlockId) break;
+      offset += block.duration_weeks;
+    }
+    return offset + 1;
+  })();
+  const absoluteDetailWeek = detailBlockStartWeek + selectedWeek - 1;
+
+  const scheduleForWeek = (schedule || []).filter(
+    (s) =>
+      (s.week_number || 1) === absoluteDetailWeek &&
+      (!activeDetailBlockId || s.training_block_id === activeDetailBlockId),
+  );
+
+  const GOAL_COLORS_DETAIL: Record<string, string> = {
+    hypertrophy: "#06b6d4", strength: "#f97316", power: "#ef4444",
+    peaking: "#a855f7", accumulation: "#3b82f6", conditioning: "#22c55e",
+    deload: "#6b7280", general_fitness: "#14b8a6", sport_specific: "#eab308",
+    custom: "#8b5cf6",
+  };
 
   // Difficulty colors
   const getDifficultyColor = (level: string) => {
@@ -175,7 +230,7 @@ function ProgramDetailsContent() {
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="min-h-screen p-4 sm:p-6 pb-24">
+      <div className="min-h-screen p-4 sm:p-6 pb-32">
         <div className="max-w-5xl mx-auto space-y-8 relative z-10">
           <nav className="flex items-center justify-between">
             <Link
@@ -186,10 +241,10 @@ function ProgramDetailsContent() {
               Back to Programs
             </Link>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full fc-glass border border-[color:var(--fc-glass-border)]">
+              <Button variant="ghost" size="icon" className="w-11 h-11 rounded-full fc-glass border border-[color:var(--fc-glass-border)]">
                 <Share2 className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full fc-glass border border-[color:var(--fc-glass-border)]">
+              <Button variant="ghost" size="icon" className="w-11 h-11 rounded-full fc-glass border border-[color:var(--fc-glass-border)]">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </div>
@@ -210,9 +265,70 @@ function ProgramDetailsContent() {
                 </span>
                 <span className="fc-text-dim font-mono text-xs">ID: {program.id.slice(0, 8)}</span>
               </div>
-              <h1 className="text-3xl font-bold tracking-tight fc-text-primary mb-4">
+              <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-3">
                 {program.name}
               </h1>
+
+              {/* Training block: single = goal badge, multi = timeline */}
+              {trainingBlocks.length === 1 && trainingBlocks[0] && (
+                <div className="flex items-center gap-2 mb-4">
+                  <span
+                    className="px-2.5 py-1 rounded-full text-xs font-semibold"
+                    style={{
+                      background: `${GOAL_COLORS_DETAIL[trainingBlocks[0].goal]}20`,
+                      color: GOAL_COLORS_DETAIL[trainingBlocks[0].goal],
+                      border: `1px solid ${GOAL_COLORS_DETAIL[trainingBlocks[0].goal]}40`,
+                    }}
+                  >
+                    Goal: {trainingBlocks[0].goal === "custom" && trainingBlocks[0].custom_goal_label
+                      ? trainingBlocks[0].custom_goal_label
+                      : TRAINING_BLOCK_GOALS[trainingBlocks[0].goal]}
+                  </span>
+                </div>
+              )}
+              {trainingBlocks.length > 1 && (() => {
+                // Compute absolute start/end weeks for each block
+                let offset = 0;
+                const blockRanges = trainingBlocks.map((block) => {
+                  const startWeek = offset + 1;
+                  const endWeek = offset + block.duration_weeks;
+                  offset += block.duration_weeks;
+                  return { startWeek, endWeek };
+                });
+                return (
+                  <div className="mb-4">
+                    <p className="text-xs fc-text-dim mb-2 font-semibold uppercase tracking-wider">
+                      Program Timeline ({trainingBlocks.reduce((s, b) => s + b.duration_weeks, 0)} weeks)
+                    </p>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {trainingBlocks.map((block, idx) => {
+                        const isActive = block.id === activeDetailBlockId;
+                        const blockColor = GOAL_COLORS_DETAIL[block.goal];
+                        const { startWeek, endWeek } = blockRanges[idx];
+                        return (
+                          <React.Fragment key={block.id}>
+                            <button
+                              onClick={() => { setActiveDetailBlockId(block.id); setSelectedWeek(1); }}
+                              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                              style={{
+                                background: isActive ? `${blockColor}22` : (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"),
+                                border: `1.5px solid ${isActive ? blockColor : (isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)")}`,
+                                color: isActive ? blockColor : (isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"),
+                              }}
+                            >
+                              {block.name} · Wks {startWeek}–{endWeek}
+                            </button>
+                            {idx < trainingBlocks.length - 1 && (
+                              <ChevronRight className="w-3 h-3 fc-text-dim" />
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {program.description && (
                 <p className="text-lg fc-text-dim leading-relaxed">
                   {program.description}
@@ -353,12 +469,37 @@ function ProgramDetailsContent() {
           <section className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-widest fc-text-dim">Training Schedule</h2>
           <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
-            <h3 className="text-lg font-bold mb-4 fc-text-primary">
-              Week 1
-            </h3>
+            {/* Week selector */}
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)]"
+                onClick={() => setSelectedWeek((prev) => Math.max(1, prev - 1))}
+                disabled={selectedWeek === 1}
+                aria-label="Previous week"
+              >
+                <ChevronLeft className="w-5 h-5 fc-text-primary" />
+              </Button>
+              <span className="text-lg font-bold fc-text-primary">
+                Week {selectedWeek} of {totalWeeks}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="min-w-11 min-h-11 rounded-xl fc-surface border border-[color:var(--fc-glass-border)]"
+                onClick={() => setSelectedWeek((prev) => Math.min(totalWeeks, prev + 1))}
+                disabled={selectedWeek === totalWeeks}
+                aria-label="Next week"
+              >
+                <ChevronRight className="w-5 h-5 fc-text-primary" />
+              </Button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {dayNames.map((label, idx) => {
-                const scheduled = week1.find(
+                const scheduled = scheduleForWeek.find(
                   (s) =>
                     (s as any).program_day === idx + 1 ||
                     (s as any).day_of_week === idx
@@ -370,37 +511,66 @@ function ProgramDetailsContent() {
                   ? templates[templateId]?.name || "Workout Day"
                   : "Rest Day";
                 const isRest = !scheduled;
+                const cardStyle = {
+                  background: isDark
+                    ? "rgba(255,255,255,0.05)"
+                    : "rgba(0,0,0,0.03)",
+                  border: isDark
+                    ? "1px solid rgba(255,255,255,0.1)"
+                    : "1px solid rgba(0,0,0,0.1)",
+                };
+                if (!isRest && templateId) {
+                  const templateHref = "/coach/workouts/templates/" + templateId;
+                  return (
+                    <Link
+                      key={idx}
+                      href={templateHref}
+                      className="flex items-center justify-between gap-3 rounded-xl p-4 min-h-[52px] cursor-pointer transition-colors hover:bg-[color:var(--fc-glass-soft)] border border-transparent hover:border-[color:var(--fc-glass-border)]"
+                      style={cardStyle}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Dumbbell
+                            className="w-5 h-5 shrink-0"
+                            style={{ color: getSemanticColor("trust").primary }}
+                          />
+                          <span
+                            className="text-sm font-semibold"
+                            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
+                          >
+                            {label}
+                          </span>
+                        </div>
+                        <div
+                          className="text-sm truncate"
+                          style={{
+                            color: isDark
+                              ? "rgba(255,255,255,0.8)"
+                              : "rgba(0,0,0,0.8)",
+                          }}
+                        >
+                          {templateName}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 shrink-0 fc-text-dim" aria-hidden />
+                    </Link>
+                  );
+                }
                 return (
                   <div
                     key={idx}
-                    className="rounded-xl p-4"
-                    style={{
-                      background: isDark
-                        ? "rgba(255,255,255,0.05)"
-                        : "rgba(0,0,0,0.03)",
-                      border: `1px solid ${
-                        isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
-                      }`,
-                    }}
+                    className="flex items-center gap-3 rounded-xl p-4 min-h-[52px] opacity-75"
+                    style={cardStyle}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      {isRest ? (
-                        <Coffee
-                          className="w-5 h-5"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.3)"
-                              : "rgba(0,0,0,0.3)",
-                          }}
-                        />
-                      ) : (
-                        <Dumbbell
-                          className="w-5 h-5"
-                          style={{
-                            color: getSemanticColor("trust").primary,
-                          }}
-                        />
-                      )}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Coffee
+                        className="w-5 h-5 shrink-0"
+                        style={{
+                          color: isDark
+                            ? "rgba(255,255,255,0.3)"
+                            : "rgba(0,0,0,0.3)",
+                        }}
+                      />
                       <span
                         className="text-sm font-semibold"
                         style={{ color: isDark ? "#fff" : "#1A1A1A" }}
@@ -409,16 +579,7 @@ function ProgramDetailsContent() {
                       </span>
                     </div>
                     <div
-                      className="text-sm"
-                      style={{
-                        color: isRest
-                          ? isDark
-                            ? "rgba(255,255,255,0.4)"
-                            : "rgba(0,0,0,0.4)"
-                          : isDark
-                          ? "rgba(255,255,255,0.8)"
-                          : "rgba(0,0,0,0.8)",
-                      }}
+                      className="text-sm fc-text-dim"
                     >
                       {templateName}
                     </div>
@@ -426,6 +587,11 @@ function ProgramDetailsContent() {
                 );
               })}
             </div>
+            {scheduleForWeek.length === 0 && (
+              <p className="text-sm fc-text-dim text-center py-4">
+                No workouts scheduled this week
+              </p>
+            )}
           </div>
           </section>
         </div>

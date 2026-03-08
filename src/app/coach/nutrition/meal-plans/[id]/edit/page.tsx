@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MealPlanService, MealPlan } from "@/lib/mealPlanService";
+import { useToast } from "@/components/ui/toast-provider";
 import { ArrowLeft, ChefHat } from "lucide-react";
 import Link from "next/link";
 
@@ -24,6 +25,7 @@ export default function EditMealPlanPage() {
   const theme = getThemeStyles();
 
   const mealPlanId = params.id as string;
+  const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -34,10 +36,27 @@ export default function EditMealPlanPage() {
     description: "",
   });
 
+  const editMealPlanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (mealPlanId && user) {
-      loadMealPlan();
-    }
+    if (!mealPlanId || !user) return;
+    if (editMealPlanTimeoutRef.current) clearTimeout(editMealPlanTimeoutRef.current);
+    editMealPlanTimeoutRef.current = setTimeout(() => {
+      editMealPlanTimeoutRef.current = null;
+      setLoading(false);
+    }, 20_000);
+    loadMealPlan().finally(() => {
+      if (editMealPlanTimeoutRef.current) {
+        clearTimeout(editMealPlanTimeoutRef.current);
+        editMealPlanTimeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (editMealPlanTimeoutRef.current) {
+        clearTimeout(editMealPlanTimeoutRef.current);
+        editMealPlanTimeoutRef.current = null;
+      }
+    };
   }, [mealPlanId, user]);
 
   const loadMealPlan = async () => {
@@ -67,7 +86,7 @@ export default function EditMealPlanPage() {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      alert("Please enter a meal plan name.");
+      addToast({ title: "Required", description: "Please enter a meal plan name.", variant: "destructive" });
       return;
     }
 
@@ -88,7 +107,7 @@ export default function EditMealPlanPage() {
       router.push(`/coach/nutrition/meal-plans/${mealPlan.id}`);
     } catch (error) {
       console.error("Error updating meal plan:", error);
-      alert("Error updating meal plan. Please try again.");
+      addToast({ title: "Error", description: "Error updating meal plan. Please try again.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -140,8 +159,12 @@ export default function EditMealPlanPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="p-4 sm:p-6 pb-24">
+        <div className="p-4 sm:p-6 pb-32">
           <div className="max-w-2xl mx-auto space-y-6">
+            <Link href="/coach/nutrition" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              Back to Nutrition
+            </Link>
             <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-8">
               <div className="flex items-center gap-4">
                 <Link href={`/coach/nutrition/meal-plans/${mealPlan.id}`} className="fc-glass fc-card w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">

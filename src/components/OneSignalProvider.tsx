@@ -15,6 +15,8 @@ export default function OneSignalProvider({ children }: OneSignalProviderProps) 
   const [userSubscribed, setUserSubscribed] = useState(false)
 
   useEffect(() => {
+    // Fire and forget - OneSignal initialization should NEVER block rendering
+    // If it fails or times out, the app continues normally (just without push notifications)
     const initializeOneSignal = async () => {
       try {
         // Check if OneSignal is supported
@@ -22,49 +24,60 @@ export default function OneSignalProvider({ children }: OneSignalProviderProps) 
         setIsSupported(supported)
 
         if (!supported) {
-          console.log('OneSignal is not supported in this environment')
+          console.log('[OneSignal] Not supported in this environment')
           return
         }
 
-        // Initialize OneSignal
+        // Initialize OneSignal (already has timeout wrapper in onesignal.ts)
         const initialized = await oneSignalService.initialize()
         
         if (initialized) {
           setIsInitialized(true)
-          console.log('OneSignal provider initialized successfully')
+          console.log('[OneSignal] Provider initialized successfully')
         } else {
-          // Silently fallback to browser notifications
+          // Silently fallback - notifications just won't work, app continues normally
+          console.log('[OneSignal] Initialization skipped or failed (non-critical)')
         }
-      } catch (error) {
-        console.error('Error initializing OneSignal provider:', error)
+      } catch (error: any) {
+        // Log but don't throw - OneSignal errors should never break the app
+        console.warn('[OneSignal] Provider initialization error (non-critical):', error?.message || String(error));
       }
     }
 
+    // Don't await - fire and forget
     initializeOneSignal()
   }, [])
 
   useEffect(() => {
+    // Fire and forget - user subscription should NEVER block page rendering
     const setupUserContext = async () => {
       if (!isInitialized || !user || userSubscribed) {
         return
       }
 
       try {
-        // Set up user context in OneSignal
+        // Set up user context in OneSignal (already has timeout wrapper in onesignal.ts)
         const userTags = {
           role: user.role || 'client',
           email: user.email || '',
           created_at: new Date().toISOString()
         }
 
-        await oneSignalService.initializeWithUser(user.id, userTags)
-        setUserSubscribed(true)
-        console.log('OneSignal user context set up successfully')
-      } catch (error) {
-        console.error('Error setting up OneSignal user context:', error)
+        const success = await oneSignalService.initializeWithUser(user.id, userTags)
+        if (success) {
+          setUserSubscribed(true)
+          console.log('[OneSignal] User context set up successfully')
+        } else {
+          // Silently fail - user just won't get push notifications
+          console.log('[OneSignal] User subscription skipped (non-critical)')
+        }
+      } catch (error: any) {
+        // Log but don't throw - subscription failure shouldn't break the app
+        console.warn('[OneSignal] User context setup error (non-critical):', error?.message || String(error));
       }
     }
 
+    // Don't await - fire and forget
     setupUserContext()
   }, [isInitialized, user?.id, userSubscribed]) // Only depend on user.id to prevent loops
 

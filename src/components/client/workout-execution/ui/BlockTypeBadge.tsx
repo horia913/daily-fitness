@@ -42,8 +42,6 @@ export function BlockTypeBadge({ blockType, blockName }: BlockTypeBadgeProps) {
         return <Link className="w-4 h-4" />;
       case "rest_pause":
         return <PauseCircle className="w-4 h-4" />;
-      case "pyramid_set":
-        return <TrendingUp className="w-4 h-4" />;
       case "pre_exhaustion":
         return <Target className="w-4 h-4" />;
       case "amrap":
@@ -52,12 +50,8 @@ export function BlockTypeBadge({ blockType, blockName }: BlockTypeBadgeProps) {
         return <TimerIcon className="w-4 h-4" />;
       case "tabata":
         return <CloudLightning className="w-4 h-4" />;
-      case "circuit":
-        return <Repeat className="w-4 h-4" />;
       case "for_time":
         return <Activity className="w-4 h-4" />;
-      case "ladder":
-        return <BarChart3 className="w-4 h-4" />;
       default:
         return <Dumbbell className="w-4 h-4" />;
     }
@@ -65,7 +59,7 @@ export function BlockTypeBadge({ blockType, blockName }: BlockTypeBadgeProps) {
 
   // Always prioritize config.name (block type name) over blockName (custom name)
   // Only use blockName as fallback if config doesn't exist
-  const displayName = config?.name || blockName || "Unknown Block Type";
+  const displayName = config?.name || blockName || "Unknown Type";
 
   return (
     <Badge

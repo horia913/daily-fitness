@@ -6,7 +6,7 @@ interface ExerciseItemProps {
   exercise: any; // Nested exercise data
   index: number;
   availableExercises?: any[];
-  blockType?: string; // Parent block type (circuit, tabata, etc.)
+  blockType?: string; // Parent block type (tabata, giant_set, etc.)
 }
 
 export default function ExerciseItem({
@@ -35,8 +35,8 @@ export default function ExerciseItem({
     const details: string[] = [];
 
     // Block-type specific details first
-    // Tabata and Circuit display the same: exercise name, work time, rest time
-    if (blockType === "circuit" || blockType === "tabata") {
+    // Tabata: exercise name, work time, rest time
+    if (blockType === "tabata") {
       // Work time - required for both
       if (
         exercise.work_seconds !== undefined &&
@@ -116,7 +116,6 @@ export default function ExerciseItem({
       blockType !== "giant_set" &&
       blockType !== "superset" &&
       blockType !== "pre_exhaustion" &&
-      blockType !== "circuit" &&
       blockType !== "tabata"
     ) {
       details.push(`${exercise.load_percentage}% load`);

@@ -7,15 +7,27 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { Button } from "@/components/ui/button";
-import { Plus, Camera, CheckCircle, Droplet, Image, Info } from "lucide-react";
+import { Droplet } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { uploadMealPhoto } from "@/lib/mealPhotoService";
-import MealCardWithOptions, { 
-  type MealWithOptionsDisplay, 
-  type MealOptionDisplay, 
-  type MealFoodItemDisplay 
-} from "@/components/client/MealCardWithOptions";
+import {
+  ClientPageShell,
+  ClientGlassCard,
+  PrimaryButton,
+  SecondaryButton,
+} from "@/components/client-ui";
+import { AddGoalModal } from "@/components/goals/AddGoalModal";
+import { CompactGoalCard } from "@/components/goals/CompactGoalCard";
+import { useToast } from "@/components/ui/toast-provider";
+import {
+  completeMeal,
+  addPhotoToCompletion,
+  undoCompletion,
+  getTodayPlanSelection,
+  selectPlanForToday,
+} from "@/lib/mealCompletionService";
+import MealCardWithOptions from "@/components/client/MealCardWithOptions";
 
 interface NutritionData {
   calories: { consumed: number; goal: number };
@@ -48,14 +60,32 @@ interface Meal {
   logged: boolean;
   photoUrl?: string;
   logged_at?: string;
-  // Meal Options support
   options?: MealOptionDisplay[];
   loggedOptionId?: string;
+}
+
+interface MealFoodItemDisplay {
+  food: { id: string; name: string; serving_size: number; serving_unit: string };
+  quantity: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface MealOptionDisplay {
+  id: string;
+  name: string;
+  order_index: number;
+  items: MealFoodItemDisplay[];
+  totals: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
 }
 
 function NutritionDashboardContent() {
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
+  const router = useRouter();
+  const { addToast } = useToast();
 
   const [nutritionData, setNutritionData] = useState<NutritionData>({
     calories: { consumed: 0, goal: 0 },
@@ -68,18 +98,51 @@ function NutritionDashboardContent() {
   const [meals, setMeals] = useState<Meal[]>([]);
 
   const NUTRITION_LOAD_TIMEOUT_MS = 20000;
-  const [uploadingMeal, setUploadingMeal] = useState<string | null>(null);
   const [loadingMeals, setLoadingMeals] = useState(true);
   const [mealsLoadError, setMealsLoadError] = useState<string | null>(null);
   const loadGenerationRef = useRef(0);
   const [hasActivePlan, setHasActivePlan] = useState<boolean | null>(null);
   const [hasMealsInPlan, setHasMealsInPlan] = useState<boolean | null>(null);
+  const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
+  /** All active assignments (for plan picker when >1). Phase N4. */
+  const [activeAssignments, setActiveAssignments] = useState<Array<{
+    id: string;
+    meal_plan_id: string;
+    label?: string | null;
+    meal_plans: { id: string; name: string; target_calories?: number; notes?: string } | null;
+  }>>([]);
+  const [activeMealPlanInfo, setActiveMealPlanInfo] = useState<{
+    mealPlanId: string;
+    name: string;
+    startDate: string | null;
+    endDate: string | null;
+    description?: string;
+  } | null>(null);
   const [waterGoalGlasses, setWaterGoalGlasses] = useState<number>(0);
   const [displayedWaterGlasses, setDisplayedWaterGlasses] = useState<number>(1); // Start with 1, expand as needed
   const [waterGoalId, setWaterGoalId] = useState<string | null>(null); // Store goal id for updates
   const [loadingWaterGoal, setLoadingWaterGoal] = useState(false); // Prevent duplicate goal creation
 
+  // E4.1 — Real data for sections 4, 5, 7
+  const [nutritionGoals, setNutritionGoals] = useState<{
+    id: string;
+    title: string;
+    target_value: number | string | null;
+    target_unit?: string | null;
+    current_value?: number | null;
+    progress_percentage?: number | null;
+    status: string;
+  }[]>([]);
+  const [showAddGoalModal, setShowAddGoalModal] = useState(false);
+  const [activeGoalsCount, setActiveGoalsCount] = useState(0);
+  const [goalsAdherence, setGoalsAdherence] = useState<number | null>(null);
+  const [calorieTrendData, setCalorieTrendData] = useState<{ label: string; date: string; calories: number }[]>([]);
+  const [recentHistory, setRecentHistory] = useState<
+    { label: string; date: string; calories: number; protein: number; completedCount: number }[]
+  >([]);
+
   const loadStartedAtRef = useRef<number | null>(null);
+  const goalsSectionRef = useRef<HTMLDivElement>(null);
 
   const runMealsLoadWithTimeout = async () => {
     if (!user?.id) return;
@@ -92,9 +155,14 @@ function NutritionDashboardContent() {
       // On retry (after an error), refresh auth so a stale token doesn't cause the same failure
       if (mealsLoadError) {
         try {
-          await supabase.auth.refreshSession();
+          await Promise.race([
+            supabase.auth.refreshSession(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("refresh_timeout")), 3000)
+            ),
+          ]);
         } catch {
-          // Proceed with load even if refresh fails
+          // Proceed with load even if refresh fails or times out
         }
       }
       await Promise.race([
@@ -118,56 +186,19 @@ function NutritionDashboardContent() {
     }
     if (loadId === loadGenerationRef.current) {
       loadWaterGoal();
+      loadNutritionHistory(loadId);
     }
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     runMealsLoadWithTimeout();
     return () => {
       loadGenerationRef.current = (loadGenerationRef.current ?? 0) + 1;
       setLoadingMeals(false);
       loadStartedAtRef.current = null;
     };
-  }, [user]);
-
-  const visibilityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState !== "visible") return;
-      if (!loadingMeals) return;
-      if (visibilityTimeoutRef.current) {
-        clearTimeout(visibilityTimeoutRef.current);
-        visibilityTimeoutRef.current = null;
-      }
-      const started = loadStartedAtRef.current;
-      if (started == null) return;
-      const elapsed = Date.now() - started;
-      if (elapsed >= NUTRITION_LOAD_TIMEOUT_MS) {
-        setLoadingMeals(false);
-        setMealsLoadError("Loading was interrupted. Tap Retry to try again.");
-        loadStartedAtRef.current = null;
-        return;
-      }
-      const graceMs = 3000;
-      visibilityTimeoutRef.current = setTimeout(() => {
-        visibilityTimeoutRef.current = null;
-        if (loadStartedAtRef.current == null) return;
-        setLoadingMeals(false);
-        setMealsLoadError("Loading took too long. Tap Retry to try again.");
-        loadStartedAtRef.current = null;
-      }, graceMs);
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
-      if (visibilityTimeoutRef.current) {
-        clearTimeout(visibilityTimeoutRef.current);
-        visibilityTimeoutRef.current = null;
-      }
-    };
-  }, [loadingMeals]);
+  }, [user?.id]);
 
   const loadTodayMeals = async (loadId: number) => {
     if (!user?.id) return;
@@ -177,58 +208,57 @@ function NutritionDashboardContent() {
       setLoadingMeals(true);
       const today = new Date().toISOString().split("T")[0];
 
-      // STEP 1: Get active meal plan assignment with meal plan details
-      // Check for active assignments that are within date range (or no end_date)
-      // Use .limit(1) instead of .maybeSingle() to handle multiple active assignments
-      const { data: assignmentsData, error: assignmentError } = await supabase
-        .from("meal_plan_assignments")
-        .select(
-          `
-          meal_plan_id,
-          start_date,
-          end_date,
-          is_active,
-          meal_plans (
+      // STEP 1 (Phase N4): Load ALL active assignments + today's plan selection
+      const [
+        { data: assignmentsData, error: assignmentError },
+        { data: todaySelectionRow },
+      ] = await Promise.all([
+        supabase
+          .from("meal_plan_assignments")
+          .select(
+            `
             id,
-            target_calories,
-            target_protein,
-            target_carbs,
-            target_fat
+            meal_plan_id,
+            start_date,
+            end_date,
+            is_active,
+            label,
+            meal_plans (
+              id,
+              name,
+              notes,
+              target_calories,
+              target_protein,
+              target_carbs,
+              target_fat
+            )
+          `
           )
-        `
-        )
-        .eq("client_id", user.id)
-        .eq("is_active", true)
-        .lte("start_date", today) // Assignment has started
-        .or(`end_date.is.null,end_date.gte.${today}`) // No end date OR hasn't ended yet
-        .order("start_date", { ascending: false })
-        .limit(1); // Get only the most recent active assignment
-
-      // Extract the first assignment (most recent) or null if none found
-      const assignment = assignmentsData && assignmentsData.length > 0 ? assignmentsData[0] : null;
+          .eq("client_id", user.id)
+          .eq("is_active", true)
+          .lte("start_date", today)
+          .or(`end_date.is.null,end_date.gte.${today}`)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("client_daily_plan_selection")
+          .select("meal_plan_assignment_id")
+          .eq("client_id", user.id)
+          .eq("date", today)
+          .maybeSingle(),
+      ]);
 
       if (assignmentError) {
-        console.error("Error loading meal plan assignment:", assignmentError);
-        console.error("Assignment error details:", {
-          message: assignmentError.message,
-          details: assignmentError.details,
-          hint: assignmentError.hint,
-          code: assignmentError.code
-        });
+        console.error("Error loading meal plan assignments:", assignmentError);
       }
 
-      // Debug: Log assignment query result
-      console.log("Meal plan assignment query result:", {
-        hasAssignment: !!assignment,
-        assignment,
-        today,
-        error: assignmentError
-      });
+      const assignmentsList = assignmentsData ?? [];
+      const todaySelectionId = todaySelectionRow?.meal_plan_assignment_id ?? null;
 
-      if (assignmentError || !assignment) {
-        console.log("No active meal plan assignment found for client:", user.id);
+      if (assignmentsList.length === 0) {
         if (!isCurrent()) return;
-        // No active plan – clear meals and zero out today's intake
+        setActiveAssignmentId(null);
+        setActiveMealPlanInfo(null);
+        setActiveAssignments([]);
         setHasActivePlan(false);
         setMeals([]);
         setNutritionData((prev) => ({
@@ -243,10 +273,27 @@ function NutritionDashboardContent() {
       }
 
       if (!isCurrent()) return;
+      setActiveAssignments(assignmentsList as any);
+
+      // Effective assignment: today's selection if valid, else first assignment
+      const selectedId =
+        todaySelectionId && assignmentsList.some((a: { id: string }) => a.id === todaySelectionId)
+          ? todaySelectionId
+          : assignmentsList[0].id;
+      const assignment = assignmentsList.find((a: { id: string }) => a.id === selectedId) ?? assignmentsList[0];
+
       setHasActivePlan(true);
+      setActiveAssignmentId(assignment.id);
+      const mealPlan = assignment.meal_plans as any;
+      setActiveMealPlanInfo({
+        mealPlanId: assignment.meal_plan_id,
+        name: mealPlan?.name || "Active Meal Plan",
+        startDate: assignment.start_date || null,
+        endDate: assignment.end_date || null,
+        description: mealPlan?.notes || undefined,
+      });
 
       // Extract meal plan targets (use 0 if not set - no defaults)
-      const mealPlan = assignment.meal_plans as any;
       const targetCalories = mealPlan?.target_calories || 0;
       const targetProtein = mealPlan?.target_protein || 0;
       const targetCarbs = mealPlan?.target_carbs || 0;
@@ -281,20 +328,27 @@ function NutritionDashboardContent() {
 
       const mealsWithData: Meal[] = [];
 
-      // STEP 3: OPTIMIZED - Batch fetch all data at once instead of N+1 queries
+      // STEP 3: OPTIMIZED - Batch 1: items that only need mealIds (parallel)
       const mealIds = planMeals.map(m => m.id);
 
-      // 3a: Batch fetch ALL meal food items for all meals at once (including meal_option_id)
-      const { data: allFoodItems, error: foodError } = await supabase
-        .from("meal_food_items")
-        .select("id, quantity, unit, food_id, meal_id, meal_option_id")
-        .in("meal_id", mealIds);
+      const [
+        { data: allFoodItems, error: foodError },
+        { data: allMealOptions, error: optionsError },
+        { data: allCompletions },
+      ] = await Promise.all([
+        supabase.from("meal_food_items").select("id, quantity, unit, food_id, meal_id, meal_option_id").in("meal_id", mealIds),
+        supabase.from("meal_options").select("*").in("meal_id", mealIds).order("order_index", { ascending: true }),
+        supabase.from("meal_completions").select("*").in("meal_id", mealIds).eq("client_id", user.id).eq("date", today),
+      ]);
 
       if (foodError) {
         console.error("Error fetching meal food items:", foodError);
       }
+      if (optionsError) {
+        console.error("Error fetching meal options:", optionsError);
+      }
 
-      // 3b: Batch fetch ALL foods at once (get unique food IDs)
+      // Batch 2: foods (depends on meal_food_items for unique food IDs)
       const uniqueFoodIds = [...new Set((allFoodItems || []).map((item: any) => item.food_id).filter(Boolean))];
       const { data: allFoods, error: foodsError } = await supabase
         .from("foods")
@@ -305,21 +359,8 @@ function NutritionDashboardContent() {
         console.error("Error fetching foods:", foodsError);
       }
 
-      // Create a map for quick food lookup
       const foodMap = new Map((allFoods || []).map((food: any) => [food.id, food]));
 
-      // 3c: Batch fetch ALL meal options for all meals at once
-      const { data: allMealOptions, error: optionsError } = await supabase
-        .from("meal_options")
-        .select("*")
-        .in("meal_id", mealIds)
-        .order("order_index", { ascending: true });
-
-      if (optionsError) {
-        console.error("Error fetching meal options:", optionsError);
-      }
-
-      // Create a map of meal options grouped by meal_id
       const optionsByMealMap = new Map<string, any[]>();
       (allMealOptions || []).forEach((opt: any) => {
         if (!optionsByMealMap.has(opt.meal_id)) {
@@ -328,26 +369,28 @@ function NutritionDashboardContent() {
         optionsByMealMap.get(opt.meal_id)!.push(opt);
       });
 
-      // 3d: Batch fetch ALL photo logs for all meals at once (including meal_option_id)
-      const { data: allPhotoLogs } = await supabase
-        .from("meal_photo_logs")
-        .select("*")
-        .in("meal_id", mealIds)
-        .eq("client_id", user.id)
-        .eq("log_date", today);
+      // Resolve private storage paths to signed URLs for display (graceful fallback)
+      const completionsWithSignedUrls = await Promise.all(
+        (allCompletions || []).map(async (comp: any) => {
+          const raw = comp?.photo_url as string | null | undefined;
+          if (!raw) return comp;
+          // If this already looks like a URL, keep it (backwards compat)
+          if (/^https?:\/\//i.test(raw)) return comp;
+          try {
+            const { data, error } = await supabase.storage
+              .from("meal-photos")
+              .createSignedUrl(raw, 3600);
+            if (error || !data?.signedUrl) return { ...comp, photo_url: null };
+            return { ...comp, photo_url: data.signedUrl };
+          } catch {
+            return { ...comp, photo_url: null };
+          }
+        })
+      );
 
-      // 3e: Batch fetch ALL completions for all meals at once (backward compatibility)
-      const { data: allCompletions } = await supabase
-        .from("meal_completions")
-        .select("*")
-        .in("meal_id", mealIds)
-        .eq("client_id", user.id)
-        .gte("completed_at", `${today}T00:00:00`)
-        .lt("completed_at", `${today}T23:59:59`);
-
-      // Create maps for quick lookup
-      const photoLogMap = new Map((allPhotoLogs || []).map((log: any) => [log.meal_id, log]));
-      const completionMap = new Map((allCompletions || []).map((comp: any) => [comp.meal_id, comp]));
+      const completionMap = new Map(
+        completionsWithSignedUrls.map((comp: any) => [comp.meal_id, comp])
+      );
 
       // STEP 4: Process meals with batched data
       for (const meal of planMeals) {
@@ -474,13 +517,19 @@ function NutritionDashboardContent() {
           mappedFoodItems = mealOptionsDisplay[0].items;
         }
 
-        // Get photo log/completion from maps (no query needed!)
-        const photoLog = photoLogMap.get(meal.id) || null;
         const completion = completionMap.get(meal.id) || null;
 
-        // Use photo logs first, fall back to completions (from maps)
-        const hasPhotoLog = photoLog !== null;
-        const hasCompletion = !hasPhotoLog && completion !== null;
+        // When completed with a specific option, use that option's items for display and macro sum
+        if (completion?.meal_option_id && mealOptionsDisplay.length > 0) {
+          const chosenOption = mealOptionsDisplay.find((o) => o.id === completion.meal_option_id);
+          if (chosenOption) {
+            mappedFoodItems = chosenOption.items;
+            totalCalories = chosenOption.totals.calories;
+            totalProtein = chosenOption.totals.protein;
+            totalCarbs = chosenOption.totals.carbs;
+            totalFat = chosenOption.totals.fat;
+          }
+        }
 
         mealsWithData.push({
           id: meal.id,
@@ -495,20 +544,11 @@ function NutritionDashboardContent() {
               ? "🍽️"
               : "🍎",
           items: mappedFoodItems,
-          logged: !!(hasPhotoLog || hasCompletion),
-          photoUrl: hasPhotoLog
-            ? photoLog.photo_url
-            : hasCompletion
-            ? completion?.photo_url
-            : undefined,
-          logged_at: hasPhotoLog
-            ? photoLog.created_at
-            : hasCompletion
-            ? completion?.completed_at
-            : undefined,
-          // Meal Options support
+          logged: !!completion,
+          photoUrl: completion?.photo_url ?? undefined,
+          logged_at: completion?.completed_at ?? undefined,
           options: mealOptionsDisplay.length > 0 ? mealOptionsDisplay : undefined,
-          loggedOptionId: hasPhotoLog ? photoLog.meal_option_id : undefined,
+          loggedOptionId: completion?.meal_option_id ?? undefined,
         });
       }
 
@@ -533,28 +573,121 @@ function NutritionDashboardContent() {
     }
   };
 
+  const todayStr = () => new Date().toISOString().split("T")[0];
+
+  const scrollToGoalsSection = () => {
+    goalsSectionRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const adherenceColor = (pct: number) =>
+    pct >= 80 ? "text-emerald-400" : pct >= 60 ? "text-amber-400" : "text-red-400";
+
+  const handleMarkComplete = async (mealId: string, optionId: string | null) => {
+    if (!user?.id) {
+      addToast({
+        title: "Cannot complete meal",
+        description: "Please sign in and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!activeAssignmentId) {
+      addToast({
+        title: "Cannot complete meal",
+        description: "No active meal plan. Please refresh the page or ask your coach to assign a plan.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await completeMeal({
+        clientId: user.id,
+        mealId,
+        mealOptionId: optionId,
+        mealPlanAssignmentId: activeAssignmentId,
+        date: todayStr(),
+      });
+      runMealsLoadWithTimeout();
+    } catch (e) {
+      addToast({
+        title: "Could not complete meal",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUndo = async (mealId: string) => {
+    if (!user?.id) return;
+    try {
+      await undoCompletion(user.id, mealId, todayStr());
+      runMealsLoadWithTimeout();
+    } catch (e) {
+      addToast({
+        title: "Could not undo",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  /** Phase N4: Switch today's plan selection and reload meals for that plan. */
+  const handlePlanSelect = async (assignmentId: string) => {
+    if (!user?.id || assignmentId === activeAssignmentId) return;
+    try {
+      await selectPlanForToday(user.id, assignmentId, todayStr());
+      runMealsLoadWithTimeout();
+    } catch (e) {
+      addToast({
+        title: "Could not switch plan",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddPhoto = async (mealId: string, file: File) => {
+    if (!user?.id) return;
+    try {
+      await addPhotoToCompletion(user.id, mealId, todayStr(), file);
+      await runMealsLoadWithTimeout();
+      addToast({
+        title: "Photo added",
+        description: "Your meal photo has been saved.",
+        variant: "default",
+      });
+    } catch (e) {
+      addToast({
+        title: "Photo upload failed",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+      throw e;
+    }
+  };
+
   const loadWaterGoal = async () => {
     if (!user?.id) return;
     if (loadingWaterGoal) return; // Prevent duplicate calls
     
     setLoadingWaterGoal(true);
     try {
-      // Fetch active water intake goal from goals table (including current_value for today's intake)
-      const { data: goals, error } = await supabase
+      // Single query: fetch ALL active goals, then derive water + nutrition in JS (deduplicated)
+      const { data: allGoals, error } = await supabase
         .from("goals")
-        .select("id, target_value, target_unit, current_value")
+        .select("id, title, target_value, target_unit, current_value, category, progress_percentage, pillar")
         .eq("client_id", user.id)
         .eq("status", "active")
-        .ilike("title", "%Water Intake%")
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Error loading water goal:", error);
-        // If no goal found or error, set goal to 0
+        console.error("Error loading goals:", error);
         setWaterGoalId(null);
         setWaterGoalGlasses(0);
-        setDisplayedWaterGlasses(1); // Show at least 1 glass even if no goal
+        setDisplayedWaterGlasses(1);
+        setNutritionGoals([]);
+        setActiveGoalsCount(0);
+        setGoalsAdherence(null);
         setNutritionData((prev) => ({
           ...prev,
           water: { ...prev.water, goal: 0, goalMl: 0, glasses: 0, ml: 0 },
@@ -562,9 +695,59 @@ function NutritionDashboardContent() {
         return;
       }
 
+      const goalsList = allGoals || [];
+      setActiveGoalsCount(goalsList.length);
+      const adherence =
+        goalsList.length > 0
+          ? Math.round(
+              goalsList.reduce((sum: number, g: { progress_percentage?: number | null }) => sum + (g.progress_percentage ?? 0), 0) /
+                goalsList.length
+            )
+          : null;
+      setGoalsAdherence(adherence);
+
+      // Filter for water goal (first Water Intake match)
+      const goals = goalsList.filter((g: { title?: string }) =>
+        (g.title || "").toLowerCase().includes("water intake")
+      );
+
+      // Nutrition goals: prefer pillar=nutrition; fallback to category/keyword for legacy
+      let nutrition: { id: string; title: string; target_value: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null; status: string }[] = [];
+      const pillarGoals = goalsList.filter((g: { pillar?: string }) => (g.pillar || "") === "nutrition").slice(0, 3);
+      if (pillarGoals.length > 0) {
+        nutrition = pillarGoals.map((g: { id: string; title: string; target_value: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null; status?: string }) => ({
+          id: g.id,
+          title: g.title,
+          target_value: g.target_value,
+          target_unit: g.target_unit,
+          current_value: g.current_value,
+          progress_percentage: g.progress_percentage,
+          status: g.status ?? "active",
+        }));
+      } else {
+        const nutritionKeywords = ["calorie", "protein", "carb", "fat", "macro", "nutrition", "diet", "food"];
+        nutrition = goalsList
+          .filter(
+            (g: { category?: string; title?: string }) =>
+              (g.category || "").toLowerCase() === "nutrition" ||
+              nutritionKeywords.some((k) => (g.title || "").toLowerCase().includes(k))
+          )
+          .filter((g: { title?: string }) => !(g.title || "").toLowerCase().includes("water intake"))
+          .slice(0, 3)
+          .map((g: { id: string; title: string; target_value: number | string | null; target_unit?: string | null; current_value?: number | null; progress_percentage?: number | null; status?: string }) => ({
+            id: g.id,
+            title: g.title,
+            target_value: g.target_value,
+            target_unit: g.target_unit,
+            current_value: g.current_value,
+            progress_percentage: g.progress_percentage,
+            status: g.status ?? "active",
+          }));
+      }
+      setNutritionGoals(nutrition);
+
       if (!goals || goals.length === 0) {
         // No water goal configured - create one automatically with default values
-        console.log("No water goal found - creating default water goal");
         const defaultTargetLiters = 3; // 3 liters (8 glasses) default goal
         const defaultTargetMl = defaultTargetLiters * 1000;
         
@@ -575,6 +758,7 @@ function NutritionDashboardContent() {
             title: "Water Intake",
             description: "Daily water intake goal",
             category: "other",
+            pillar: "nutrition",
             target_value: defaultTargetLiters,
             target_unit: "liters",
             current_value: 0,
@@ -591,6 +775,8 @@ function NutritionDashboardContent() {
           setWaterGoalId(null);
           setWaterGoalGlasses(0);
           setDisplayedWaterGlasses(1);
+          setActiveGoalsCount(0);
+          setGoalsAdherence(null);
           setNutritionData((prev) => ({
             ...prev,
             water: { ...prev.water, goal: 0, goalMl: 0, glasses: 0, ml: 0 },
@@ -605,6 +791,8 @@ function NutritionDashboardContent() {
         setWaterGoalId(newGoal.id);
         setWaterGoalGlasses(displayGoalGlasses);
         setDisplayedWaterGlasses(Math.max(displayGoalGlasses, 1));
+        setActiveGoalsCount(1);
+        setGoalsAdherence(0);
         setNutritionData((prev) => ({
           ...prev,
           water: {
@@ -614,13 +802,11 @@ function NutritionDashboardContent() {
             goalMl: defaultTargetMl,
           },
         }));
-        console.log("Water goal created successfully:", newGoal.id);
         setLoadingWaterGoal(false);
         return;
       }
 
       const waterGoal = goals[0];
-      console.log("Water goal loaded:", waterGoal.id, "current_value:", waterGoal.current_value);
       setWaterGoalId(waterGoal.id); // Store goal id for updates
       const targetValue = waterGoal.target_value || 0;
       const currentValue = waterGoal.current_value || 0; // Today's water intake (in ml)
@@ -666,7 +852,7 @@ function NutritionDashboardContent() {
       console.error("Error loading water goal:", error);
       setWaterGoalId(null);
       setWaterGoalGlasses(0);
-      setDisplayedWaterGlasses(1); // Show at least 1 glass even if no goal
+      setDisplayedWaterGlasses(1);
       setNutritionData((prev) => ({
         ...prev,
         water: { ...prev.water, goal: 0, goalMl: 0, glasses: 0, ml: 0 },
@@ -676,11 +862,102 @@ function NutritionDashboardContent() {
     }
   };
 
+  // E4.1: Load last 7 days nutrition history for Calorie Trend + Nutrition History (3 queries)
+  const loadNutritionHistory = async (loadId: number) => {
+    if (!user?.id) return;
+    const isCurrent = () => loadId === loadGenerationRef.current;
+
+    const today = new Date().toISOString().split("T")[0];
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    const sevenDaysAgo = d.toISOString().split("T")[0];
+
+    try {
+      // Phase N5: Single source of truth — meal_completions only (no meal_photo_logs)
+      const { data: completions } = await supabase
+        .from("meal_completions")
+        .select("date, completed_at, meal_id")
+        .eq("client_id", user.id)
+        .gte("date", sevenDaysAgo)
+        .lte("date", today);
+
+      const allMealIds = [...new Set((completions || []).map((c: { meal_id: string }) => c.meal_id))];
+
+      const mealIdToCalories = new Map<string, number>();
+      const proteinByMeal = new Map<string, number>();
+
+      if (allMealIds.length > 0) {
+        const { data: mfi } = await supabase
+          .from("meal_food_items")
+          .select("meal_id, quantity, foods(calories_per_serving, serving_size, protein)")
+          .in("meal_id", allMealIds);
+
+        for (const item of mfi || []) {
+          const row = item as { meal_id: string; quantity: number; foods: { calories_per_serving?: number; serving_size?: number; protein?: number } | null };
+          const f = row.foods;
+          const servingSize = f?.serving_size || 1;
+          const mult = row.quantity / servingSize;
+          const cal = ((f?.calories_per_serving || 0) * mult) || 0;
+          const prot = ((f?.protein || 0) * mult) || 0;
+          const mid = row.meal_id;
+          mealIdToCalories.set(mid, (mealIdToCalories.get(mid) || 0) + cal);
+          proteinByMeal.set(mid, (proteinByMeal.get(mid) || 0) + prot);
+        }
+      }
+
+      const dateToData = new Map<
+        string,
+        { calories: number; protein: number; completedCount: number }
+      >();
+
+      for (const c of completions || []) {
+        const row = c as { date?: string; completed_at: string; meal_id: string };
+        const dateStr = row.date || row.completed_at.split("T")[0];
+        const mid = row.meal_id;
+        const existing = dateToData.get(dateStr) || { calories: 0, protein: 0, completedCount: 0 };
+        dateToData.set(dateStr, {
+          calories: existing.calories + (mealIdToCalories.get(mid) || 0),
+          protein: existing.protein + (proteinByMeal.get(mid) || 0),
+          completedCount: existing.completedCount + 1,
+        });
+      }
+
+      const sortedDates = Array.from(dateToData.keys()).sort();
+      const trend = sortedDates.map((dateStr) => ({
+        label: new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+        date: dateStr,
+        calories: dateToData.get(dateStr)?.calories || 0,
+      }));
+
+      const history = sortedDates
+        .slice(-7)
+        .reverse()
+        .map((dateStr) => {
+          const v = dateToData.get(dateStr)!;
+          return {
+            label: new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+            date: dateStr,
+            calories: Math.round(v.calories),
+            protein: Math.round(v.protein),
+            completedCount: v.completedCount,
+          };
+        });
+
+      if (isCurrent()) {
+        setCalorieTrendData(trend);
+        setRecentHistory(history);
+      }
+    } catch (err) {
+      console.error("Error loading nutrition history:", err);
+      if (isCurrent()) {
+        setCalorieTrendData([]);
+        setRecentHistory([]);
+      }
+    }
+  };
+
   const handleWaterGlassClick = async (targetGlasses: number) => {
-    console.log("handleWaterGlassClick called with:", targetGlasses, "waterGoalId:", waterGoalId, "user:", user?.id);
-    
     if (!user?.id || !waterGoalId) {
-      console.log("No goal configured - updating UI state only");
       // No goal configured, just update UI state
       setNutritionData((prev) => {
         const maxGlasses = 16;
@@ -703,7 +980,6 @@ function NutritionDashboardContent() {
     }
 
     try {
-      console.log("Saving water intake to database...");
       // Store old value for error revert
       const oldGlasses = nutritionData.water.glasses;
       const oldMl = nutritionData.water.ml;
@@ -723,14 +999,12 @@ function NutritionDashboardContent() {
       
       const newMl = newGlasses * 375; // 375ml per glass
       
-      console.log("Updating UI state - newGlasses:", newGlasses, "newMl:", newMl);
       // Update UI state immediately (optimistic update)
       setNutritionData((prev) => ({
         ...prev,
         water: { ...prev.water, glasses: newGlasses, ml: newMl },
       }));
 
-      console.log("Saving to database - goalId:", waterGoalId, "newMl:", newMl);
       // Save to database (goals table current_value in ml)
       const { data: updateData, error: updateError } = await supabase
         .from("goals")
@@ -752,46 +1026,24 @@ function NutritionDashboardContent() {
           ...prev,
           water: { ...prev.water, glasses: oldGlasses, ml: oldMl },
         }));
-        alert("Failed to save water intake. Please try again.");
-      } else {
-        console.log("Water intake saved successfully! Response:", updateData);
-        if (!updateData || updateData.length === 0) {
-          console.warn("Update succeeded but no rows were updated - goal might not exist or permissions issue");
-        } else {
-          console.log("Updated goal:", updateData[0]);
-        }
+        addToast({ title: "Error", description: "Failed to save water intake. Please try again.", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error in handleWaterGlassClick:", error);
-      alert("Failed to save water intake. Please try again.");
+      addToast({ title: "Error", description: "Failed to save water intake. Please try again.", variant: "destructive" });
     }
   };
 
-  // Helper function to build meal description from food items
-  const getMealDescription = (meal: Meal): string => {
-    if (meal.items.length === 0) return "";
-    return meal.items
-      .map((item) => item.food?.name || "Unknown Food")
-      .join(", ");
+  // Helper: items to show as chips (from meal.items or first option)
+  const getDisplayItems = (meal: Meal): MealFoodItem[] => {
+    if (meal.items && meal.items.length > 0) return meal.items;
+    const opt = meal.options?.[0];
+    return opt?.items ?? [];
   };
 
   // Helper function to get meal calories
   const getMealCalories = (meal: Meal): number => {
     return meal.items.reduce((sum, item) => sum + item.calories, 0);
-  };
-
-  // Helper function to format time from timestamp
-  const formatTime = (timestamp?: string): string => {
-    if (!timestamp) return "";
-    return new Date(timestamp).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
-
-  // Helper function to get logged meals count
-  const getLoggedMealsCount = (): number => {
-    return meals.filter((m) => m.logged).length;
   };
 
   // Helper function to calculate and update nutrition totals from meals array
@@ -803,32 +1055,22 @@ function NutritionDashboardContent() {
     targetCarbs?: number,
     targetFat?: number
   ) => {
-    const totalCalories = mealsArray.reduce(
-      (sum, meal) =>
-        meal.logged
-          ? sum + meal.items.reduce((itemSum, item) => itemSum + item.calories, 0)
-          : sum,
+    // Sum macros from completed (logged) meals only; each meal's items reflect chosen option when logged
+    const loggedMeals = mealsArray.filter((m) => m.logged);
+    const totalCalories = loggedMeals.reduce(
+      (sum, meal) => sum + meal.items.reduce((itemSum, item) => itemSum + item.calories, 0),
       0
     );
-    const totalProtein = mealsArray.reduce(
-      (sum, meal) =>
-        meal.logged
-          ? sum + meal.items.reduce((itemSum, item) => itemSum + item.protein, 0)
-          : sum,
+    const totalProtein = loggedMeals.reduce(
+      (sum, meal) => sum + meal.items.reduce((itemSum, item) => itemSum + item.protein, 0),
       0
     );
-    const totalCarbs = mealsArray.reduce(
-      (sum, meal) =>
-        meal.logged
-          ? sum + meal.items.reduce((itemSum, item) => itemSum + item.carbs, 0)
-          : sum,
+    const totalCarbs = loggedMeals.reduce(
+      (sum, meal) => sum + meal.items.reduce((itemSum, item) => itemSum + item.carbs, 0),
       0
     );
-    const totalFat = mealsArray.reduce(
-      (sum, meal) =>
-        meal.logged
-          ? sum + meal.items.reduce((itemSum, item) => itemSum + item.fat, 0)
-          : sum,
+    const totalFat = loggedMeals.reduce(
+      (sum, meal) => sum + meal.items.reduce((itemSum, item) => itemSum + item.fat, 0),
       0
     );
 
@@ -855,606 +1097,332 @@ function NutritionDashboardContent() {
     }));
   };
 
-  const handleMealPhotoUpload = async (mealId: string, mealType: string) => {
-    if (!user) return;
-
-    // Check if already logged today for THIS SPECIFIC MEAL
-    const meal = meals.find((m) => m.id === mealId);
-    if (meal?.logged) {
-      alert(
-        `Photo already uploaded for ${meal.name} today. Each meal can have one photo per day.`
-      );
-      return;
-    }
-
-    // Create a file input element
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.capture = "environment"; // Use camera on mobile
-
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      setUploadingMeal(mealId);
-
-      try {
-        // Use mealPhotoService to handle upload with constraint enforcement
-        const today = new Date().toISOString().split("T")[0];
-        const result = await uploadMealPhoto(user.id, mealId, file, today);
-
-        if (!result.success) {
-          console.error("Upload failed:", result.error);
-          if (
-            result.error?.includes("already logged") ||
-            result.error?.includes("UNIQUE")
-          ) {
-            alert(
-              `Photo already uploaded for ${
-                meal?.name || "this meal"
-              } today. Each meal can have one photo per day.`
-            );
-          } else {
-            alert(result.error || "Failed to upload photo. Please try again.");
-          }
-          setUploadingMeal(null);
-          return;
-        }
-
-        // Update local state with the logged photo
-        if (result.photoLog) {
-          setMeals((prev) => {
-            const updated = prev.map((meal) =>
-              meal.id === mealId
-                ? {
-                    ...meal,
-                    logged: true,
-                    photoUrl: result.photoLog!.photo_url,
-                    logged_at: result.photoLog!.created_at,
-                  }
-                : meal
-            );
-            // Recalculate nutrition totals automatically after meal is logged
-            calculateNutritionTotals(updated);
-            return updated;
-          });
-        }
-
-        alert("Meal photo uploaded successfully!");
-      } catch (error) {
-        console.error("Error processing meal photo:", error);
-        alert("Failed to process photo. Please try again.");
-      } finally {
-        setUploadingMeal(null);
-      }
-    };
-
-    input.click();
-  };
-
-  // Surface card class (design system token)
-  const surfaceCard = "fc-surface rounded-3xl border border-[color:var(--fc-surface-card-border)] relative overflow-hidden";
-
-  // Calculate calorie percentage for ring
-  const caloriePercent =
-    nutritionData.calories.goal > 0
-      ? Math.min(
-          (nutritionData.calories.consumed / nutritionData.calories.goal) * 100,
-          100
-        )
-      : 0;
-  const calorieRemaining = Math.max(
-    0,
-    nutritionData.calories.goal - nutritionData.calories.consumed
-  );
-
-  // Calculate macro percentages
-  const proteinPercent =
-    nutritionData.protein.goal > 0
-      ? Math.min(
-          (nutritionData.protein.consumed / nutritionData.protein.goal) * 100,
-          100
-        )
-      : 0;
-  const carbsPercent =
-    nutritionData.carbs.goal > 0
-      ? Math.min(
-          (nutritionData.carbs.consumed / nutritionData.carbs.goal) * 100,
-          100
-        )
-      : 0;
-  const fatPercent =
-    nutritionData.fat.goal > 0
-      ? Math.min(
-          (nutritionData.fat.consumed / nutritionData.fat.goal) * 100,
-          100
-        )
-      : 0;
-
-  // Format date
-  const today = new Date();
-  const formattedDate = today.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
-      <div className="relative z-10 container mx-auto max-w-6xl fc-page">
-        {/* Header Section */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] fc-text-dim mb-2">
-              Nutrition Overview
-            </p>
-            <h1 className="text-3xl font-bold tracking-tight fc-text-primary">
-              Nutrition Tracking
-            </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm font-medium uppercase tracking-widest fc-text-dim">
-                {formattedDate}
-              </span>
-              {hasActivePlan && meals.length > 0 && (
-                <>
-                  <span className="w-1 h-1 rounded-full fc-text-dim"></span>
-                  <span className="text-sm font-semibold fc-text-meals">
-                    {getLoggedMealsCount()} of {meals.length} meals logged
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-          <Link href="/client/nutrition/foods/create">
-            <Button
-              variant="success"
-              className="h-12 px-8 rounded-xl flex items-center justify-center gap-2 font-semibold w-full md:w-auto"
-            >
-              <Plus className="w-5 h-5" />
-              Log Food
-            </Button>
-          </Link>
-        </header>
-
-        {/* Load error - retry without restarting app */}
+      <ClientPageShell className="max-w-3xl flex flex-col gap-6 overflow-x-hidden px-4 sm:px-6">
+        {/* Load error */}
         {mealsLoadError && !loadingMeals && (
-          <div className="fc-glass fc-card p-6 rounded-2xl border border-[color:var(--fc-glass-border)] mb-8">
+          <ClientGlassCard className="p-6">
             <div className="text-center space-y-4">
               <p className="fc-text-primary font-medium">{mealsLoadError}</p>
-              <Button
-                type="button"
+              <SecondaryButton
                 onClick={() => {
                   setMealsLoadError(null);
                   setLoadingMeals(true);
                   runMealsLoadWithTimeout();
                 }}
-                variant="default"
-                className="rounded-xl"
               >
                 Retry
-              </Button>
+              </SecondaryButton>
             </div>
-          </div>
+          </ClientGlassCard>
         )}
 
-        {/* No Meal Plan Message */}
-        {!loadingMeals && !mealsLoadError && hasActivePlan === false && (
-          <div className="fc-glass fc-card p-6 rounded-2xl border border-[color:var(--fc-glass-border)] mb-8">
-            <div className="text-center">
-              <h2 className="text-xl font-semibold mb-2 fc-text-primary">
-                No Meal Plan Assigned
-              </h2>
-              <p className="text-sm fc-text-dim">
-                Contact your coach to get a meal plan assigned to start tracking
-                your nutrition.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Nutrition Summary Grid - only show if there is an active meal plan */}
         {loadingMeals ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className={`${surfaceCard} p-6`}>
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 rounded w-1/2" style={{ background: "var(--fc-surface-sunken)" }} />
+          <div className="space-y-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="fc-surface rounded-2xl p-6 animate-pulse">
+                <div className="h-4 rounded w-1/2 mb-4" style={{ background: "var(--fc-surface-sunken)" }} />
                 <div className="h-24 rounded" style={{ background: "var(--fc-surface-sunken)" }} />
               </div>
-            </div>
-            <div className={`${surfaceCard} p-6`}>
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 rounded w-1/3" style={{ background: "var(--fc-surface-sunken)" }} />
-                <div className="h-20 rounded" style={{ background: "var(--fc-surface-sunken)" }} />
-              </div>
-            </div>
+            ))}
           </div>
-        ) : hasActivePlan ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Calorie Ring Card */}
-            <div className={`${surfaceCard} p-6 flex items-center justify-between`}>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold mb-1 fc-text-primary">
-                  Calories
-                </h3>
-                <div className="flex items-baseline gap-2 mb-4">
-                  <span className="text-3xl font-bold font-mono fc-text-primary">
-                    {Math.round(nutritionData.calories.consumed).toLocaleString()}
-                  </span>
-                  <span className="text-sm font-mono fc-text-dim">
-                    / {nutritionData.calories.goal.toLocaleString()} kcal
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm fc-text-dim">
-                  <Info className="w-4 h-4" />
-                  {calorieRemaining.toLocaleString()} kcal remaining
-                </div>
-              </div>
-              <div className="relative w-28 h-28 flex-shrink-0">
-                <svg viewBox="0 0 100 100" className="w-full h-full">
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="42"
-                    fill="none"
-                    stroke="var(--fc-surface-sunken)"
-                    strokeWidth="10"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="42"
-                    fill="none"
-                    stroke="var(--fc-accent-cyan)"
-                    strokeWidth="10"
-                    strokeDasharray={`${264 * (caloriePercent / 100)} 264`}
-                    strokeDashoffset="0"
-                    strokeLinecap="round"
-                    className="transition-all duration-800 ease-in-out"
-                    style={{
-                      transform: "rotate(-90deg)",
-                      transformOrigin: "50% 50%",
-                    }}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center font-bold text-lg font-mono fc-text-primary">
-                  {Math.round(caloriePercent)}%
-                </div>
-              </div>
-            </div>
-
-            {/* Macro Progress Card */}
-            <div className={`${surfaceCard} p-6`}>
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold fc-text-primary">
-                  Daily Macros
-                </h3>
-                <button className="text-xs font-bold uppercase tracking-widest hover:underline" style={{ color: "var(--fc-accent-cyan)" }}>
-                  Adjust Goals
+        ) : !hasActivePlan ? (
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h1 className="text-xl font-bold fc-text-primary">Fuel</h1>
+                <button
+                  type="button"
+                  onClick={scrollToGoalsSection}
+                  className="text-xs fc-text-dim hover:fc-text-primary transition-colors text-left mt-0.5 block"
+                >
+                  {activeGoalsCount > 0 ? (
+                    <>
+                      · {activeGoalsCount} goal{activeGoalsCount !== 1 ? "s" : ""}
+                      {goalsAdherence != null && (
+                        <span className={`ml-1 ${adherenceColor(goalsAdherence)}`}>
+                          · {goalsAdherence}% adherence
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      · No goals set —{" "}
+                      <span className="text-[color:var(--fc-accent-cyan)] hover:underline">Set your first goal ↓</span>
+                    </>
+                  )}
                 </button>
               </div>
-              <div className="space-y-5">
-                {/* Protein */}
-                <div>
-                  <div className="flex justify-between text-sm mb-1.5">
-                    <span className="fc-text-secondary">
-                      Protein{" "}
-                      <span className="fc-text-dim">
-                        ({Math.round(nutritionData.protein.consumed)}g / {nutritionData.protein.goal}g)
-                      </span>
-                    </span>
-                    <span className="font-bold font-mono fc-text-primary">
-                      {Math.round(proteinPercent)}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 rounded overflow-hidden" style={{ background: "var(--fc-surface-sunken)" }}>
-                    <div className="h-full rounded transition-all duration-1000 ease-out" style={{ width: `${proteinPercent}%`, background: "var(--fc-accent-cyan)" }} />
-                  </div>
-                </div>
-                {/* Carbs */}
-                <div>
-                  <div className="flex justify-between text-sm mb-1.5">
-                    <span className="fc-text-secondary">
-                      Carbs{" "}
-                      <span className="fc-text-dim">
-                        ({Math.round(nutritionData.carbs.consumed)}g / {nutritionData.carbs.goal}g)
-                      </span>
-                    </span>
-                    <span className="font-bold font-mono fc-text-primary">
-                      {Math.round(carbsPercent)}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 rounded overflow-hidden" style={{ background: "var(--fc-surface-sunken)" }}>
-                    <div className="h-full rounded transition-all duration-1000 ease-out" style={{ width: `${carbsPercent}%`, background: "var(--fc-status-error)" }} />
-                  </div>
-                </div>
-                {/* Fats */}
-                <div>
-                  <div className="flex justify-between text-sm mb-1.5">
-                    <span className="fc-text-secondary">
-                      Fats{" "}
-                      <span className="fc-text-dim">
-                        ({Math.round(nutritionData.fat.consumed)}g / {nutritionData.fat.goal}g)
-                      </span>
-                    </span>
-                    <span className="font-bold font-mono fc-text-primary">
-                      {Math.round(fatPercent)}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 rounded overflow-hidden" style={{ background: "var(--fc-surface-sunken)" }}>
-                    <div className="h-full rounded transition-all duration-1000 ease-out" style={{ width: `${fatPercent}%`, background: "var(--fc-status-warning)" }} />
-                  </div>
-                </div>
-              </div>
+              <Link href="/client/progress/nutrition" className="text-sm fc-text-dim hover:fc-text-primary transition-colors shrink-0">
+                History
+              </Link>
             </div>
-          </div>
-        ) : null}
-
-        {/* Meals Section */}
-        {hasActivePlan && (
-          <section className="mb-8">
-            <div className="flex items-center justify-between mb-6">
+            <ClientGlassCard className="p-8 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <span className="text-4xl opacity-80">🍽️</span>
+                <p className="font-semibold fc-text-primary">No meal plan assigned yet</p>
+                <p className="text-sm fc-text-dim">
+                  Your coach will assign a meal plan when you&apos;re ready to start.
+                </p>
+              </div>
+            </ClientGlassCard>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-2">
               <div>
-                <h2 className="text-xl font-semibold fc-text-primary">
-                  Today&apos;s Meals
-                </h2>
-                <p className="text-xs mt-1 uppercase tracking-tighter fc-text-dim">
-                  Upload 1 photo per meal for accountability
-                </p>
+                <h1 className="text-xl font-bold fc-text-primary">Fuel</h1>
+                <button
+                  type="button"
+                  onClick={scrollToGoalsSection}
+                  className="text-xs fc-text-dim hover:fc-text-primary transition-colors text-left mt-0.5 block"
+                >
+                  {activeGoalsCount > 0 ? (
+                    <>
+                      · {activeGoalsCount} goal{activeGoalsCount !== 1 ? "s" : ""}
+                      {goalsAdherence != null && (
+                        <span className={`ml-1 ${adherenceColor(goalsAdherence)}`}>
+                          · {goalsAdherence}% adherence
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      · No goals set —{" "}
+                      <span className="text-[color:var(--fc-accent-cyan)] hover:underline">Set your first goal ↓</span>
+                    </>
+                  )}
+                </button>
               </div>
-              <Camera className="w-6 h-6 fc-text-dim" />
+              <Link href="/client/progress/nutrition" className="text-sm fc-text-dim hover:fc-text-primary transition-colors shrink-0">
+                History
+              </Link>
             </div>
 
-            {/* Empty state */}
-            {!loadingMeals && hasMealsInPlan === false && (
-              <div className={`${surfaceCard} p-6`}>
-                <p className="text-sm text-center fc-text-dim">
-                  Your active meal plan has no meals configured yet.
-                </p>
-              </div>
+            {/* Plan picker: compact dropdown when client has multiple active plans (Phase N4) */}
+            {activeAssignments.length > 1 && (
+              <section>
+                <label htmlFor="fuel-plan-picker" className="text-sm font-medium fc-text-primary mb-1.5 block">
+                  Today&apos;s Plan
+                </label>
+                <select
+                  id="fuel-plan-picker"
+                  value={activeAssignmentId ?? ""}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    if (id) handlePlanSelect(id);
+                  }}
+                  className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-[color:var(--fc-surface-card-border)] fc-glass bg-[color:var(--fc-surface)] fc-text-primary text-sm font-medium appearance-none cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 12px center",
+                    paddingRight: "36px",
+                  }}
+                >
+                  {activeAssignments.map((a) => {
+                    const plan = a.meal_plans;
+                    const name = plan?.name ?? "Meal Plan";
+                    const kcal = plan?.target_calories ?? 0;
+                    const labelPart = a.label?.trim() ? ` (${a.label})` : "";
+                    return (
+                      <option key={a.id} value={a.id}>
+                        {name}{kcal ? ` - ${kcal}kcal` : ""}{labelPart}
+                      </option>
+                    );
+                  })}
+                </select>
+              </section>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {meals.map((meal) => {
-                const mealCalories = getMealCalories(meal);
-                const mealDescription = getMealDescription(meal);
-                const mealTime = formatTime(meal.logged_at);
+            {/* FuelHeader: plan name, date, progress ring, daily macros */}
+            <section>
+              <ClientGlassCard className="p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h2 className="text-base font-semibold fc-text-primary">
+                      {activeMealPlanInfo?.name ?? "Meal Plan"}
+                    </h2>
+                    <p className="text-xs fc-text-dim font-mono">
+                      {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center w-14 h-14 rounded-full border-2 border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-glass-highlight)]">
+                    <span className="text-lg font-bold fc-text-primary">
+                      {meals.filter((m) => m.logged).length}/{meals.length}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-sm fc-text-dim space-y-1">
+                  <p>
+                    <span className="font-mono font-medium fc-text-primary">
+                      {Math.round(nutritionData.calories.consumed)} / {nutritionData.calories.goal || "—"} kcal
+                    </span>
+                  </p>
+                  <p className="text-xs">
+                    P {Math.round(nutritionData.protein.consumed)}g · C {Math.round(nutritionData.carbs.consumed)}g · F {Math.round(nutritionData.fat.consumed)}g
+                    {nutritionData.protein.goal != null && (
+                      <span className="fc-text-dim">
+                        {" "}
+                        (target: {nutritionData.protein.goal}g / {nutritionData.carbs.goal ?? "—"}g / {nutritionData.fat.goal ?? "—"}g)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </ClientGlassCard>
+            </section>
 
-                // Use MealCardWithOptions for meals with options
-                if (meal.options && meal.options.length > 0) {
+            {/* Water — compact strip: label + progress, then glasses + Add (mobile-first) */}
+            <section className="px-0">
+              <ClientGlassCard className="p-3">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-sm font-medium fc-text-primary flex items-center gap-1.5">
+                    <Droplet className="w-4 h-4 text-[color:var(--fc-accent-cyan)]" />
+                    Water
+                  </span>
+                  <span className="text-sm font-mono fc-text-primary shrink-0">
+                    {nutritionData.water.ml.toLocaleString()} / {nutritionData.water.goalMl > 0 ? nutritionData.water.goalMl.toLocaleString() : "—"} mL
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {Array.from({ length: Math.min(displayedWaterGlasses, 16) }).map((_, index) => {
+                    const isActive = index < nutritionData.water.glasses;
+                    const glassNumber = index + 1;
+                    const isGoalGlass = glassNumber <= waterGoalGlasses;
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => handleWaterGlassClick(glassNumber)}
+                        className={`min-h-[44px] min-w-[44px] p-1.5 rounded-lg transition-all flex items-center justify-center ${
+                          isActive
+                            ? isGoalGlass
+                              ? "bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] active:scale-95"
+                              : "bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)] active:scale-95"
+                            : "bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-dim)]"
+                        }`}
+                      >
+                        <Droplet className="w-5 h-5" />
+                      </button>
+                    );
+                  })}
+                  {displayedWaterGlasses < 16 && nutritionData.water.glasses >= displayedWaterGlasses && (
+                    <button
+                      type="button"
+                      onClick={() => handleWaterGlassClick(nutritionData.water.glasses + 1)}
+                      className="min-h-[44px] px-3 rounded-lg bg-[color:var(--fc-glass-highlight)] text-[color:var(--fc-text-dim)] text-sm font-medium flex items-center gap-1"
+                    >
+                      <span>+</span>
+                      <span>Add</span>
+                    </button>
+                  )}
+                </div>
+              </ClientGlassCard>
+            </section>
+
+            {/* Meal cards — full width, proper padding for mobile */}
+            {hasMealsInPlan && (
+              <section className="space-y-4 w-full min-w-0">
+                {meals.map((meal) => {
+                  const displayMeal = {
+                    id: meal.id,
+                    name: meal.name,
+                    meal_type: meal.type,
+                    emoji: meal.emoji,
+                    options: meal.options ?? [],
+                    legacyItems: meal.items,
+                    logged: meal.logged,
+                    loggedOptionId: meal.loggedOptionId,
+                    photoUrl: meal.photoUrl,
+                    logged_at: meal.logged_at,
+                  };
                   return (
                     <MealCardWithOptions
                       key={meal.id}
-                      meal={{
-                        id: meal.id,
-                        name: meal.name,
-                        meal_type: meal.type,
-                        emoji: meal.emoji,
-                        options: meal.options,
-                        logged: meal.logged,
-                        loggedOptionId: meal.loggedOptionId,
-                        photoUrl: meal.photoUrl,
-                        logged_at: meal.logged_at,
-                      }}
-                      clientId={user?.id || ''}
-                      onMealLogged={(mealId, optionId, photoUrl) => {
-                        // Update local state when meal is logged
-                        setMeals((prev) => {
-                          const updated = prev.map((m) =>
-                            m.id === mealId
-                              ? {
-                                  ...m,
-                                  logged: true,
-                                  photoUrl: photoUrl,
-                                  loggedOptionId: optionId || undefined,
-                                  logged_at: new Date().toISOString(),
-                                }
-                              : m
-                          );
-                          // Recalculate nutrition totals
-                          calculateNutritionTotals(updated);
-                          return updated;
-                        });
-                      }}
+                      meal={displayMeal}
+                      clientId={user?.id ?? ""}
+                      onMarkComplete={handleMarkComplete}
+                      onUndo={() => handleUndo(meal.id)}
+                      onAddPhoto={handleAddPhoto}
                     />
                   );
-                }
+                })}
+              </section>
+            )}
 
-                // Legacy rendering for meals without options
-                return (
-                  <div
-                    key={meal.id}
-                    className={`${surfaceCard} flex flex-col h-full ${
-                      meal.logged && meal.photoUrl ? "" : "justify-between"
-                    }`}
-                  >
-                    {meal.logged && meal.photoUrl ? (
-                      <>
-                        {/* Logged Meal with Photo */}
-                        <div className="p-5 border-b border-[color:var(--fc-surface-card-border)]">
-                          <div className="flex justify-between items-start mb-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-2xl">{meal.emoji}</span>
-                              <h3 className="text-lg font-bold fc-text-primary">
-                                {meal.name}
-                              </h3>
-                            </div>
-                            <span className="text-sm font-bold font-mono fc-text-dim">
-                              {Math.round(mealCalories)} kcal
-                            </span>
-                          </div>
-                          {mealDescription && (
-                            <p className="text-xs mt-1 fc-text-dim">
-                              {mealDescription}
-                            </p>
-                          )}
-                        </div>
+            {hasActivePlan && hasMealsInPlan === false && !loadingMeals && (
+              <ClientGlassCard className="p-6 text-center">
+                <p className="text-sm fc-text-dim">No meals in this plan yet.</p>
+              </ClientGlassCard>
+            )}
 
-                        {/* Photo Display */}
-                        <div className="relative h-40 group">
-                          <img
-                            src={meal.photoUrl}
-                            alt={`${meal.name} photo`}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                          <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                            <div className="backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ background: "color-mix(in srgb, var(--fc-status-success) 20%, transparent)", border: "1px solid color-mix(in srgb, var(--fc-status-success) 30%, transparent)", color: "var(--fc-status-success)" }}>
-                              <CheckCircle className="w-3 h-3" />
-                              {meal.type === "breakfast"
-                                ? "Breakfast"
-                                : meal.type === "lunch"
-                                ? "Lunch"
-                                : meal.type === "dinner"
-                                ? "Dinner"
-                                : "Snack"}{" "}
-                              Logged
-                            </div>
-                            {mealTime && (
-                              <span className="text-[10px] font-mono text-neutral-300">
-                                {mealTime}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* Unlogged Meal */}
-                        <div className="p-5">
-                          <div className="flex justify-between items-start mb-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-2xl">{meal.emoji}</span>
-                              <h3 className="text-lg font-bold fc-text-primary">
-                                {meal.name}
-                              </h3>
-                            </div>
-                            <span className="text-sm font-bold font-mono fc-text-dim">
-                              Not Logged
-                            </span>
-                          </div>
-                          {mealDescription && (
-                            <p className="text-xs mt-1 fc-text-dim">
-                              {mealDescription}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="mt-8 mb-4 flex flex-col items-center justify-center py-8 rounded-2xl border border-dashed mx-5" style={{ background: "var(--fc-surface-sunken)", borderColor: "var(--fc-surface-card-border)" }}>
-                          <Image className="w-8 h-8 mb-2 fc-text-dim" />
-                          <p className="text-xs italic fc-text-dim">
-                            No photo uploaded yet
-                          </p>
-                        </div>
-
-                        <div className="px-5 pb-5">
-                          <Button
-                            onClick={() =>
-                              handleMealPhotoUpload(meal.id, meal.type)
-                            }
-                            disabled={uploadingMeal === meal.id}
-                            variant="fc-primary"
-                            className="w-full h-12 rounded-xl flex items-center justify-center gap-2 font-semibold"
-                          >
-                            {uploadingMeal === meal.id ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                <span>Uploading...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Camera className="w-5 h-5" />
-                                Upload{" "}
-                                {meal.type === "breakfast"
-                                  ? "Breakfast"
-                                  : meal.type === "lunch"
-                                  ? "Lunch"
-                                  : meal.type === "dinner"
-                                  ? "Dinner"
-                                  : "Snack"}{" "}
-                                Photo
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+            <p className="text-xs fc-text-dim text-center py-2">
+              All portions are for raw/uncooked ingredients.
+            </p>
+          </>
         )}
 
-        {/* Water Tracker */}
-        <section className="mb-12">
-          <div className={`${surfaceCard} p-6 flex flex-col md:flex-row md:items-center justify-between gap-6`}>
-            <div>
-              <h3 className="text-xl font-semibold mb-1 fc-text-primary">
-                Hydration
-              </h3>
-              <p
-                className="text-sm fc-text-dim"
-              >
-                {nutritionData.water.goalMl > 0 ? (
-                  <>Daily Goal: {nutritionData.water.goalMl.toLocaleString()}ml ({nutritionData.water.goal} glasses)</>
-                ) : (
-                  <>No water goal configured. Set your goal in the Habits page.</>
-                )}
-              </p>
-            </div>
-            <div className="flex gap-2.5 overflow-x-auto pb-2">
-              {/* Interactive glasses - show goal number initially, expand dynamically up to 16 (6000ml) */}
-              {Array.from({ length: Math.min(displayedWaterGlasses, 16) }).map((_, index) => {
-                const isActive = index < nutritionData.water.glasses;
-                const glassNumber = index + 1;
-                const isGoalGlass = glassNumber <= waterGoalGlasses;
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleWaterGlassClick(glassNumber)}
-                    className={`p-2 rounded-lg transition-all ${
-                      isActive
-                        ? isGoalGlass
-                          ? "bg-blue-500/10 text-blue-400 active:scale-90"
-                          : "bg-blue-500/5 text-blue-300 active:scale-90"
-                        : "bg-white/5 text-neutral-600 hover:bg-white/10"
-                    }`}
-                    style={{
-                      transform: isActive
-                        ? "translateY(-4px) scale(1.1)"
-                        : "none",
-                    }}
-                  >
-                    <Droplet className="w-6 h-6" />
-                  </button>
-                );
-              })}
-              {/* Show + button if we're at displayed limit but haven't reached max */}
-              {displayedWaterGlasses < 16 && nutritionData.water.glasses >= displayedWaterGlasses && (
-                <button
-                  onClick={() => handleWaterGlassClick(nutritionData.water.glasses + 1)}
-                  className="p-2 rounded-lg transition-all bg-white/5 text-neutral-600 hover:bg-white/10 active:scale-90 flex items-center gap-1"
+        {/* Goals section — always at bottom for header scroll target */}
+        <section ref={goalsSectionRef} id="fuel-goals-section">
+          {nutritionGoals.length === 0 ? (
+            <ClientGlassCard className="p-6 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <span className="text-3xl" aria-hidden>🎯</span>
+                <h3 className="text-lg font-semibold fc-text-primary">Set Your Goals</h3>
+                <p className="text-sm fc-text-dim max-w-sm">
+                  Track nutrition, hydration, and wellness goals to stay on top of your progress.
+                </p>
+                <Button
+                  onClick={() => setShowAddGoalModal(true)}
+                  className="min-h-[44px] px-6 rounded-xl bg-[color:var(--fc-accent-cyan)] hover:opacity-90 text-white font-semibold"
                 >
-                  <Droplet className="w-6 h-6" />
-                  <span className="text-xs">+</span>
-                </button>
-              )}
-            </div>
-            <div className="text-right">
-              <div className="text-xl font-bold font-mono fc-text-primary">
-                {nutritionData.water.ml.toLocaleString()}ml
+                  + Set Up My Goals
+                </Button>
               </div>
-              <div
-                className="text-[10px] uppercase font-bold tracking-widest fc-text-dim"
+            </ClientGlassCard>
+          ) : (
+            <ClientGlassCard className="p-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h3 className="text-sm font-semibold fc-text-primary">
+                  Goals
+                  {nutritionGoals.length > 0 && (
+                    <span className="fc-text-dim font-normal ml-1">
+                      · {Math.round(nutritionGoals.reduce((s, g) => s + (g.progress_percentage ?? 0), 0) / nutritionGoals.length)}% adherence
+                    </span>
+                  )}
+                </h3>
+                <Link
+                  href="/client/goals"
+                  className="text-sm font-medium text-[color:var(--fc-accent-cyan)] hover:underline"
+                >
+                  Manage
+                </Link>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {nutritionGoals.slice(0, 3).map((g) => (
+                  <CompactGoalCard key={g.id} goal={g} />
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddGoalModal(true)}
+                className="w-full mt-3 min-h-[44px] rounded-xl border-[color:var(--fc-accent-cyan)]/50 text-[color:var(--fc-accent-cyan)] hover:bg-[color:var(--fc-accent-cyan)]/10"
               >
-                Logged
-              </div>
-            </div>
-          </div>
+                + Add goal
+              </Button>
+            </ClientGlassCard>
+          )}
         </section>
-      </div>
+        <AddGoalModal
+          open={showAddGoalModal}
+          onClose={() => setShowAddGoalModal(false)}
+          pillar="nutrition"
+          onSuccess={() => loadWaterGoal()}
+        />
+      </ClientPageShell>
     </AnimatedBackground>
   );
 }

@@ -5,6 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/contexts/ThemeContext";
 import { GlassCard } from "@/components/ui/GlassCard";
+import {
+  ClientPageShell,
+  ClientGlassCard,
+  SectionHeader,
+  PrimaryButton,
+  SecondaryButton,
+  AssignedWorkoutRow,
+} from "@/components/client-ui";
+import { AddGoalModal } from "@/components/goals/AddGoalModal";
+import { CompactGoalCard } from "@/components/goals/CompactGoalCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
@@ -103,10 +113,10 @@ type ClientBlockExerciseRecord = {
 
 type ClientBlockRecord = {
   id: string;
-  block_order: number | null;
-  block_type: string | null;
-  block_name: string | null;
-  block_notes: string | null;
+  set_order: number | null;
+  set_type: string | null;
+  set_name: string | null;
+  set_notes: string | null;
   total_sets: number | null;
   reps_per_set: string | null;
   rest_seconds: number | null;
@@ -117,7 +127,7 @@ type ClientProgramRuleRecord = {
   id: string;
   program_assignment_id: string | null;
   week_number: number | null;
-  block_order: number | null;
+  set_order: number | null;
   exercise_id: string | null;
   exercise_order: number | null;
   exercise_letter: string | null;
@@ -182,6 +192,8 @@ export default function EnhancedClientWorkouts({
     Record<string, string>
   >({});
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [pillarGoals, setPillarGoals] = useState<Array<{ id: string; title: string; target_value?: number; current_value?: number; target_unit?: string; progress_percentage?: number; target_date?: string; status: string }>>([]);
+  const [showAddGoalModal, setShowAddGoalModal] = useState(false);
 
   // Modal states
   const [showAlternatives, setShowAlternatives] = useState<string | null>(null);
@@ -212,7 +224,7 @@ export default function EnhancedClientWorkouts({
       await ensureAuthenticated();
 
       // Load next due workout using direct database queries (same as dashboard)
-      console.log("🔍 Client Workouts - Loading workout for client:", clientId);
+      console.log("ðŸ” Client Workouts - Loading workout for client:", clientId);
 
       let nextWorkout = null;
 
@@ -237,7 +249,7 @@ export default function EnhancedClientWorkouts({
         .maybeSingle();
 
       console.log(
-        "🔍 Client Workouts - Today assignment:",
+        "ðŸ” Client Workouts - Today assignment:",
         todaysAssignment,
         todaysError
       );
@@ -265,7 +277,7 @@ export default function EnhancedClientWorkouts({
           .maybeSingle();
 
         console.log(
-          "🔍 Client Workouts - Recent assignment:",
+          "ðŸ” Client Workouts - Recent assignment:",
           recentAssignment,
           recentError
         );
@@ -287,7 +299,7 @@ export default function EnhancedClientWorkouts({
         // Fetch original blocks using workout_template_id from assignment
         if (!assignmentToUse.workout_template_id) {
           console.error(
-            "🔍 Client Workouts - Workout template ID not found in assignment"
+            "ðŸ” Client Workouts - Workout template ID not found in assignment"
           );
         } else {
           // Use WorkoutBlockService to fetch blocks (handles RLS properly)
@@ -300,17 +312,17 @@ export default function EnhancedClientWorkouts({
 
           if (!workoutBlocks || workoutBlocks.length === 0) {
             console.warn(
-              "🔍 Client Workouts - No workout blocks found for template"
+              "ðŸ” Client Workouts - No workout blocks found for template"
             );
           } else {
             // Convert WorkoutBlock[] to ClientBlockRecord[] format
             const clientBlocks: ClientBlockRecord[] = workoutBlocks.map(
               (block) => ({
                 id: block.id,
-                block_order: block.block_order,
-                block_type: block.block_type,
-                block_name: block.block_name ?? null,
-                block_notes: block.block_notes ?? null,
+                set_order: block.set_order,
+                set_type: block.set_type,
+                set_name: block.set_name ?? null,
+                set_notes: block.set_notes ?? null,
                 total_sets: block.total_sets ?? null,
                 reps_per_set: block.reps_per_set ?? null,
                 rest_seconds: block.rest_seconds ?? null,
@@ -354,7 +366,7 @@ export default function EnhancedClientWorkouts({
 
               if (exerciseDetailsError) {
                 console.error(
-                  "🔍 Client Workouts - Error loading exercise metadata:",
+                  "ðŸ” Client Workouts - Error loading exercise metadata:",
                   exerciseDetailsError
                 );
               } else if (exerciseDetails) {
@@ -392,7 +404,7 @@ export default function EnhancedClientWorkouts({
                     name: detail?.name || fallbackName,
                     description: detail?.description || "",
                     orderIndex,
-                    notes: exercise.notes ?? block.block_notes ?? undefined,
+                    notes: exercise.notes ?? block.set_notes ?? undefined,
                     sets: exercise.sets ?? block.total_sets ?? 0,
                     reps: exercise.reps ?? block.reps_per_set ?? "",
                     weightGuidance:
@@ -438,7 +450,7 @@ export default function EnhancedClientWorkouts({
         };
       }
 
-      console.log("🔍 Client Workouts - Final workout:", nextWorkout);
+      console.log("ðŸ” Client Workouts - Final workout:", nextWorkout);
       setTodaysWorkout(nextWorkout);
 
       // Check for active program assignment (if program tables exist)
@@ -468,7 +480,7 @@ export default function EnhancedClientWorkouts({
         allProgramAssignments = programAssignmentsData || null;
 
         console.log(
-          "🔍 Client Workouts - ALL program assignments:",
+          "ðŸ” Client Workouts - ALL program assignments:",
           allProgramAssignments,
           allProgramError
         );
@@ -479,7 +491,7 @@ export default function EnhancedClientWorkouts({
           : null;
 
         console.log(
-          "🔍 Client Workouts - Program assignment:",
+          "ðŸ” Client Workouts - Program assignment:",
           programAssignment
         );
 
@@ -491,7 +503,7 @@ export default function EnhancedClientWorkouts({
           const workoutInfo = await getCurrentWorkoutFromProgress(supabase, clientId);
           
           console.log(
-            "🔍 Client Workouts - getCurrentWorkoutFromProgress result:",
+            "ðŸ” Client Workouts - getCurrentWorkoutFromProgress result:",
             workoutInfo
           );
 
@@ -528,7 +540,7 @@ export default function EnhancedClientWorkouts({
               estimatedDuration = Math.max(15, programExercises.length * 3);
             } catch (blocksError) {
               console.error(
-                "🔍 Client Workouts - Error loading workout blocks:",
+                "ðŸ” Client Workouts - Error loading workout blocks:",
                 blocksError
               );
             }
@@ -562,7 +574,7 @@ export default function EnhancedClientWorkouts({
               message: workoutInfo.position_label ? `${workoutInfo.position_label} ready!` : "Program workout ready!",
             };
             console.log(
-              "🔍 Client Workouts - Set program workout from progress:",
+              "ðŸ” Client Workouts - Set program workout from progress:",
               nextWorkout
             );
           } else if (workoutInfo.status === "completed") {
@@ -592,7 +604,7 @@ export default function EnhancedClientWorkouts({
         }
       } catch (error) {
         console.log(
-          "🔍 Client Workouts - Program queries failed (tables may not exist):",
+          "ðŸ” Client Workouts - Program queries failed (tables may not exist):",
           error
         );
       }
@@ -647,11 +659,11 @@ export default function EnhancedClientWorkouts({
               coachInfo = coach;
             }
           } else {
-            console.log("🔍 Client Workouts - Program not found in assignment");
+            console.log("ðŸ” Client Workouts - Program not found in assignment");
           }
         } catch (error) {
           console.log(
-            "🔍 Client Workouts - Error fetching program via assignment:",
+            "ðŸ” Client Workouts - Error fetching program via assignment:",
             error
           );
           programError = error as any;
@@ -754,7 +766,7 @@ export default function EnhancedClientWorkouts({
           .order("assigned_date", { ascending: false });
 
         console.log(
-          "🔍 Client Workouts - Assigned workouts:",
+          "ðŸ” Client Workouts - Assigned workouts:",
           assignedWorkouts,
           assignedError
         );
@@ -763,7 +775,7 @@ export default function EnhancedClientWorkouts({
         const assignedPrograms = allProgramAssignments || [];
 
         console.log(
-          "🔍 Client Workouts - Assigned programs:",
+          "ðŸ” Client Workouts - Assigned programs:",
           assignedPrograms
         );
 
@@ -804,7 +816,7 @@ export default function EnhancedClientWorkouts({
         // Process workout assignments (no queries in loop!)
         if (assignedWorkouts) {
           const workoutsWithDetails = assignedWorkouts.map((assignment: any) => {
-            console.log("🔎 Processing workout assignment:", assignment);
+            console.log("ðŸ”Ž Processing workout assignment:", assignment);
             let templateSnapshot =
               assignment.name || assignment.description
                 ? {
@@ -839,7 +851,7 @@ export default function EnhancedClientWorkouts({
         // Process program assignments (no queries in loop!)
         if (assignedPrograms) {
           const programsWithDetails = assignedPrograms.map((assignment: any) => {
-            console.log("🔎 Processing program assignment:", assignment);
+            console.log("ðŸ”Ž Processing program assignment:", assignment);
             let programSnapshot =
               assignment.name || assignment.description
                 ? {
@@ -882,7 +894,7 @@ export default function EnhancedClientWorkouts({
         }
 
         console.log(
-          "🔍 Client Workouts - All assignments (workouts + programs):",
+          "ðŸ” Client Workouts - All assignments (workouts + programs):",
           allAssignments
         );
         setAllAssignedWorkouts(allAssignments);
@@ -1155,18 +1167,59 @@ export default function EnhancedClientWorkouts({
     }
   }, [user, useNewLoader]);
 
-  useEffect(() => {
-    if (useNewLoader) {
-      loadWorkoutDataFromApi().catch((error) => {
-        console.error("Error loading workout data (API):", error);
-      });
-      return;
-    }
+  const workoutsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    loadWorkoutData().catch((error) => {
-      console.error("Error loading workout data:", error);
-    });
+  useEffect(() => {
+    if (workoutsTimeoutRef.current) clearTimeout(workoutsTimeoutRef.current);
+    workoutsTimeoutRef.current = setTimeout(() => {
+      workoutsTimeoutRef.current = null;
+      setLoading(false);
+    }, 20_000);
+
+    const loadPromise = useNewLoader
+      ? loadWorkoutDataFromApi()
+      : loadWorkoutData();
+
+    loadPromise
+      .catch((error) => {
+        console.error("Error loading workout data:", error);
+      })
+      .finally(() => {
+        if (workoutsTimeoutRef.current) {
+          clearTimeout(workoutsTimeoutRef.current);
+          workoutsTimeoutRef.current = null;
+        }
+      });
+
+    return () => {
+      if (workoutsTimeoutRef.current) {
+        clearTimeout(workoutsTimeoutRef.current);
+        workoutsTimeoutRef.current = null;
+      }
+    };
   }, [loadWorkoutData, loadWorkoutDataFromApi, useNewLoader]);
+
+  const fetchPillarGoals = useCallback(async () => {
+    if (!clientId) return;
+    try {
+      const { data, error } = await supabase
+        .from("goals")
+        .select("id, title, target_value, current_value, target_unit, progress_percentage, target_date, status")
+        .eq("client_id", clientId)
+        .eq("pillar", "training")
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(3);
+      if (error) throw error;
+      setPillarGoals(data || []);
+    } catch {
+      setPillarGoals([]);
+    }
+  }, [clientId]);
+
+  useEffect(() => {
+    fetchPillarGoals();
+  }, [fetchPillarGoals]);
 
   useEffect(() => {
     if (!PERF_WORKOUTS_ENABLED) return;
@@ -1196,7 +1249,7 @@ export default function EnhancedClientWorkouts({
     // ========================================================================
     if (workout.weekNumber && workout.templateId) {
       try {
-        console.log("🚀 Starting program workout via start-from-progress API...");
+        console.log("ðŸš€ Starting program workout via start-from-progress API...");
         const response = await fetchApi("/api/program-workouts/start-from-progress", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1210,8 +1263,8 @@ export default function EnhancedClientWorkouts({
         } else {
           const result = await response.json();
           if (result.workout_assignment_id) {
-            console.log("🚀 Got workout_assignment_id:", result.workout_assignment_id);
-            router.push(`/client/workouts/${result.workout_assignment_id}/start`);
+            console.log("ðŸš€ Got workout_assignment_id:", result.workout_assignment_id);
+            window.location.href = `/client/workouts/${result.workout_assignment_id}/start`;
             return;
           }
         }
@@ -1223,7 +1276,7 @@ export default function EnhancedClientWorkouts({
 
     // Legacy: If scheduleId is a program_day_assignments.id or workout_assignments.id
     if (workout.scheduleId) {
-      router.push(`/client/workouts/${workout.scheduleId}/start`);
+      window.location.href = `/client/workouts/${workout.scheduleId}/start`;
       return;
     }
 
@@ -1233,7 +1286,7 @@ export default function EnhancedClientWorkouts({
       if (useNewLoader) {
         const scheduleId = scheduleIdByTemplate[workout.templateId];
         if (scheduleId) {
-          router.push(`/client/workouts/${scheduleId}/start`);
+          window.location.href = `/client/workouts/${scheduleId}/start`;
           return;
         }
         const assignmentId = assignmentIdByTemplate[workout.templateId];
@@ -1257,15 +1310,17 @@ export default function EnhancedClientWorkouts({
       if (error) throw error;
 
       if (assignment) {
-        router.push(`/client/workouts/${assignment.id}/start`);
+        window.location.href = `/client/workouts/${assignment.id}/start`;
       } else {
-        // Fallback to template ID if no assignment found
-        router.push(`/client/workouts/${workout.templateId}/start`);
+        // No assignment found for this standalone template — cannot start.
+        // Do NOT push template ID as URL param: start/page.tsx cannot resolve it.
+        console.warn('[EnhancedClientWorkouts] No workout_assignment found for template:', workout.templateId);
+        alert('No active assignment found for this workout. Ask your coach to assign it.');
       }
     } catch (error) {
       console.error("Error finding assignment:", error);
-      // Fallback to template ID
-      router.push(`/client/workouts/${workout.templateId}/start`);
+      // Do NOT fall back to template ID — it is not a valid workout_assignment_id.
+      alert('Could not start workout. Please try again.');
     }
   };
 
@@ -1317,11 +1372,11 @@ export default function EnhancedClientWorkouts({
 
   const getMotivationalMessage = () => {
     const messages = [
-      "You're crushing your fitness goals! 💪",
-      "Every workout brings you closer to your best self! 🌟",
-      "Your consistency is paying off! Keep it up! 🔥",
-      "Transform your body, transform your life! ⚡",
-      "The only bad workout is the one you didn't do! 🏆",
+      "You're crushing your fitness goals! ðŸ’ª",
+      "Every workout brings you closer to your best self! ðŸŒŸ",
+      "Your consistency is paying off! Keep it up! ðŸ”¥",
+      "Transform your body, transform your life! âš¡",
+      "The only bad workout is the one you didn't do! ðŸ†",
     ];
     return messages[Math.floor(Math.random() * messages.length)];
   };
@@ -1340,11 +1395,6 @@ export default function EnhancedClientWorkouts({
     weeklyProgress.goal > 0
       ? Math.min((weeklyProgress.current / weeklyProgress.goal) * 100, 100)
       : 0;
-
-  // Get program week info for subtitle
-  const programSubtitle = currentProgram
-    ? `${currentProgram.name} • Week ${currentProgram.current_week}`
-    : "Training Schedule";
 
   if (loading) {
     return (
@@ -1395,590 +1445,252 @@ export default function EnhancedClientWorkouts({
         <FloatingParticles />
       )}
       <div className="relative z-10 min-h-screen pb-28 fc-page">
-          <div className="relative z-10 max-w-4xl mx-auto flex flex-col gap-5" style={{ gap: "var(--fc-gap-sections)" }}>
-            {/* Header Section */}
-            <header className="flex justify-between items-center mb-10">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight fc-text-primary m-0">Your Workouts</h1>
-                <p className="text-sm fc-text-dim mt-1">{programSubtitle}</p>
-              </div>
-              <div className="w-14 h-14 rounded-2xl fc-glass border-2 border-[color:var(--fc-glass-border)] flex items-center justify-center overflow-hidden p-0.5">
-                <img src={getAvatarUrl()} alt="" className="w-full h-full rounded-xl object-cover" />
-              </div>
-            </header>
-
-            {/* Unified Hero Card */}
-            {todaysWorkout?.hasWorkout ? (
-              <section className="mb-8">
-                <GlassCard
-                  elevation={2}
-                  className="fc-hero-card fc-kinetic-shimmer p-6 sm:p-8 min-h-[240px] flex flex-col justify-between relative overflow-hidden"
-                >
-                  <div className="relative z-10 flex flex-col gap-6 flex-1">
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-3">
-                        <span className="fc-pill fc-pill-glass fc-text-workouts inline-flex items-center gap-1 w-fit fc-streak-pulse">
-                          <Zap className="w-3 h-3" />
-                          Today
-                        </span>
-                        {currentProgram && (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="fc-outline" className="px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.2em]">
-                              Program
-                            </Badge>
-                            <span className="text-[11px] uppercase tracking-[0.22em] fc-text-dim font-mono">
-                              Week {currentProgram.current_week} of {currentProgram.total_weeks}
-                            </span>
-                            {typeof currentProgram.progress_percentage === "number" && (
-                              <span className="text-[11px] uppercase tracking-[0.22em] fc-text-dim font-mono">
-                                • {currentProgram.progress_percentage}% complete
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight tracking-tight fc-text-primary m-0">
-                          {todaysWorkout.templateName}
-                        </h2>
-                        <div className="flex flex-wrap gap-4 fc-text-dim">
-                          <div className="flex items-center gap-1.5">
-                            <Dumbbell className="w-4 h-4 fc-text-workouts" />
-                            <span className="text-sm font-medium">
-                              {(todaysWorkout.exerciseCount ??
-                                (todaysWorkout.exercises?.length || 0))}{" "}
-                              Exercises
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Layers className="w-4 h-4 fc-text-workouts" />
-                            <span className="text-sm font-medium">
-                              {(todaysWorkout.totalSets ??
-                                (todaysWorkout.exercises?.reduce(
-                                  (sum, e) => sum + (e.sets || 0),
-                                  0
-                                ) || 0))}{" "}
-                              Sets
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="w-4 h-4 fc-text-dim" />
-                            <span className="text-sm font-medium font-mono">
-                              ~{todaysWorkout.estimatedDuration || 0} min
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Buttons */}
-                    <div className="mt-8 flex flex-col md:flex-row gap-4">
-                      <Button
-                        variant="fc-primary"
-                        size="xl"
-                        onClick={() => startWorkout(todaysWorkout)}
-                        className="flex-1 gap-3"
-                      >
-                        <Play className="w-6 h-6 fill-current" />
-                        Start Workout
-                      </Button>
-                      <Button
-                        variant="fc-secondary"
-                        size="lg"
-                        onClick={() => {
-                          const tid = todaysWorkout.templateId;
-                          const aid = tid != null ? assignmentIdByTemplate[tid] : undefined;
-                          router.push(aid ? `/client/workouts/${aid}/details` : tid ? `/client/workouts/${tid}/details` : "/client/workouts");
-                        }}
-                        className="px-6 gap-2 fc-text-dim font-semibold"
-                      >
-                        <Info className="w-5 h-5" />
-                        Details
-                      </Button>
-                    </div>
-                  </div>
-                </GlassCard>
-              </section>
-            ) : (
-              <GlassCard elevation={2} className="fc-card p-8 sm:p-16 text-center overflow-hidden">
-                  {todaysWorkout?.weekCompleted === true ? (
-                    <>
-                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8 fc-icon-tile fc-icon-meals bg-[color-mix(in_srgb,var(--fc-status-success)_25%,transparent)] border-[color:var(--fc-status-success)]">
-                        <Trophy className="w-8 h-8 sm:w-12 sm:h-12 fc-text-success" />
-                      </div>
-                      <h3 className="text-xl sm:text-2xl font-semibold fc-text-primary mb-3 sm:mb-4">
-                        {todaysWorkout.currentWeek != null ? `Week ${todaysWorkout.currentWeek} Complete! 🎉` : 'Week Complete! 🎉'}
-                      </h3>
-                      <p className="fc-text-dim text-lg sm:text-xl mb-4">
-                        {todaysWorkout.message ||
-                          "The work is done for the week! You have completed all workouts, recharge your batteries and be prepared to crush next week!"}
-                      </p>
-                      <div className="fc-glass-soft p-4 sm:p-6 rounded-2xl border border-[color:var(--fc-glass-border)] fc-accent-meals">
-                        <p className="fc-text-primary text-sm sm:text-base">
-                          🏆 Amazing work this week! Your dedication is paying
-                          off. Take this time to recover, stay hydrated, and get
-                          ready for another week of progress.
-                        </p>
-                      </div>
-                    </>
-                  ) : todaysWorkout?.message?.includes("No active program") ? (
-                    <>
-                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8 fc-icon-tile fc-icon-workouts">
-                        <Target className="w-8 h-8 sm:w-12 sm:h-12 fc-text-workouts" />
-                      </div>
-                      <h3 className="text-xl sm:text-2xl font-semibold fc-text-primary mb-3 sm:mb-4">
-                        Ready to Get Started? 💪
-                      </h3>
-                      <p className="fc-text-dim text-lg sm:text-xl mb-4">
-                        No active program assigned. Contact your coach to get
-                        started with your fitness journey!
-                      </p>
-                      <div className="fc-glass-soft p-4 sm:p-6 rounded-2xl border border-[color:var(--fc-glass-border)] fc-accent-workouts">
-                        <p className="fc-text-primary text-sm sm:text-base">
-                          🎯 Your coach will create a personalized workout
-                          program just for you. Once assigned, you&apos;ll see
-                          your daily workouts here!
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mx-auto mb-6 sm:mb-8 fc-icon-tile fc-icon-meals border-[color:var(--fc-glass-border)]">
-                        <Calendar className="w-8 h-8 sm:w-12 sm:h-12 fc-text-dim" />
-                      </div>
-                      <h3 className="text-xl sm:text-2xl font-semibold fc-text-primary mb-3 sm:mb-4">
-                        Rest Day
-                      </h3>
-                      <p className="fc-text-dim text-lg sm:text-xl mb-4">
-                        {getMotivationalMessage()}
-                      </p>
-                      <p className="fc-text-dim text-sm sm:text-base">
-                        Check back tomorrow for your next workout.
-                      </p>
-                    </>
-                  )}
-              </GlassCard>
-            )}
-
-            {/* Weekly Progress - standalone section (mockup layout) */}
-            {(weeklyProgress.goal > 0 || weeklyStats.totalVolume > 0 || weeklyStats.activeTime > 0) && (
-              <section className="mb-8">
-                <GlassCard elevation={2} className="fc-card p-6 rounded-2xl border-l-4 border-l-[color:var(--fc-domain-workouts)]">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex justify-between items-end">
-                        <h3 className="text-lg font-semibold fc-text-primary">Weekly Progress</h3>
-                        <span className="font-mono text-sm font-bold fc-text-workouts">
-                          {weeklyProgress.current}
-                          {" / "}
-                          {weeklyProgress.goal}{" "}
-                          <span className="font-normal fc-text-subtle">Workouts</span>
-                        </span>
-                      </div>
-                      <div className="fc-progress-track">
-                        <div
-                          className="fc-progress-fill"
-                          style={{ width: `${weeklyProgressPercent}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="hidden md:block h-12 w-px bg-[color:var(--fc-glass-border)]" />
-                    <div className="flex gap-8">
-                      <div>
-                        <p className="text-xs uppercase tracking-widest fc-text-dim mb-1">Total Volume</p>
-                        <p className="text-xl font-bold font-mono tracking-tight fc-text-primary m-0">
-                          {weeklyStats.totalVolume.toLocaleString()}
-                          <span className="text-sm font-normal fc-text-subtle ml-1">kg</span>
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-widest fc-text-dim mb-1">Active Time</p>
-                        <p className="text-xl font-bold font-mono tracking-tight fc-text-primary m-0">
-                          {weeklyStats.activeTime}
-                          <span className="text-sm font-normal fc-text-subtle ml-1">min</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </GlassCard>
-              </section>
-            )}
-
-            {/* This Week's Workouts - dedupe by id to avoid duplicate React keys */}
-            {thisWeekAssignments.length > 0 && (
-              <section className="mb-8">
-                <h3 className="text-xl font-semibold leading-tight fc-text-primary mb-4 pl-1">
-                  This Week
-                </h3>
-                <div className="flex flex-col gap-3">
-                  {Array.from(
-                    new Map(thisWeekAssignments.map((a) => [a.id, a])).values()
-                  ).map((assignment) => {
-                    const workoutDate = new Date(assignment.scheduled_date);
-                    const isCompleted = assignment.completed;
-                    const isSkipped = assignment.status === "skipped";
-                    const isToday = assignment.scheduled_date === today;
-                    const scheduleLabel = formatDate(assignment.scheduled_date);
-
-                    const monthAbbr = workoutDate.toLocaleDateString("en-US", {
-                      month: "short",
-                    });
-                    const day = workoutDate.getDate();
-                    const dateLabel = `${monthAbbr} ${day}`;
-                    const dateVariant = isCompleted
-                      ? "fc-date-card--done"
-                      : isSkipped
-                      ? "fc-date-card--skipped"
-                      : "fc-date-card--today";
-                    const statusVariant = isCompleted
-                      ? "fc-status-pill--done"
-                      : isSkipped
-                      ? "fc-status-pill--skipped"
-                      : "fc-status-pill--upcoming";
-
-                    return (
-                      <div
-                        key={assignment.id}
-                        onClick={() => {
-                          router.push(
-                            `/client/workouts/${assignment.id}/details`
-                          );
-                        }}
-                      >
-                        <div className={isSkipped ? "opacity-70" : ""}>
-                          <div
-                            className={`fc-surface rounded-2xl p-4 sm:p-5 cursor-pointer transition-all duration-200 hover:translate-y-[-1px] active:scale-[0.98] ${
-                              isCompleted ? "border-l-4 border-l-[color:var(--fc-status-success)]" : ""
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                              <div className="flex items-center gap-3 sm:gap-4 flex-1">
-                                <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 border ${isCompleted ? "bg-[color:var(--fc-status-success)]/10 border-[color:var(--fc-status-success)]/20 text-[color:var(--fc-status-success)]" : isSkipped ? "bg-[color:var(--fc-glass-highlight)] border-[color:var(--fc-glass-border)] fc-text-subtle" : "bg-[color:var(--fc-domain-workouts)]/10 border-[color:var(--fc-domain-workouts)]/20 fc-text-workouts"}`}>
-                                  <span className="text-[9px] font-bold uppercase tracking-wide">{monthAbbr}</span>
-                                  <span className="text-lg font-extrabold leading-none">{day}</span>
-                                </div>
-                                <div className="flex-1">
-                                  <h4 className="text-base font-bold leading-tight fc-text-primary mb-0.5">
-                                    {assignment.name || "Workout"}
-                                  </h4>
-                                  <div className="text-xs fc-text-dim">
-                                    {isCompleted && assignment.completed_at
-                                      ? `Completed ${new Date(assignment.completed_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${assignment.duration_minutes ? ` • ${assignment.duration_minutes} min` : ""}`
-                                      : isSkipped
-                                      ? "Marked as skipped"
-                                      : isToday
-                                      ? "Today"
-                                      : `Scheduled • ${dateLabel}`}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between sm:justify-end gap-3 pl-0 sm:pl-0">
-                                <span className={`fc-status-pill ${statusVariant}`}>
-                                  {isCompleted ? <CheckCircle className="w-3.5 h-3.5" /> : null}
-                                  {isCompleted
-                                    ? "DONE"
-                                    : isSkipped
-                                    ? "SKIPPED"
-                                    : "UPCOMING"}
-                                </span>
-                                <ChevronRight className="w-5 h-5 fc-text-subtle" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            {/* My Programs & Assigned Workouts */}
-            {allAssignedWorkouts.length > 0 && (
-              <section className="space-y-6 mb-8">
-                {/* Header */}
-                <div className="flex items-center gap-4">
-                  <div className="fc-icon-tile fc-icon-workouts">
-                    <Dumbbell className="w-7 h-7" />
-                  </div>
-                  <h2 className="text-2xl font-bold tracking-tight fc-text-primary">
-                    My Programs & Workouts
-                  </h2>
-                </div>
-
-                {/* Workout Cards */}
-                <div className="space-y-4">
-                  {allAssignedWorkouts.map((assignment) => {
-                    const template = assignment.workout_templates;
-                    const coach = assignment.profiles;
-                    const category = template?.exercise_categories;
-                    const assignedDate =
-                      assignment.assigned_date || assignment.start_date;
-                    const dateObj = assignedDate
-                      ? new Date(assignedDate)
-                      : new Date();
-                    const monthName = dateObj.toLocaleDateString("en-US", {
-                      month: "short",
-                    });
-                    const dayNumber = dateObj.getDate();
-
-                    // Determine status styling
-                    const getStatusBadge = () => {
-                      if (assignment.status === "assigned") {
-                        return {
-                          label: "ASSIGNED",
-                        };
-                      } else if (
-                        assignment.status === "in_progress" ||
-                        assignment.status === "active"
-                      ) {
-                        return {
-                          label: "IN PROGRESS",
-                        };
-                      } else {
-                        return {
-                          label: "COMPLETED",
-                        };
-                      }
-                    };
-
-                    const statusBadge = getStatusBadge();
-                    const statusVariant =
-                      assignment.status === "assigned"
-                        ? "fc-status-pill--upcoming"
-                        : assignment.status === "in_progress" ||
-                          assignment.status === "active"
-                        ? "fc-status-pill--active"
-                        : "fc-status-pill--done";
-                    const iconVariant =
-                      assignment.type === "program"
-                        ? "fc-icon-challenges"
-                        : "fc-icon-workouts";
-
-                    const programIdForDetails =
-                      assignment.type === "program"
-                        ? (assignment.program_id ?? assignment.workout_templates?.id)
-                        : null;
-
-                    return (
-                      <Link
-                        key={assignment.id}
-                        href={
-                          assignment.type === "program"
-                            ? (programIdForDetails ? `/client/programs/${programIdForDetails}/details` : "#")
-                            : `/client/workouts/${assignment.id}/details`
-                        }
-                        className="group block"
-                        onClick={
-                          assignment.type === "program" && !programIdForDetails
-                            ? (e) => e.preventDefault()
-                            : undefined
-                        }
-                      >
-                        <div
-                          className="fc-surface rounded-2xl p-4 sm:p-5 transition-all duration-200 hover:translate-y-[-1px] active:scale-[0.98]"
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                            <div className="flex items-center gap-3 sm:gap-4 flex-1">
-                              <div className={`fc-icon-tile ${iconVariant} w-10 h-10 sm:w-11 sm:h-11 shrink-0`}>
-                                {assignment.type === "program" ? (
-                                  <Award className="w-5 h-5" />
-                                ) : (
-                                  <Dumbbell className="w-5 h-5" />
-                                )}
-                              </div>
-
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-base font-bold fc-text-primary leading-tight mb-0.5">
-                                  {template?.name ||
-                                    assignment.name ||
-                                    (assignment.type === "program"
-                                      ? "Program"
-                                      : "Workout")}
-                                </h4>
-                                <div className="text-[11px] uppercase tracking-wider fc-text-dim">
-                                  {monthName.toUpperCase()} {dayNumber}
-                                  {coach?.first_name && (
-                                    <span className="hidden sm:inline"> • Coach: {coach.first_name}</span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Bottom row on mobile / Right section on desktop */}
-                            <div className="flex items-center justify-between sm:justify-end gap-3 pl-14 sm:pl-0">
-                              <span className={`fc-status-pill ${statusVariant}`}>
-                                {statusBadge.label}
-                              </span>
-                              {assignment.type === "program" ? (
-                                <div className="flex gap-2">
-                                  <Button
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      // Start program workout via progress API
-                                      try {
-                                        const response = await fetchApi("/api/program-workouts/start-from-progress", {
-                                          method: "POST",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({}),
-                                        });
-                                        if (response.ok) {
-                                          const result = await response.json();
-                                          if (result.workout_assignment_id) {
-                                            router.push(`/client/workouts/${result.workout_assignment_id}/start`);
-                                            return;
-                                          }
-                                        }
-                                        // Fallback to program details if API fails
-                                        if (programIdForDetails) router.push(`/client/programs/${programIdForDetails}/details`);
-                                      } catch (err) {
-                                        console.error("Error starting program workout:", err);
-                                        if (programIdForDetails) router.push(`/client/programs/${programIdForDetails}/details`);
-                                      }
-                                    }}
-                                    className="h-9 sm:h-10 px-4 rounded-xl font-semibold"
-                                    variant="fc-primary"
-                                  >
-                                    <Play size={16} className="mr-1.5 fill-current" />
-                                    Start
-                                  </Button>
-                                  <Button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      if (programIdForDetails) router.push(`/client/programs/${programIdForDetails}/details`);
-                                    }}
-                                    className="h-9 sm:h-10 px-3 rounded-xl font-semibold"
-                                    variant="fc-secondary"
-                                  >
-                                    <Eye size={16} />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/client/workouts/${assignment.id}/start`);
-                                  }}
-                                  className="h-9 sm:h-10 px-4 rounded-xl font-semibold"
-                                  variant="fc-primary"
-                                >
-                                  <Play size={16} className="mr-1.5 fill-current" />
-                                  Start
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            {/* Exercise Alternatives Modal */}
-            {showAlternatives && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                <GlassCard
-                  elevation={3}
-                  className="fc-card max-w-2xl w-full max-h-[80vh] overflow-hidden rounded-3xl"
-                >
-                  <div className="border-b border-[color:var(--fc-glass-border)] p-8">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 fc-icon-tile fc-icon-workouts rounded-lg flex items-center justify-center">
-                          <Shuffle className="w-4 h-4 fc-text-workouts" />
-                        </div>
-                        <span className="text-xl font-bold fc-text-primary">
-                          Exercise Alternatives
-                        </span>
-                      </div>
-                      <Button
-                        variant="fc-ghost"
-                        size="sm"
-                        onClick={() => setShowAlternatives(null)}
-                        className="p-3 rounded-xl"
-                      >
-                        <X className="w-5 h-5" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="p-8">
-                    {selectedExerciseAlternatives.length > 0 ? (
-                      <div className="space-y-6">
-                        <p className="text-base fc-text-dim">
-                          Choose an alternative exercise if equipment is
-                          unavailable or you prefer a different variation:
-                        </p>
-                        <div className="space-y-4 max-h-96 overflow-y-auto">
-                          {selectedExerciseAlternatives.map((alternative) => (
-                            <div
-                              key={alternative.id}
-                              className="flex items-center justify-between p-6 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-2xl hover:border-[color:var(--fc-domain-workouts)] transition-colors"
-                            >
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-lg mb-2 fc-text-primary">
-                                  {alternative.alternative_exercise?.name}
-                                </h4>
-                                <p className="text-base mb-3 fc-text-dim">
-                                  {
-                                    alternative.alternative_exercise
-                                      ?.description
-                                  }
-                                </p>
-                                <div className="flex items-center gap-3">
-                                  <Badge
-                                    variant="outline"
-                                    className="text-sm px-3 py-1 border-[color:var(--fc-glass-border)]"
-                                  >
-                                    {alternative.reason}
-                                  </Badge>
-                                  <span className="text-sm fc-text-dim">
-                                    {typeof alternative.alternative_exercise
-                                      ?.category === "string"
-                                      ? alternative.alternative_exercise
-                                          .category
-                                      : (
-                                          alternative.alternative_exercise
-                                            ?.category as any
-                                        )?.name}
-                                  </span>
-                                </div>
-                              </div>
-                              <Button
-                                variant="fc-primary"
-                                onClick={() =>
-                                  swapExercise(
-                                    showAlternatives,
-                                    alternative.alternative_exercise_id
-                                  )
-                                }
-                                className="ml-6 rounded-xl px-6 py-3"
-                              >
-                                <ArrowRight className="w-4 h-4 mr-2" />
-                                Use This
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-12">
-                        <Lightbulb className="w-16 h-16 fc-text-dim mx-auto mb-6" />
-                        <h3 className="font-semibold text-xl mb-3 fc-text-primary">
-                          No alternatives available
-                        </h3>
-                        <p className="text-base fc-text-dim">
-                          This exercise doesn&apos;t have any alternatives
-                          configured yet.
-                        </p>
-                      </div>
+          <ClientPageShell className="max-w-3xl flex flex-col gap-6">
+            {/* SECTION 1 â€” Current Program (Hero) */}
+            <ClientGlassCard className="p-6">
+              {currentProgram ? (
+                <>
+                  <h3 className="text-lg font-bold fc-text-primary mb-1">
+                    {currentProgram.name}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-2 fc-text-dim text-sm mb-4">
+                    <span>Week {currentProgram.current_week} of {currentProgram.total_weeks}</span>
+                    {typeof currentProgram.progress_percentage === "number" && (
+                      <span>â€¢ {currentProgram.progress_percentage}% complete</span>
                     )}
                   </div>
-                </GlassCard>
+                  {todaysWorkout?.hasWorkout && (
+                    <PrimaryButton
+                      className="mb-4"
+                      onClick={() => startWorkout(todaysWorkout)}
+                    >
+                      <Play className="w-4 h-4 mr-2" />
+                      Start Today&apos;s Workout
+                    </PrimaryButton>
+                  )}
+                  <SecondaryButton
+                    className="w-full sm:w-auto"
+                    onClick={() => {
+                      const programAssignment = allAssignedWorkouts.find((a: any) => a.program_id);
+                      const programId = programAssignment?.program_id ?? (currentProgram as any)?.program_id ?? currentProgram?.id;
+                      if (programId) router.push(`/client/programs/${programId}/details`);
+                      else router.push("/client/workouts");
+                    }}
+                  >
+                    View Full Program
+                  </SecondaryButton>
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="fc-text-dim mb-4">No active program assigned.</p>
+                  <SecondaryButton
+                    className="w-auto"
+                    onClick={() => router.push("/client/workouts")}
+                  >
+                    Browse Workouts
+                  </SecondaryButton>
+                </div>
+              )}
+            </ClientGlassCard>
+
+            {/* SECTION 1b - Assigned Workouts */}
+            <section>
+              <SectionHeader title="Assigned Workouts" />
+              <ClientGlassCard className="p-4">
+                {(() => {
+                  const fromAll = (allAssignedWorkouts || []).filter((a: any) => a.type === "workout");
+                  const fromWeek = (thisWeekAssignments || []);
+                  const seen = new Set<string>();
+                  const allItems = [...fromWeek, ...fromAll].filter((a: any) => {
+                    const id = a.id;
+                    if (seen.has(id)) return false;
+                    seen.add(id);
+                    return true;
+                  });
+                  const toShow = allItems.slice(0, 6);
+                  const hasMore = allItems.length > 6;
+                  if (toShow.length === 0) {
+                    return <p className="fc-text-dim text-sm py-4 text-center">No workouts assigned yet.</p>;
+                  }
+                  return (
+                    <div className="space-y-0">
+                      {toShow.map((item: any) => {
+                        const name = item.workout_templates?.name || item.name || "Workout";
+                        const dayLabel = item.scheduled_date ? formatDate(item.scheduled_date) : item.assigned_date ? formatDate(item.assigned_date) : "Assigned";
+                        const asDaily: DailyWorkout = {
+                          hasWorkout: true,
+                          templateId: item.workout_template_id || item.workout_templates?.id,
+                          scheduleId: item.id,
+                          templateName: name,
+                          weekNumber: item.week_number,
+                          programDay: item.program_day,
+                          estimatedDuration: 0,
+                          exercises: [],
+                          message: "",
+                        };
+                        return (
+                          <AssignedWorkoutRow
+                            key={item.id}
+                            title={name}
+                            subtitle={dayLabel}
+                            onStart={() => startWorkout(asDaily)}
+                          />
+                        );
+                      })}
+                      {hasMore && (
+                        <div className="pt-3 mt-3 border-t border-[color:var(--fc-glass-border)]">
+                          <Link
+                            href="/client/workouts"
+                            className="text-sm font-medium fc-text-workouts hover:underline"
+                          >
+                            View all assigned
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </ClientGlassCard>
+            </section>
+
+            {/* SECTION 2 â€” Workout History */}
+            <section>
+              <SectionHeader
+                title="Recent Workouts"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => router.push("/client/progress/workout-logs")}
+                    className="fc-btn fc-btn-secondary fc-press h-8 px-4 text-xs rounded-xl"
+                  >
+                    View All Logs
+                  </button>
+                }
+              />
+              <ClientGlassCard className="p-4">
+                {(workoutHistory?.slice(0, 5) ?? thisWeekAssignments.filter((a: any) => a.completed).slice(0, 5)).length > 0 ? (
+                  <div className="space-y-3">
+                    {(workoutHistory?.slice(0, 5) ?? thisWeekAssignments.filter((a: any) => a.completed).slice(0, 5)).map((item: any, idx: number) => (
+                      <div key={item.id || idx} className="flex items-center justify-between py-2 border-b border-[color:var(--fc-glass-border)] last:border-0">
+                        <div>
+                          <p className="font-semibold fc-text-primary text-sm">
+                            {item.templateName ?? item.name ?? "Workout"}
+                          </p>
+                          <p className="text-xs fc-text-dim">
+                            {item.generatedAt || item.completed_at || item.scheduled_date
+                              ? new Date(item.generatedAt || item.completed_at || item.scheduled_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+                              : ""}
+                          </p>
+                        </div>
+                        {item.completed && <CheckCircle className="w-4 h-4 fc-text-success shrink-0" />}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="fc-text-dim text-sm py-4 text-center">No recent workouts yet.</p>
+                )}
+                <SecondaryButton
+                  className="w-full mt-4"
+                  onClick={() => router.push("/client/progress/workout-logs")}
+                >
+                  View All Logs
+                </SecondaryButton>
+              </ClientGlassCard>
+            </section>
+
+            {/* SECTION 3 â€” Performance */}
+            <section>
+              <SectionHeader title="Performance" />
+              <ClientGlassCard className="p-5">
+                <div className="flex flex-wrap gap-6 mb-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider fc-text-dim mb-1">Weekly Volume</p>
+                    <p className="text-xl font-bold fc-text-primary">{weeklyStats.totalVolume.toLocaleString()} kg</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider fc-text-dim mb-1">Active Time</p>
+                    <p className="text-xl font-bold fc-text-primary">{weeklyStats.activeTime} min</p>
+                  </div>
+                </div>
+                <PrimaryButton onClick={() => router.push("/client/progress/personal-records")}>
+                  View Performance
+                </PrimaryButton>
+              </ClientGlassCard>
+            </section>
+
+            {/* SECTION 4 â€” Competitive */}
+            <section>
+              <SectionHeader title="Competitive" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Link href="/client/progress/leaderboard">
+                  <ClientGlassCard className="p-5 cursor-pointer fc-hover-rise transition-all">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Trophy className="w-6 h-6 fc-text-warning" />
+                      <h4 className="font-bold fc-text-primary">Leaderboard</h4>
+                    </div>
+                    <p className="text-sm fc-text-dim">See your rank among peers.</p>
+                  </ClientGlassCard>
+                </Link>
+                <Link href="/client/challenges">
+                  <ClientGlassCard className="p-5 cursor-pointer fc-hover-rise transition-all">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Zap className="w-6 h-6 fc-text-workouts" />
+                      <h4 className="font-bold fc-text-primary">Challenges</h4>
+                    </div>
+                    <p className="text-sm fc-text-dim">Join events and competitions.</p>
+                  </ClientGlassCard>
+                </Link>
               </div>
-            )}
-        </div>
+            </section>
+
+            {/* SECTION 5 â€” Training Goals */}
+            <section>
+              <SectionHeader
+                title={
+                  pillarGoals.length > 0
+                    ? `Training Goals · ${Math.round(pillarGoals.reduce((s, g) => s + (g.progress_percentage ?? 0), 0) / pillarGoals.length)}% adherence`
+                    : "Training Goals"
+                }
+              />
+              <ClientGlassCard className="p-5">
+                {pillarGoals.length > 0 ? (
+                  <div className="space-y-3 mb-4">
+                    {pillarGoals.map((g) => (
+                      <CompactGoalCard
+                        key={g.id}
+                        goal={{
+                          id: g.id,
+                          title: g.title,
+                          target_value: g.target_value,
+                          current_value: g.current_value,
+                          target_unit: g.target_unit,
+                          progress_percentage: g.progress_percentage,
+                          status: g.status,
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="fc-text-dim text-sm mb-4">No active training goals.</p>
+                )}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <PrimaryButton className="w-full sm:w-auto" onClick={() => setShowAddGoalModal(true)}>
+                    + Add Training Goal
+                  </PrimaryButton>
+                  <SecondaryButton className="w-full sm:w-auto" onClick={() => router.push("/client/goals")}>
+                    Manage all goals
+                  </SecondaryButton>
+                </div>
+              </ClientGlassCard>
+            </section>
+
+            <AddGoalModal
+              open={showAddGoalModal}
+              onClose={() => setShowAddGoalModal(false)}
+              pillar="training"
+              onSuccess={fetchPillarGoals}
+            />
+          </ClientPageShell>
       </div>
       </>
     </AnimatedBackground>

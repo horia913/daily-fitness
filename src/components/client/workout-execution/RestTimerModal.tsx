@@ -134,7 +134,7 @@ export function RestTimerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pb-24 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="fc-modal fc-card w-full max-w-[320px] overflow-hidden rounded-2xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-glass)]">
         {/* Optional: Completion hero */}
         {lastSet && (

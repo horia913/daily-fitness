@@ -33,6 +33,7 @@ import {
 } from "@/lib/mobile-compatibility";
 import WorkoutTemplateService from "@/lib/workoutTemplateService";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useToast } from "@/components/ui/toast-provider";
 
 interface WorkoutTemplate {
   id: string;
@@ -71,6 +72,7 @@ export default function WorkoutAssignmentModal({
   preselectedTemplate,
 }: WorkoutAssignmentModalProps) {
   const { isDark, getThemeStyles } = useTheme();
+  const { addToast } = useToast();
   const theme = getThemeStyles();
 
   const [currentStep, setCurrentStep] = useState<Step>("workouts");
@@ -362,20 +364,22 @@ export default function WorkoutAssignmentModal({
       }
 
       if (failureCount > 0) {
-        alert(
-          `Assigned ${successCount} workout(s), but ${failureCount} failed. Check console for details.`
-        );
+        addToast({
+          title: `Assigned ${successCount} workout(s), but ${failureCount} failed. Check console for details.`,
+          variant: "destructive",
+        });
       } else {
-        alert(
-          `Successfully assigned ${successCount} workout(s) to ${selectedClients.length} client(s)!`
-        );
+        addToast({
+          title: `Successfully assigned ${successCount} workout(s) to ${selectedClients.length} client(s)!`,
+          variant: "success",
+        });
       }
 
       onSuccess();
       onClose();
     } catch (error) {
       console.error("Error assigning workouts:", error);
-      alert("Error assigning workouts. Please try again.");
+      addToast({ title: "Error assigning workouts. Please try again.", variant: "destructive" });
     } finally {
       setLoading(false);
     }

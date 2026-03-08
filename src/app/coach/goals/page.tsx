@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { withTimeout } from '@/lib/withTimeout'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -38,6 +39,8 @@ import {
   TrendingDown
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { useToast } from '@/components/ui/toast-provider'
 
 interface Goal {
   id: string
@@ -102,6 +105,7 @@ const nutrientOptions = [
 
 export default function CoachGoals() {
   const { isDark, getThemeStyles, performanceSettings } = useTheme()
+  const { addToast } = useToast()
   const theme = getThemeStyles()
   
   const [goals, setGoals] = useState<Goal[]>([])
@@ -130,88 +134,97 @@ export default function CoachGoals() {
     auto_track: true
   })
 
+  const loadingRef = useRef(false)
+
   const loadData = useCallback(async () => {
+    if (loadingRef.current) return
+    loadingRef.current = true
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      // Load clients
-      const { data: clientsData, error: clientsError } = await supabase
-        .from('clients')
-        .select('client_id')
-        .eq('coach_id', user.id)
-        .eq('status', 'active')
-
-      if (clientsError) {
-        console.log('Clients error:', clientsError)
-        setClients([])
-        setGoals([])
-      } else if (clientsData && clientsData.length > 0) {
-        const clientIds = clientsData.map(c => c.client_id)
-        
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email, avatar_url')
-          .in('id', clientIds)
-
-        const clientsWithProfiles = profilesData?.map(profile => ({
-          id: profile.id,
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          email: profile.email
-        })) || []
-
-        setClients(clientsWithProfiles)
-
-        // Load exercises from exercise library
-        const { data: exercisesData } = await supabase
-          .from('exercises')
-          .select('id, name, category')
-          .order('name')
-
-        if (exercisesData) {
-          setExercises(exercisesData)
-        }
-
-        // Load goals
-        try {
+      setLoading(true)
+      await withTimeout(
+        (async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
+          const { data: clientsData, error: clientsError } = await supabase
+            .from('clients')
+            .select('client_id')
+            .eq('coach_id', user.id)
+            .eq('status', 'active')
+          if (clientsError) {
+            setClients([])
+            setGoals([])
+            return
+          }
+          if (!clientsData || clientsData.length === 0) {
+            setClients([])
+            setGoals([])
+            return
+          }
+          const clientIds = clientsData.map(c => c.client_id)
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email, avatar_url')
+            .in('id', clientIds)
+          const clientsWithProfiles = profilesData?.map(profile => ({
+            id: profile.id,
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            email: profile.email
+          })) || []
+          setClients(clientsWithProfiles)
+          const { data: exercisesData } = await supabase
+            .from('exercises')
+            .select('id, name, category')
+            .order('name')
+          if (exercisesData) setExercises(exercisesData)
           const { data: goalsData, error: goalsError } = await supabase
             .from('goals')
             .select('*')
             .in('client_id', clientIds)
             .order('created_at', { ascending: false })
-
           if (goalsError) {
-            console.log('Goals table error:', goalsError)
             setGoals([])
           } else if (goalsData) {
             const goalsWithClients = goalsData.map(goal => ({
               ...goal,
               client: profilesData?.find(p => p.id === goal.client_id)
             }))
-
-            console.log('Goals loaded successfully:', goalsWithClients.length, 'items')
             setGoals(goalsWithClients)
           }
-        } catch (error) {
-          console.log('Goals table error:', error)
-          setGoals([])
-        }
-      } else {
-        setClients([])
-        setGoals([])
-      }
+        })(),
+        45000,
+        'loadData'
+      )
     } catch (error) {
       console.error('Error loading data:', error)
       setGoals([])
       setClients([])
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
   }, [])
 
+  const goalsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
-    loadData()
+    if (goalsTimeoutRef.current) clearTimeout(goalsTimeoutRef.current)
+    goalsTimeoutRef.current = setTimeout(() => {
+      goalsTimeoutRef.current = null
+      setLoading(false)
+    }, 20_000)
+    loadData().finally(() => {
+      if (goalsTimeoutRef.current) {
+        clearTimeout(goalsTimeoutRef.current)
+        goalsTimeoutRef.current = null
+      }
+    })
+    return () => {
+      if (goalsTimeoutRef.current) {
+        clearTimeout(goalsTimeoutRef.current)
+        goalsTimeoutRef.current = null
+      }
+    }
   }, [loadData])
 
   const handleMetricTypeChange = (metricType: string) => {
@@ -263,6 +276,7 @@ export default function CoachGoals() {
         .from('goals')
         .insert({
           client_id: goalForm.client_id,
+          pillar: 'general',
           title: goalForm.title,
           description: goalForm.description,
           metric_type: goalForm.metric_type,
@@ -279,7 +293,7 @@ export default function CoachGoals() {
 
       if (error) {
         console.error('Error creating goal:', error)
-        alert('Error creating goal. Please try again.')
+        addToast({ title: "Couldn't create goal. Please try again.", variant: "destructive" })
         return
       }
 
@@ -302,7 +316,7 @@ export default function CoachGoals() {
       loadData()
     } catch (error) {
       console.error('Error creating goal:', error)
-      alert('Error creating goal. Please try again.')
+      addToast({ title: "Couldn't create goal. Please try again.", variant: "destructive" })
     }
   }
 
@@ -324,7 +338,7 @@ export default function CoachGoals() {
 
       if (error) {
         console.error('Error updating goal:', error)
-        alert('Error updating goal. Please try again.')
+        addToast({ title: "Couldn't update goal. Please try again.", variant: "destructive" })
         return
       }
 
@@ -333,7 +347,7 @@ export default function CoachGoals() {
       loadData()
     } catch (error) {
       console.error('Error updating goal:', error)
-      alert('Error updating goal. Please try again.')
+      addToast({ title: "Couldn't update goal. Please try again.", variant: "destructive" })
     }
   }
 
@@ -350,14 +364,14 @@ export default function CoachGoals() {
 
       if (error) {
         console.error('Error deleting goal:', error)
-        alert('Error deleting goal. Please try again.')
+        addToast({ title: "Couldn't delete goal. Please try again.", variant: "destructive" })
         return
       }
 
       loadData()
     } catch (error) {
       console.error('Error deleting goal:', error)
-      alert('Error deleting goal. Please try again.')
+      addToast({ title: "Couldn't delete goal. Please try again.", variant: "destructive" })
     }
   }
 
@@ -430,19 +444,17 @@ export default function CoachGoals() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div style={{ backgroundColor: '#E8E9F3', minHeight: '100vh', paddingBottom: '100px' }}>
-          <div style={{ padding: '24px 20px' }}>
-            <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '32px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-                <div className="animate-pulse">
-                  <div className={`h-8 ${isDark ? 'bg-slate-700' : 'bg-slate-200'} rounded-xl mb-4`}></div>
-                  <div className={`h-4 ${isDark ? 'bg-slate-700' : 'bg-slate-200'} rounded-lg w-3/4 mb-2`}></div>
-                  <div className={`h-4 ${isDark ? 'bg-slate-700' : 'bg-slate-200'} rounded-lg w-1/2`}></div>
-                </div>
+        <AnimatedBackground>
+          <div className="min-h-screen pb-24 bg-[color:var(--fc-bg-page)]">
+            <div className="p-6 max-w-7xl mx-auto space-y-6">
+              <div className="rounded-2xl p-8 bg-[color:var(--fc-glass-highlight)] animate-pulse">
+                <div className="h-8 rounded-xl mb-4 bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-4 rounded-lg w-3/4 mb-2 bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-4 rounded-lg w-1/2 bg-[color:var(--fc-glass-highlight)]" />
               </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     )
   }
@@ -451,7 +463,7 @@ export default function CoachGoals() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-24">
+        <div className="min-h-screen pb-32">
           <div className="px-6 pt-10">
             <div className="max-w-7xl mx-auto space-y-6">
               <GlassCard elevation={2} className="fc-glass fc-card p-6 md:p-8">
@@ -474,7 +486,7 @@ export default function CoachGoals() {
 
             <GlassCard className="p-6">
               <div className="flex items-start gap-4">
-                <div className="rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 p-3 text-white shadow-lg">
+                <div className="rounded-xl bg-[color:var(--fc-accent-primary)] p-3 text-white shadow-lg">
                   <Zap className="w-6 h-6" />
                 </div>
                 <div className="flex-1">
@@ -516,13 +528,13 @@ export default function CoachGoals() {
             <div className="flex flex-wrap gap-3">
               <Dialog open={showCreateGoal} onOpenChange={setShowCreateGoal}>
                 <DialogTrigger asChild>
-                  <Button className="fc-btn fc-btn-primary">
+                  <Button variant="fc-primary">
                     <Plus className="w-5 h-5 mr-2" />
                     Create Goal
                   </Button>
                 </DialogTrigger>
               </Dialog>
-              <Button variant="outline" onClick={loadData} className="fc-btn fc-btn-ghost">
+              <Button variant="fc-ghost" onClick={loadData}>
                 <RefreshCw className="w-5 h-5 mr-2" />
                 Refresh
               </Button>
@@ -530,47 +542,47 @@ export default function CoachGoals() {
 
             {/* Statistics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', marginBottom: '20px' }}>
+              <div className="rounded-2xl p-6 fc-surface mb-5">
                 <div className="flex items-center gap-4">
                   <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Target style={{ width: '32px', height: '32px', color: '#FFFFFF' }} />
+                    <Target className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <p style={{ fontSize: '40px', fontWeight: '800', color: '#1A1A1A', lineHeight: '1.1' }}>{goals.length}</p>
-                    <p style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>Total Goals</p>
+                    <p className="text-3xl font-extrabold fc-text-primary leading-tight">{goals.length}</p>
+                    <p className="text-sm font-normal fc-text-dim">Total Goals</p>
                   </div>
                 </div>
               </div>
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', marginBottom: '20px' }}>
+              <div className="rounded-2xl p-6 fc-surface mb-5">
                 <div className="flex items-center gap-4">
                   <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Clock style={{ width: '32px', height: '32px', color: '#FFFFFF' }} />
+                    <Clock className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <p style={{ fontSize: '40px', fontWeight: '800', color: '#1A1A1A', lineHeight: '1.1' }}>{goals.filter(g => g.status === 'active').length}</p>
-                    <p style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>Active</p>
+                    <p className="text-3xl font-extrabold fc-text-primary leading-tight">{goals.filter(g => g.status === 'active').length}</p>
+                    <p className="text-sm font-normal fc-text-dim">Active</p>
                   </div>
                 </div>
               </div>
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', marginBottom: '20px' }}>
+              <div className="rounded-2xl p-6 fc-surface mb-5">
                 <div className="flex items-center gap-4">
                   <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #4CAF50 0%, #81C784 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <CheckCircle style={{ width: '32px', height: '32px', color: '#FFFFFF' }} />
+                    <CheckCircle className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <p style={{ fontSize: '40px', fontWeight: '800', color: '#1A1A1A', lineHeight: '1.1' }}>{goals.filter(g => g.status === 'completed').length}</p>
-                    <p style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>Completed</p>
+                    <p className="text-3xl font-extrabold fc-text-primary leading-tight">{goals.filter(g => g.status === 'completed').length}</p>
+                    <p className="text-sm font-normal fc-text-dim">Completed</p>
                   </div>
                 </div>
               </div>
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', marginBottom: '20px' }}>
+              <div className="rounded-2xl p-6 fc-surface mb-5">
                 <div className="flex items-center gap-4">
                   <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: 'linear-gradient(135deg, #F093FB 0%, #F5576C 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Users style={{ width: '32px', height: '32px', color: '#FFFFFF' }} />
+                    <Users className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <p style={{ fontSize: '40px', fontWeight: '800', color: '#1A1A1A', lineHeight: '1.1' }}>{clients.length}</p>
-                    <p style={{ fontSize: '14px', fontWeight: '400', color: '#6B7280' }}>Active Clients</p>
+                    <p className="text-3xl font-extrabold fc-text-primary leading-tight">{clients.length}</p>
+                    <p className="text-sm font-normal fc-text-dim">Active Clients</p>
                   </div>
                 </div>
               </div>
@@ -585,31 +597,19 @@ export default function CoachGoals() {
                 Client Goals
               </h2>
               {filteredGoals.length === 0 ? (
-                <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '48px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', textAlign: 'center' }}>
-                    <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-                      <Target className="w-12 h-12 text-white" />
-                    </div>
-                    <h3 className={`text-2xl font-bold ${theme.text} mb-4`}>
-                      No Goals Set
-                    </h3>
-                    <p className={`${theme.textSecondary} text-lg mb-8 max-w-md mx-auto`}>
-                      Start setting fitness goals for your clients. Goals will auto-track from workouts, nutrition logs, and body measurements.
-                    </p>
-                    <Dialog open={showCreateGoal} onOpenChange={setShowCreateGoal}>
-                      <DialogTrigger asChild>
-                        <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl shadow-lg hover:scale-105 transition-all duration-200 px-8 py-3 text-lg font-semibold">
-                          <Plus className="w-5 h-5 mr-2" />
-                          Create First Goal
-                        </Button>
-                      </DialogTrigger>
-                    </Dialog>
-                </div>
+                <EmptyState
+                  icon={Target}
+                  title="No goals yet"
+                  description="Set goals to track client progress."
+                  actionLabel="Create goal"
+                  onAction={() => setShowCreateGoal(true)}
+                />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredGoals.map(goal => {
                     const progress = calculateProgress(goal.current_value, goal.target_value)
                     return (
-                      <div key={goal.id} style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '24px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', marginBottom: '20px' }}>
+                      <div key={goal.id} className="rounded-2xl p-6 fc-surface mb-5">
                           <div className="space-y-4">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
@@ -718,11 +718,7 @@ export default function CoachGoals() {
 
             {/* Create Goal Modal */}
             <Dialog open={showCreateGoal} onOpenChange={setShowCreateGoal}>
-              <DialogContent className="rounded-2xl border-0 shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[90vh] !w-[min(600px,95vw)] !m-0 !p-0 overflow-hidden" style={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E5E7EB',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-              }}>
+              <DialogContent className="rounded-2xl border border-[color:var(--fc-glass-border)] shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[90vh] !w-[min(600px,95vw)] !m-0 !p-0 overflow-hidden fc-surface">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                   <DialogHeader className="space-y-3">
                     <DialogTitle className={`text-2xl font-bold ${theme.text} leading-tight`}>Create Goal</DialogTitle>
@@ -942,11 +938,7 @@ export default function CoachGoals() {
 
             {/* Edit Goal Modal */}
             <Dialog open={showEditGoal} onOpenChange={setShowEditGoal}>
-              <DialogContent className="rounded-2xl border-0 shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[85vh] !w-[min(600px,95vw)] !m-0 !p-0 overflow-hidden" style={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E5E7EB',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-              }}>
+              <DialogContent className="rounded-2xl border border-[color:var(--fc-glass-border)] shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[85vh] !w-[min(600px,95vw)] !m-0 !p-0 overflow-hidden fc-surface">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                   <DialogHeader className="space-y-3">
                     <DialogTitle className={`text-2xl font-bold ${theme.text} leading-tight`}>Edit Goal</DialogTitle>

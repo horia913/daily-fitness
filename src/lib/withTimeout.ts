@@ -1,17 +1,26 @@
 /**
- * Wraps a promise with a timeout. If the promise does not resolve within ms,
- * the returned promise rejects with an Error whose message is the given message (default 'timeout').
- * Use in catch: error.message === 'timeout' for user-friendly load error + Retry.
+ * Wraps a promise with a timeout. If the promise doesn't settle within
+ * the given milliseconds, the returned promise rejects with a timeout error.
+ * The original promise continues running but its result is ignored.
  */
 export function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
-  message = "timeout"
+  label?: string
 ): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(message)), ms)
-    ),
-  ]);
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Timeout: ${label || 'operation'} took longer than ${ms}ms`));
+    }, ms);
+
+    promise
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
 }

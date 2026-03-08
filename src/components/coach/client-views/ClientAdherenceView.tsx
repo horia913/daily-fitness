@@ -20,44 +20,52 @@ export default function ClientAdherenceView({ clientId }: ClientAdherenceViewPro
   useEffect(() => {
     let cancelled = false
     async function load() {
-      const { data: assignments } = await supabase
-        .from('program_assignments')
-        .select('id, program_id')
-        .eq('client_id', clientId)
-        .eq('status', 'active')
-        .limit(1)
-      const assignment = assignments?.[0]
-      if (!assignment || cancelled) {
-        if (!cancelled) setLoading(false)
-        return
-      }
-      const { data: progress } = await supabase
-        .from('program_progress')
-        .select('current_week_number')
-        .eq('program_assignment_id', assignment.id)
-        .single()
-      const weekNum = progress?.current_week_number ?? 1
-      const { data: slots } = await supabase
-        .from('program_schedule')
-        .select('id')
-        .eq('program_id', assignment.program_id)
-        .eq('week_number', weekNum)
-      const assigned = slots?.length ?? 0
-      const { data: completions } = await supabase
-        .from('program_day_completions')
-        .select('id, program_schedule_id, program_schedule!inner(week_number)')
-        .eq('program_assignment_id', assignment.id)
-      const completedInWeek = (completions || []).filter((c: any) => (c.program_schedule?.week_number ?? 0) === weekNum).length
-      const completed = Math.min(assigned, completedInWeek)
-      if (!cancelled) {
-        setAdherenceData({
-          workoutAdherence: assigned > 0 ? Math.round((completed / assigned) * 100) : 0,
+      try {
+        const { data: assignments } = await supabase
+          .from('program_assignments')
+          .select('id, program_id')
+          .eq('client_id', clientId)
+          .eq('status', 'active')
+          .limit(1)
+        const assignment = assignments?.[0]
+        if (!assignment || cancelled) return
+
+        const { data: progress } = await supabase
+          .from('program_progress')
+          .select('current_week_number')
+          .eq('program_assignment_id', assignment.id)
+          .single()
+        const weekNum = progress?.current_week_number ?? 1
+        const { data: slots } = await supabase
+          .from('program_schedule')
+          .select('id')
+          .eq('program_id', assignment.program_id)
+          .eq('week_number', weekNum)
+        const assigned = slots?.length ?? 0
+        const { data: completions } = await supabase
+          .from('program_day_completions')
+          .select('id, program_schedule_id, program_schedule!inner(week_number)')
+          .eq('program_assignment_id', assignment.id)
+        const completedInWeek = (completions || []).filter((c: any) => (c.program_schedule?.week_number ?? 0) === weekNum).length
+        const completed = Math.min(assigned, completedInWeek)
+        if (!cancelled) {
+          setAdherenceData({
+            workoutAdherence: assigned > 0 ? Math.round((completed / assigned) * 100) : 0,
+            nutritionAdherence: 0,
+            weeklyAverage: assigned > 0 ? Math.round((completed / assigned) * 100) : 0,
+            thisWeek: { completed, missed: Math.max(0, assigned - completed), total: assigned }
+          })
+        }
+      } catch (err) {
+        if (!cancelled) setAdherenceData({
+          workoutAdherence: 0,
           nutritionAdherence: 0,
-          weeklyAverage: assigned > 0 ? Math.round((completed / assigned) * 100) : 0,
-          thisWeek: { completed, missed: Math.max(0, assigned - completed), total: assigned }
+          weeklyAverage: 0,
+          thisWeek: { completed: 0, missed: 0, total: 0 }
         })
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      setLoading(false)
     }
     load()
     return () => { cancelled = true }

@@ -113,7 +113,7 @@ export default function SetLoggingForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workout_log_id: undefined, // API will create if needed
-          block_id: templateExercise?.block_id,
+          set_entry_id: templateExercise?.set_entry_id,
           exercise_id: templateExercise?.exercise_id || templateExercise?.exercise?.id,
           weight: parseFloat(formData.weight_used) || 0,
           reps: parseInt(formData.reps_completed) || 0,

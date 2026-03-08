@@ -109,17 +109,15 @@ export class PrefetchService {
     }
 
     try {
-      const [profile, stats, todaysSessions, clientProgress] = await Promise.all([
+      const [profile, stats, clientProgress] = await Promise.all([
         DatabaseService.getProfile(userId),
         DatabaseService.getCoachStats(userId),
-        DatabaseService.getTodaysSessions(userId),
         DatabaseService.getClientProgress(userId)
       ])
 
       cache.set(cacheKey, {
         profile,
         stats,
-        todaysSessions,
         clientProgress
       }, 2 * 60 * 1000) // 2 minutes TTL
     } catch (error) {

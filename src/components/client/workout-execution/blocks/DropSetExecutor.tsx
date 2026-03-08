@@ -18,6 +18,7 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import {
   getWeightDefaultAndSuggestion,
@@ -47,9 +48,12 @@ export function DropSetExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
+  onPlateCalculatorClick,
   onRestTimerClick,
   onSetComplete,
   onLastSetLoggedForRest,
+  progressionSuggestion,
+  previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -74,6 +78,8 @@ export function DropSetExecutor({
   const isManuallyEditingDropWeight = useRef(false);
   const [isWeightPristine, setIsWeightPristine] = useState(true);
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  /** Collapsible set history: show all sets or only last 2 */
+  const [showAllSets, setShowAllSets] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -234,7 +240,7 @@ export function DropSetExecutor({
   }
 
   const instructions =
-    currentExercise?.notes || block.block.block_notes || undefined;
+    currentExercise?.notes || block.block.set_notes || undefined;
 
   const handleEditSet = (setEntry: LoggedSet) => {
     const dropVal = (setEntry.weight_kg ?? 0) * (1 - dropPercentage / 100);
@@ -255,7 +261,7 @@ export function DropSetExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "DropSetExecutor",
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -293,7 +299,7 @@ export function DropSetExecutor({
     const pct = w0 > 0 ? ((w0 - w1) / w0) * 100 : dropPercentage;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.block_type, {
+      const payload = buildSetEditPatchPayload(block.block.set_type, {
         dropset_initial_weight: w0,
         dropset_initial_reps: r0,
         dropset_final_weight: w1,
@@ -308,7 +314,7 @@ export function DropSetExecutor({
         console.log("[SAVE EDITS]", {
           executor: "DropSetExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -324,7 +330,7 @@ export function DropSetExecutor({
           id: editingSetId,
           exercise_id:
             current?.exercise_id ?? currentExercise?.exercise_id ?? "",
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: editDraft.set_number,
           weight_kg: w0,
           reps_completed: r0,
@@ -411,7 +417,7 @@ export function DropSetExecutor({
           : 0;
 
       const logData: any = {
-        block_type: "dropset",
+        set_type: "dropset",
         set_number: currentSetNumber,
       };
 
@@ -435,7 +441,7 @@ export function DropSetExecutor({
         const newLoggedSet: LoggedSet = {
           id: result.set_log_id || `temp-${currentSetNumber}-${Date.now()}`,
           exercise_id: currentExercise.exercise_id,
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: currentSetNumber,
           weight_kg: initialWeightNum,
           reps_completed: initialRepsNum,
@@ -509,60 +515,126 @@ export function DropSetExecutor({
             background: "var(--fc-surface-sunken)",
           }}
         >
-          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
-            Logged sets
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+              Logged sets
+            </div>
+            {loggedSetsList.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSets(!showAllSets)}
+                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
+              >
+                {showAllSets ? (
+                  <>Show less ▲</>
+                ) : (
+                  <>Show all {loggedSetsList.length} sets ▼</>
+                )}
+              </button>
+            )}
           </div>
           <ul className="space-y-1.5">
-            {loggedSetsList.map((setEntry) => (
+            {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
+              // Calculate the actual index in the full list for isLatestSet
+              const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
+              const isLatestSet = actualIndex === loggedSetsList.length - 1;
+              return (
               <li
                 key={setEntry.id}
-                className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
                 style={{ background: "var(--fc-surface-elevated)" }}
               >
-                <span className="text-sm fc-text-primary">
-                  Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"} kg ×{" "}
-                  {setEntry.reps_completed ?? "—"} reps
-                </span>
-                <div className="relative flex items-center">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMenuOpenSetId(
-                        menuOpenSetId === setEntry.id ? null : setEntry.id,
-                      )
-                    }
-                    className="p-1.5 rounded-lg fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
-                    aria-label="Options"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                  {menuOpenSetId === setEntry.id && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setMenuOpenSetId(null)}
-                        aria-hidden
-                      />
-                      <div
-                        className="absolute right-0 top-full mt-1 z-20 py-1 rounded-lg shadow-lg min-w-[120px]"
-                        style={{
-                          background: "var(--fc-surface-elevated)",
-                          border: "1px solid var(--fc-surface-card-border)",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleEditSet(setEntry)}
-                          className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm hover:opacity-80"
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm fc-text-primary">
+                    Set {setEntry.set_number}: {setEntry.weight_kg ?? "—"} kg ×{" "}
+                    {setEntry.reps_completed ?? "—"} reps
+                  </span>
+                  <div className="relative flex items-center">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMenuOpenSetId(
+                          menuOpenSetId === setEntry.id ? null : setEntry.id,
+                        )
+                      }
+                      className="p-1.5 rounded-lg fc-text-dim hover:fc-text-primary focus:outline-none focus:ring-2"
+                      aria-label="Options"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                    {menuOpenSetId === setEntry.id && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setMenuOpenSetId(null)}
+                          aria-hidden
+                        />
+                        <div
+                          className="absolute right-0 top-full mt-1 z-20 py-1 rounded-lg shadow-lg min-w-[120px]"
+                          style={{
+                            background: "var(--fc-surface-elevated)",
+                            border: "1px solid var(--fc-surface-card-border)",
+                          }}
                         >
-                          <Pencil className="w-3.5 h-3.5" /> Edit
-                        </button>
-                      </div>
-                    </>
-                  )}
+                          <button
+                            type="button"
+                            onClick={() => handleEditSet(setEntry)}
+                            className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm hover:opacity-80"
+                          >
+                            <Pencil className="w-3.5 h-3.5" /> Edit
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
+                <InlineRPERow
+                  setLogId={setEntry.id.startsWith("temp-") ? null : setEntry.id}
+                  currentRPE={setEntry.rpe ?? null}
+                  onRPESelect={async (rpe) => {
+                    const updatedEntry: LoggedSet = {
+                      ...setEntry,
+                      rpe,
+                    };
+                    onSetLogUpsert?.(block.block.id, updatedEntry, {
+                      replaceId: setEntry.id,
+                    });
+
+                    if (!setEntry.id.startsWith("temp-")) {
+                      try {
+                        const res = await fetch(`/api/sets/${setEntry.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ rpe }),
+                          credentials: "include",
+                        });
+                        if (!res.ok) {
+                          console.error("Failed to update RPE:", await res.text());
+                          const revertedEntry: LoggedSet = {
+                            ...setEntry,
+                            rpe: setEntry.rpe ?? undefined,
+                          };
+                          onSetLogUpsert?.(block.block.id, revertedEntry, {
+                            replaceId: setEntry.id,
+                          });
+                        }
+                      } catch (err) {
+                        console.error("Error updating RPE:", err);
+                        const revertedEntry: LoggedSet = {
+                          ...setEntry,
+                          rpe: setEntry.rpe ?? undefined,
+                        };
+                        onSetLogUpsert?.(block.block.id, revertedEntry, {
+                          replaceId: setEntry.id,
+                        });
+                      }
+                    }
+                  }}
+                  isLatestSet={isLatestSet}
+                />
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}
@@ -793,7 +865,10 @@ export function DropSetExecutor({
         calculateSuggestedWeight,
         onVideoClick,
         onAlternativesClick,
+        onPlateCalculatorClick,
         onRestTimerClick,
+        progressionSuggestion,
+        previousPerformanceMap,
       }}
       exerciseName={currentExercise?.exercise?.name || "Exercise"}
       blockDetails={blockDetails}
@@ -808,6 +883,9 @@ export function DropSetExecutor({
       showRestTimer={
         !!(block.block.rest_seconds || currentExercise?.rest_seconds)
       }
+      onApplySuggestion={(w, _r) => {
+        if (w != null) setInitialWeight(String(w));
+      }}
     />
   );
 }

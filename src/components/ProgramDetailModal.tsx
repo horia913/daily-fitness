@@ -263,7 +263,7 @@ export default function ProgramDetailModal({ isOpen, onClose, program, onEdit }:
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className={`${safeTheme.text} hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl`}
+                className={`min-w-11 min-h-11 flex items-center justify-center ${safeTheme.text} hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl`}
               >
                 <X className="w-5 h-5" />
               </Button>

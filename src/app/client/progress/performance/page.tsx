@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -111,11 +111,29 @@ function PerformancePageContent() {
   const [loading, setLoading] = useState(true);
   const [showLogModal, setShowLogModal] = useState(false);
   const [selectedType, setSelectedType] = useState<TestType>("1km_run");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (user && !authLoading) {
-      loadTests();
-    }
+    if (!user || authLoading) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setLoading(false);
+      setLoadError("Loading took too long. Tap Retry to try again.");
+    }, 20_000);
+    loadTests().finally(() => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
   }, [user, authLoading]);
 
   const loadTests = async () => {
@@ -140,6 +158,22 @@ function PerformancePageContent() {
   const stepTrendPercent = getTrendPercent(stepTests, "step_test");
   const improvement = getImprovement(currentTests, selectedType);
   const latest = currentTests[0];
+
+  if (loadError) {
+    return (
+      <ProtectedRoute>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-6 sm:px-6 lg:px-12 fc-page max-w-4xl mx-auto">
+            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+            </div>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
 
   if (authLoading || loading) {
     return (

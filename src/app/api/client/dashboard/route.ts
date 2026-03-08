@@ -6,22 +6,20 @@
  * OPTIMIZED: Uses single PostgreSQL RPC call (get_client_dashboard)
  * instead of 10+ individual queries.
  * 
+ * For program clients: todaySlot and isRestDay come from buildProgramWeekState
+ * (single authority — same function as program-week API). RPC todaysWorkout
+ * is ignored for Today selection. Dashboard does NOT call programStateService directly.
+ * 
  * Response includes:
- * - avatarUrl
- * - firstName
- * - clientType
- * - nextSession (if in_gym client)
- * - streak
- * - weeklyProgress { current, goal }
- * - weeklyStats { volume, time, prsCount }
- * - workoutDays (array of day indices with workouts)
- * - bodyWeight { current, change }
- * - todaysWorkout
+ * - avatarUrl, firstName, clientType, nextSession, streak, weeklyProgress,
+ *   weeklyStats, workoutDays, bodyWeight, todaysWorkout (from RPC)
+ * - todaySlot, isRestDay (from buildProgramWeekState)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { PerfCollector } from '@/lib/perfUtils'
+import { buildProgramWeekState } from '@/lib/programWeekStateBuilder'
 
 export async function GET(request: NextRequest) {
   const perf = new PerfCollector('/api/client/dashboard')
@@ -41,6 +39,13 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       )
     }
+
+    // todayWeekday: 0=Mon..6=Sun (client timezone). Default if missing.
+    const { searchParams } = new URL(request.url)
+    const todayWeekdayParam = searchParams.get('todayWeekday')
+    const todayWeekday = todayWeekdayParam !== null
+      ? Math.min(6, Math.max(0, parseInt(todayWeekdayParam, 10) || 0))
+      : (new Date().getDay() + 6) % 7
     
     // 3. Call the optimized RPC
     const rpcResult = await perf.time('rpc_get_client_dashboard', async () =>
@@ -77,11 +82,25 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    // 4. Log performance summary
+    // 4. For program clients: get todaySlot, isRestDay, overdueSlots from buildProgramWeekState (single authority)
+    let todaySlot = null
+    let isRestDay = false
+    let overdueSlots: unknown[] = []
+    try {
+      const programWeekState = await buildProgramWeekState(supabase, user.id, todayWeekday)
+      todaySlot = programWeekState.todaySlot
+      isRestDay = programWeekState.isRestDay
+      overdueSlots = programWeekState.overdueSlots
+    } catch (e) {
+      console.warn('[dashboard] Could not get program week state:', e)
+    }
+
+    // 5. Log performance summary
     perf.logSummary()
     
-    // 5. Return response with Server-Timing headers
-    const response = NextResponse.json(data)
+    // 6. Return response with Server-Timing headers (todaySlot, isRestDay, overdueSlots from builder)
+    const payload = { ...data, todaySlot, isRestDay, overdueSlots }
+    const response = NextResponse.json(payload)
     const perfHeaders = perf.getHeaders()
     Object.entries(perfHeaders).forEach(([key, value]) => {
       response.headers.set(key, value)
@@ -92,7 +111,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('[dashboard] Unexpected error:', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error?.message || 'Internal server error' },
       { status: 500 }
     )
   }

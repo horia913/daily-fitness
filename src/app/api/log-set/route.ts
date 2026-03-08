@@ -6,36 +6,47 @@ import { createForbiddenResponse } from '@/lib/apiAuth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { PerfCollector } from '@/lib/perfUtils'
 
+/** Request body for POST /api/log-set. Common fields + set-type-specific (optional). */
+interface LogSetRequestBody {
+  workout_log_id?: string
+  workout_assignment_id?: string
+  set_entry_id?: string   // current name
+  block_id?: string       // backward-compat alias for set_entry_id
+  set_type?: string       // current name
+  block_type?: string     // backward-compat alias for set_type
+  client_id?: string
+  session_id?: string
+  notes?: string
+  template_exercise_id?: string
+  rpe?: number | string
+  idempotency_key?: string
+  exercise_id?: string
+  weight?: number | string
+  reps?: number | string
+  set_number?: number
+  [key: string]: unknown
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
 export async function POST(req: NextRequest) {
   // Initialize performance collector for Server-Timing header
   const perf = new PerfCollector('/api/log-set')
-  
-  console.log("📥 /api/log-set called");
-  
+
   try {
     const supabaseAuth = await createSupabaseServerClient()
     const { data: { user }, error: authError } = await perf.time('auth', () => 
       supabaseAuth.auth.getUser()
     )
     if (authError || !user) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[AuthMissing]', {
-          route: '/api/log-set',
-          reason: authError?.message || 'no_user',
-        })
-      }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const userId = user.id
-    let supabaseAdmin: any = null
-    // Parse request body - support both old format (backwards compatible) and new format
-    let body: any;
+    let supabaseAdmin: ReturnType<typeof createClient> | null = null
+    let body: LogSetRequestBody
     try {
-      body = await req.json();
-      console.log("📦 Request body parsed successfully");
-    } catch (parseError) {
+      body = (await req.json()) as LogSetRequestBody
+    } catch (parseError: unknown) {
       console.error("❌ Error parsing request body:", parseError);
       return createErrorResponse(
         "Invalid JSON in request body",
@@ -44,34 +55,15 @@ export async function POST(req: NextRequest) {
         400
       );
     }
-    
-    // Debug logging - comprehensive request body inspection
-    console.log("📦 Request body:", {
-      exercise_id: body.exercise_id,
-      weight: body.weight,
-      reps: body.reps,
-      block_id: body.block_id,
-      client_id: body.client_id,
-      workout_assignment_id: body.workout_assignment_id,
-      block_type: body.block_type,
-      exercise_id_type: typeof body.exercise_id,
-      weight_type: typeof body.weight,
-      reps_type: typeof body.reps,
-      has_exercise_id: !!body.exercise_id,
-      has_weight: !!body.weight,
-      has_reps: !!body.reps,
-      has_block_id: !!body.block_id,
-      has_client_id: !!body.client_id,
-      has_workout_assignment_id: !!body.workout_assignment_id,
-      all_keys: Object.keys(body),
-    })
-    
+
     const {
       workout_log_id,
-      block_id,
+      set_entry_id: bodySetEntryId,
+      block_id: bodyBlockId,           // backward-compat alias
       client_id,
       notes,
-      block_type: incomingBlockType,
+      set_type: bodySetType,
+      block_type: bodyBlockType,       // backward-compat alias
       workout_assignment_id,
       session_id, // workout_sessions.id - used to link workout_logs
       template_exercise_id,
@@ -79,27 +71,16 @@ export async function POST(req: NextRequest) {
       idempotency_key, // Golden Logging Flow: client-generated dedup key
     } = body
 
+    // Resolve canonical field names (prefer new names, fall back to old)
+    const set_entry_id = bodySetEntryId ?? bodyBlockId
+    const incomingBlockType = bodySetType ?? bodyBlockType
+
     // Validate session_id is a valid UUID if provided
     const isValidUuid = (value: string | null | undefined): boolean => {
       if (!value) return false;
       return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
     };
     const validSessionId = isValidUuid(session_id) ? session_id : null;
-
-    console.log("📥 /api/log-set received:", {
-      workout_assignment_id,
-      block_id,
-      client_id,
-      has_workout_log_id: !!workout_log_id,
-    });
-
-    console.log("🔍 Extracted parameters:", {
-      has_workout_log_id: !!workout_log_id,
-      has_block_id: !!block_id,
-      has_client_id: !!client_id,
-      has_workout_assignment_id: !!workout_assignment_id,
-      block_type: incomingBlockType,
-    });
 
     if (!userId) {
       console.error("❌ Missing user - cannot determine user");
@@ -115,8 +96,11 @@ export async function POST(req: NextRequest) {
     
     // Ensure we have admin client
     if (!supabaseAdmin) {
-      const supabaseServiceKey =
-        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (!supabaseServiceKey) {
+        console.error('SUPABASE_SERVICE_ROLE_KEY is not configured')
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 503 })
+      }
       supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
         global: { fetch: getTrackedFetch() },
       })
@@ -143,22 +127,18 @@ export async function POST(req: NextRequest) {
     let blockType: BlockType = 'straight_set'
 
     if (incomingBlockType) {
-      console.log("🔍 Validating block_type:", incomingBlockType);
-      if (!validBlockTypes.includes(incomingBlockType)) {
-        console.error("❌ Invalid block_type:", incomingBlockType, "Valid types:", validBlockTypes);
+      if (!(validBlockTypes as readonly string[]).includes(incomingBlockType)) {
+        console.error("❌ Invalid set_type:", incomingBlockType, "Valid types:", validBlockTypes);
         return NextResponse.json(
           { 
-            error: `Invalid block_type: ${incomingBlockType}`,
+            error: `Invalid set_type: ${incomingBlockType}`,
             details: `Must be one of: ${validBlockTypes.join(", ")}`,
             received: incomingBlockType
           },
           { status: 400 }
         )
       }
-      blockType = incomingBlockType;
-      console.log("✅ Using block_type:", blockType);
-    } else {
-      console.log("⚠️ No block_type provided, defaulting to straight_set");
+      blockType = incomingBlockType as BlockType;
     }
 
     // Step 1: Get or create workout_log_id (REQUIRED for workout_set_logs)
@@ -166,14 +146,9 @@ export async function POST(req: NextRequest) {
     // Individual sets go to workout_set_logs table, but they require a workout_log_id
     let workoutLogId = workout_log_id
 
-    console.log("🔍 Step 1: Getting/creating workout_log_id");
-    console.log("  - Provided workout_log_id:", workoutLogId || "none");
-
     // If workout_log_id not provided, check for existing one or create a new one
     // workout_assignment_id is REQUIRED (NOT NULL constraint)
     if (!workoutLogId) {
-      console.log("  - workout_log_id not provided, checking for existing or creating new one");
-      
       if (!workout_assignment_id) {
         console.error("❌ Missing workout_assignment_id - required to create workout_log");
         return NextResponse.json(
@@ -191,7 +166,7 @@ export async function POST(req: NextRequest) {
       
       // If workout_log_id is provided but workout_assignment_id is not, resolve it from workout_logs
       if (!actualWorkoutAssignmentId && workout_log_id) {
-        const { data: workoutLog, error: logError } = await supabaseAdmin
+        const { data: rawLog, error: logError } = await supabaseAdmin
           .from('workout_logs')
           .select('workout_assignment_id')
           .eq('id', workout_log_id)
@@ -209,6 +184,7 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        const workoutLog = rawLog as { workout_assignment_id: string | null } | null;
         if (!workoutLog?.workout_assignment_id) {
           console.error('❌ workout_log found but workout_assignment_id is null');
           return NextResponse.json(
@@ -221,7 +197,6 @@ export async function POST(req: NextRequest) {
         }
 
         actualWorkoutAssignmentId = workoutLog.workout_assignment_id;
-        console.log('✅ Resolved workout_assignment_id from workout_log:', actualWorkoutAssignmentId);
       }
 
       // Validate that workout_assignment_id exists and has workout_template_id
@@ -237,7 +212,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Get workout_assignment to verify it exists and get workout_template_id
-      const { data: workoutAssignment, error: assignmentError } = await supabaseAdmin
+      const { data: rawAssignment, error: assignmentError } = await supabaseAdmin
         .from('workout_assignments')
         .select('id, workout_template_id, client_id')
         .eq('id', actualWorkoutAssignmentId)
@@ -255,6 +230,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const workoutAssignment = rawAssignment as { id: string; workout_template_id: string | null; client_id: string } | null;
       if (!workoutAssignment) {
         console.error('❌ workout_assignment not found or access denied');
         return NextResponse.json(
@@ -278,18 +254,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      console.log('✅ Validated workout_assignment:', {
-        id: workoutAssignment.id,
-        workout_template_id: workoutAssignment.workout_template_id,
-      });
-      
-      console.log('🔍 Checking for existing workout_log:', {
-        client_id: userId,
-        workout_assignment_id: actualWorkoutAssignmentId,
-        original_assignment_id: workout_assignment_id,
-        timestamp: new Date().toISOString(),
-      });
-
       // ✅ Check if workout_log already exists for this assignment (and is not completed)
       // If session_id provided, prefer logs linked to that session
       let existingLogQuery = supabaseAdmin
@@ -308,20 +272,12 @@ export async function POST(req: NextRequest) {
       
       const { data: existingLog, error: existingError } = await existingLogQuery.maybeSingle();
 
-      console.log('🔴 DEBUG: Query result for existing log:', {
-        existingLog: existingLog ? { id: existingLog.id, started_at: existingLog.started_at, workout_session_id: existingLog.workout_session_id } : null,
-        hasError: !!existingError,
-        errorCode: existingError?.code,
-        errorMessage: existingError?.message,
-        errorDetails: existingError?.details,
-        errorHint: existingError?.hint,
-        queriedWithSessionId: validSessionId,
-      });
+      type ExistingLogRow = { id: string; started_at: string | null; completed_at: string | null; workout_session_id?: string | null };
+      let finalExistingLog: ExistingLogRow | null = (existingLog ?? null) as ExistingLogRow | null;
 
       // Fallback: If no log found for this session, check for any active log without session linkage
-      let finalExistingLog = existingLog;
       if (!existingLog && validSessionId) {
-        const { data: unlinkedLog, error: unlinkedError } = await supabaseAdmin
+        const { data: rawUnlinked, error: unlinkedError } = await supabaseAdmin
           .from('workout_logs')
           .select('id, started_at, completed_at, workout_session_id')
           .eq('client_id', userId)
@@ -331,14 +287,11 @@ export async function POST(req: NextRequest) {
           .order('started_at', { ascending: false })
           .limit(1)
           .maybeSingle();
+        type UnlinkedLogRow = { id: string; started_at: string | null; completed_at: string | null; workout_session_id: string | null };
+        const unlinkedLog = rawUnlinked as UnlinkedLogRow | null;
         
         if (unlinkedLog && !unlinkedError) {
-          // Link this existing unlinked log to the session
-          console.log('🔗 Found unlinked workout_log, linking to session:', {
-            logId: unlinkedLog.id,
-            sessionId: validSessionId,
-          });
-          const { error: linkError } = await supabaseAdmin
+          const { error: linkError } = await (supabaseAdmin as any)
             .from('workout_logs')
             .update({ workout_session_id: validSessionId })
             .eq('id', unlinkedLog.id);
@@ -366,30 +319,14 @@ export async function POST(req: NextRequest) {
         completed_at: string | null
       }>
 
-      console.log('🔴 DEBUG: All logs for this assignment:', {
-        totalCount: count,
-        activeLogs: logsForAssignment.filter(l => !l.completed_at).length,
-        completedLogs: logsForAssignment.filter(l => l.completed_at).length,
-        recentLogs: logsForAssignment.slice(0, 5).map(l => ({
-          id: l.id,
-          started_at: l.started_at,
-          completed_at: l.completed_at,
-        })),
-      });
-
       if (existingError && existingError.code !== 'PGRST116') {
         // PGRST116 is "not found" which is fine, but other errors are not
         console.error('❌ Error checking for existing workout_log:', existingError);
       }
 
       if (finalExistingLog) {
-        // ✅ Reuse existing log
-        console.log('✅ Found existing workout_log, reusing:', finalExistingLog.id);
         workoutLogId = finalExistingLog.id;
       } else {
-        // ✅ Create new log only if none exists
-        console.log('📝 No existing log found, creating new workout_log');
-        
         // Include workout_session_id if we have a valid session
         const insertPayload: {
           client_id: string;
@@ -406,10 +343,9 @@ export async function POST(req: NextRequest) {
         
         if (validSessionId) {
           insertPayload.workout_session_id = validSessionId;
-          console.log('🔗 Linking new workout_log to session:', validSessionId);
         }
 
-        const { data: newLog, error: createError } = await supabaseAdmin
+        const { data: newLog, error: createError } = await (supabaseAdmin as any)
           .from('workout_logs')
           .insert([insertPayload])
           .select('id, workout_assignment_id, workout_session_id')
@@ -445,15 +381,8 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        console.log('✅ Created new workout_log:', {
-          id: newLog.id,
-          workout_assignment_id: newLog.workout_assignment_id,
-          workout_session_id: newLog.workout_session_id,
-        });
         workoutLogId = newLog.id;
       }
-    } else {
-      console.log("✅ Using existing workout_log_id:", workoutLogId);
     }
 
     // CRITICAL: Validate workout_log_id is set (REQUIRED by database NOT NULL constraint)
@@ -469,34 +398,29 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Step 2: Build insert payload based on block_type and log to workout_set_logs
-    console.log("🔍 Step 2: Building insert payload for workout_set_logs");
-    
+    // Step 2: Build insert payload based on set_type and log to workout_set_logs
     let primaryExerciseId: string | null = null
     let primaryWeight: number | null = null
     let primaryReps: number | null = null
 
-    // Validate that we have at least block_id (required for workout_set_logs)
-    if (!block_id) {
-      console.error("❌ Missing required field: block_id");
+    // Validate that we have at least set_entry_id (required for workout_set_logs)
+    if (!set_entry_id) {
+      console.error("❌ Missing required field: set_entry_id");
       return NextResponse.json(
         { 
-          error: 'Missing required field: block_id',
-          details: 'block_id is required for workout_set_logs table'
+          error: 'Missing required field: set_entry_id',
+          details: 'set_entry_id is required for workout_set_logs table'
         },
         { status: 400 }
       )
     }
-    
-    console.log("✅ block_id validated:", block_id);
-    console.log("✅ workout_log_id validated:", workoutLogId);
 
     // Build insert data - workout_log_id is REQUIRED (NOT NULL constraint)
     const insertData: any = {
       client_id: userId,
-      block_id,
+      set_entry_id,
       workout_log_id: workoutLogId, // REQUIRED - always set at this point
-      block_type: blockType,
+      set_type: blockType,
       completed_at: new Date().toISOString(),
     }
 
@@ -518,25 +442,13 @@ export async function POST(req: NextRequest) {
       return isNaN(num) ? null : num
     }
 
-    console.log("🔍 Processing block_type:", blockType);
-    
     const blockTypeForPerformance = blockType as BlockType | 'hr_sets'
 
     switch (blockTypeForPerformance) {
         case 'straight_set': {
-          console.log("  - Processing straight_set");
           const exerciseId = body.exercise_id as string | undefined
           const weightNum = parseNumber(body.weight)
           const repsNum = parseIntNumber(body.reps)
-
-          console.log("  - Validation:", {
-            has_exercise_id: !!exerciseId,
-            exercise_id: exerciseId,
-            weight: weightNum,
-            reps: repsNum,
-            weight_raw: body.weight,
-            reps_raw: body.reps,
-          });
 
           if (!exerciseId || !weightNum || !repsNum) {
             console.error("❌ Missing required fields for straight_set:", {
@@ -561,8 +473,6 @@ export async function POST(req: NextRequest) {
               { status: 400 }
             )
           }
-          
-          console.log("✅ straight_set validation passed");
 
           insertData.exercise_id = exerciseId
           insertData.weight = weightNum
@@ -585,7 +495,7 @@ export async function POST(req: NextRequest) {
           insertData.superset_reps_b = parseIntNumber(body.superset_reps_b)
 
           // Use exercise A for e1RM
-          primaryExerciseId = body.superset_exercise_a_id || null
+          primaryExerciseId = typeof body.superset_exercise_a_id === 'string' ? body.superset_exercise_a_id : null
           primaryWeight = parseNumber(body.superset_weight_a)
           primaryReps = parseIntNumber(body.superset_reps_a)
           break
@@ -706,7 +616,7 @@ export async function POST(req: NextRequest) {
 
         default: {
           return NextResponse.json(
-            { error: `Unhandled block_type: ${blockType}` },
+            { error: `Unhandled set_type: ${blockType}` },
             { status: 500 }
           )
         }
@@ -722,13 +632,13 @@ export async function POST(req: NextRequest) {
 
     // Golden Logging Flow: Server-side dedupe by natural key
     // If idempotency_key is provided, check for an existing row matching
-    // (workout_log_id, block_id, exercise_id, set_number) before inserting.
+    // (workout_log_id, set_entry_id, exercise_id, set_number) before inserting.
     if (idempotency_key && workoutLogId && insertData.set_number != null) {
       const dedupeQuery = supabaseAdmin
         .from('workout_set_logs')
         .select('id')
         .eq('workout_log_id', workoutLogId)
-        .eq('block_id', block_id)
+        .eq('set_entry_id', set_entry_id)
         .eq('set_number', insertData.set_number)
 
       // exercise_id may be null for some block types
@@ -736,13 +646,10 @@ export async function POST(req: NextRequest) {
         dedupeQuery.eq('exercise_id', insertData.exercise_id)
       }
 
-      const { data: existingRows } = await dedupeQuery.limit(1)
+      const { data: rawExisting } = await dedupeQuery.limit(1)
+      const existingRows = rawExisting as { id: string }[] | null
 
       if (existingRows && existingRows.length > 0) {
-        console.log('🔁 [dedupe] Existing set found, returning without duplicate insert:', {
-          idempotency_key,
-          existing_id: existingRows[0].id,
-        })
         return NextResponse.json({
           success: true,
           set_log_id: existingRows[0].id,
@@ -756,24 +663,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Log the insert data for debugging
-    console.log('💾 Step 3: Inserting to workout_set_logs:', {
-      block_type: blockType,
-      block_id,
-      workout_log_id: workoutLogId || 'null',
-      client_id: userId,
-      has_exercise_id: !!insertData.exercise_id,
-      has_rpe: insertData.rpe !== undefined,
-      idempotency_key: idempotency_key || 'none',
-      insert_keys: Object.keys(insertData),
-      insert_data_sample: {
-        ...insertData,
-        // Don't log entire object if it's huge
-        ...(insertData.giant_set_exercises ? { giant_set_exercises: '[JSONB data]' } : {}),
-      },
-    })
-
-    const { data: insertedData, error: logError } = await supabaseAdmin
+    const { data: insertedData, error: logError } = await (supabaseAdmin as any)
       .from('workout_set_logs')
       .insert([insertData])
       .select('id')
@@ -795,8 +685,8 @@ export async function POST(req: NextRequest) {
           code: logError.code,
           hint: logError.hint,
           attempted_insert: {
-            block_type: blockType,
-            block_id,
+            set_type: blockType,
+            set_entry_id,
             has_exercise_id: !!insertData.exercise_id,
             has_weight: insertData.weight !== undefined,
             has_reps: insertData.reps !== undefined,
@@ -805,14 +695,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
-    
-    console.log('✅ Successfully inserted to workout_set_logs');
 
-    console.log('API log-set: Successfully inserted set log:', {
-      inserted_id: insertedData?.id,
-    })
-
-    // Step 3: Calculate estimated 1RM using Epley formula for supported block types
+    // Calculate estimated 1RM using Epley formula for supported block types
     let e1rm = 0
     const shouldCalculateE1RM =
       primaryExerciseId &&
@@ -1025,7 +909,7 @@ export async function POST(req: NextRequest) {
     if (updatedMetricsByExercise.size > 0) {
       try {
         const upsertData = Array.from(updatedMetricsByExercise.values())
-        const { error: upsertError } = await supabaseAdmin
+        const { error: upsertError } = await (supabaseAdmin as any)
           .from('user_exercise_metrics')
           .upsert(upsertData, { onConflict: 'user_id,exercise_id' })
 
@@ -1043,14 +927,15 @@ export async function POST(req: NextRequest) {
     if (shouldCalculateE1RM && primaryExerciseId && e1rmUpdated) {
       try {
         const { syncStrengthGoal } = await import('@/lib/goalSyncService')
-        const { data: exercise } = await supabaseAdmin
+        const { data: rawEx } = await supabaseAdmin
           .from('exercises')
           .select('id, name')
           .eq('id', primaryExerciseId)
           .single()
+        const exercise = rawEx as { id: string; name: string } | null
 
         if (exercise) {
-          const { data: strengthGoals } = await supabaseAdmin
+          const { data: strengthGoals } = await (supabaseAdmin as any)
             .from('goals')
             .select('id, title')
             .eq('client_id', userId)
@@ -1088,6 +973,51 @@ export async function POST(req: NextRequest) {
       ? 'New volume PR!'
       : null
 
+    // Step 6.5: Check and store PRs in personal_records table (non-blocking)
+    const storedPRResults: Array<{ exercise_id: string; exercise_name: string; prResult: any }> = []
+    if (primaryExerciseId && primaryWeight && primaryReps) {
+      try {
+        const { checkAndStorePR } = await import('@/lib/prService')
+        const { data: rawExercise } = await supabaseAdmin
+          .from('exercises')
+          .select('id, name')
+          .eq('id', primaryExerciseId)
+          .single()
+        const exercise = rawExercise as { id: string; name: string } | null
+
+        if (exercise) {
+          // Get workout_assignment_id from workout_log_id if available
+          let workoutAssignmentId: string | undefined = undefined
+          if (workoutLogId) {
+            const { data: rawWl } = await supabaseAdmin
+              .from('workout_logs')
+              .select('workout_assignment_id')
+              .eq('id', workoutLogId)
+              .single()
+            const workoutLog = rawWl as { workout_assignment_id: string | null } | null
+            workoutAssignmentId = workoutLog?.workout_assignment_id || undefined
+          }
+          
+          const prResult = await checkAndStorePR(userId, {
+            exercise_id: primaryExerciseId,
+            weight: primaryWeight,
+            reps: primaryReps,
+            workout_assignment_id: workoutAssignmentId,
+            completed_at: insertData.completed_at || new Date().toISOString(),
+          })
+          if (prResult?.isNewPR) {
+            storedPRResults.push({
+              exercise_id: primaryExerciseId,
+              exercise_name: exercise.name,
+              prResult,
+            })
+          }
+        }
+      } catch (prError) {
+        console.error('Failed to check/store PR (non-blocking):', prError)
+      }
+    }
+
     // Step 7: Return success (set logging succeeded, metrics update may have warnings)
     // Include set_log_id and workout_log_id at top level for RPE modal and Undo (set correction)
     const setLogId = insertedData?.id ?? null;
@@ -1096,11 +1026,11 @@ export async function POST(req: NextRequest) {
       success: true,
       set_log_id: setLogId,
       workout_log_id: workoutLogId ?? null,
-      block_type: blockType,
+      set_type: blockType,
       set_logged: insertData || {
         workout_log_id: workoutLogId || null,
-        block_id,
-        block_type: blockType,
+        set_entry_id,
+        set_type: blockType,
       },
       e1rm: {
         calculated: parseFloat(e1rm.toFixed(2)),
@@ -1113,6 +1043,7 @@ export async function POST(req: NextRequest) {
         any_volume_pr: anyVolumePR,
         results: prResults,
         message: prMessage,
+        stored_prs: storedPRResults,
       },
     }
 
@@ -1133,7 +1064,7 @@ export async function POST(req: NextRequest) {
     })
     
     return jsonResponse
-  } catch (error) {
+  } catch (error: unknown) {
     return handleApiError(error, 'Failed to log workout set')
   }
 }

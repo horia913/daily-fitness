@@ -102,6 +102,31 @@ export async function getActiveProgramAssignment(
 }
 
 /**
+ * Get the most recently completed program assignment for a client (or null).
+ * Used when no active program exists, to show "Program Completed" state on dashboard.
+ */
+export async function getRecentlyCompletedProgramAssignment(
+  supabase: SupabaseClient,
+  clientId: string
+): Promise<ProgramAssignment | null> {
+  const { data, error } = await supabase
+    .from('program_assignments')
+    .select('id, program_id, client_id, name, status, start_date, duration_weeks, total_days, created_at')
+    .eq('client_id', clientId)
+    .eq('status', 'completed')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[programStateService] Error fetching completed assignment:', error)
+    return null
+  }
+
+  return data
+}
+
+/**
  * Get all schedule slots for a program, ordered by (week_number ASC, day_number ASC).
  * Uses day_number (1-based) as the canonical ordering column.
  * Falls back to day_of_week + 1 if day_number is not yet populated.
@@ -335,6 +360,62 @@ export async function updateProgressCache(
     console.error('[programStateService] Error updating progress cache:', error)
     // Non-fatal: the ledger is the source of truth, progress is just a cache
   }
+}
+
+// ============================================================================
+// TODAY SLOT HELPER
+// Pure function — no DB calls. Matches slot by day_of_week (0=Mon..6=Sun).
+// Does not filter by completion. Returns null for Rest day.
+// ============================================================================
+
+/**
+ * Get the slot in unlocked week that matches todayWeekday.
+ * todayWeekday = (new Date().getDay() + 6) % 7  (0=Monday .. 6=Sunday)
+ * If multiple slots match (should not happen in well-formed schedule), returns first by day_number order.
+ */
+export function getTodaySlot(
+  slots: ProgramScheduleSlot[],
+  unlockedWeekMax: number,
+  todayWeekday: number
+): ProgramScheduleSlot | null {
+  const unlockedSlots = slots.filter(s => s.week_number === unlockedWeekMax)
+  return unlockedSlots.find(s => s.day_of_week === todayWeekday) ?? null
+}
+
+// ============================================================================
+// OVERDUE SLOTS HELPER
+// Pure function — no DB calls, no writes. Read-only projection over unlocked week.
+// ============================================================================
+
+/**
+ * Get uncompleted slots in unlocked week that are "before" today (overdue).
+ * - If todaySlot exists: overdue = uncompleted slots where day_number < todaySlot.day_number
+ * - If todaySlot null (rest day): overdue = uncompleted slots where day_of_week < todayWeekday
+ * Returns at most maxCount (default 2), ordered earliest first.
+ */
+export function getOverdueSlots(
+  slots: ProgramScheduleSlot[],
+  completedSlots: CompletedSlot[],
+  unlockedWeekMax: number,
+  todaySlot: ProgramScheduleSlot | null,
+  todayWeekday: number,
+  maxCount: number = 2
+): ProgramScheduleSlot[] {
+  const unlockedSlots = slots.filter(s => s.week_number === unlockedWeekMax)
+  const completedScheduleIds = new Set(completedSlots.map(c => c.program_schedule_id))
+  const uncompleted = unlockedSlots.filter(s => !completedScheduleIds.has(s.id))
+
+  let overdue: ProgramScheduleSlot[]
+
+  if (todaySlot) {
+    overdue = uncompleted.filter(s => s.day_number < todaySlot.day_number)
+    overdue.sort((a, b) => a.day_number - b.day_number)
+  } else {
+    overdue = uncompleted.filter(s => s.day_of_week < todayWeekday)
+    overdue.sort((a, b) => a.day_of_week - b.day_of_week)
+  }
+
+  return overdue.slice(0, maxCount)
 }
 
 // ============================================================================

@@ -78,6 +78,10 @@ const logIdleIfNeeded = (screenKey: string, stats: QueryStats) => {
   }
 }
 
+// Dev-only: track last URL per screen to detect repeated requests
+const lastUrlByScreen: Record<string, { url: string; at: number }> = {}
+const REPEAT_WINDOW_MS = 2000
+
 const recordQuery = (entry: QueryLogEntry) => {
   const statsByScreen = getGlobalStats()
   const stats = statsByScreen[entry.screen] ?? {
@@ -93,6 +97,15 @@ const recordQuery = (entry: QueryLogEntry) => {
   stats.byKind[entry.kind] += 1
   stats.lastAt = entry.at
   statsByScreen[entry.screen] = stats
+
+  // Dev-only: print URL, duration, and whether same request repeated
+  if (process.env.NODE_ENV !== 'production' && (entry.kind === 'rest' || entry.kind === 'api')) {
+    const prev = lastUrlByScreen[entry.screen]
+    const sameUrl = prev && prev.url === entry.url && entry.at - prev.at < REPEAT_WINDOW_MS
+    lastUrlByScreen[entry.screen] = { url: entry.url, at: entry.at }
+    const shortUrl = entry.url.length > 80 ? entry.url.slice(0, 77) + '...' : entry.url
+    console.log(`[TrackedFetch] ${entry.screen} ${entry.durationMs}ms ${sameUrl ? '(REPEAT) ' : ''}${entry.method} ${shortUrl}`)
+  }
 
   if (isDebugHarnessEnabled()) {
     recordRequestCount(entry.kind, entry.screen)

@@ -178,7 +178,7 @@ export default function DailyAdherenceLog({ clientId, clientName, dailyLogs }: D
             ) : getOverallTrend() === 'down' ? (
               <TrendingDown className="w-4 h-4 text-red-600" />
             ) : (
-              <Activity className="w-4 h-4 text-slate-400" />
+              <Activity className="w-4 h-4 fc-text-subtle" />
             )}
             <span className={`text-sm ${theme.textSecondary}`}>
               {getOverallTrend()} trend

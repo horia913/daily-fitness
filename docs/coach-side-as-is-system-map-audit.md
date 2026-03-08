@@ -23,52 +23,52 @@ Gym Console, Compliance, Adherence, Analytics, Clients list, Scheduling, Session
 
 ### Route hierarchy under `/coach`
 
-| Segment | Path | Purpose |
-|--------|------|--------|
-| **Root** | `/coach` | Coach dashboard |
-| **Programs** | `/coach/programs` | Programs list |
-| | `/coach/programs/create` | Create program |
-| | `/coach/programs/[id]` | Program view |
-| | `/coach/programs/[id]/edit` | Program edit |
-| **Programs + Workouts** | `/coach/programs-workouts` | Redirects to `/coach/workouts/templates` |
-| **Workouts** | `/coach/workouts/templates` | Workout templates list |
-| | `/coach/workouts/templates/create` | Create template |
-| | `/coach/workouts/templates/[id]` | Template view |
-| | `/coach/workouts/templates/[id]/edit` | Template edit |
-| **Clients** | `/coach/clients` | Clients list |
-| | `/coach/clients/add` | Add client |
-| | `/coach/clients/[id]` | Client hub (tabs: overview embedded, link to workouts/programs/etc.) |
-| | `/coach/clients/[id]/workouts` | Client workouts view |
-| | `/coach/clients/[id]/programs/[programId]` | Client program details |
-| | `/coach/clients/[id]/profile` | Client profile |
-| | `/coach/clients/[id]/progress` | Client progress |
-| | `/coach/clients/[id]/goals` | Client goals |
-| | `/coach/clients/[id]/habits` | Client habits |
-| | `/coach/clients/[id]/meals` | Client meals |
-| | `/coach/clients/[id]/analytics` | Client analytics |
-| | `/coach/clients/[id]/adherence` | Client adherence |
-| | `/coach/clients/[id]/clipcards` | Client clip cards |
-| | `/coach/clients/[id]/fms` | FMS |
-| **Compliance / Adherence** | `/coach/compliance` | Compliance dashboard |
-| | `/coach/adherence` | Adherence overview |
-| **Analytics / Progress** | `/coach/analytics` | Analytics (OptimizedAnalyticsReporting) |
-| | `/coach/progress` | Progress (client progress monitoring) |
-| **Nutrition** | `/coach/nutrition` | Nutrition dashboard |
-| | `/coach/nutrition/meal-plans`, `create`, `[id]`, `[id]/edit` | Meal plans CRUD |
-| **Scheduling** | `/coach/scheduling` | Scheduling |
-| | `/coach/sessions` | Sessions list |
-| **Other** | `/coach/availability` | Availability |
-| | `/coach/exercises` | Exercises |
-| | `/coach/exercise-categories` | Exercise categories |
-| | `/coach/categories` | Workout categories |
-| | `/coach/goals`, `/coach/habits`, `/coach/meals` | Goals, habits, meals |
-| | `/coach/gym-console` | Gym console (pickup) |
-| | `/coach/notifications` | Notifications |
-| | `/coach/reports` | Reports |
-| | `/coach/challenges`, `/coach/challenges/[id]` | Challenges |
-| | `/coach/profile` | Profile |
-| | `/coach/menu` | Menu (links to all sections) |
-| | `/coach/bulk-assignments` | Bulk assignments |
+| Segment                    | Path                                                         | Purpose                                                              |
+| -------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| **Root**                   | `/coach`                                                     | Coach dashboard                                                      |
+| **Programs**               | `/coach/programs`                                            | Programs list                                                        |
+|                            | `/coach/programs/create`                                     | Create program                                                       |
+|                            | `/coach/programs/[id]`                                       | Program view                                                         |
+|                            | `/coach/programs/[id]/edit`                                  | Program edit                                                         |
+| **Programs + Workouts**    | `/coach/programs-workouts`                                   | Redirects to `/coach/workouts/templates`                             |
+| **Workouts**               | `/coach/workouts/templates`                                  | Workout templates list                                               |
+|                            | `/coach/workouts/templates/create`                           | Create template                                                      |
+|                            | `/coach/workouts/templates/[id]`                             | Template view                                                        |
+|                            | `/coach/workouts/templates/[id]/edit`                        | Template edit                                                        |
+| **Clients**                | `/coach/clients`                                             | Clients list                                                         |
+|                            | `/coach/clients/add`                                         | Add client                                                           |
+|                            | `/coach/clients/[id]`                                        | Client hub (tabs: overview embedded, link to workouts/programs/etc.) |
+|                            | `/coach/clients/[id]/workouts`                               | Client workouts view                                                 |
+|                            | `/coach/clients/[id]/programs/[programId]`                   | Client program details                                               |
+|                            | `/coach/clients/[id]/profile`                                | Client profile                                                       |
+|                            | `/coach/clients/[id]/progress`                               | Client progress                                                      |
+|                            | `/coach/clients/[id]/goals`                                  | Client goals                                                         |
+|                            | `/coach/clients/[id]/habits`                                 | Client habits                                                        |
+|                            | `/coach/clients/[id]/meals`                                  | Client meals                                                         |
+|                            | `/coach/clients/[id]/analytics`                              | Client analytics                                                     |
+|                            | `/coach/clients/[id]/adherence`                              | Client adherence                                                     |
+|                            | `/coach/clients/[id]/clipcards`                              | Client clip cards                                                    |
+|                            | `/coach/clients/[id]/fms`                                    | FMS                                                                  |
+| **Compliance / Adherence** | `/coach/compliance`                                          | Compliance dashboard                                                 |
+|                            | `/coach/adherence`                                           | Adherence overview                                                   |
+| **Analytics / Progress**   | `/coach/analytics`                                           | Analytics (OptimizedAnalyticsReporting)                              |
+|                            | `/coach/progress`                                            | Progress (client progress monitoring)                                |
+| **Nutrition**              | `/coach/nutrition`                                           | Nutrition dashboard                                                  |
+|                            | `/coach/nutrition/meal-plans`, `create`, `[id]`, `[id]/edit` | Meal plans CRUD                                                      |
+| **Scheduling**             | `/coach/scheduling`                                          | Scheduling                                                           |
+|                            | `/coach/sessions`                                            | Sessions list                                                        |
+| **Other**                  | `/coach/availability`                                        | Availability                                                         |
+|                            | `/coach/exercises`                                           | Exercises                                                            |
+|                            | `/coach/exercise-categories`                                 | Exercise categories                                                  |
+|                            | `/coach/categories`                                          | Workout categories                                                   |
+|                            | `/coach/goals`, `/coach/habits`, `/coach/meals`              | Goals, habits, meals                                                 |
+|                            | `/coach/gym-console`                                         | Gym console (pickup)                                                 |
+|                            | `/coach/notifications`                                       | Notifications                                                        |
+|                            | `/coach/reports`                                             | Reports                                                              |
+|                            | `/coach/challenges`, `/coach/challenges/[id]`                | Challenges                                                           |
+|                            | `/coach/profile`                                             | Profile                                                              |
+|                            | `/coach/menu`                                                | Menu (links to all sections)                                         |
+|                            | `/coach/bulk-assignments`                                    | Bulk assignments                                                     |
 
 ### Redundancies
 
@@ -118,7 +118,7 @@ No workout completion counts, no program progress, no compliance percentages on 
 ### View client
 
 - **Entry:** `/coach/clients` → click client → `/coach/clients/[id]`.
-- **File:** `src/app/coach/clients/[id]/page.tsx`. Loads client profile (Supabase `profiles`), then `calculateStreak(clientId)`, `calculateWeeklyProgress(clientId)`, workout_logs (total completed, last active, recent with assignment/template name), meal_photo_logs (recent). Builds a single client object with stats (workoutsThisWeek, workoutGoal, compliance, streak, totalWorkouts, lastActive) and recentActivity. Compliance on the hub = (weeklyProgress.current / weeklyProgress.goal) * 100 when goal > 0.
+- **File:** `src/app/coach/clients/[id]/page.tsx`. Loads client profile (Supabase `profiles`), then `calculateStreak(clientId)`, `calculateWeeklyProgress(clientId)`, workout_logs (total completed, last active, recent with assignment/template name), meal_photo_logs (recent). Builds a single client object with stats (workoutsThisWeek, workoutGoal, compliance, streak, totalWorkouts, lastActive) and recentActivity. Compliance on the hub = (weeklyProgress.current / weeklyProgress.goal) \* 100 when goal > 0.
 - **Tabs / sub-routes:** Links or tabs to `/coach/clients/[id]/workouts`, `programs/[programId]`, `profile`, `progress`, `goals`, `habits`, `meals`, `analytics`, `adherence`, `clipcards`, `fms`. Each is a separate page component that typically links back to `/coach/clients/[id]`.
 
 ### Assign program

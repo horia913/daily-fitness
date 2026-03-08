@@ -144,11 +144,8 @@ export default function AddClient() {
         if (!data) throw new Error('No invite code returned from database')
 
         inviteCode = data
-        console.log('Invite code generated via database function:', inviteCode)
 
-      } catch (dbError) {
-        console.log('Database function not available, using fallback method:', dbError)
-        
+      } catch {
         // Fallback: Generate code client-side and insert directly
         inviteCode = generateClientSideInviteCode()
         
@@ -172,8 +169,6 @@ export default function AddClient() {
           console.error('Error inserting invite code:', insertError)
           throw new Error('Failed to save invite code to database')
         }
-
-        console.log('Invite code generated via fallback method:', inviteCode)
       }
 
       // Invite links always use the production app URL (Vercel) so clients never get localhost
@@ -229,7 +224,7 @@ export default function AddClient() {
       const result = await response.json()
       
       if (result.success) {
-        console.log('✅ Invite email sent successfully')
+        // Invite email sent
       } else {
         console.error('❌ Failed to send invite email:', result.error)
       }
@@ -278,14 +273,14 @@ export default function AddClient() {
               helperText="We'll generate a signup link with this email pre-filled"
             />
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label className="text-sm font-medium text-[color:var(--fc-text-primary)]">
                 Invite Link Expiry
               </label>
               <Select 
                 value={formData.inviteExpiryDays.toString()} 
                 onValueChange={(value) => handleInputChange('inviteExpiryDays', value)}
               >
-                <SelectTrigger className="h-12 border-2 border-slate-300 focus:border-purple-500 dark:border-slate-600 dark:focus:border-purple-400">
+                <SelectTrigger className="h-12 border-2 border-[color:var(--fc-glass-border)] focus:border-[color:var(--fc-accent-primary)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -296,7 +291,7 @@ export default function AddClient() {
                   <SelectItem value="90">90 days</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-[color:var(--fc-text-dim)]">
                 How long should the invite link remain valid?
               </p>
             </div>
@@ -311,24 +306,24 @@ export default function AddClient() {
                 <div className="p-4 bg-purple-100 dark:bg-purple-900/30 rounded-full w-fit mx-auto mb-6">
                   <UserPlus className="w-8 h-8 text-purple-600 dark:text-purple-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-2">
+                <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
                   Ready to Generate Invite Link
                 </h3>
-                <p className="text-slate-600 dark:text-slate-400 mb-6">
+                <p className="text-[color:var(--fc-text-dim)] mb-6">
                   We'll create a personalized signup link for your client
                 </p>
                 
                 {/* Summary Card */}
                 <div className={`${theme.card} ${theme.shadow} rounded-xl p-6 mb-6 text-left`}>
-                  <h4 className="font-semibold text-slate-800 dark:text-white mb-4">Invite Summary</h4>
+                  <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-4">Invite Summary</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">Email:</span>
-                      <span className="font-medium text-slate-800 dark:text-white">{formData.email}</span>
+                      <span className="text-[color:var(--fc-text-dim)]">Email:</span>
+                      <span className="font-medium text-[color:var(--fc-text-primary)]">{formData.email}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">Expires in:</span>
-                      <span className="font-medium text-slate-800 dark:text-white">{formData.inviteExpiryDays} days</span>
+                      <span className="text-[color:var(--fc-text-dim)]">Expires in:</span>
+                      <span className="font-medium text-[color:var(--fc-text-primary)]">{formData.inviteExpiryDays} days</span>
                     </div>
                   </div>
                 </div>
@@ -358,10 +353,10 @@ export default function AddClient() {
                   <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-full w-fit mx-auto mb-4">
                     <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
                   </div>
-                  <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-2">
+                  <h3 className="text-xl font-semibold text-[color:var(--fc-text-primary)] mb-2">
                     Invite Link Generated! 🎉
                   </h3>
-                  <p className="text-slate-600 dark:text-slate-400">
+                  <p className="text-[color:var(--fc-text-dim)]">
                     Your client can now sign up using the link below
                   </p>
                 </div>
@@ -369,8 +364,8 @@ export default function AddClient() {
                 {/* Invite Link Display */}
                 <div className={`${theme.card} ${theme.shadow} rounded-xl p-6 border-2 border-purple-200 dark:border-purple-800`}>
                   <div className="text-center">
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">📋 Signup Link</p>
-                    <div className="bg-slate-900 dark:bg-slate-800 text-white p-4 rounded-lg mb-4 break-all border border-slate-700">
+                    <p className="text-sm font-medium text-[color:var(--fc-text-primary)] mb-3">📋 Signup Link</p>
+                    <div className="fc-surface text-[color:var(--fc-text-primary)] p-4 rounded-lg mb-4 break-all border border-[color:var(--fc-surface-card-border)]">
                       <p className="text-sm font-mono select-all">{generatedInviteLink}</p>
                     </div>
                     
@@ -390,7 +385,7 @@ export default function AddClient() {
                         </>
                       )}
                     </Button>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                    <p className="text-xs text-[color:var(--fc-text-dim)] mt-2">
                       Click the button above or select and copy the link manually
                     </p>
                   </div>
@@ -471,7 +466,7 @@ export default function AddClient() {
               <ArrowLeft className="w-6 h-6 fc-text-primary" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Add New Client</h1>
+              <h1 className="text-2xl font-bold tracking-tight fc-text-primary">Add New Client</h1>
               <p className="text-sm fc-text-dim font-mono uppercase tracking-wider mt-1">Invite by email</p>
             </div>
           </header>

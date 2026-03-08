@@ -16,21 +16,10 @@ import { validateApiAuth, validateOwnership, createUnauthorizedResponse, createF
 import { completeWorkout } from '@/lib/completeWorkoutService'
 
 export async function POST(req: NextRequest) {
-  console.log("📥 /api/complete-workout called");
-  
   try {
-    // Validate authentication
     const { user, supabaseAuth, supabaseAdmin } = await validateApiAuth(req)
     const body = await req.json()
-    
     const { workout_log_id, client_id, duration_minutes, session_id } = body
-
-    console.log('📥 /api/complete-workout received:', {
-      workout_log_id,
-      client_id,
-      session_id,
-      duration_minutes,
-    })
 
     // Validate required fields
     const validation = validateRequiredFields(body, ['workout_log_id', 'client_id'])
@@ -59,9 +48,7 @@ export async function POST(req: NextRequest) {
       sessionId: session_id,
     })
 
-    // Handle idempotent case (already completed)
     if (result.alreadyCompleted) {
-      console.log('ℹ️ Workout was already completed (idempotent no-op)')
       return NextResponse.json({
         success: true,
         already_completed: true,
@@ -102,7 +89,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log('✅ Workout completed successfully via unified pipeline')
     return NextResponse.json(response, { status: 200 })
 
   } catch (error: any) {

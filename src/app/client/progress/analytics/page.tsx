@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -20,19 +20,26 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import { Input } from "@/components/ui/input";
+import {
+  getTopProgressions,
+  getTrainedExercises,
+  getExerciseProgression,
+  isCompoundLift,
+  getCompoundLiftDisplayName,
+  type ExerciseProgression,
+  type TrainedExercise,
+} from "@/lib/strengthAnalytics";
+import { ExerciseProgressionChart } from "@/components/progress/ExerciseProgressionChart";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { getWeeklyVolume, type VolumeStats } from "@/lib/volumeAnalytics";
+import { getWellnessTrends, type WellnessStats } from "@/lib/wellnessAnalytics";
+import { VolumeTrendChart } from "@/components/progress/VolumeTrendChart";
+import { WellnessTrendChart } from "@/components/progress/WellnessTrendChart";
 
 interface WorkoutFrequencyData {
   week: string;
   count: number;
-}
-
-interface StrengthData {
-  exercise: string;
-  date: string;
-  weight: number;
-  percentIncrease: number;
 }
 
 interface BodyCompositionData {
@@ -47,35 +54,50 @@ function AnalyticsPageContent() {
 
   const [loading, setLoading] = useState(true);
   const [workoutFrequency, setWorkoutFrequency] = useState<WorkoutFrequencyData[]>([]);
-  const [strengthData, setStrengthData] = useState<StrengthData[]>([]);
   const [bodyComposition, setBodyComposition] = useState<BodyCompositionData[]>([]);
   const [goalCompletion, setGoalCompletion] = useState({ completed: 0, total: 0 });
-  const [timeRange, setTimeRange] = useState<"7D" | "30D" | "90D" | "ALL">("30D");
+  const [timeRange, setTimeRange] = useState<"1M" | "3M" | "6M" | "1Y" | "ALL">("3M");
+  
+  // Volume and wellness state
+  const [volumeStats, setVolumeStats] = useState<VolumeStats | null>(null);
+  const [wellnessStats, setWellnessStats] = useState<WellnessStats | null>(null);
 
-  // Modal state
-  const [showStrengthModal, setShowStrengthModal] = useState(false);
+  // Strength progression state (1RM + charts)
+  const [topProgressions, setTopProgressions] = useState<ExerciseProgression[]>([]);
+  const [trainedExercises, setTrainedExercises] = useState<TrainedExercise[]>([]);
+  const [compoundProgressions, setCompoundProgressions] = useState<ExerciseProgression[]>([]);
+  const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
+  const [progressionCache, setProgressionCache] = useState<Record<string, ExerciseProgression>>({});
+  const [loadingProgression, setLoadingProgression] = useState<string | null>(null);
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState("");
-  const [availableExercises, setAvailableExercises] = useState<string[]>([]);
-  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
-  const [selectedExerciseData, setSelectedExerciseData] = useState<StrengthData[]>([]);
-  const [loadingExerciseData, setLoadingExerciseData] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (user) {
-      loadAnalyticsData();
-    }
+    if (!user) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setLoading(false);
+      setLoadError("Loading took too long. Tap Retry to try again.");
+    }, 20_000);
+    loadAnalyticsData().finally(() => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
   }, [user]);
 
-  useEffect(() => {
-    if (showStrengthModal && user) {
-      loadAvailableExercises();
-    }
-  }, [showStrengthModal, user]);
-
   const loadAnalyticsData = async () => {
-    if (!user) {
+      if (!user) {
       setWorkoutFrequency([]);
-      setStrengthData([]);
       setBodyComposition([]);
       setGoalCompletion({ completed: 0, total: 0 });
       setLoading(false);
@@ -86,14 +108,57 @@ function AnalyticsPageContent() {
     try {
       await Promise.all([
         loadWorkoutFrequency(),
-        loadStrengthProgress(),
+        loadStrengthProgressions(),
         loadBodyComposition(),
         loadGoalCompletion(),
+        loadVolumeStats(),
+        loadWellnessStats(),
       ]);
     } catch (error) {
       console.error("Error loading analytics data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStrengthProgressions = async () => {
+    if (!user?.id) return;
+    try {
+      const [top, trained] = await Promise.all([
+        getTopProgressions(user.id, 3, "3M"),
+        getTrainedExercises(user.id),
+      ]);
+      setTopProgressions(top);
+      setTrainedExercises(trained);
+      const compound = trained.filter((ex) => isCompoundLift(ex.name));
+      const progressions = await Promise.all(
+        compound.map((ex) => getExerciseProgression(user.id, ex.id, "3M"))
+      );
+      setCompoundProgressions(progressions.filter((p): p is ExerciseProgression => p != null && p.dataPoints.length >= 2));
+    } catch (e) {
+      console.error("Error loading strength progressions:", e);
+      setTopProgressions([]);
+      setTrainedExercises([]);
+      setCompoundProgressions([]);
+    }
+  };
+
+  const loadExerciseProgressionForExpand = async (exerciseId: string) => {
+    if (!user?.id || progressionCache[exerciseId]) {
+      setExpandedExerciseId(exerciseId);
+      return;
+    }
+    setLoadingProgression(exerciseId);
+    try {
+      const prog = await getExerciseProgression(user.id, exerciseId, "3M");
+      if (prog) {
+        setProgressionCache((prev) => ({ ...prev, [exerciseId]: prog }));
+        setExpandedExerciseId(exerciseId);
+      }
+    } catch (e) {
+      console.error("Error loading progression:", e);
+    } finally {
+      setLoadingProgression(null);
     }
   };
 
@@ -156,130 +221,6 @@ function AnalyticsPageContent() {
     }
   };
 
-  const loadStrengthProgress = async () => {
-    if (!user) return;
-
-    try {
-      // Get all workout logs (no time limit to find first vs highest)
-      const { data: workoutLogs, error: logsError } = await supabase
-        .from("workout_logs")
-        .select("id, completed_at")
-        .eq("client_id", user.id)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: true });
-
-      if (logsError) throw logsError;
-      if (!workoutLogs || workoutLogs.length === 0) {
-        setStrengthData([]);
-        return;
-      }
-
-      const logIds = workoutLogs.map((log) => log.id);
-
-      // Get all set logs with exercise info, ordered by date
-      const { data: setLogs, error: setsError } = await supabase
-        .from("workout_set_logs")
-        .select(`
-          workout_log_id,
-          weight,
-          completed_at,
-          exercises (
-            id,
-            name
-          )
-        `)
-        .in("workout_log_id", logIds)
-        .not("weight", "is", null)
-        .gt("weight", 0)
-        .order("completed_at", { ascending: true });
-
-      if (setsError) throw setsError;
-      if (!setLogs || setLogs.length === 0) {
-        setStrengthData([]);
-        return;
-      }
-
-      // Group by exercise: track all weights and dates
-      const exerciseData = new Map<string, { weights: number[]; dates: string[] }>();
-
-      setLogs.forEach((setLog: any) => {
-        const exercise = setLog.exercises;
-        if (!exercise || !exercise.name) return;
-
-        const exerciseName = exercise.name;
-        const weight = setLog.weight;
-        const date = new Date(setLog.completed_at).toISOString().split("T")[0];
-
-        if (!exerciseData.has(exerciseName)) {
-          exerciseData.set(exerciseName, { weights: [], dates: [] });
-        }
-
-        const data = exerciseData.get(exerciseName)!;
-        data.weights.push(weight);
-        data.dates.push(date);
-      });
-
-      // Calculate % increase for each exercise: ((highest - first) / first) * 100
-      const exercisesWithProgress = Array.from(exerciseData.entries())
-        .map(([name, data]) => {
-          if (data.weights.length === 0) return null;
-
-          const firstWeight = data.weights[0];
-          const highestWeight = Math.max(...data.weights);
-          const percentIncrease = ((highestWeight - firstWeight) / firstWeight) * 100;
-
-          // Create time series: group by date, take max weight per day
-          const dateWeightMap = new Map<string, number>();
-          data.dates.forEach((date, index) => {
-            const currentMax = dateWeightMap.get(date) || 0;
-            dateWeightMap.set(date, Math.max(currentMax, data.weights[index]));
-          });
-
-          return {
-            name,
-            firstWeight,
-            highestWeight,
-            percentIncrease,
-            dateWeightMap,
-          };
-        })
-        .filter((e) => e !== null && e!.percentIncrease > 0) as Array<{
-        name: string;
-        firstWeight: number;
-        highestWeight: number;
-        percentIncrease: number;
-        dateWeightMap: Map<string, number>;
-      }>;
-
-      // Sort by % increase (descending) and take top 2
-      exercisesWithProgress.sort((a, b) => b.percentIncrease - a.percentIncrease);
-      const top2Exercises = exercisesWithProgress.slice(0, 2);
-
-      // Convert to chart data format
-      const strengthChartData: StrengthData[] = [];
-      top2Exercises.forEach((exercise) => {
-        Array.from(exercise.dateWeightMap.entries())
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .forEach(([date, weight]) => {
-            strengthChartData.push({
-              exercise: exercise.name,
-              date: new Date(date).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              }),
-              weight: Math.round(weight * 10) / 10, // Round to 1 decimal
-              percentIncrease: exercise.percentIncrease,
-            });
-          });
-      });
-
-      setStrengthData(strengthChartData);
-    } catch (error) {
-      console.error("Error loading strength progress:", error);
-      setStrengthData([]);
-    }
-  };
-
   const loadBodyComposition = async () => {
     if (!user) return;
 
@@ -298,7 +239,6 @@ function AnalyticsPageContent() {
       }
 
       if (!metrics || metrics.length === 0) {
-        console.log("No body metrics found for user");
         setBodyComposition([]);
         return;
       }
@@ -312,7 +252,6 @@ function AnalyticsPageContent() {
         bodyFat: metric.body_fat_percentage ? parseFloat(metric.body_fat_percentage) : undefined,
       }));
 
-      console.log("Loaded body composition data:", compositionData.length, "entries");
       setBodyComposition(compositionData);
     } catch (error) {
       console.error("Error loading body composition:", error);
@@ -341,155 +280,32 @@ function AnalyticsPageContent() {
     }
   };
 
-  const loadAvailableExercises = async () => {
-    if (!user) return;
-
+  const loadVolumeStats = async () => {
+    if (!user?.id) return;
     try {
-      // Get all workout logs for this client
-      const { data: workoutLogs, error: logsError } = await supabase
-        .from("workout_logs")
-        .select("id")
-        .eq("client_id", user.id);
-
-      if (logsError) throw logsError;
-      if (!workoutLogs || workoutLogs.length === 0) {
-        setAvailableExercises([]);
-        return;
-      }
-
-      const logIds = workoutLogs.map((log) => log.id);
-
-      // Get unique exercise names from set logs
-      const { data: setLogs, error: setsError } = await supabase
-        .from("workout_set_logs")
-        .select(`
-          exercises (
-            name
-          )
-        `)
-        .in("workout_log_id", logIds)
-        .not("weight", "is", null)
-        .gt("weight", 0);
-
-      if (setsError) throw setsError;
-
-      // Extract unique exercise names
-      const exerciseNames = new Set<string>();
-      setLogs?.forEach((setLog: any) => {
-        if (setLog.exercises?.name) {
-          exerciseNames.add(setLog.exercises.name);
-        }
-      });
-
-      setAvailableExercises(Array.from(exerciseNames).sort());
+      const stats = await getWeeklyVolume(user.id, 26); // 6 months = 26 weeks
+      setVolumeStats(stats);
     } catch (error) {
-      console.error("Error loading available exercises:", error);
-      setAvailableExercises([]);
+      console.error("Error loading volume stats:", error);
+      setVolumeStats(null);
     }
   };
 
-  const loadExerciseProgression = async (exerciseName: string) => {
-    if (!user) return;
-
-    setLoadingExerciseData(true);
+  const loadWellnessStats = async () => {
+    if (!user?.id) return;
     try {
-      // Get all workout logs
-      const { data: workoutLogs, error: logsError } = await supabase
-        .from("workout_logs")
-        .select("id, completed_at")
-        .eq("client_id", user.id)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: true });
-
-      if (logsError) throw logsError;
-      if (!workoutLogs || workoutLogs.length === 0) {
-        setSelectedExerciseData([]);
-        return;
-      }
-
-      const logIds = workoutLogs.map((log) => log.id);
-
-      // Get set logs for this specific exercise
-      const { data: setLogs, error: setsError } = await supabase
-        .from("workout_set_logs")
-        .select(`
-          weight,
-          completed_at,
-          exercises (
-            name
-          )
-        `)
-        .in("workout_log_id", logIds)
-        .not("weight", "is", null)
-        .gt("weight", 0)
-        .order("completed_at", { ascending: true });
-
-      if (setsError) throw setsError;
-
-      // Filter by exercise name and group by date
-      const exerciseSetLogs = setLogs?.filter(
-        (setLog: any) => setLog.exercises?.name === exerciseName
-      ) || [];
-
-      if (exerciseSetLogs.length === 0) {
-        setSelectedExerciseData([]);
-        return;
-      }
-
-      // Group by date, take max weight per day
-      const dateWeightMap = new Map<string, number>();
-      exerciseSetLogs.forEach((setLog: any) => {
-        const date = new Date(setLog.completed_at).toISOString().split("T")[0];
-        const currentMax = dateWeightMap.get(date) || 0;
-        dateWeightMap.set(date, Math.max(currentMax, setLog.weight));
-      });
-
-      // Calculate % increase
-      const weights = Array.from(dateWeightMap.values());
-      const firstWeight = weights[0];
-      const highestWeight = Math.max(...weights);
-      const percentIncrease = ((highestWeight - firstWeight) / firstWeight) * 100;
-
-      // Convert to chart data format
-      const progressionData: StrengthData[] = Array.from(dateWeightMap.entries())
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([date, weight]) => ({
-          exercise: exerciseName,
-          date: new Date(date).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-          }),
-          weight: Math.round(weight * 10) / 10,
-          percentIncrease,
-        }));
-
-      setSelectedExerciseData(progressionData);
+      const stats = await getWellnessTrends(user.id, 60); // 60 days default
+      setWellnessStats(stats);
     } catch (error) {
-      console.error("Error loading exercise progression:", error);
-      setSelectedExerciseData([]);
-    } finally {
-      setLoadingExerciseData(false);
+      console.error("Error loading wellness stats:", error);
+      setWellnessStats(null);
     }
-  };
-
-  const handleExerciseSelect = (exerciseName: string) => {
-    setSelectedExercise(exerciseName);
-    loadExerciseProgression(exerciseName);
   };
 
   const maxWorkouts = Math.max(...workoutFrequency.map((w) => w.count), 1);
   const maxBodyWeight = bodyComposition.length > 0 ? Math.max(...bodyComposition.map((b) => b.weight), 0) : 0;
   const minBodyWeight = bodyComposition.length > 0 ? Math.min(...bodyComposition.map((b) => b.weight), maxBodyWeight) : 0;
   const bodyWeightRange = maxBodyWeight - minBodyWeight || 1;
-
-  // Group strength data by exercise for display
-  const strengthByExercise = new Map<string, StrengthData[]>();
-  strengthData.forEach((data) => {
-    if (!strengthByExercise.has(data.exercise)) {
-      strengthByExercise.set(data.exercise, []);
-    }
-    strengthByExercise.get(data.exercise)!.push(data);
-  });
 
   const completionPercentage =
     goalCompletion.total > 0
@@ -512,7 +328,7 @@ function AnalyticsPageContent() {
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-8 sm:px-6 lg:px-10 fc-page">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-8 sm:px-6 lg:px-10 fc-page">
         <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10 mb-10">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -529,7 +345,7 @@ function AnalyticsPageContent() {
                       <BarChart3 className="w-4 h-4" />
                       <span className="text-xs font-bold tracking-[0.2em] uppercase">Performance</span>
                     </div>
-                    <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
                       Analytics <span className="text-[color:var(--fc-text-dim)]">Overview</span>
                     </h1>
                   </div>
@@ -537,7 +353,7 @@ function AnalyticsPageContent() {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex bg-[color:var(--fc-glass-highlight)] p-1 rounded-2xl border border-[color:var(--fc-glass-border)] overflow-x-auto">
-                  {(["7D", "30D", "90D", "ALL"] as const).map((range) => (
+                  {(["1M", "3M", "6M", "1Y", "ALL"] as const).map((range) => (
                     <button
                       key={range}
                       type="button"
@@ -552,25 +368,31 @@ function AnalyticsPageContent() {
                     </button>
                   ))}
                 </div>
-                <Button
-                  className="fc-btn fc-btn-primary shrink-0"
-                  type="button"
-                  onClick={() => setShowStrengthModal(true)}
-                >
+                <a href="#strength-exercises" className="fc-btn fc-btn-primary shrink-0 inline-flex items-center">
                   <Search className="mr-2 h-4 w-4" />
-                  Explore Exercises
-                </Button>
+                  All Exercises
+                </a>
               </div>
             </div>
           </div>
         </div>
 
-        {loading ? (
-          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12 text-center">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[color:var(--fc-accent-purple)]"></div>
-            <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
-              Loading analytics...
-            </p>
+        {loadError ? (
+          <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+            <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+            <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+          </div>
+        ) : loading ? (
+          <div className="animate-pulse space-y-4 p-4 pb-32">
+            <div className="h-6 w-32 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-8 w-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+            <div className="grid grid-cols-2 gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-24 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+              ))}
+            </div>
+            <div className="h-48 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-48 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
           </div>
         ) : (
           <div className="space-y-8">
@@ -627,7 +449,7 @@ function AnalyticsPageContent() {
                   </span>
                 </div>
                 <p className="mt-3 text-2xl font-semibold text-[color:var(--fc-text-primary)]">
-                  {strengthByExercise.size}
+                  {trainedExercises.length}
                 </p>
                 <p className="text-sm text-[color:var(--fc-text-dim)]">
                   Exercises tracked
@@ -637,7 +459,7 @@ function AnalyticsPageContent() {
             {/* Workout Frequency Chart */}
             <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
               <div className="mb-6 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 shadow-[0_10px_20px_rgba(59,130,246,0.25)]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-cyan)] shadow-[0_10px_20px_rgba(59,130,246,0.25)]">
                   <Calendar className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -668,7 +490,7 @@ function AnalyticsPageContent() {
                               {week.count}
                             </span>
                             <div
-                              className="w-full rounded-t-lg bg-gradient-to-t from-sky-500 to-indigo-600 transition-all duration-500 hover:opacity-80"
+                              className="w-full rounded-t-lg bg-[color:var(--fc-accent-cyan)] transition-all duration-500 hover:opacity-80"
                               style={{
                                 height: `${Math.max(height, 5)}%`,
                                 minHeight: "20px",
@@ -690,83 +512,161 @@ function AnalyticsPageContent() {
               )}
             </div>
 
-            {/* Strength Progress Charts */}
-            {strengthByExercise.size > 0 && (
-              <div
-                className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 transition-all hover:-translate-y-1 hover:shadow-2xl cursor-pointer"
-                onClick={() => setShowStrengthModal(true)}
-              >
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 shadow-[0_10px_20px_rgba(249,115,22,0.3)]">
+            {/* Strength Progress — Top 3 + 1RM card + Exercise browser */}
+            {(topProgressions.length > 0 || trainedExercises.length > 0) && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-domain-workouts)] shadow-[0_10px_20px_rgba(249,115,22,0.3)]">
                     <Dumbbell className="h-6 w-6 text-white" />
                   </div>
-                  <div className="flex-1">
+                  <div>
                     <h2 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
-                      Best Strength Progressions
+                      Strength Progress
                     </h2>
                     <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Top exercises by weight increase. Tap to explore more.
+                      Estimated 1RM and progression over time
                     </p>
                   </div>
-                  <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
-                    Explore
-                  </span>
                 </div>
 
-                <div className="space-y-8">
-                  {Array.from(strengthByExercise.entries()).map(([exercise, data], exerciseIndex) => {
-                    const maxWeight = Math.max(...data.map((d) => d.weight));
-                    const minWeight = Math.min(...data.map((d) => d.weight));
-                    const range = maxWeight - minWeight || 1;
-                    const percentIncrease = data[0]?.percentIncrease || 0;
+                {topProgressions.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-[color:var(--fc-text-dim)] uppercase tracking-wider mb-3">
+                      Biggest Gains
+                    </h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {topProgressions.map((prog) => (
+                        <ExerciseProgressionChart
+                          key={prog.exerciseId}
+                          progression={prog}
+                          compact
+                          defaultTimeRange="3M"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                    return (
-                      <div key={exercise}>
-                        <div className="mb-4 flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)]">
-                            {exercise}
-                          </h3>
-                          <div className="rounded-full bg-gradient-to-br from-emerald-500 to-green-600 px-3 py-1 text-sm font-semibold text-white">
-                            +{percentIncrease.toFixed(1)}%
-                          </div>
+                {compoundProgressions.length > 0 && (
+                  <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-4 sm:p-6">
+                    <h3 className="text-sm font-semibold text-[color:var(--fc-text-dim)] uppercase tracking-wider mb-3">
+                      Estimated 1RM — Compound Lifts
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {compoundProgressions.map((prog) => (
+                        <div
+                          key={prog.exerciseId}
+                          className="fc-glass-soft rounded-xl p-3 border border-[color:var(--fc-glass-border)]"
+                        >
+                          <p className="text-xs text-[color:var(--fc-text-dim)] truncate">
+                            {getCompoundLiftDisplayName(prog.exerciseName)}
+                          </p>
+                          <p className="text-lg font-bold text-[color:var(--fc-text-primary)]">
+                            {prog.currentOneRM > 0 ? `${Math.round(prog.currentOneRM * 10) / 10} kg` : "—"}
+                          </p>
                         </div>
-                        <div className="relative h-48">
-                          <div className="absolute inset-0 flex items-end justify-between gap-2">
-                            {data.map((point, index) => {
-                              const height = ((point.weight - minWeight) / range) * 100;
-                              return (
-                                <div
-                                  key={index}
-                                  className="flex-1 flex flex-col items-center gap-2"
-                                  style={{
-                                    animation: `fadeInUp 0.6s ease-out ${(exerciseIndex * 0.2 + index * 0.1)}s both`,
-                                  }}
-                                >
-                                  <div className="w-full flex flex-col items-center">
-                                    <span className="mb-1 text-xs font-bold text-[color:var(--fc-text-primary)]">
-                                      {point.weight}kg
-                                    </span>
-                                    <div
-                                      className="w-full rounded-t-lg bg-gradient-to-t from-orange-500 to-red-600 transition-all duration-500 hover:opacity-80"
-                                      style={{
-                                        height: `${Math.max(height, 10)}%`,
-                                        minHeight: "30px",
-                                      }}
-                                    />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div id="strength-exercises">
+                  <h3 className="text-sm font-semibold text-[color:var(--fc-text-dim)] uppercase tracking-wider mb-3">
+                    All Exercises
+                  </h3>
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-[color:var(--fc-text-dim)]" />
+                    <Input
+                      type="text"
+                      placeholder="Search exercises..."
+                      value={exerciseSearchQuery}
+                      onChange={(e) => setExerciseSearchQuery(e.target.value)}
+                      className="fc-input pl-9 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    {trainedExercises
+                      .filter(
+                        (ex) =>
+                          !exerciseSearchQuery ||
+                          ex.name.toLowerCase().includes(exerciseSearchQuery.toLowerCase())
+                      )
+                      .map((ex) => {
+                        const isExpanded = expandedExerciseId === ex.id;
+                        const cached = progressionCache[ex.id];
+                        const loading = loadingProgression === ex.id;
+                        return (
+                          <div
+                            key={ex.id}
+                            className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] overflow-hidden"
+                          >
+                            <button
+                              type="button"
+                              className="w-full flex items-center justify-between p-4 text-left hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+                              onClick={() =>
+                                isExpanded
+                                  ? setExpandedExerciseId(null)
+                                  : loadExerciseProgressionForExpand(ex.id)
+                              }
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {isExpanded ? (
+                                  <ChevronDown className="w-5 h-5 text-[color:var(--fc-text-dim)] flex-shrink-0" />
+                                ) : (
+                                  <ChevronRight className="w-5 h-5 text-[color:var(--fc-text-dim)] flex-shrink-0" />
+                                )}
+                                <span className="font-semibold text-[color:var(--fc-text-primary)] truncate">
+                                  {ex.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0 text-sm text-[color:var(--fc-text-dim)]">
+                                <span>{ex.sessionCount} sessions</span>
+                                <span>
+                                  {ex.lastTrained
+                                    ? new Date(ex.lastTrained + "T12:00:00").toLocaleDateString("en-US", {
+                                        month: "short",
+                                        day: "numeric",
+                                      })
+                                    : "—"}
+                                </span>
+                              </div>
+                            </button>
+                            {isExpanded && (
+                              <div className="border-t border-[color:var(--fc-glass-border)] p-4 bg-[color:var(--fc-bg-base)]/50">
+                                {loading && (
+                                  <div className="flex items-center justify-center py-12">
+                                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--fc-domain-workouts)] border-t-transparent" />
                                   </div>
-                                  <span className="text-center text-xs text-[color:var(--fc-text-subtle)]">
-                                    {point.date}
-                                  </span>
-                                </div>
-                              );
-                            })}
+                                )}
+                                {!loading && cached && (
+                                  <ExerciseProgressionChart
+                                    progression={cached}
+                                    defaultTimeRange="3M"
+                                  />
+                                )}
+                                {!loading && !cached && (
+                                  <p className="py-8 text-center text-sm text-[color:var(--fc-text-dim)]">
+                                    Need at least 2 sessions to show chart.
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                  </div>
                 </div>
               </div>
+            )}
+
+            {/* Training Volume Chart */}
+            {volumeStats && volumeStats.weeklyData.length > 0 && (
+              <VolumeTrendChart volumeStats={volumeStats} />
+            )}
+
+            {/* Recovery & Wellness Chart */}
+            {wellnessStats && wellnessStats.dailyData.length > 0 && (
+              <WellnessTrendChart wellnessStats={wellnessStats} />
             )}
 
             {/* Body Composition Chart */}
@@ -868,7 +768,7 @@ function AnalyticsPageContent() {
             {/* Goal Completion */}
             <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
               <div className="mb-6 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-[0_10px_20px_rgba(124,58,237,0.3)]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--fc-accent-primary)] shadow-[0_10px_20px_rgba(124,58,237,0.3)]">
                   <Target className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -893,7 +793,7 @@ function AnalyticsPageContent() {
 
                 <div className="relative h-6 rounded-full bg-[color:var(--fc-glass-soft)] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 transition-all duration-1000 ease-out"
+                    className="h-full rounded-full bg-[color:var(--fc-accent-primary)] transition-all duration-1000 ease-out"
                     style={{
                       width: `${completionPercentage}%`,
                       animation: "fadeInLeft 1s ease-out",
@@ -928,132 +828,6 @@ function AnalyticsPageContent() {
           }
         }
       `}      </style>
-
-      {/* Strength Progression Modal */}
-      <ResponsiveModal
-        isOpen={showStrengthModal}
-        onClose={() => {
-          setShowStrengthModal(false);
-          setSelectedExercise(null);
-          setSelectedExerciseData([]);
-          setExerciseSearchQuery("");
-        }}
-        title="Exercise Progression Search"
-        subtitle="Search and view progression for any exercise"
-        icon={<Dumbbell className="w-6 h-6 text-white" />}
-        maxWidth="4xl"
-      >
-        <div className="space-y-6">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--fc-text-dim)]" />
-            <Input
-              type="text"
-              placeholder="Search exercises by name..."
-              value={exerciseSearchQuery}
-              onChange={(e) => setExerciseSearchQuery(e.target.value)}
-              className="fc-input rounded-xl pl-10"
-            />
-          </div>
-
-          {/* Exercise List */}
-          {availableExercises.length > 0 ? (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {availableExercises
-                .filter((exercise) =>
-                  exercise.toLowerCase().includes(exerciseSearchQuery.toLowerCase())
-                )
-                .map((exercise) => (
-                  <div
-                    key={exercise}
-                    onClick={() => handleExerciseSelect(exercise)}
-                    className={`cursor-pointer rounded-xl p-4 transition-all ${
-                      selectedExercise === exercise
-                        ? "bg-gradient-to-r from-orange-500 to-red-600 text-white"
-                        : "fc-glass-soft border border-[color:var(--fc-glass-border)] text-[color:var(--fc-text-primary)] hover:border-[color:var(--fc-glass-border-strong)]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">{exercise}</span>
-                      {selectedExercise === exercise && (
-                        <span className="text-sm opacity-90">Selected</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          ) : (
-            <p className="py-8 text-center text-sm text-[color:var(--fc-text-dim)]">
-              No exercises found
-            </p>
-          )}
-
-          {/* Selected Exercise Chart */}
-          {selectedExercise && (
-            <div className="mt-8 pt-8 border-t border-[color:var(--fc-surface-card-border)]">
-              {loadingExerciseData ? (
-                <div className="py-12 text-center">
-                  <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-orange-500"></div>
-                  <p className="mt-4 text-sm text-[color:var(--fc-text-dim)]">
-                    Loading progression data...
-                  </p>
-                </div>
-              ) : selectedExerciseData.length > 0 ? (
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-[color:var(--fc-text-primary)]">
-                      {selectedExercise}
-                    </h3>
-                    <div className="rounded-full bg-gradient-to-br from-emerald-500 to-green-600 px-4 py-2 text-sm font-semibold text-white">
-                      +{selectedExerciseData[0]?.percentIncrease.toFixed(1)}% increase
-                    </div>
-                  </div>
-
-                  <div className="relative h-64">
-                    <div className="absolute inset-0 flex items-end justify-between gap-2">
-                      {selectedExerciseData.map((point, index) => {
-                        const maxWeight = Math.max(...selectedExerciseData.map((d) => d.weight));
-                        const minWeight = Math.min(...selectedExerciseData.map((d) => d.weight));
-                        const range = maxWeight - minWeight || 1;
-                        const height = ((point.weight - minWeight) / range) * 100;
-                        return (
-                          <div
-                            key={index}
-                            className="flex-1 flex flex-col items-center gap-2"
-                            style={{
-                              animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`,
-                            }}
-                          >
-                            <div className="w-full flex flex-col items-center">
-                              <span className="mb-1 text-xs font-bold text-[color:var(--fc-text-primary)]">
-                                {point.weight}kg
-                              </span>
-                              <div
-                                className="w-full bg-gradient-to-t from-orange-500 to-red-600 rounded-t-lg transition-all duration-500 hover:opacity-80"
-                                style={{
-                                  height: `${Math.max(height, 10)}%`,
-                                  minHeight: "30px",
-                                }}
-                              />
-                            </div>
-                            <span className="text-center text-xs text-[color:var(--fc-text-subtle)]">
-                              {point.date}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="py-8 text-center text-sm text-[color:var(--fc-text-dim)]">
-                  No progression data available for this exercise
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      </ResponsiveModal>
     </AnimatedBackground>
   );
 }

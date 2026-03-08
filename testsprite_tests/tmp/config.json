@@ -1,0 +1,20 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
+  "loginUser": "horia.popescu98@gmail.com",
+  "loginPassword": "123456",
+  "executionArgs": {
+    "projectName": "dailyfitness-app",
+    "projectPath": "c:\\Users\\HP\\Desktop\\DailyFitness\\dailyfitness-app",
+    "testIds": [],
+    "additionalInstruction": "Use the latest PRD v6 in testsprite_tests/standard_prd.json; always log in at '/', never '/login', each test logs in fresh as a coach, and cover only the flows defined there.",
+    "serverMode": "development",
+    "envs": {
+      "API_KEY": "sk-user-tBMZ6l86aFg8avgDrSC6a4t5lyoqJf6Ou98hCvg0-PL4RuOGgx-txYuB2cldkza9rYDekwIZUWoBo95gcR3u8UrSxceyiKJYPkFUCfJOwh0txUXLkQRDKI7dbeZFj-HikLA"
+    }
+  },
+  "serverPort": 53112,
+  "proxy": "http://57d345ec-8444-4304-846e-cd77f0a86c98:csj1E5cC3OSikfYiEzFZW5Jaa77zK0D5@tun.testsprite.com:8080"
+}

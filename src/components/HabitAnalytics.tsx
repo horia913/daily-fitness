@@ -349,15 +349,15 @@ export default function HabitAnalyticsComponent({
               <TabsList className={`grid w-full grid-cols-3 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
                 <TabsTrigger value="overview" className="rounded-xl flex items-center gap-2">
                   <BarChart3 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Overview</span>
+                  <span className="text-[10px] sm:text-xs">Overview</span>
                 </TabsTrigger>
                 <TabsTrigger value="habits" className="rounded-xl flex items-center gap-2">
                   <Target className="w-4 h-4" />
-                  <span className="hidden sm:inline">Habits</span>
+                  <span className="text-[10px] sm:text-xs">Habits</span>
                 </TabsTrigger>
                 <TabsTrigger value="insights" className="rounded-xl flex items-center gap-2">
                   <Activity className="w-4 h-4" />
-                  <span className="hidden sm:inline">Insights</span>
+                  <span className="text-[10px] sm:text-xs">Insights</span>
                 </TabsTrigger>
               </TabsList>
 

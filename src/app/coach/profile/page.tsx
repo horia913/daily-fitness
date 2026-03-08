@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
@@ -59,9 +59,11 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/toast-provider";
 
 export default function CoachProfilePage() {
   const { user } = useAuth();
+  const { addToast } = useToast();
   const { performanceSettings } = useTheme();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -107,10 +109,27 @@ export default function CoachProfilePage() {
     injuries: "",
   });
 
+  const profileTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (user) {
-      loadProfile();
-    }
+    if (!user) return;
+    if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+    profileTimeoutRef.current = setTimeout(() => {
+      profileTimeoutRef.current = null;
+      setLoading(false);
+    }, 20_000);
+    loadProfile().finally(() => {
+      if (profileTimeoutRef.current) {
+        clearTimeout(profileTimeoutRef.current);
+        profileTimeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (profileTimeoutRef.current) {
+        clearTimeout(profileTimeoutRef.current);
+        profileTimeoutRef.current = null;
+      }
+    };
   }, [user]);
 
   const loadProfile = async () => {
@@ -159,13 +178,13 @@ export default function CoachProfilePage() {
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
+      addToast({ title: "Please select an image file", variant: "default" });
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image size should be less than 5MB");
+      addToast({ title: "Image size should be less than 5MB", variant: "default" });
       return;
     }
 
@@ -190,11 +209,12 @@ export default function CoachProfilePage() {
         });
 
         if (uploadError.message.includes("row-level security policy")) {
-          alert(
-            "Storage bucket not configured. Please contact administrator to set up avatar storage."
-          );
+          addToast({
+            title: "Storage bucket not configured. Please contact administrator to set up avatar storage.",
+            variant: "destructive",
+          });
         } else {
-          alert(`Error uploading image: ${uploadError.message}`);
+          addToast({ title: "Couldn't upload image. Please try again.", variant: "destructive" });
         }
         return;
       }
@@ -212,16 +232,16 @@ export default function CoachProfilePage() {
 
       if (updateError) {
         console.error("Update error:", updateError);
-        alert("Error updating profile. Please try again.");
+        addToast({ title: "Couldn't update profile. Please try again.", variant: "destructive" });
         return;
       }
 
       // Update local state
       setProfile({ ...profile, avatar_url: publicUrl });
-      alert("Profile picture updated successfully!");
+      addToast({ title: "Profile picture updated successfully", variant: "success" });
     } catch (error) {
       console.error("Error uploading image:", error);
-      alert("Error uploading image. Please try again.");
+      addToast({ title: "Couldn't upload image. Please try again.", variant: "destructive" });
     } finally {
       setUploadingImage(false);
     }
@@ -237,7 +257,7 @@ export default function CoachProfilePage() {
 
       if (error) {
         console.error("Error updating profile:", error);
-        alert("Error updating profile. Please try again.");
+        addToast({ title: "Couldn't update profile. Please try again.", variant: "destructive" });
         return;
       }
 
@@ -245,7 +265,7 @@ export default function CoachProfilePage() {
       setEditing(false);
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Error updating profile. Please try again.");
+      addToast({ title: "Couldn't update profile. Please try again.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -386,7 +406,7 @@ export default function CoachProfilePage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-24">
+        <div className="min-h-screen pb-32">
           <div className="max-w-3xl mx-auto fc-page px-4 sm:px-6 pt-10 flex flex-col gap-8">
             <nav className="flex items-center justify-between">
               <Button
@@ -401,15 +421,15 @@ export default function CoachProfilePage() {
               <div className="flex items-center gap-2">
                 {editing ? (
                   <>
-                    <Button variant="ghost" size="sm" onClick={handleCancel} className="fc-btn fc-btn-ghost hidden sm:inline-flex">
+                    <Button variant="ghost" onClick={handleCancel} className="fc-btn fc-btn-ghost hidden sm:inline-flex">
                       Cancel
                     </Button>
-                    <Button onClick={handleSave} disabled={saving} size="sm" className="fc-btn fc-btn-primary">
+                    <Button onClick={handleSave} disabled={saving} className="fc-btn fc-btn-primary">
                       {saving ? "Saving..." : "Save Changes"}
                     </Button>
                   </>
                 ) : (
-                  <Button onClick={() => setEditing(true)} size="sm" className="fc-btn fc-btn-primary">
+                  <Button onClick={() => setEditing(true)} className="fc-btn fc-btn-primary">
                     Edit
                   </Button>
                 )}
@@ -628,7 +648,7 @@ export default function CoachProfilePage() {
                       }
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[color:var(--fc-surface)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[color:var(--fc-surface)] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                   </label>
                 </div>
 
@@ -656,7 +676,7 @@ export default function CoachProfilePage() {
                       }
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[color:var(--fc-surface)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[color:var(--fc-surface)] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                   </label>
                 </div>
 
@@ -684,7 +704,7 @@ export default function CoachProfilePage() {
                       }
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[color:var(--fc-surface)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[color:var(--fc-surface)] after:border-[color:var(--fc-glass-border)] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                   </label>
                 </div>
 
@@ -712,7 +732,7 @@ export default function CoachProfilePage() {
                       }
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <div className="w-11 h-6 bg-[color:var(--fc-glass-highlight)] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-[color:var(--fc-surface)] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[color:var(--fc-surface)] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                   </label>
                 </div>
               </div>

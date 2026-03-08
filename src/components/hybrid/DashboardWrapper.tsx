@@ -223,7 +223,7 @@ export function ClientDashboardWrapper() {
 // Coach Dashboard Wrapper
 export function CoachDashboardWrapper() {
   const { user } = useAuth()
-  const { profile, stats, todaysSessions, clientProgress, loading } = useCoachDashboardData()
+  const { profile, stats, clientProgress, loading } = useCoachDashboardData()
   const [showWorkoutAssignment, setShowWorkoutAssignment] = useState(false)
 
   if (loading) {
@@ -252,47 +252,6 @@ export function CoachDashboardWrapper() {
         />
 
         {/* Dynamic Data Sections */}
-        {todaysSessions.length > 0 && (
-          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-            <CardHeader className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-green-600" />
-                  <span className="text-sm font-medium text-green-800">Today's Sessions</span>
-                </div>
-                <Badge className="bg-green-100 text-green-800">
-                  {todaysSessions.length} scheduled
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="space-y-3">
-                {todaysSessions.slice(0, 3).map((session) => (
-                  <div key={session.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-green-200">
-                    <div>
-                      <p className="font-medium text-slate-800">{session.title}</p>
-                      <p className="text-sm text-slate-500">
-                        {session.client_profile?.first_name || 'Client'} • {session.duration_minutes} min
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-slate-400" />
-                      <span className="text-sm text-slate-600">
-                        {new Date(session.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {todaysSessions.length > 3 && (
-                  <p className="text-sm text-slate-500 text-center">
-                    +{todaysSessions.length - 3} more sessions today
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="bg-white border-slate-200">
@@ -311,13 +270,13 @@ export function CoachDashboardWrapper() {
                   <Plus className="w-4 h-4 mr-2" />
                   Assign Workout
                 </Button>
-                <Link href="/coach/programs-workouts">
+                <Link href="/coach/programs">
                   <Button variant="outline" className="w-full">
                     <Dumbbell className="w-4 h-4 mr-2" />
                     Manage Programs & Workouts
                   </Button>
                 </Link>
-                <Link href="/coach/meals">
+                <Link href="/coach/nutrition">
                   <Button variant="outline" className="w-full">
                     <Users className="w-4 h-4 mr-2" />
                     Assign Meal Plan
@@ -396,7 +355,7 @@ export function CoachDashboardWrapper() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {/* Programs & Workouts */}
-              <Link href="/coach/programs-workouts">
+              <Link href="/coach/programs">
                 <div className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -456,7 +415,7 @@ export function CoachDashboardWrapper() {
               </Link>
 
               {/* Meal Plans */}
-              <Link href="/coach/meals">
+              <Link href="/coach/nutrition">
                 <div className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -480,21 +439,6 @@ export function CoachDashboardWrapper() {
                     <div>
                       <h3 className="font-medium text-slate-800">Programs</h3>
                       <p className="text-sm text-slate-500">Program Builder</p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Scheduling */}
-              <Link href="/coach/scheduling">
-                <div className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
-                      <Calendar className="w-5 h-5 text-teal-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-slate-800">Scheduling</h3>
-                      <p className="text-sm text-slate-500">Session Scheduling</p>
                     </div>
                   </div>
                 </div>
@@ -560,20 +504,7 @@ export function CoachDashboardWrapper() {
                 </div>
               </Link>
 
-              {/* Bulk Assignments */}
-              <Link href="/coach/bulk-assignments">
-                <div className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                      <Activity className="w-5 h-5 text-emerald-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-slate-800">Bulk Assign</h3>
-                      <p className="text-sm text-slate-500">Bulk Assignments</p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
+              {/* Bulk Assignments entry removed – multi-client assignment lives elsewhere */}
 
               {/* Profile */}
               <Link href="/coach/profile">
@@ -599,7 +530,6 @@ export function CoachDashboardWrapper() {
           onClose={() => setShowWorkoutAssignment(false)}
           onSuccess={() => {
             // Could refresh data here if needed
-            console.log('Workout assigned successfully!')
           }}
         />
 

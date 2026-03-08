@@ -8,37 +8,72 @@ import {
   Home,
   Dumbbell,
   Apple,
-  TrendingUp,
+  ClipboardCheck,
+  User,
   Grid,
-  Award,
+  Users,
+  BarChart3,
 } from "lucide-react";
 
 interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string; fill?: string; stroke?: string }>;
   label: string;
+  isCenter?: boolean; // Special flag for the elevated center button
 }
 
 const clientNavItems: NavItem[] = [
   { href: "/client", icon: Home, label: "Home" },
-  { href: "/client/workouts", icon: Dumbbell, label: "Workouts" },
-  { href: "/client/nutrition", icon: Apple, label: "Nutrition" },
-  { href: "/client/progress", icon: TrendingUp, label: "Progress" },
-  { href: "/client/menu", icon: Grid, label: "Menu" },
+  { href: "/client/check-ins", icon: ClipboardCheck, label: "Check-in" },
+  { href: "/client/train", icon: Dumbbell, label: "Train", isCenter: true },
+  { href: "/client/nutrition", icon: Apple, label: "Fuel" },
+  { href: "/client/me", icon: User, label: "Me" },
 ];
 
+// Phase 2 — Spec v2.0: exactly 5 pillars. Training = /coach/programs. No scheduling, no Menu in nav.
 const coachNavItems: NavItem[] = [
-  { href: "/coach", icon: Home, label: "Dashboard" },
-  { href: "/coach/programs-workouts", icon: Dumbbell, label: "Workouts" },
-  { href: "/coach/programs", icon: Award, label: "Programs" },
+  { href: "/coach", icon: Home, label: "Home" },
+  { href: "/coach/clients", icon: Users, label: "Clients" },
+  { href: "/coach/programs", icon: Dumbbell, label: "Training" },
   { href: "/coach/nutrition", icon: Apple, label: "Nutrition" },
-  { href: "/coach/menu", icon: Grid, label: "Menu" },
+  { href: "/coach/analytics", icon: BarChart3, label: "Analytics" },
 ];
 
-function isSegmentActive(pathname: string, href: string): boolean {
+function isSegmentActive(pathname: string, item: NavItem): boolean {
+  const { href } = item;
+  
+  // Home: exact match only
   if (href === "/client" || href === "/coach") {
     return pathname === href;
   }
+  
+  // Check-in: starts with /client/check-in
+  if (href === "/client/check-ins") {
+    return pathname.startsWith("/client/check-in");
+  }
+  
+  // Train: matches both /client/train and /client/workouts
+  if (href === "/client/train") {
+    return pathname.startsWith("/client/train") || pathname.startsWith("/client/workouts");
+  }
+  
+  // Fuel: starts with /client/nutrition
+  if (href === "/client/nutrition") {
+    return pathname.startsWith("/client/nutrition");
+  }
+  
+  // Me: matches /client/me, /client/profile, /client/progress
+  if (href === "/client/me") {
+    return pathname.startsWith("/client/me") || 
+           pathname.startsWith("/client/profile") || 
+           pathname.startsWith("/client/progress") ||
+           pathname.startsWith("/client/goals") ||
+           pathname.startsWith("/client/habits") ||
+           pathname.startsWith("/client/challenges") ||
+           pathname.startsWith("/client/clipcards");
+  }
+  
+  // Default: exact match or starts with href + "/"
   return pathname === href || pathname.startsWith(href + "/");
 }
 
@@ -54,6 +89,11 @@ export default function BottomNav() {
     return null;
   }
 
+  // Hide nav on workout execution pages
+  if (pathname.includes("/workouts/") && pathname.includes("/start")) {
+    return null;
+  }
+
   const navItems = pathname.startsWith("/coach")
     ? coachNavItems
     : clientNavItems;
@@ -64,10 +104,37 @@ export default function BottomNav() {
       className="fc-bottom-nav-float"
     >
       <div className="fc-bottom-nav-inner">
-        {navItems.map((item) => {
+        {navItems.map((item, index) => {
           const Icon = item.icon;
-          const isActive = isSegmentActive(pathname, item.href);
+          const isActive = isSegmentActive(pathname, item);
+          const isCenter = item.isCenter === true;
 
+          // Render center button with special styling
+          if (isCenter) {
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="fc-bottom-nav-item-center"
+              >
+                <div className="fc-bottom-nav-center-button">
+                  <Icon
+                    className={`w-6 h-6 transition-all duration-200 ${
+                      isActive ? "text-white" : "text-white/90"
+                    }`}
+                  />
+                  {isActive && (
+                    <div className="fc-bottom-nav-center-ring" aria-hidden />
+                  )}
+                </div>
+                <span className="fc-bottom-nav-center-label">
+                  {item.label}
+                </span>
+              </Link>
+            );
+          }
+
+          // Render regular nav items
           return (
             <Link
               key={item.href}

@@ -20,7 +20,7 @@ export default function ProgramsAndWorkoutsPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="min-h-screen pb-24">
+        <div className="min-h-screen pb-32">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
             <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] mx-auto max-w-lg p-10 text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[color:var(--fc-text-primary)] mx-auto mb-4"></div>

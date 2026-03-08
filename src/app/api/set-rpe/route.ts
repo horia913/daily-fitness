@@ -110,13 +110,7 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-    
-    console.log('[set-rpe] Successfully updated RPE:', {
-      set_log_id,
-      rpe: rpeNum,
-      user_id: user.id
-    });
-    
+
     return NextResponse.json({
       success: true,
       set_log_id,

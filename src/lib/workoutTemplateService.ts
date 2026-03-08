@@ -79,6 +79,7 @@ export interface Program {
   updated_at: string
   schedule?: ProgramSchedule[]
   progression_rules?: ProgressionRule[]
+  training_blocks?: import('@/types/trainingBlock').TrainingBlock[] // Added in Phase 2
 }
 
 export interface ProgramSchedule {
@@ -87,6 +88,7 @@ export interface ProgramSchedule {
   program_day: number // 1-7 (Day 1, Day 2, ..., Day 7) - Interface uses program_day, DB uses day_of_week
   week_number: number // Week number in the program
   template_id: string
+  training_block_id?: string | null // Added in Phase 2
   // Note: is_optional, is_active, notes are NOT in database schema (mapped/optional fields)
   is_optional?: boolean // Optional field (not in DB schema, defaults to false)
   is_active?: boolean // Optional field (not in DB schema, defaults to true)
@@ -249,19 +251,22 @@ export class WorkoutTemplateService {
   
   // ===== WORKOUT TEMPLATE MANAGEMENT =====
   
-  static async getWorkoutTemplates(coachId: string): Promise<WorkoutTemplate[]> {
+  static async getWorkoutTemplates(coachId: string, options?: { skipExerciseCount?: boolean }): Promise<WorkoutTemplate[]> {
     try {
-      // Ensure user is authenticated before querying
       const { ensureAuthenticated } = await import('./supabase');
       await ensureAuthenticated();
-      
+
+      if (process.env.NODE_ENV !== 'production') console.time('[getWorkoutTemplates] workout_templates')
       const { data, error } = await supabase
         .from('workout_templates')
         .select('*')
         .eq('coach_id', coachId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-
+      if (process.env.NODE_ENV !== 'production') {
+        console.timeEnd('[getWorkoutTemplates] workout_templates')
+        console.log('[getWorkoutTemplates] workout_templates rows=', (data || []).length)
+      }
       if (error) throw error
       const templates = data || []
 
@@ -269,19 +274,27 @@ export class WorkoutTemplateService {
         return []
       }
 
+      const skipCount = options?.skipExerciseCount === true
+      if (skipCount) {
+        if (process.env.NODE_ENV !== 'production') console.log('[getWorkoutTemplates] skipExerciseCount=true, skipping blocks metadata and count queries')
+        return templates.map((t: any) => ({ ...t, exercise_count: 0 }))
+      }
+
       const templateIds = templates.map((t: any) => t.id)
-
-      // Get all blocks for these templates to determine block types
+      if (process.env.NODE_ENV !== 'production') console.time('[getWorkoutTemplates] workout_set_entries metadata')
       const { data: blocks, error: blocksError } = await supabase
-        .from('workout_blocks')
-        .select('id, template_id, block_type')
+        .from('workout_set_entries')
+        .select('id, template_id, set_type')
         .in('template_id', templateIds)
-
+      if (process.env.NODE_ENV !== 'production') {
+        console.timeEnd('[getWorkoutTemplates] workout_set_entries metadata')
+        console.log('[getWorkoutTemplates] workout_set_entries metadata rows=', (blocks || []).length)
+      }
       if (blocksError) {
         console.warn('Unable to load blocks for exercise counting:', blocksError.message)
       }
 
-      // Group blocks by template_id and block_type
+      // Group set entries by template_id and set_type
       const blocksByTemplate = new Map<string, any[]>()
       const blockIdsByType = {
         usesBlockExercises: [] as string[],
@@ -298,8 +311,8 @@ export class WorkoutTemplateService {
         }
         blocksByTemplate.get(templateId)!.push(block)
 
-        const blockType = block.block_type
-        // Categorize blocks by which table they use for exercises
+        const blockType = block.set_type
+        // Categorize set entries by which table they use for exercises
         if (['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(blockType)) {
           blockIdsByType.usesBlockExercises.push(block.id)
         } else if (blockType === 'drop_set') {
@@ -316,7 +329,7 @@ export class WorkoutTemplateService {
       // Count exercises from each table with timeout protection
       const counts: Record<string, number> = {}
       
-      // Build a map of block_id -> template_id to avoid JOINs
+      // Build a map of set_entry_id -> template_id to avoid JOINs
       const blockToTemplate = new Map<string, string>()
       ;(blocks || []).forEach((block: any) => {
         blockToTemplate.set(block.id, block.template_id)
@@ -345,19 +358,22 @@ export class WorkoutTemplateService {
         }
       };
       
-      // Count from workout_block_exercises (for straight_set, superset, giant_set, pre_exhaustion)
-      // OPTIMIZED: No JOIN - use block_id map instead
+      // Count from workout_set_entry_exercises (for straight_set, superset, giant_set, pre_exhaustion)
       if (blockIdsByType.usesBlockExercises.length > 0) {
+        if (process.env.NODE_ENV !== 'production') console.time('[getWorkoutTemplates] count workout_set_entry_exercises')
         const exerciseRows = await safeQueryForCount<any[]>(
           supabase
-            .from('workout_block_exercises')
-            .select('id, block_id')
-            .in('block_id', blockIdsByType.usesBlockExercises)
-        );
-
+            .from('workout_set_entry_exercises')
+            .select('id, set_entry_id')
+            .in('set_entry_id', blockIdsByType.usesBlockExercises)
+        )
+        if (process.env.NODE_ENV !== 'production') {
+          console.timeEnd('[getWorkoutTemplates] count workout_set_entry_exercises')
+          console.log('[getWorkoutTemplates] count workout_set_entry_exercises rows=', exerciseRows?.length ?? 0)
+        }
         if (exerciseRows) {
           exerciseRows.forEach((row: any) => {
-            const templateId = blockToTemplate.get(row.block_id)
+            const templateId = blockToTemplate.get(row.set_entry_id)
             if (templateId) {
               counts[templateId] = (counts[templateId] || 0) + 1
             }
@@ -365,20 +381,23 @@ export class WorkoutTemplateService {
         }
       }
 
-      // Count from workout_drop_sets (for drop_set) - count unique exercises per block
-      // OPTIMIZED: No JOIN - use block_id map instead
+      // Count from workout_drop_sets (for drop_set) - count unique exercises per set entry
       if (blockIdsByType.usesDropSets.length > 0) {
+        if (process.env.NODE_ENV !== 'production') console.time('[getWorkoutTemplates] count workout_drop_sets')
         const dropSets = await safeQueryForCount<any[]>(
           supabase
             .from('workout_drop_sets')
-            .select('block_id, exercise_id, exercise_order')
-            .in('block_id', blockIdsByType.usesDropSets)
-        );
-
+            .select('set_entry_id, exercise_id, exercise_order')
+            .in('set_entry_id', blockIdsByType.usesDropSets)
+        )
+        if (process.env.NODE_ENV !== 'production') {
+          console.timeEnd('[getWorkoutTemplates] count workout_drop_sets')
+          console.log('[getWorkoutTemplates] count workout_drop_sets rows=', dropSets?.length ?? 0)
+        }
         if (dropSets) {
           const uniqueExercises = new Set<string>()
           dropSets.forEach((row: any) => {
-            const templateId = blockToTemplate.get(row.block_id)
+            const templateId = blockToTemplate.get(row.set_entry_id)
             const key = `${templateId}:${row.exercise_id}:${row.exercise_order}`
             if (templateId && !uniqueExercises.has(key)) {
               uniqueExercises.add(key)
@@ -389,18 +408,21 @@ export class WorkoutTemplateService {
       }
 
       // Count from workout_cluster_sets (for cluster_set)
-      // OPTIMIZED: No JOIN - use block_id map instead
       if (blockIdsByType.usesClusterSets.length > 0) {
+        if (process.env.NODE_ENV !== 'production') console.time('[getWorkoutTemplates] count workout_cluster_sets')
         const clusterSets = await safeQueryForCount<any[]>(
           supabase
             .from('workout_cluster_sets')
-            .select('block_id, exercise_id, exercise_order')
-            .in('block_id', blockIdsByType.usesClusterSets)
-        );
-
+            .select('set_entry_id, exercise_id, exercise_order')
+            .in('set_entry_id', blockIdsByType.usesClusterSets)
+        )
+        if (process.env.NODE_ENV !== 'production') {
+          console.timeEnd('[getWorkoutTemplates] count workout_cluster_sets')
+          console.log('[getWorkoutTemplates] count workout_cluster_sets rows=', clusterSets?.length ?? 0)
+        }
         if (clusterSets) {
           clusterSets.forEach((row: any) => {
-            const templateId = blockToTemplate.get(row.block_id)
+            const templateId = blockToTemplate.get(row.set_entry_id)
             if (templateId) {
               counts[templateId] = (counts[templateId] || 0) + 1
             }
@@ -409,18 +431,21 @@ export class WorkoutTemplateService {
       }
 
       // Count from workout_rest_pause_sets (for rest_pause)
-      // OPTIMIZED: No JOIN - use block_id map instead
       if (blockIdsByType.usesRestPause.length > 0) {
+        if (process.env.NODE_ENV !== 'production') console.time('[getWorkoutTemplates] count workout_rest_pause_sets')
         const restPauseSets = await safeQueryForCount<any[]>(
           supabase
             .from('workout_rest_pause_sets')
-            .select('block_id, exercise_id, exercise_order')
-            .in('block_id', blockIdsByType.usesRestPause)
-        );
-
+            .select('set_entry_id, exercise_id, exercise_order')
+            .in('set_entry_id', blockIdsByType.usesRestPause)
+        )
+        if (process.env.NODE_ENV !== 'production') {
+          console.timeEnd('[getWorkoutTemplates] count workout_rest_pause_sets')
+          console.log('[getWorkoutTemplates] count workout_rest_pause_sets rows=', restPauseSets?.length ?? 0)
+        }
         if (restPauseSets) {
           restPauseSets.forEach((row: any) => {
-            const templateId = blockToTemplate.get(row.block_id)
+            const templateId = blockToTemplate.get(row.set_entry_id)
             if (templateId) {
               counts[templateId] = (counts[templateId] || 0) + 1
             }
@@ -428,20 +453,23 @@ export class WorkoutTemplateService {
         }
       }
 
-      // Count from workout_time_protocols (for amrap, emom, for_time, tabata) - count unique exercises per block
-      // OPTIMIZED: No JOIN - use block_id map instead
+      // Count from workout_time_protocols (for amrap, emom, for_time, tabata) - count unique exercises per set entry
       if (blockIdsByType.usesTimeProtocols.length > 0) {
+        if (process.env.NODE_ENV !== 'production') console.time('[getWorkoutTemplates] count workout_time_protocols')
         const timeProtocols = await safeQueryForCount<any[]>(
           supabase
             .from('workout_time_protocols')
-            .select('block_id, exercise_id, exercise_order')
-            .in('block_id', blockIdsByType.usesTimeProtocols)
-        );
-
+            .select('set_entry_id, exercise_id, exercise_order')
+            .in('set_entry_id', blockIdsByType.usesTimeProtocols)
+        )
+        if (process.env.NODE_ENV !== 'production') {
+          console.timeEnd('[getWorkoutTemplates] count workout_time_protocols')
+          console.log('[getWorkoutTemplates] count workout_time_protocols rows=', timeProtocols?.length ?? 0)
+        }
         if (timeProtocols) {
           const uniqueExercises = new Set<string>()
           timeProtocols.forEach((row: any) => {
-            const templateId = blockToTemplate.get(row.block_id)
+            const templateId = blockToTemplate.get(row.set_entry_id)
             const key = `${templateId}:${row.exercise_id}:${row.exercise_order}`
             if (templateId && !uniqueExercises.has(key)) {
               uniqueExercises.add(key)
@@ -524,17 +552,17 @@ export class WorkoutTemplateService {
   // Count exercises for a single template (uses same logic as getWorkoutTemplates)
   static async countExercisesForTemplate(templateId: string): Promise<number> {
     try {
-      // Get all blocks for this template
+      // Get all set entries for this template
       const blocks = await this.safeQueryWithTimeout<any[]>(
         supabase
-          .from('workout_blocks')
-          .select('id, template_id, block_type')
+          .from('workout_set_entries')
+          .select('id, template_id, set_type')
           .eq('template_id', templateId)
       )
 
       if (!blocks || !Array.isArray(blocks) || blocks.length === 0) return 0
 
-      // Categorize blocks by which table they use for exercises
+      // Categorize set entries by which table they use for exercises
       const blockIdsByType = {
         usesBlockExercises: [] as string[],
         usesDropSets: [] as string[],
@@ -544,7 +572,7 @@ export class WorkoutTemplateService {
       }
 
       blocks.forEach((block: any) => {
-        const blockType = block.block_type
+        const blockType = block.set_type
         if (['straight_set', 'superset', 'giant_set', 'pre_exhaustion'].includes(blockType)) {
           blockIdsByType.usesBlockExercises.push(block.id)
         } else if (blockType === 'drop_set') {
@@ -561,26 +589,26 @@ export class WorkoutTemplateService {
       // Run all count queries in parallel with timeout protection
       const countPromises: Promise<number>[] = []
 
-      // Count from workout_block_exercises
+      // Count from workout_set_entry_exercises
       if (blockIdsByType.usesBlockExercises.length > 0) {
         countPromises.push(
           this.safeQueryWithTimeout<any[]>(
             supabase
-              .from('workout_block_exercises')
+              .from('workout_set_entry_exercises')
               .select('id')
-              .in('block_id', blockIdsByType.usesBlockExercises)
+              .in('set_entry_id', blockIdsByType.usesBlockExercises)
           ).then(data => (Array.isArray(data) ? data.length : 0))
         )
       }
 
-      // Count from workout_drop_sets - count unique exercises per block
+      // Count from workout_drop_sets - count unique exercises per set entry
       if (blockIdsByType.usesDropSets.length > 0) {
         countPromises.push(
           this.safeQueryWithTimeout<any[]>(
             supabase
               .from('workout_drop_sets')
               .select('exercise_id, exercise_order')
-              .in('block_id', blockIdsByType.usesDropSets)
+              .in('set_entry_id', blockIdsByType.usesDropSets)
           ).then(data => {
             if (!data || !Array.isArray(data)) return 0
             const uniqueExercises = new Set<string>()
@@ -599,7 +627,7 @@ export class WorkoutTemplateService {
             supabase
               .from('workout_cluster_sets')
               .select('id')
-              .in('block_id', blockIdsByType.usesClusterSets)
+              .in('set_entry_id', blockIdsByType.usesClusterSets)
           ).then(data => (Array.isArray(data) ? data.length : 0))
         )
       }
@@ -611,19 +639,19 @@ export class WorkoutTemplateService {
             supabase
               .from('workout_rest_pause_sets')
               .select('id')
-              .in('block_id', blockIdsByType.usesRestPause)
+              .in('set_entry_id', blockIdsByType.usesRestPause)
           ).then(data => (Array.isArray(data) ? data.length : 0))
         )
       }
 
-      // Count from workout_time_protocols - count unique exercises per block
+      // Count from workout_time_protocols - count unique exercises per set entry
       if (blockIdsByType.usesTimeProtocols.length > 0) {
         countPromises.push(
           this.safeQueryWithTimeout<any[]>(
             supabase
               .from('workout_time_protocols')
               .select('exercise_id, exercise_order')
-              .in('block_id', blockIdsByType.usesTimeProtocols)
+              .in('set_entry_id', blockIdsByType.usesTimeProtocols)
           ).then(data => {
             if (!data || !Array.isArray(data)) return 0
             const uniqueExercises = new Set<string>()
@@ -810,11 +838,11 @@ export class WorkoutTemplateService {
         for (const block of blocks) {
           const newBlock = await WorkoutBlockService.createWorkoutBlock(
             newTemplate.id,
-            block.block_type,
-            block.block_order,
+            block.set_type,
+            block.set_order,
             {
-              block_name: block.block_name,
-              block_notes: block.block_notes,
+              set_name: block.set_name,
+              set_notes: block.set_notes,
               total_sets: block.total_sets,
               reps_per_set: block.reps_per_set,
               rest_seconds: block.rest_seconds,
@@ -864,7 +892,7 @@ export class WorkoutTemplateService {
         templateId,
         'straight_set',
         orderIndex,
-        { block_notes: notes }
+        { set_notes: notes }
       )
 
       if (!block) return null
@@ -938,14 +966,18 @@ export class WorkoutTemplateService {
 
   // ===== PROGRAM MANAGEMENT =====
   
-  static async getPrograms(coachId: string): Promise<Program[]> {
+  static async getPrograms(coachId: string, includeInactive: boolean = false): Promise<Program[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('workout_programs')
         .select('*')
         .eq('coach_id', coachId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
+      
+      if (!includeInactive) {
+        query = query.eq('is_active', true)
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) throw error
       return data || []
@@ -1064,6 +1096,7 @@ export class WorkoutTemplateService {
           program_day: programDay,
           week_number: weekNumber,
           template_id: templateId,
+          training_block_id: row.training_block_id ?? null,
           is_optional: false, // Default value since column doesn't exist in DB
           is_active: row.is_active ?? true,
           notes: row.notes,
@@ -1343,6 +1376,45 @@ export class WorkoutTemplateService {
   }
 
   /**
+   * Returns which of the given client IDs have an active program assignment,
+   * with the current program name (for replace confirmation UI).
+   */
+  static async getClientsWithActiveProgram(clientIds: string[]): Promise<{ client_id: string; program_name: string }[]> {
+    if (!clientIds.length) return []
+    try {
+      const { data: assignments, error } = await supabase
+        .from('program_assignments')
+        .select('client_id, program_id')
+        .in('client_id', clientIds)
+        .eq('status', 'active')
+
+      if (error) {
+        console.error('Error fetching active program assignments:', error)
+        return []
+      }
+      if (!assignments?.length) return []
+
+      const programIds = [...new Set(assignments.map((a) => a.program_id).filter(Boolean))]
+      const { data: programs, error: programsError } = await supabase
+        .from('workout_programs')
+        .select('id, name')
+        .in('id', programIds)
+
+      if (programsError || !programs?.length) {
+        return assignments.map((a) => ({ client_id: a.client_id, program_name: 'Program' }))
+      }
+      const nameById = new Map(programs.map((p) => [p.id, p.name ?? 'Program']))
+      return assignments.map((a) => ({
+        client_id: a.client_id,
+        program_name: nameById.get(a.program_id) ?? 'Program',
+      }))
+    } catch (e) {
+      console.error('getClientsWithActiveProgram:', e)
+      return []
+    }
+  }
+
+  /**
    * Convenience method: assign a program to multiple clients and copy program days
    */
   static async assignProgramToClients(
@@ -1405,72 +1477,144 @@ export class WorkoutTemplateService {
     return successCount
   }
 
-  static async setProgramSchedule(programId: string, programDay: number, weekNumber: number, templateId: string, isOptional: boolean = false, notes?: string): Promise<ProgramSchedule | null> {
+  static async setProgramSchedule(
+    programId: string,
+    programDay: number,
+    weekNumber: number,
+    templateId: string,
+    isOptional: boolean = false,
+    notes?: string,
+    trainingBlockId?: string
+  ): Promise<ProgramSchedule | null> {
     try {
       // programDay is 1-based (Day 1-7), but DB uses day_of_week (0-based, 0-6)
       // Validate programDay is between 1-7
       if (programDay < 1 || programDay > 7) {
         throw new Error(`Invalid program_day: ${programDay}. Must be between 1-7.`)
       }
-      
-      // Use program_schedule table with template_id (not workout_template_id)
-      const dayOfWeek = programDay - 1; // Convert to 0-based (1→0, 2→1, ..., 7→6)
-      
-      const { data, error } = await supabase
-        .from('program_schedule')
-        .upsert({
-          program_id: programId,
-          day_of_week: dayOfWeek, // 0-based (0=Day 1, 1=Day 2, ..., 6=Day 7)
-          week_number: weekNumber,
-          template_id: templateId
-        }, {
-          onConflict: 'program_id,day_of_week,week_number'
-        })
-        .select('*')
-        .single()
 
-      if (error) {
-        console.error('Supabase error details:', error)
-        throw error
+      const dayOfWeek = programDay - 1; // Convert to 0-based (1→0, 2→1, ..., 7→6)
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[setProgramSchedule] Saving slot:', {
+          programId,
+          programDay,
+          dayOfWeek,
+          weekNumber,
+          templateId,
+        })
       }
-      
+
+      // Manual upsert-style logic that respects existing schema and constraints.
+      // When trainingBlockId is provided, scope the lookup to that specific block so that
+      // multiple training blocks using different absolute week offsets don't collide.
+      let scheduleQuery = supabase
+        .from('program_schedule')
+        .select('*')
+        .eq('program_id', programId)
+        .eq('day_of_week', dayOfWeek)
+        .eq('week_number', weekNumber)
+
+      if (trainingBlockId) {
+        scheduleQuery = scheduleQuery.eq('training_block_id', trainingBlockId)
+      }
+
+      const { data: existing, error: selectError } = await scheduleQuery.maybeSingle()
+
+      if (selectError && selectError.code !== 'PGRST116') {
+        console.error('[setProgramSchedule] Error selecting existing schedule row:', selectError)
+        throw selectError
+      }
+
+      let row: any = existing
+
+      if (row) {
+        const { data: updated, error: updateError } = await supabase
+          .from('program_schedule')
+          .update({
+            template_id: templateId,
+            updated_at: new Date().toISOString(),
+            // Ensure training_block_id is stamped on update so migrated rows
+            // (which had it set via SQL UPDATE) stay correctly attributed
+            ...(trainingBlockId ? { training_block_id: trainingBlockId } : {}),
+          })
+          .eq('id', row.id)
+          .select('*')
+          .single()
+
+        if (updateError) {
+          console.error('[setProgramSchedule] Error updating program_schedule row:', updateError)
+          throw updateError
+        }
+
+        row = updated
+      } else {
+        const { data: inserted, error: insertError } = await supabase
+          .from('program_schedule')
+          .insert({
+            program_id: programId,
+            day_number: programDay,
+            day_of_week: dayOfWeek,
+            week_number: weekNumber,
+            template_id: templateId,
+            ...(trainingBlockId ? { training_block_id: trainingBlockId } : {}),
+          })
+          .select('*')
+          .single()
+
+        if (insertError) {
+          console.error('[setProgramSchedule] Error inserting program_schedule row:', insertError)
+          throw insertError
+        }
+
+        row = inserted
+      }
+
       // REQUIREMENT: Copy workout data to program_progression_rules when schedule is set
-      if (templateId && templateId !== "rest" && data?.id) {
+      if (templateId && templateId !== "rest" && row?.id) {
         try {
           // Delete existing progression rules for this schedule/week first
-          await ProgramProgressionService.deleteProgressionRules(data.id, weekNumber);
-          
+          await ProgramProgressionService.deleteProgressionRules(row.id, weekNumber);
+
           // Copy workout data to progression rules
           const copySuccess = await ProgramProgressionService.copyWorkoutToProgram(
             programId,
-            data.id,
+            row.id,
             templateId,
             weekNumber
           );
-          
+
           if (copySuccess) {
-            console.log(`✅ [setProgramSchedule] Copied workout ${templateId} to progression rules for Week ${weekNumber}, Day ${programDay}`);
+            console.log(
+              `✅ [setProgramSchedule] Copied workout ${templateId} to progression rules for Week ${weekNumber}, Day ${programDay}`
+            );
           } else {
-            console.warn(`⚠️ [setProgramSchedule] Failed to copy workout ${templateId} to progression rules`);
+            console.warn(
+              `⚠️ [setProgramSchedule] Failed to copy workout ${templateId} to progression rules`
+            );
           }
         } catch (copyError) {
-          console.error(`❌ [setProgramSchedule] Error copying workout to progression rules:`, copyError);
+          console.error(
+            `❌ [setProgramSchedule] Error copying workout to progression rules:`,
+            copyError
+          );
           // Don't throw - schedule was saved successfully, copy can be retried
         }
       }
-      
+
       // Map to ProgramSchedule interface, setting is_optional to false by default
       return {
-        id: data.id,
-        program_id: data.program_id,
+        id: row.id,
+        program_id: row.program_id,
         program_day: programDay, // Keep 1-based for interface (1-7)
         week_number: weekNumber,
         template_id: templateId,
+        training_block_id: row.training_block_id ?? null,
         is_optional: false, // Default value since column doesn't exist in DB
         is_active: true,
-        notes: data.notes || undefined,
-        created_at: data.created_at || new Date().toISOString(),
-        updated_at: data.updated_at || new Date().toISOString(),
+        notes: row.notes || undefined,
+        created_at: row.created_at || new Date().toISOString(),
+        updated_at: row.updated_at || new Date().toISOString(),
       } as ProgramSchedule
     } catch (error: any) {
       console.error('Error setting program schedule:', error)
@@ -1478,7 +1622,7 @@ export class WorkoutTemplateService {
         message: error?.message,
         code: error?.code,
         details: error?.details,
-        hint: error?.hint
+        hint: error?.hint,
       })
       return null
     }
@@ -1549,8 +1693,8 @@ export class WorkoutTemplateService {
               id: exercise.id,
               template_id: templateId,
               exercise_id: exercise.exercise_id,
-              order_index: block.block_order || blockIndex + 1,
-              notes: exercise.notes || block.block_notes,
+              order_index: block.set_order || blockIndex + 1,
+              notes: exercise.notes || block.set_notes,
             })
           })
         }
@@ -1595,7 +1739,7 @@ export class WorkoutTemplateService {
         return []
       }
       
-      // Enrich with exercise details by looking up from workout_block_exercises
+      // Enrich with exercise details by looking up from workout_set_entry_exercises
       // Get unique template_exercise_ids to batch fetch
       const templateExerciseIds = [...new Set(data.map(rule => rule.template_exercise_id).filter(Boolean))]
       
@@ -1603,9 +1747,9 @@ export class WorkoutTemplateService {
         return data as ProgressionRule[]
       }
       
-      // Fetch all block exercises in one query
+      // Fetch all set entry exercises in one query
       const { data: blockExercises, error: blockExercisesError } = await supabase
-        .from('workout_block_exercises')
+        .from('workout_set_entry_exercises')
         .select(`
           id,
           exercise_id,

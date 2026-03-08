@@ -83,7 +83,7 @@ export default function ReportPreview({
         <div className="w-20 h-20 fc-glass-soft border border-[color:var(--fc-glass-border)] rounded-full flex items-center justify-center text-2xl font-bold fc-text-primary mx-auto mb-4">
           {clientData.avatar}
         </div>
-        <h1 className="text-3xl font-bold fc-text-primary mb-2">{clientData.name}</h1>
+        <h1 className="text-2xl font-bold fc-text-primary mb-2">{clientData.name}</h1>
         <p className="text-lg fc-text-dim">{clientData.program}</p>
         <div className="flex items-center justify-center gap-4 mt-4 text-sm fc-text-subtle">
           <span>Report Period: {dateRange.charAt(0).toUpperCase() + dateRange.slice(1)}</span>

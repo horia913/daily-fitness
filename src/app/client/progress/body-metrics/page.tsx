@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -17,10 +17,15 @@ import {
   Target,
   ListFilter,
   ChevronRight,
+  Camera,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { LogMeasurementModal } from "@/components/client/LogMeasurementModal";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BodyMeasurement } from "@/lib/measurementService";
+import { MeasurementMiniChart } from "@/components/progress/MeasurementMiniChart";
+import { getPhotosForDate } from "@/lib/progressPhotoService";
 
 interface BodyMetric {
   date: string;
@@ -46,28 +51,60 @@ function BodyMetricsPageContent() {
   const { performanceSettings } = useTheme();
 
   const [metrics, setMetrics] = useState<BodyMetric[]>([]);
+  const [fullMeasurements, setFullMeasurements] = useState<BodyMeasurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLogModal, setShowLogModal] = useState(false);
   const [chartRange, setChartRange] = useState<"12M" | "6M" | "1M">("12M");
+  const [activeTab, setActiveTab] = useState<"weight-bf" | "measurements">("weight-bf");
+  const [latestDatePhotos, setLatestDatePhotos] = useState<{ url: string; type: string }[]>([]);
+  const [previousDatePhotos, setPreviousDatePhotos] = useState<{ url: string; type: string }[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (user && !authLoading) {
-      loadMetricsData();
-    }
+    if (!user || authLoading) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setLoading(false);
+      setLoadError("Loading took too long. Tap Retry to try again.");
+    }, 20_000);
+    loadMetricsData().finally(() => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
   }, [user, authLoading]);
 
   const loadMetricsData = async () => {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const twelveWeeksAgo = new Date();
-      twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84);
-      const { data, error } = await supabase
-        .from("body_metrics")
-        .select("measured_date, weight_kg, waist_circumference, body_fat_percentage")
-        .eq("client_id", user.id)
-        .gte("measured_date", twelveWeeksAgo.toISOString().split("T")[0])
-        .order("measured_date", { ascending: true });
+      // Load 12 months of data (for 12M range)
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      const dateFrom = twelveMonthsAgo.toISOString().split("T")[0];
+
+      const [
+        { data: fullData, error: fullError },
+        { data, error },
+      ] = await Promise.all([
+        supabase.from("body_metrics").select("*").eq("client_id", user.id).gte("measured_date", dateFrom).order("measured_date", { ascending: false }),
+        supabase.from("body_metrics").select("measured_date, weight_kg, waist_circumference, body_fat_percentage").eq("client_id", user.id).gte("measured_date", dateFrom).order("measured_date", { ascending: true }),
+      ]);
+
+      if (fullError) {
+        console.error("Error loading full measurements:", fullError);
+      } else {
+        setFullMeasurements(fullData || []);
+      }
 
       if (error) {
         console.error("Error loading measurements:", error);
@@ -85,50 +122,74 @@ function BodyMetricsPageContent() {
     } catch (error) {
       console.error("Error loading body metrics:", error);
       setMetrics([]);
+      setFullMeasurements([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const { current, previous } = useMemo(() => {
-    if (metrics.length === 0) return { current: null, previous: null };
+  // Latest = most recent check-in, previous = one before that (for "last vs current" comparison)
+  const { latest, previous } = useMemo(() => {
+    if (fullMeasurements.length === 0) return { latest: null, previous: null };
+    const latestEntry = fullMeasurements[0];
+    const previousEntry = fullMeasurements.length >= 2 ? fullMeasurements[1] : null;
+    return { latest: latestEntry, previous: previousEntry };
+  }, [fullMeasurements]);
+
+  const daysSincePrevious = useMemo(() => {
+    if (!previous?.measured_date) return null;
+    const prev = new Date(previous.measured_date + "T12:00:00Z");
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-    const currentMonthMetrics = metrics.filter((m) => {
-      const d = new Date(m.date);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    return Math.floor((now.getTime() - prev.getTime()) / (24 * 60 * 60 * 1000));
+  }, [previous]);
+
+  useEffect(() => {
+    if (!user?.id || !latest?.measured_date) {
+      setLatestDatePhotos([]);
+      return;
+    }
+    let cancelled = false;
+    getPhotosForDate(user.id, latest.measured_date).then((photos) => {
+      if (!cancelled)
+        setLatestDatePhotos(photos.map((p) => ({ url: p.photo_url, type: p.photo_type })));
     });
-    const previousMonthMetrics = metrics.filter((m) => {
-      const d = new Date(m.date);
-      return d.getMonth() === previousMonth && d.getFullYear() === previousYear;
+    return () => { cancelled = true; };
+  }, [user?.id, latest?.measured_date]);
+  useEffect(() => {
+    if (!user?.id || !previous?.measured_date) {
+      setPreviousDatePhotos([]);
+      return;
+    }
+    let cancelled = false;
+    getPhotosForDate(user.id, previous.measured_date).then((photos) => {
+      if (!cancelled)
+        setPreviousDatePhotos(photos.map((p) => ({ url: p.photo_url, type: p.photo_type })));
     });
-    return {
-      current:
-        currentMonthMetrics.length > 0
-          ? currentMonthMetrics[currentMonthMetrics.length - 1]
-          : metrics[metrics.length - 1],
-      previous:
-        previousMonthMetrics.length > 0
-          ? previousMonthMetrics[previousMonthMetrics.length - 1]
-          : null,
-    };
+    return () => { cancelled = true; };
+  }, [user?.id, previous?.measured_date]);
+
+  const { current, previous: previousMetric } = useMemo(() => {
+    if (metrics.length === 0) return { current: null, previous: null };
+    const latestM = metrics[0];
+    const prevM = metrics.length >= 2 ? metrics[1] : null;
+    return { current: latestM, previous: prevM };
   }, [metrics]);
 
-  const currentWeight = current?.weight ?? 0;
-  const currentWaist = current?.waist ?? 0;
-  const currentBodyFat = current?.bodyFat ?? 0;
-  const weightChange = previous ? currentWeight - previous.weight : 0;
+  const currentWeight = latest?.weight_kg ?? current?.weight ?? 0;
+  const currentWaist = latest?.waist_circumference ?? current?.waist ?? 0;
+  const currentBodyFat = latest?.body_fat_percentage ?? current?.bodyFat ?? 0;
+  const weightChange = previous ? (latest?.weight_kg ?? 0) - (previous.weight_kg ?? 0) : 0;
   const waistChange =
-    previous && currentWaist != null && previous.waist != null
-      ? currentWaist - previous.waist
+    previous && (latest?.waist_circumference != null) && (previous.waist_circumference != null)
+      ? (latest.waist_circumference ?? 0) - (previous.waist_circumference ?? 0)
       : null;
   const bodyFatChange =
-    previous && currentBodyFat != null && previous.bodyFat != null
-      ? currentBodyFat - previous.bodyFat
+    previous && (latest?.body_fat_percentage != null) && (previous.body_fat_percentage != null)
+      ? (latest.body_fat_percentage ?? 0) - (previous.body_fat_percentage ?? 0)
       : null;
+  const muscleChange = previous && (latest?.muscle_mass_kg != null) && (previous.muscle_mass_kg != null)
+    ? (latest.muscle_mass_kg ?? 0) - (previous.muscle_mass_kg ?? 0)
+    : null;
 
   const historyNewestFirst = useMemo(
     () => [...metrics].reverse(),
@@ -136,6 +197,36 @@ function BodyMetricsPageContent() {
   );
 
   const latestDate = metrics.length > 0 ? metrics[metrics.length - 1].date : null;
+
+  // Check if there's circumference data to show Measurements tab
+  const hasCircumferenceData = useMemo(() => {
+    return fullMeasurements.some((m) => 
+      m.left_arm_circumference != null ||
+      m.right_arm_circumference != null ||
+      m.torso_circumference != null ||
+      m.hips_circumference != null ||
+      m.left_thigh_circumference != null ||
+      m.right_thigh_circumference != null ||
+      m.left_calf_circumference != null ||
+      m.right_calf_circumference != null
+    );
+  }, [fullMeasurements]);
+
+  if (loadError) {
+    return (
+      <ProtectedRoute>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 fc-page">
+            <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+            </div>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
 
   if (authLoading || loading) {
     return (
@@ -180,7 +271,7 @@ function BodyMetricsPageContent() {
                     <ChevronRight className="w-3 h-3 shrink-0" />
                     <span className="text-[color:var(--fc-text-primary)]">Body Metrics</span>
                   </nav>
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                  <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
                     Body Metrics
                   </h1>
                   <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
@@ -193,14 +284,23 @@ function BodyMetricsPageContent() {
                 </div>
               </div>
             </div>
-            {latestDate && (
-              <div className="flex items-center gap-3 fc-glass-soft px-4 py-2 rounded-2xl border border-[color:var(--fc-glass-border)] shrink-0">
-                <div className="w-2 h-2 rounded-full bg-[color:var(--fc-status-success)] animate-pulse" />
-                <span className="text-sm fc-text-subtle">
-                  <span className="font-mono fc-text-primary">{formatTimeAgo(latestDate)}</span>
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              {latestDate && (
+                <div className="flex items-center gap-3 fc-glass-soft px-4 py-2 rounded-2xl border border-[color:var(--fc-glass-border)] shrink-0">
+                  <div className="w-2 h-2 rounded-full bg-[color:var(--fc-status-success)] animate-pulse" />
+                  <span className="text-sm fc-text-subtle">
+                    <span className="font-mono fc-text-primary">{formatTimeAgo(latestDate)}</span>
+                  </span>
+                </div>
+              )}
+              <Link
+                href="/client/progress/photos"
+                className="fc-glass-soft px-4 py-2 rounded-2xl border border-[color:var(--fc-glass-border)] flex items-center gap-2 text-sm font-medium fc-text-primary hover:bg-[color:var(--fc-glass-highlight)] transition-colors"
+              >
+                <Camera className="w-4 h-4" />
+                Photos
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -226,107 +326,198 @@ function BodyMetricsPageContent() {
           </div>
         ) : (
           <main className="space-y-8">
-            {/* Hero: Current weight + Goal */}
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div
-                className="md:col-span-2 fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] min-h-[220px] flex flex-col justify-between"
-              >
-                <div className="flex justify-between items-start">
-                  <span className="text-xs font-semibold uppercase tracking-widest fc-text-subtle">
-                    Current body weight
-                  </span>
-                  {weightChange !== 0 && (
-                    <div
-                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${
-                        weightChange < 0
-                          ? "bg-[color:var(--fc-status-success)]/10 text-[color:var(--fc-status-success)]"
-                          : "bg-[color:var(--fc-status-warning)]/10 fc-text-warning"
-                      }`}
-                    >
-                      {weightChange < 0 ? (
-                        <TrendingDown className="w-4 h-4" />
-                      ) : (
-                        <TrendingUp className="w-4 h-4" />
+            {/* Last vs current comparison */}
+            <section className="fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
+              <h2 className="text-lg font-semibold fc-text-primary mb-1">Body check-in</h2>
+              {previous && daysSincePrevious != null && (
+                <p className="text-sm fc-text-dim mb-6">
+                  Last check-in: {new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ({daysSincePrevious} day{daysSincePrevious === 1 ? "" : "s"} ago)
+                </p>
+              )}
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[280px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-[color:var(--fc-glass-border)]">
+                      <th className="text-left py-3 pr-4 text-xs font-semibold fc-text-subtle uppercase"></th>
+                      {previous && (
+                        <>
+                          <th className="text-right py-3 px-2 text-xs font-semibold fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>
+                          <th className="text-right py-3 px-2 text-xs font-semibold fc-text-primary">Current</th>
+                          <th className="text-right py-3 pl-2 text-xs font-semibold fc-text-subtle">Change</th>
+                        </>
                       )}
-                      {weightChange > 0 ? "+" : ""}
-                      {weightChange.toFixed(1)} kg
-                      <span className="text-[10px] ml-1 opacity-70">month</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <AnimatedNumber
-                    value={currentWeight}
-                    decimals={1}
-                    className="text-4xl sm:text-5xl font-bold font-mono tracking-tight fc-text-primary"
-                  />
-                  <span className="text-2xl font-medium fc-text-subtle">kg</span>
-                </div>
-                <div className="flex flex-wrap gap-6 sm:gap-8 mt-6">
-                  {currentWaist > 0 && (
-                    <div>
-                      <p className="text-xs fc-text-subtle uppercase mb-1">Waist</p>
-                      <p className="text-xl font-semibold font-mono fc-text-primary">
-                        {currentWaist}
-                        <span className="text-sm fc-text-subtle"> cm</span>
-                      </p>
-                      {waistChange !== null && waistChange !== 0 && (
-                        <p
-                          className={`text-[10px] font-bold ${
-                            waistChange < 0 ? "fc-text-success" : "fc-text-warning"
-                          }`}
-                        >
-                          {waistChange > 0 ? "+" : ""}
-                          {waistChange} cm
-                        </p>
+                      {!previous && <th className="text-right py-3 px-2 text-xs font-semibold fc-text-primary">Current</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="fc-text-primary">
+                    <tr className="border-b border-[color:var(--fc-glass-border)]">
+                      <td className="py-3 pr-4 font-medium">Weight</td>
+                      {previous && <td className="text-right py-3 px-2 font-mono">{(previous.weight_kg ?? 0).toFixed(1)} kg</td>}
+                      <td className="text-right py-3 px-2 font-mono">{(latest?.weight_kg ?? 0).toFixed(1)} kg</td>
+                      {previous && (
+                        <td className="text-right py-3 pl-2">
+                          {weightChange !== 0 ? (
+                            <span className={`text-sm font-bold ${weightChange < 0 ? "fc-text-success" : "fc-text-warning"}`}>
+                              {weightChange < 0 ? "▼" : "▲"} {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} kg
+                            </span>
+                          ) : "—"}
+                        </td>
                       )}
-                    </div>
-                  )}
-                  {currentBodyFat > 0 && (
-                    <div>
-                      <p className="text-xs fc-text-subtle uppercase mb-1">Body fat</p>
-                      <p className="text-xl font-semibold font-mono fc-text-primary">
-                        {currentBodyFat}
-                        <span className="text-sm fc-text-subtle">%</span>
-                      </p>
-                      {bodyFatChange !== null && bodyFatChange !== 0 && (
-                        <p
-                          className={`text-[10px] font-bold ${
-                            bodyFatChange < 0 ? "fc-text-success" : "fc-text-warning"
-                          }`}
-                        >
-                          {bodyFatChange > 0 ? "+" : ""}
-                          {bodyFatChange.toFixed(1)}%
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    </tr>
+                    {(latest?.body_fat_percentage != null || previous?.body_fat_percentage != null) && (
+                      <tr className="border-b border-[color:var(--fc-glass-border)]">
+                        <td className="py-3 pr-4 font-medium">Body fat</td>
+                        {previous && <td className="text-right py-3 px-2 font-mono">{(previous.body_fat_percentage ?? "—")}%</td>}
+                        <td className="text-right py-3 px-2 font-mono">{(latest?.body_fat_percentage ?? "—")}%</td>
+                        {previous && (
+                          <td className="text-right py-3 pl-2">
+                            {bodyFatChange != null && bodyFatChange !== 0 ? (
+                              <span className={`text-sm font-bold ${bodyFatChange < 0 ? "fc-text-success" : "fc-text-warning"}`}>
+                                {bodyFatChange < 0 ? "▼" : "▲"} {bodyFatChange > 0 ? "+" : ""}{bodyFatChange.toFixed(1)}%
+                              </span>
+                            ) : "—"}
+                          </td>
+                        )}
+                      </tr>
+                    )}
+                    {(latest?.muscle_mass_kg != null || previous?.muscle_mass_kg != null) && (
+                      <tr className="border-b border-[color:var(--fc-glass-border)]">
+                        <td className="py-3 pr-4 font-medium">Muscle mass</td>
+                        {previous && <td className="text-right py-3 px-2 font-mono">{(previous.muscle_mass_kg ?? "—").toString()} kg</td>}
+                        <td className="text-right py-3 px-2 font-mono">{(latest?.muscle_mass_kg ?? "—").toString()} kg</td>
+                        {previous && (
+                          <td className="text-right py-3 pl-2">
+                            {muscleChange != null && muscleChange !== 0 ? (
+                              <span className={`text-sm font-bold ${muscleChange > 0 ? "fc-text-success" : "fc-text-warning"}`}>
+                                {muscleChange > 0 ? "▲" : "▼"} {muscleChange > 0 ? "+" : ""}{muscleChange.toFixed(1)} kg
+                              </span>
+                            ) : "—"}
+                          </td>
+                        )}
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
 
-              <div
-                className="fc-surface p-6 rounded-2xl border border-[color:var(--fc-surface-card-border)] flex flex-col items-center justify-center text-center"
-              >
-                <div className="w-16 h-16 rounded-2xl bg-[color:var(--fc-status-error)]/10 flex items-center justify-center fc-text-error mb-4">
-                  <Target className="w-8 h-8" />
+              {/* Weight trend sparkline (last 8–12 points) */}
+              {metrics.length >= 2 && (() => {
+                const sparkData = metrics.slice(-12);
+                const minW = Math.min(...sparkData.map((x) => x.weight));
+                const maxW = Math.max(...sparkData.map((x) => x.weight));
+                const range = maxW - minW || 1;
+                return (
+                  <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
+                    <p className="text-xs font-semibold fc-text-subtle uppercase mb-2">Weight trend (last 3 months)</p>
+                    <div className="flex items-end gap-0.5 h-12">
+                      {sparkData.map((m, i) => {
+                        const h = ((m.weight - minW) / range) * 100;
+                        return (
+                          <div
+                            key={`${m.date}-${i}`}
+                            className="flex-1 min-w-[4px] rounded-t bg-[color:var(--fc-accent)]/60"
+                            style={{ height: `${Math.max(h, 4)}%` }}
+                            title={`${m.weight.toFixed(1)} kg · ${new Date(m.date).toLocaleDateString()}`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-between mt-1 text-[10px] fc-text-subtle font-mono">
+                      <span>{sparkData[0]?.weight.toFixed(1)} kg</span>
+                      <span>{sparkData[sparkData.length - 1]?.weight.toFixed(1)} kg</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Measurements comparison (previous vs current) */}
+              {previous && latest && hasCircumferenceData && (() => {
+                const rows: { label: string; prev: number | null; curr: number | null }[] = [
+                  { label: "Chest", prev: previous.torso_circumference ?? null, curr: latest.torso_circumference ?? null },
+                  { label: "Waist", prev: previous.waist_circumference ?? null, curr: latest.waist_circumference ?? null },
+                  { label: "Hips", prev: previous.hips_circumference ?? null, curr: latest.hips_circumference ?? null },
+                  { label: "Bicep (L)", prev: previous.left_arm_circumference ?? null, curr: latest.left_arm_circumference ?? null },
+                  { label: "Bicep (R)", prev: previous.right_arm_circumference ?? null, curr: latest.right_arm_circumference ?? null },
+                  { label: "Thigh (L)", prev: previous.left_thigh_circumference ?? null, curr: latest.left_thigh_circumference ?? null },
+                  { label: "Thigh (R)", prev: previous.right_thigh_circumference ?? null, curr: latest.right_thigh_circumference ?? null },
+                ].filter((r) => r.prev != null || r.curr != null);
+                if (rows.length === 0) return null;
+                return (
+                  <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
+                    <p className="text-xs font-semibold fc-text-subtle uppercase mb-3">Measurements</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[240px] text-sm">
+                        <thead>
+                          <tr className="border-b border-[color:var(--fc-glass-border)]">
+                            <th className="text-left py-2 pr-2 fc-text-subtle font-medium"></th>
+                            {previous && <th className="text-right py-2 px-2 fc-text-subtle">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</th>}
+                            <th className="text-right py-2 px-2 fc-text-subtle">Current</th>
+                            <th className="text-right py-2 pl-2 fc-text-subtle">Change</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((r) => {
+                            const change = r.prev != null && r.curr != null ? r.curr - r.prev : null;
+                            return (
+                              <tr key={r.label} className="border-b border-[color:var(--fc-glass-border)]/50">
+                                <td className="py-2 pr-2 fc-text-primary">{r.label}</td>
+                                <td className="text-right py-2 px-2 font-mono">{r.prev != null ? `${r.prev} cm` : "—"}</td>
+                                <td className="text-right py-2 px-2 font-mono">{r.curr != null ? `${r.curr} cm` : "—"}</td>
+                                <td className="text-right py-2 pl-2 font-mono">
+                                  {change != null && change !== 0 ? (
+                                    <span className={change < 0 ? "fc-text-success" : "fc-text-warning"}>{change > 0 ? "+" : ""}{change} cm</span>
+                                  ) : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Progress photos comparison */}
+              {(latestDatePhotos.length > 0 || previousDatePhotos.length > 0) && (
+                <div className="mt-6 pt-6 border-t border-[color:var(--fc-glass-border)]">
+                  <p className="text-xs font-semibold fc-text-subtle uppercase mb-3">Progress photos</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {previous && previousDatePhotos.length > 0 && (
+                      <div>
+                        <p className="text-[10px] fc-text-subtle mb-1">{new Date(previous.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} (Previous)</p>
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-[color:var(--fc-glass-soft)]">
+                          <img src={previousDatePhotos[0].url} alt="Previous" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    )}
+                    {latest && latestDatePhotos.length > 0 && (
+                      <div>
+                        <p className="text-[10px] fc-text-subtle mb-1">{new Date(latest.measured_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} (Current)</p>
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-[color:var(--fc-glass-soft)]">
+                          <img src={latestDatePhotos[0].url} alt="Current" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] fc-text-subtle mt-2">Swipe or scroll for more views</p>
                 </div>
-                <h3 className="text-xl font-semibold fc-text-primary mb-2">Goal target</h3>
-                <p className="text-2xl font-bold font-mono fc-text-primary">
-                  — <span className="text-lg fc-text-subtle">kg</span>
-                </p>
-                <p className="text-xs fc-text-subtle mt-3">Set a weight goal in Goals</p>
-              </div>
+              )}
             </section>
 
-            {/* Weight timeline */}
-            <div
-              className="fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)]"
-            >
+            {/* Tabs: Weight & BF and Measurements */}
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "weight-bf" | "measurements")} className="fc-surface p-6 sm:p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)]">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <h3 className="text-xl font-semibold fc-text-primary flex items-center gap-2">
-                  <Activity className="w-5 h-5 fc-text-workouts" />
-                  Weight timeline
-                </h3>
+                <TabsList className="fc-glass-soft border border-[color:var(--fc-glass-border)]">
+                  <TabsTrigger value="weight-bf" className="data-[state=active]:fc-glass">
+                    Weight & BF
+                  </TabsTrigger>
+                  {hasCircumferenceData && (
+                    <TabsTrigger value="measurements" className="data-[state=active]:fc-glass">
+                      Measurements
+                    </TabsTrigger>
+                  )}
+                </TabsList>
                 <div className="flex fc-glass-soft p-1 rounded-xl border border-[color:var(--fc-glass-border)]">
                   {(["12M", "6M", "1M"] as const).map((range) => (
                     <button
@@ -344,44 +535,313 @@ function BodyMetricsPageContent() {
                   ))}
                 </div>
               </div>
-              {metrics.length > 0 ? (
-                <div className="flex items-end justify-between gap-1 sm:gap-2 h-64">
-                  {metrics.slice(-12).map((metric, index) => {
-                    const maxW = Math.max(...metrics.map((m) => m.weight));
-                    const minW = Math.min(...metrics.map((m) => m.weight));
-                    const range = maxW - minW || 1;
-                    const height = ((metric.weight - minW) / range) * 100;
-                    return (
-                      <div key={`${metric.date}-${index}`} className="flex-1 flex flex-col items-center min-w-0">
-                        <div
-                          className="w-full rounded-t-lg min-h-[20px] transition-opacity hover:opacity-90"
-                          style={{
-                            height: `${Math.max(height, 8)}%`,
-                            background:
-                              "linear-gradient(135deg, var(--fc-status-error) 0%, var(--fc-accent-blue) 100%)",
-                          }}
-                        />
-                        <div className="mt-2 text-center truncate w-full">
-                          <p className="text-xs font-semibold fc-text-primary truncate">
-                            {metric.weight.toFixed(1)}
-                          </p>
-                          <p className="text-[10px] fc-text-subtle truncate">
-                            {new Date(metric.date).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </p>
+
+              <TabsContent value="weight-bf" className="mt-0">
+                {metrics.length > 0 ? (
+                  <div className="relative">
+                    <div className="flex items-end justify-between gap-1 sm:gap-2 h-64">
+                      {metrics.slice(-12).map((metric, index) => {
+                        const maxW = Math.max(...metrics.map((m) => m.weight));
+                        const minW = Math.min(...metrics.map((m) => m.weight));
+                        const range = maxW - minW || 1;
+                        const height = ((metric.weight - minW) / range) * 100;
+                        
+                        // Body fat secondary indicator (if data exists)
+                        const hasBodyFat = metrics.some((m) => m.bodyFat != null);
+                        const maxBF = hasBodyFat ? Math.max(...metrics.map((m) => m.bodyFat || 0)) : 0;
+                        const minBF = hasBodyFat ? Math.min(...metrics.map((m) => m.bodyFat || 0)) : 0;
+                        const rangeBF = maxBF - minBF || 1;
+                        const heightBF = metric.bodyFat != null ? ((metric.bodyFat - minBF) / rangeBF) * 100 : 0;
+                        
+                        return (
+                          <div key={`${metric.date}-${index}`} className="flex-1 flex flex-col items-center min-w-0 relative h-full">
+                            {/* Body fat indicator (positioned in chart area, above bar) */}
+                            {metric.bodyFat != null && heightBF > 0 && (
+                              <div
+                                className="absolute w-2 h-2 rounded-full bg-[color:var(--fc-status-success)] border border-[color:var(--fc-glass-border)] z-10"
+                                style={{
+                                  bottom: `calc(${Math.max(heightBF, 2)}% + 2rem)`,
+                                }}
+                                title={`Body Fat: ${metric.bodyFat}%`}
+                              />
+                            )}
+                            {/* Weight bar */}
+                            <div
+                              className="w-full rounded-t-lg min-h-[20px] transition-opacity hover:opacity-90 relative"
+                              style={{
+                                height: `${Math.max(height, 8)}%`,
+                                background:
+                                  "linear-gradient(135deg, var(--fc-status-error) 0%, var(--fc-accent-blue) 100%)",
+                              }}
+                            />
+                            <div className="mt-2 text-center truncate w-full">
+                              <p className="text-xs font-semibold fc-text-primary truncate">
+                                {metric.weight.toFixed(1)}
+                              </p>
+                              <p className="text-[10px] fc-text-subtle truncate">
+                                {new Date(metric.date).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {metrics.some((m) => m.bodyFat != null) && (
+                      <div className="flex items-center gap-3 mt-4 text-xs fc-text-subtle">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-[color:var(--fc-status-error)] to-[color:var(--fc-accent-blue)]" />
+                          <span>Weight</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[color:var(--fc-status-success)]" />
+                          <span>Body Fat %</span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-center py-12 text-sm fc-text-dim">
-                  Not enough data to show chart
-                </p>
-              )}
-            </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-center py-12 text-sm fc-text-dim">
+                    Not enough data to show chart
+                  </p>
+                )}
+              </TabsContent>
+
+              <TabsContent value="measurements" className="mt-0">
+                {fullMeasurements.length > 0 ? (
+                  <div className="space-y-6">
+                    {/* Comparison Summary Card */}
+                    {(() => {
+                      const sortedMeasurements = [...fullMeasurements].sort(
+                        (a, b) => a.measured_date.localeCompare(b.measured_date)
+                      );
+                      const firstMeasurement = sortedMeasurements[0];
+                      const lastMeasurement = sortedMeasurements[sortedMeasurements.length - 1];
+
+                      if (!firstMeasurement || !lastMeasurement) return null;
+
+                      const comparisons: Array<{
+                        label: string;
+                        change: number;
+                        isGood: boolean;
+                        hasData: boolean;
+                      }> = [];
+
+                      // Waist
+                      if (
+                        firstMeasurement.waist_circumference != null &&
+                        lastMeasurement.waist_circumference != null
+                      ) {
+                        const change = lastMeasurement.waist_circumference - firstMeasurement.waist_circumference;
+                        comparisons.push({
+                          label: "Waist",
+                          change,
+                          isGood: change < 0, // Decrease is good
+                          hasData: true,
+                        });
+                      }
+
+                      // Hips
+                      if (
+                        firstMeasurement.hips_circumference != null &&
+                        lastMeasurement.hips_circumference != null
+                      ) {
+                        const change = lastMeasurement.hips_circumference - firstMeasurement.hips_circumference;
+                        comparisons.push({
+                          label: "Hips",
+                          change,
+                          isGood: change < 0, // Decrease is good
+                          hasData: true,
+                        });
+                      }
+
+                      // Arms (average of left/right)
+                      const firstArms = [
+                        firstMeasurement.left_arm_circumference,
+                        firstMeasurement.right_arm_circumference,
+                      ].filter((v) => v != null);
+                      const lastArms = [
+                        lastMeasurement.left_arm_circumference,
+                        lastMeasurement.right_arm_circumference,
+                      ].filter((v) => v != null);
+                      if (firstArms.length > 0 && lastArms.length > 0) {
+                        const firstAvg = firstArms.reduce((a, b) => a + b, 0) / firstArms.length;
+                        const lastAvg = lastArms.reduce((a, b) => a + b, 0) / lastArms.length;
+                        const change = lastAvg - firstAvg;
+                        comparisons.push({
+                          label: "Arms",
+                          change,
+                          isGood: change > 0, // Increase is good (muscle growth)
+                          hasData: true,
+                        });
+                      }
+
+                      // Thighs (average)
+                      const firstThighs = [
+                        firstMeasurement.left_thigh_circumference,
+                        firstMeasurement.right_thigh_circumference,
+                      ].filter((v) => v != null);
+                      const lastThighs = [
+                        lastMeasurement.left_thigh_circumference,
+                        lastMeasurement.right_thigh_circumference,
+                      ].filter((v) => v != null);
+                      if (firstThighs.length > 0 && lastThighs.length > 0) {
+                        const firstAvg = firstThighs.reduce((a, b) => a + b, 0) / firstThighs.length;
+                        const lastAvg = lastThighs.reduce((a, b) => a + b, 0) / lastThighs.length;
+                        const change = lastAvg - firstAvg;
+                        comparisons.push({
+                          label: "Thighs",
+                          change,
+                          isGood: change > 0, // Increase is good
+                          hasData: true,
+                        });
+                      }
+
+                      // Calves (average)
+                      const firstCalves = [
+                        firstMeasurement.left_calf_circumference,
+                        firstMeasurement.right_calf_circumference,
+                      ].filter((v) => v != null);
+                      const lastCalves = [
+                        lastMeasurement.left_calf_circumference,
+                        lastMeasurement.right_calf_circumference,
+                      ].filter((v) => v != null);
+                      if (firstCalves.length > 0 && lastCalves.length > 0) {
+                        const firstAvg = firstCalves.reduce((a, b) => a + b, 0) / firstCalves.length;
+                        const lastAvg = lastCalves.reduce((a, b) => a + b, 0) / lastCalves.length;
+                        const change = lastAvg - firstAvg;
+                        comparisons.push({
+                          label: "Calves",
+                          change,
+                          isGood: change > 0, // Increase is good
+                          hasData: true,
+                        });
+                      }
+
+                      if (comparisons.length === 0) return null;
+
+                      return (
+                        <div className="fc-glass-soft p-4 rounded-xl border border-[color:var(--fc-glass-border)]">
+                          <h3 className="text-sm font-semibold fc-text-primary mb-3">
+                            Since {new Date(firstMeasurement.measured_date).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                            {comparisons.map((comp) => (
+                              <div key={comp.label} className="text-center">
+                                <p className="text-xs fc-text-subtle mb-1">{comp.label}</p>
+                                <p
+                                  className={`text-sm font-bold font-mono ${
+                                    comp.isGood
+                                      ? "fc-text-success"
+                                      : comp.change === 0
+                                        ? "fc-text-subtle"
+                                        : "fc-text-warning"
+                                  }`}
+                                >
+                                  {comp.change > 0 ? "+" : ""}
+                                  {comp.change.toFixed(1)} cm
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Measurement Charts Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Waist */}
+                      {fullMeasurements.filter((m) => m.waist_circumference != null).length >= 2 && (
+                        <MeasurementMiniChart
+                          title="Waist"
+                          measurements={fullMeasurements}
+                          getValue={(m) => m.waist_circumference ?? null}
+                          timeRange={chartRange}
+                          isDecreaseGood={true}
+                        />
+                      )}
+
+                      {/* Hips */}
+                      {fullMeasurements.filter((m) => m.hips_circumference != null).length >= 2 && (
+                        <MeasurementMiniChart
+                          title="Hips"
+                          measurements={fullMeasurements}
+                          getValue={(m) => m.hips_circumference ?? null}
+                          timeRange={chartRange}
+                          isDecreaseGood={true}
+                        />
+                      )}
+
+                      {/* Torso/Chest */}
+                      {fullMeasurements.filter((m) => m.torso_circumference != null).length >= 2 && (
+                        <MeasurementMiniChart
+                          title="Torso/Chest"
+                          measurements={fullMeasurements}
+                          getValue={(m) => m.torso_circumference ?? null}
+                          timeRange={chartRange}
+                          isDecreaseGood={false}
+                        />
+                      )}
+
+                      {/* Arms (Left & Right) */}
+                      {fullMeasurements.filter(
+                        (m) => m.left_arm_circumference != null || m.right_arm_circumference != null
+                      ).length >= 2 && (
+                        <MeasurementMiniChart
+                          title="Arms"
+                          measurements={fullMeasurements}
+                          getValue={(m) => m.left_arm_circumference ?? null}
+                          getValue2={(m) => m.right_arm_circumference ?? null}
+                          label2="Right"
+                          timeRange={chartRange}
+                          isDecreaseGood={false}
+                        />
+                      )}
+
+                      {/* Thighs (Left & Right) */}
+                      {fullMeasurements.filter(
+                        (m) => m.left_thigh_circumference != null || m.right_thigh_circumference != null
+                      ).length >= 2 && (
+                        <MeasurementMiniChart
+                          title="Thighs"
+                          measurements={fullMeasurements}
+                          getValue={(m) => m.left_thigh_circumference ?? null}
+                          getValue2={(m) => m.right_thigh_circumference ?? null}
+                          label2="Right"
+                          timeRange={chartRange}
+                          isDecreaseGood={false}
+                        />
+                      )}
+
+                      {/* Calves (Left & Right) */}
+                      {fullMeasurements.filter(
+                        (m) => m.left_calf_circumference != null || m.right_calf_circumference != null
+                      ).length >= 2 && (
+                        <MeasurementMiniChart
+                          title="Calves"
+                          measurements={fullMeasurements}
+                          getValue={(m) => m.left_calf_circumference ?? null}
+                          getValue2={(m) => m.right_calf_circumference ?? null}
+                          label2="Right"
+                          timeRange={chartRange}
+                          isDecreaseGood={false}
+                        />
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-center py-12 text-sm fc-text-dim">
+                    No measurement data available
+                  </p>
+                )}
+              </TabsContent>
+            </Tabs>
 
             {/* Log history */}
             <div
@@ -463,6 +923,7 @@ function BodyMetricsPageContent() {
           clientId={user.id}
           onClose={() => setShowLogModal(false)}
           onSuccess={() => loadMetricsData()}
+          lastMeasurement={latest ?? undefined}
         />
       )}
     </AnimatedBackground>

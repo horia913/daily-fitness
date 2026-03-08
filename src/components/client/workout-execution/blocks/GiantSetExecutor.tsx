@@ -19,12 +19,14 @@ import { LargeInput } from "../ui/LargeInput";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import {
   getWeightDefaultAndSuggestion,
   getCoachSuggestedWeight,
 } from "@/lib/weightDefaultService";
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
+import { ProgressionNudge } from "../ui/ProgressionNudge";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 
@@ -48,9 +50,12 @@ export function GiantSetExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
+  onPlateCalculatorClick,
   onRestTimerClick,
   onSetComplete,
   onLastSetLoggedForRest,
+  progressionSuggestionsMap,
+  previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -72,6 +77,8 @@ export function GiantSetExecutor({
   useLoggingReset(isLoggingSet, setIsLoggingSet);
   const [weightsPristine, setWeightsPristine] = useState<boolean[]>([]);
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  /** Collapsible set history: show all sets or only last 2 */
+  const [showAllSets, setShowAllSets] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -238,7 +245,7 @@ export function GiantSetExecutor({
     }
   });
 
-  const instructions = block.block.block_notes || undefined;
+  const instructions = block.block.set_notes || undefined;
 
   const roundNumbersLogged = [
     ...new Set(loggedSetsList.map((s) => s.set_number)),
@@ -269,7 +276,7 @@ export function GiantSetExecutor({
     if (giantSetExercises.length === 0) return;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.block_type, {
+      const payload = buildSetEditPatchPayload(block.block.set_type, {
         round_number: viewingSetIndex,
         giant_set_exercises: giantSetExercises,
       });
@@ -349,7 +356,7 @@ export function GiantSetExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "GiantSetExecutor",
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -379,7 +386,7 @@ export function GiantSetExecutor({
     if (giantSetExercises.length === 0) return;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.block_type, {
+      const payload = buildSetEditPatchPayload(block.block.set_type, {
         round_number: editDraft.round_number,
         giant_set_exercises: giantSetExercises,
       });
@@ -387,7 +394,7 @@ export function GiantSetExecutor({
         console.log("[SAVE EDITS]", {
           executor: "GiantSetExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -521,7 +528,7 @@ export function GiantSetExecutor({
 
       // Log giant set as a single call
       const logData: any = {
-        block_type: "giant_set",
+        set_type: "giant_set",
         round_number: completedSets + 1,
       };
 
@@ -539,7 +546,7 @@ export function GiantSetExecutor({
           ({
             id: setLogId,
             exercise_id: exercise.exercise_id,
-            block_id: block.block.id,
+            set_entry_id: block.block.id,
             set_number: roundNumber,
             weight_kg: parseFloat(weights[idx] || "0"),
             reps_completed: parseInt(reps[idx] || "0"),
@@ -599,11 +606,31 @@ export function GiantSetExecutor({
             background: "var(--fc-surface-sunken)",
           }}
         >
-          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
-            Logged rounds
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+              Logged rounds
+            </div>
+            {roundNumbersLogged.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSets(!showAllSets)}
+                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
+              >
+                {showAllSets ? (
+                  <>Show less ▲</>
+                ) : (
+                  <>Show all {roundNumbersLogged.length} sets ▼</>
+                )}
+              </button>
+            )}
           </div>
           <ul className="space-y-1.5">
-            {roundNumbersLogged.map((roundNum) => {
+            {(showAllSets ? roundNumbersLogged : roundNumbersLogged.slice(-2)).map((roundNum) => {
+              // Calculate the actual index in the full list for isLatestSet
+              const actualIndex = showAllSets 
+                ? roundNumbersLogged.indexOf(roundNum)
+                : roundNumbersLogged.length - 2 + roundNumbersLogged.slice(-2).indexOf(roundNum);
+              const isLatestRound = actualIndex === roundNumbersLogged.length - 1;
               const forRound = loggedSetsList.filter(
                 (s) => s.set_number === roundNum,
               );
@@ -618,46 +645,95 @@ export function GiantSetExecutor({
                 .map((s) => `${s.weight_kg ?? "—"}×${s.reps_completed ?? "—"}`)
                 .join(", ");
               const firstId = forRound[0]?.id ?? "";
+              const rpeForRound = forRound[0]?.rpe ?? null;
               return (
                 <li
                   key={`round-${roundNum}`}
-                  className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                  className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
                   style={{ background: "var(--fc-surface-elevated)" }}
                 >
-                  <span className="text-sm fc-text-primary">
-                    Round {roundNum}: {label}
-                  </span>
-                  <div className="relative flex items-center">
-                    <button
-                      type="button"
-                      className="p-1.5 rounded-md hover:bg-black/10"
-                      onClick={() =>
-                        setMenuOpenSetId(
-                          menuOpenSetId === firstId ? null : firstId,
-                        )
-                      }
-                      aria-label="Options"
-                    >
-                      <MoreVertical className="w-4 h-4 fc-text-dim" />
-                    </button>
-                    {menuOpenSetId === firstId && (
-                      <div
-                        className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
-                        style={{
-                          background: "var(--fc-surface-elevated)",
-                          border: "1px solid var(--fc-surface-card-border)",
-                        }}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm fc-text-primary">
+                      Round {roundNum}: {label}
+                    </span>
+                    <div className="relative flex items-center">
+                      <button
+                        type="button"
+                        className="p-1.5 rounded-md hover:bg-black/10"
+                        onClick={() =>
+                          setMenuOpenSetId(
+                            menuOpenSetId === firstId ? null : firstId,
+                          )
+                        }
+                        aria-label="Options"
                       >
-                        <button
-                          type="button"
-                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
-                          onClick={() => handleEditSet(forRound[0])}
+                        <MoreVertical className="w-4 h-4 fc-text-dim" />
+                      </button>
+                      {menuOpenSetId === firstId && (
+                        <div
+                          className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
+                          style={{
+                            background: "var(--fc-surface-elevated)",
+                            border: "1px solid var(--fc-surface-card-border)",
+                          }}
                         >
-                          <Pencil className="w-4 h-4" /> Edit
-                        </button>
-                      </div>
-                    )}
+                          <button
+                            type="button"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
+                            onClick={() => handleEditSet(forRound[0])}
+                          >
+                            <Pencil className="w-4 h-4" /> Edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  <InlineRPERow
+                    setLogId={firstId.startsWith("temp-") ? null : firstId}
+                    currentRPE={rpeForRound}
+                    onRPESelect={async (rpe) => {
+                      // Update RPE for the first entry in the round (represents the round)
+                      const updatedEntry: LoggedSet = {
+                        ...forRound[0]!,
+                        rpe,
+                      };
+                      onSetLogUpsert?.(block.block.id, updatedEntry, {
+                        replaceId: forRound[0]!.id,
+                      });
+
+                      // If set is synced, update via API
+                      if (!firstId.startsWith("temp-")) {
+                        try {
+                          const res = await fetch(`/api/sets/${firstId}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ rpe }),
+                            credentials: "include",
+                          });
+                          if (!res.ok) {
+                            console.error("Failed to update RPE:", await res.text());
+                            const revertedEntry: LoggedSet = {
+                              ...forRound[0]!,
+                              rpe: forRound[0]!.rpe ?? undefined,
+                            };
+                            onSetLogUpsert?.(block.block.id, revertedEntry, {
+                              replaceId: forRound[0]!.id,
+                            });
+                          }
+                        } catch (err) {
+                          console.error("Error updating RPE:", err);
+                          const revertedEntry: LoggedSet = {
+                            ...forRound[0]!,
+                            rpe: forRound[0]!.rpe ?? undefined,
+                          };
+                          onSetLogUpsert?.(block.block.id, revertedEntry, {
+                            replaceId: forRound[0]!.id,
+                          });
+                        }
+                      }
+                    }}
+                    isLatestSet={isLatestRound}
+                  />
                 </li>
               );
             })}
@@ -712,6 +788,29 @@ export function GiantSetExecutor({
               onAlternativesClick={onAlternativesClick}
             />
           </div>
+          {exercise.exercise_id && (
+            <ProgressionNudge
+              suggestion={progressionSuggestionsMap?.get(exercise.exercise_id)}
+              previousPerformance={previousPerformanceMap?.get(exercise.exercise_id) ?? null}
+              onApplySuggestion={(w, r) => {
+                if (w != null) {
+                  setWeightsPristine((prev) => {
+                    const next = [...(prev.length ? prev : new Array(exercises.length).fill(true))];
+                    next[idx] = false;
+                    return next;
+                  });
+                  const newWeights = [...weights];
+                  newWeights[idx] = String(w);
+                  setWeights(newWeights);
+                }
+                if (r != null) {
+                  const newReps = [...reps];
+                  newReps[idx] = String(r);
+                  setReps(newReps);
+                }
+              }}
+            />
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <LargeInput
@@ -888,6 +987,7 @@ export function GiantSetExecutor({
         calculateSuggestedWeight,
         onVideoClick,
         onAlternativesClick,
+        onPlateCalculatorClick,
         onRestTimerClick,
       }}
       exerciseName={`Giant Set: ${exercises.length} Exercises`}

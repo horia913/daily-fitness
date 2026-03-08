@@ -119,8 +119,8 @@ export const getCachedTemplate = (templateId: string) =>
         .from('workout_templates')
         .select(`
           id, name, description, estimated_duration, difficulty_level, category,
-          workout_blocks (
-            id, block_type, block_name, block_order, total_sets
+          workout_set_entries (
+            id, set_type, set_name, set_order, total_sets
           )
         `)
         .eq('id', templateId)

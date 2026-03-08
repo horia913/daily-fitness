@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -10,6 +10,10 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Camera, Loader2, ShieldAlert, Utensils } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/toast-provider";
+import { getNutritionComplianceTrend } from "@/lib/nutritionLogService";
+import { NutritionComplianceChart } from "@/components/progress/NutritionComplianceChart";
+import type { NutritionComplianceDay } from "@/lib/nutritionLogService";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -76,12 +80,15 @@ function formatNumber(value: number, digits = 0) {
 export default function NutritionPage() {
   const { user } = useAuth();
   const { performanceSettings } = useTheme();
+  const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [uploadingMealId, setUploadingMealId] = useState<string | null>(null);
   const [assignment, setAssignment] = useState<MealPlanAssignment | null>(null);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [complianceTrend, setComplianceTrend] = useState<NutritionComplianceDay[]>([]);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const dailyTotals = useMemo(() => {
     return meals.reduce(
@@ -97,9 +104,8 @@ export default function NutritionPage() {
 
   const loggedMeals = meals.filter((meal) => meal.completion).length;
 
-  useEffect(() => {
-    const loadNutrition = async () => {
-      if (!user?.id) return;
+  const loadNutrition = async () => {
+    if (!user?.id) return;
       setLoading(true);
       setErrorMessage(null);
 
@@ -225,10 +231,43 @@ export default function NutritionPage() {
       } finally {
         setLoading(false);
       }
-    };
+  };
 
-    loadNutrition();
-  }, [user]);
+  useEffect(() => {
+    if (!user?.id) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setLoading(false);
+      setErrorMessage("Loading took too long. Tap Retry to try again.");
+    }, 20_000);
+    loadNutrition().finally(() => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 90);
+    getNutritionComplianceTrend(
+      user.id,
+      start.toISOString().split("T")[0],
+      end.toISOString().split("T")[0]
+    )
+      .then(setComplianceTrend)
+      .catch(() => setComplianceTrend([]));
+  }, [user?.id]);
 
   const handleUpload = async (mealId: string) => {
     if (!user?.id) return;
@@ -298,12 +337,20 @@ export default function NutritionPage() {
           if (insertError) throw insertError;
         }
 
-        // Reload data
         setUploadingMealId(null);
-        window.location.reload();
+        await loadNutrition();
+        addToast({
+          title: "Photo uploaded",
+          description: "Meal logged successfully.",
+          variant: "success",
+        });
       } catch (err: any) {
         console.error("Error uploading meal photo:", err);
-        alert("Failed to upload photo. Please try again.");
+        addToast({
+          title: "Upload failed",
+          description: "Failed to upload photo. Please try again.",
+          variant: "destructive",
+        });
         setUploadingMealId(null);
       }
     };
@@ -510,7 +557,7 @@ export default function NutritionPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
               <div className="animate-pulse space-y-3">
                 <div className="h-6 rounded bg-[color:var(--fc-glass-highlight)] w-1/3" />
@@ -528,7 +575,7 @@ export default function NutritionPage() {
     <ProtectedRoute>
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10 space-y-6">
           <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -556,6 +603,12 @@ export default function NutritionPage() {
               )}
             </div>
           </div>
+
+          <NutritionComplianceChart
+            data={complianceTrend}
+            defaultTimeRange="2W"
+            className="w-full"
+          />
 
           {renderDailySummary()}
 

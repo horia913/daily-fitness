@@ -11,8 +11,11 @@ import {
   Check,
   X,
   Package,
-  Edit
+  Edit,
+  Image
 } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { useToast } from '@/components/ui/toast-provider'
 
 interface ClipcardType {
   id: string
@@ -42,6 +45,7 @@ interface ClientClipcards {
 }
 
 export default function ClientClipcards({ clientId, clientName }: ClientClipcards) {
+  const { addToast } = useToast()
   const [clipcards, setClipcards] = useState<Clipcard[]>([])
   const [clipcardTypes, setClipcardTypes] = useState<ClipcardType[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,7 +131,7 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
         (type) => type.id === newClipcard.clipcard_type_id
       )
       if (!selectedType) {
-        alert('Please select a clipcard type.')
+        addToast({ title: "Please select a clipcard type.", variant: "default" })
         return
       }
 
@@ -149,7 +153,7 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
 
       if (error) throw error
 
-      alert('Clipcard created successfully!')
+      addToast({ title: "Clipcard created successfully", variant: "success" })
       setShowCreateModal(false)
       setNewClipcard({
         clipcard_type_id: clipcardTypes[0]?.id || '',
@@ -158,7 +162,7 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
       loadClipcards()
     } catch (error: any) {
       console.error('Error creating clipcard:', error)
-      alert(`Failed to create clipcard: ${error.message}`)
+      addToast({ title: "Couldn't create clipcard. Please try again.", variant: "destructive" })
     } finally {
       setCreating(false)
     }
@@ -175,6 +179,7 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
       loadClipcards()
     } catch (error) {
       console.error('Error updating clipcard:', error)
+      addToast({ title: "Couldn't update clipcard. Please try again.", variant: "destructive" })
     }
   }
 
@@ -205,6 +210,7 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
       setEditingClipcard(null)
     } catch (error) {
       console.error('Error updating clipcard:', error)
+      addToast({ title: "Couldn't save clipcard changes. Please try again.", variant: "destructive" })
     } finally {
       setEditing(false)
     }
@@ -297,7 +303,7 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
           </div>
           <Button
             onClick={() => setShowCreateModal(true)}
-            className="fc-btn fc-btn-primary fc-press"
+            variant="fc-primary"
           >
             <Plus className="w-5 h-5 mr-2" />
             Create ClipCard
@@ -321,24 +327,13 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
 
       {/* Clipcards List */}
       {clipcards.length === 0 ? (
-        <div className="fc-glass-soft border border-dashed border-[color:var(--fc-glass-border)] rounded-2xl text-center px-6 py-12">
-          <div className="mx-auto mb-4 fc-icon-tile fc-icon-workouts w-16 h-16">
-            <CreditCard className="w-8 h-8" />
-          </div>
-          <h3 className="text-xl font-bold fc-text-primary mb-2">
-            No ClipCards Yet
-          </h3>
-          <p className="text-sm fc-text-dim mb-6">
-            Create a clipcard to allow this client to book sessions
-          </p>
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            className="fc-btn fc-btn-primary fc-press"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Create First ClipCard
-          </Button>
-        </div>
+        <EmptyState
+          icon={Image}
+          title="No clipcards yet"
+          description="Clipcards will appear here once added."
+          actionLabel="Create clipcard"
+          onAction={() => setShowCreateModal(true)}
+        />
       ) : (
         <div className="grid gap-4">
           {clipcards.map((clipcard) => (
@@ -408,16 +403,14 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
                 <div className="flex gap-2 flex-shrink-0">
                   <Button
                     onClick={() => handleEditClick(clipcard)}
-                    variant="outline"
-                    className="fc-btn fc-btn-secondary fc-press"
+                    variant="fc-secondary"
                   >
                     <Edit className="w-4 h-4 mr-2" />
                     Edit
                   </Button>
                   <Button
                     onClick={() => toggleClipcardStatus(clipcard.id, clipcard.is_active)}
-                    variant="outline"
-                    className="fc-btn fc-btn-secondary fc-press"
+                    variant="fc-secondary"
                   >
                     {clipcard.is_active ? (
                       <>
@@ -541,14 +534,13 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
                 <Button
                   onClick={createClipcard}
                   disabled={creating || !selectedNewType}
-                  className="flex-1 fc-btn fc-btn-primary fc-press"
+                  variant="fc-primary"
                 >
                   {creating ? 'Creating...' : 'Create ClipCard'}
                 </Button>
                 <Button
                   onClick={() => setShowCreateModal(false)}
-                  variant="outline"
-                  className="fc-btn fc-btn-secondary fc-press"
+                  variant="fc-secondary"
                 >
                   Cancel
                 </Button>
@@ -560,7 +552,7 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
 
       {/* Edit Clipcard Modal - Fixed */}
       {showEditModal && editingClipcard && (
-        <div className="fixed inset-0 z-[10000] flex items-start justify-center pt-6 px-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
           <div className="fc-modal fc-card w-full max-w-3xl overflow-hidden">
             <div className="p-6 border-b border-[color:var(--fc-glass-border)]">
               <div className="flex items-center gap-3">
@@ -737,7 +729,7 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
                 <Button
                   onClick={editClipcard}
                   disabled={editing}
-                  className="flex-1 fc-btn fc-btn-primary fc-press"
+                  variant="fc-primary"
                 >
                   {editing ? 'Updating...' : 'Update ClipCard'}
                 </Button>
@@ -746,8 +738,7 @@ export default function ClientClipcards({ clientId, clientName }: ClientClipcard
                     setShowEditModal(false)
                     setEditingClipcard(null)
                   }}
-                  variant="outline"
-                  className="fc-btn fc-btn-secondary fc-press"
+                  variant="fc-secondary"
                 >
                   Cancel
                 </Button>

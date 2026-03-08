@@ -59,7 +59,7 @@ export default function AnalyticsChart({
     switch (trend) {
       case 'up': return <TrendingUp className="w-3 h-3 text-green-600" />
       case 'down': return <TrendingDown className="w-3 h-3 text-red-600" />
-      default: return <Activity className="w-3 h-3 text-slate-400" />
+      default: return <Activity className="w-3 h-3 fc-text-subtle" />
     }
   }
 
@@ -119,7 +119,7 @@ export default function AnalyticsChart({
         </svg>
         
         {/* X-axis labels */}
-        <div className="flex justify-between mt-2 text-xs text-slate-500">
+        <div className="flex justify-between mt-2 text-xs fc-text-subtle">
           {data.map((point, index) => (
             <span key={index} className="text-center">
               {point.label}
@@ -151,7 +151,7 @@ export default function AnalyticsChart({
                     </div>
                   </div>
                 </div>
-                <div className="text-xs text-slate-500 mt-2 text-center">
+                <div className="text-xs fc-text-subtle mt-2 text-center">
                   {point.label}
                 </div>
               </div>
@@ -317,7 +317,7 @@ export default function AnalyticsChart({
         {/* Chart Controls */}
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-slate-400" />
+            <Filter className="w-4 h-4 fc-text-subtle" />
             <span className={`text-sm ${theme.textSecondary}`}>Interactive Chart</span>
           </div>
           <div className="flex items-center gap-2">

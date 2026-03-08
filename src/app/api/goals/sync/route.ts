@@ -1,3 +1,8 @@
+// WARNING: No frontend caller found as of Feb 2026. Goals are synced via scheduledJobs
+// (goalSyncService) and direct lib usage. This route may be unused.
+// If confirmed unused, it should be removed. Do not delete without verifying
+// that no external service or cron calls this endpoint.
+
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAllClientGoals } from '@/lib/goalSyncService'
 import { createErrorResponse, handleApiError, createSuccessResponse } from '@/lib/apiErrorHandler'

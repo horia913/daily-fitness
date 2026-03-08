@@ -1,21 +1,22 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTheme } from '@/contexts/ThemeContext'
-import { 
-  BarChart3, 
-  Users, 
-  TrendingUp, 
+import {
+  BarChart3,
+  Users,
+  TrendingUp,
   TrendingDown,
   Target,
   Calendar,
   Award,
   AlertCircle,
+  AlertTriangle,
   CheckCircle,
   Clock,
   Dumbbell,
@@ -23,44 +24,23 @@ import {
   Zap,
   Heart,
   Activity,
-  MessageSquare,
-  ArrowLeft,
-  ArrowRight,
-  Filter,
+  LineChart,
+  PieChart,
   Download,
   RefreshCw,
-  Star,
-  Flame,
-  Shield,
-  Sparkles,
-  Eye,
-  Settings,
-  PieChart,
-  LineChart,
-  FileText,
-  Share2,
-  Printer,
-  Maximize2,
   Minimize2,
-  UserPlus,
-  UserMinus,
-  Percent,
-  Timer,
-  BookOpen,
-  Brain,
-  Lightbulb,
-  ThumbsUp,
-  ThumbsDown,
-  AlertTriangle,
-  Info,
-  ChevronUp,
-  ChevronDown,
-  ArrowUpRight,
-  ArrowDownRight,
-  Minus
+  Maximize2,
+  ArrowLeft,
 } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  Dumbbell,
+  Apple,
+  Heart,
+  Target,
+}
 
 interface ClientCompliance {
   id: string
@@ -145,6 +125,8 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
   const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set())
   const [topClients, setTopClients] = useState<ClientCompliance[]>([])
   const [bottomClients, setBottomClients] = useState<ClientCompliance[]>([])
+  const loadingRef = useRef(false)
+  const didLoadRef = useRef(false)
 
   // Initialize with empty data
   const [analyticsData, setAnalyticsData] = useState<AnalyticsOverviewData>({
@@ -180,165 +162,72 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
     insights: []
   })
 
-  useEffect(() => {
-    if (coachId) {
-      loadAnalyticsData()
+  const loadData = useCallback(async (signal?: AbortSignal) => {
+    if (!coachId) return
+    if (didLoadRef.current) return
+    if (loadingRef.current) return
+    didLoadRef.current = true
+    loadingRef.current = true
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/coach/analytics/overview?period=${selectedPeriod}`, { signal: signal ?? null })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error ?? `HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      const breakdown = (data.complianceBreakdown || []).map((item: { category: string; percentage: number; color: string; icon: string }) => ({
+        ...item,
+        icon: iconMap[item.icon] || Dumbbell,
+      }))
+      setTopClients(data.topClients || [])
+      setBottomClients(data.bottomClients || [])
+      setAnalyticsData({
+        totalClients: data.totalClients ?? 0,
+        activeClients: data.activeClients ?? 0,
+        newClientsThisPeriod: data.newClientsThisPeriod ?? 0,
+        clientRetentionRate: data.clientRetentionRate ?? 0,
+        overallComplianceRate: data.overallComplianceRate ?? 0,
+        avgSessionTime: data.avgSessionTime ?? 0,
+        sessionsPerWeek: data.sessionsPerWeek ?? 0,
+        goalsAchieved: data.goalsAchieved ?? 0,
+        totalGoals: data.totalGoals ?? 0,
+        successRate: data.successRate ?? 0,
+        totalWorkouts: data.totalWorkouts ?? 0,
+        totalMeals: data.totalMeals ?? 0,
+        totalHabits: data.totalHabits ?? 0,
+        personalBests: data.personalBests ?? 0,
+        clientGrowthTrend: data.clientGrowthTrend ?? 'stable',
+        complianceTrend: data.complianceTrend ?? 'stable',
+        engagementTrend: data.engagementTrend ?? 'stable',
+        clientGrowthData: data.clientGrowthData ?? [],
+        complianceBreakdown: breakdown,
+        programEffectiveness: data.programEffectiveness ?? [],
+        insights: data.insights ?? [],
+      })
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        didLoadRef.current = false
+        return
+      }
+      console.error('Error loading analytics data:', err)
+      didLoadRef.current = false
+    } finally {
+      setLoading(false)
+      loadingRef.current = false
     }
   }, [coachId, selectedPeriod])
 
-  const loadAnalyticsData = async () => {
+  useEffect(() => {
     if (!coachId) return
-    try {
-      setLoading(true)
-      const {
-        getCoachClientIds,
-        getTotalWorkouts,
-        getTotalMeals,
-        getHabitCompletionsCount,
-        getPersonalRecordsCount,
-        getSuccessRate,
-        getAvgSessionTime,
-        getSessionsPerWeek,
-        getNewClientsInPeriod,
-        getPeriodBounds
-      } = await import('@/lib/metrics')
-
-      let period: { start: string; end: string; weeksInPeriod: number }
-      if (selectedPeriod === '7d') {
-        period = getPeriodBounds('last_7_days')
-      } else if (selectedPeriod === '30d') {
-        period = getPeriodBounds('this_month')
-      } else if (selectedPeriod === '90d') {
-        const end = new Date()
-        const start = new Date(end)
-        start.setUTCDate(start.getUTCDate() - 90)
-        period = { start: start.toISOString(), end: end.toISOString(), weeksInPeriod: 90 / 7 }
-      } else {
-        const end = new Date()
-        const start = new Date(end)
-        start.setUTCFullYear(start.getUTCFullYear() - 1)
-        period = { start: start.toISOString(), end: end.toISOString(), weeksInPeriod: 52 }
-      }
-
-      const clientIds = await getCoachClientIds(coachId, false)
-      if (clientIds.length === 0) {
-        setAnalyticsData(prev => ({ ...prev, totalClients: 0, activeClients: 0 }))
-        setLoading(false)
-        return
-      }
-
-      const { data: clients, error: clientsError } = await supabase
-        .from('clients')
-        .select('id, client_id, status, created_at')
-        .eq('coach_id', coachId)
-        .in('client_id', clientIds)
-      if (clientsError) throw clientsError
-
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, avatar_url')
-        .in('id', clientIds)
-
-      const clientsWithProfiles = (clients || []).map(client => ({
-        ...client,
-        profile: profiles?.find(p => p.id === client.client_id)
-      }))
-      const totalClients = clientsWithProfiles.length
-      const activeClients = clientsWithProfiles.filter(c => c.status === 'active').length
-
-      const [
-        totalWorkouts,
-        totalMeals,
-        totalHabits,
-        personalBests,
-        successRate,
-        avgSessionTime,
-        sessionsPerWeek,
-        newClientsThisPeriod,
-        workoutLogsData,
-        assignedData
-      ] = await Promise.all([
-        getTotalWorkouts(clientIds, period),
-        getTotalMeals(clientIds, period),
-        getHabitCompletionsCount(clientIds, period),
-        getPersonalRecordsCount(clientIds, period),
-        getSuccessRate(clientIds, period),
-        getAvgSessionTime(clientIds, period),
-        getSessionsPerWeek(clientIds, period),
-        getNewClientsInPeriod(coachId, period),
-        supabase.from('workout_logs').select('client_id').in('client_id', clientIds).not('completed_at', 'is', null).gte('completed_at', period.start).lt('completed_at', period.end),
-        supabase.from('workout_assignments').select('client_id, scheduled_date, assigned_date').in('client_id', clientIds)
-      ])
-
-      const periodStart = period.start.slice(0, 10)
-      const periodEnd = period.end.slice(0, 10)
-      const completedByClient: Record<string, number> = {}
-      clientIds.forEach(id => (completedByClient[id] = 0))
-      ;(workoutLogsData.data || []).forEach((r: { client_id: string }) => { completedByClient[r.client_id] = (completedByClient[r.client_id] || 0) + 1 })
-      const assignedByClient: Record<string, number> = {}
-      clientIds.forEach(id => (assignedByClient[id] = 0))
-      ;(assignedData.data || []).forEach((r: { client_id: string; scheduled_date?: string; assigned_date?: string }) => {
-        const d = (r.scheduled_date || r.assigned_date) ?? ''
-        if (d >= periodStart && d < periodEnd) assignedByClient[r.client_id] = (assignedByClient[r.client_id] || 0) + 1
-      })
-
-      const clientComplianceData: ClientCompliance[] = clientsWithProfiles.map(client => {
-        const completed = completedByClient[client.client_id] || 0
-        const assigned = assignedByClient[client.client_id] || 0
-        const compliance = assigned > 0 ? Math.round((completed / assigned) * 100) : 0
-        const firstName = client.profile?.first_name || 'Unknown'
-        const lastName = client.profile?.last_name || ''
-        const fullName = `${firstName} ${lastName}`.trim() || 'Unknown'
-        return {
-          id: client.id,
-          name: fullName,
-          avatar_url: client.profile?.avatar_url,
-          compliance
-        }
-      })
-
-      const sortedByCompliance = [...clientComplianceData].sort((a, b) => b.compliance - a.compliance)
-      setTopClients(sortedByCompliance.slice(0, 5))
-      setBottomClients(sortedByCompliance.slice(-5).reverse())
-
-      const avgCompliance = clientComplianceData.length > 0
-        ? Math.round(clientComplianceData.reduce((sum, c) => sum + c.compliance, 0) / clientComplianceData.length)
-        : 0
-
-      setAnalyticsData({
-        totalClients,
-        activeClients,
-        newClientsThisPeriod,
-        clientRetentionRate: totalClients > 0 ? Math.round((activeClients / totalClients) * 100) : 0,
-        overallComplianceRate: avgCompliance,
-        avgSessionTime,
-        sessionsPerWeek,
-        goalsAchieved: successRate.achieved,
-        totalGoals: successRate.total,
-        successRate: successRate.ratePercent,
-        totalWorkouts,
-        totalMeals,
-        totalHabits,
-        personalBests,
-        clientGrowthTrend: newClientsThisPeriod > 0 ? 'up' : 'stable',
-        complianceTrend: 'stable',
-        engagementTrend: sessionsPerWeek > 0 ? 'up' : 'stable',
-        clientGrowthData: [],
-        complianceBreakdown: [
-          { category: 'Workouts', percentage: avgCompliance, color: 'bg-[color:var(--fc-domain-workouts)]', icon: Dumbbell },
-          { category: 'Nutrition', percentage: 0, color: 'bg-[color:var(--fc-domain-meals)]', icon: Apple },
-          { category: 'Habits', percentage: 0, color: 'bg-[color:var(--fc-domain-habits)]', icon: Heart },
-          { category: 'Goals', percentage: successRate.ratePercent, color: 'bg-[color:var(--fc-status-warning)]', icon: Target }
-        ],
-        programEffectiveness: [],
-        insights: []
-      })
-    } catch (error) {
-      console.error('Error loading analytics data:', error)
-    } finally {
-      setLoading(false)
+    const ac = new AbortController()
+    loadData(ac.signal)
+    return () => {
+      didLoadRef.current = false
+      loadingRef.current = false
+      ac.abort()
     }
-  }
+  }, [coachId, selectedPeriod, loadData])
 
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
@@ -385,9 +274,9 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
       <div className={`min-h-screen ${theme.background}`}>
         <div className="animate-pulse">
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
-          <div className="p-6 space-y-6">
-            <div className="max-w-7xl mx-auto space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-6">
+          <div className="p-3 sm:p-6 space-y-3 sm:space-y-6">
+            <div className="max-w-7xl mx-auto space-y-3 sm:space-y-6">
+              <div className="fc-glass fc-card rounded-2xl p-3 sm:p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -403,9 +292,10 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
   }
 
   return (
-    <div className={`min-h-screen ${theme.background}`}>
-      {/* Enhanced Header */}
-      <div className={`p-4 sm:p-6 ${theme.background} relative overflow-hidden`}>
+    <div className={`min-h-screen flex flex-col gap-0 sm:gap-6 ${theme.background}`}>
+      {/* Enhanced Header - hidden on mobile to save vertical space */}
+      <div className="hidden sm:block shrink-0">
+      <div className={`p-2 sm:p-6 ${theme.background} relative overflow-hidden max-w-full overflow-x-hidden`}>
         {/* Floating background elements */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent-cyan)]/10 rounded-full blur-3xl"></div>
@@ -415,7 +305,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
 
         <div className="max-w-7xl mx-auto relative z-10">
           <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
-            <CardContent className="p-5 sm:p-6 space-y-6">
+            <CardContent className="p-3 sm:p-6 space-y-3 sm:space-y-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-start gap-3 sm:gap-4">
                   <Button
@@ -427,7 +317,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
                   </Button>
                   <div className="space-y-2">
                     <Badge className="fc-badge">Business Intelligence</Badge>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       Analytics Overview 📊
                     </h1>
                     <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)]">
@@ -439,7 +329,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
                 <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
                   <Button
                     variant="outline"
-                    onClick={() => loadAnalyticsData()}
+                    onClick={() => { didLoadRef.current = false; loadData(); }}
                     className="fc-btn fc-btn-ghost flex items-center gap-2"
                     size="sm"
                   >
@@ -478,15 +368,16 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
           </Card>
         </div>
       </div>
+      </div>
 
-      {/* Main Content */}
-      <div className="p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+      {/* Main Content - no top spacing on mobile when hero is hidden */}
+      <div className="p-2 sm:p-6 max-w-full pt-0 sm:pt-6 min-w-0">
+        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-8">
           {/* Key Performance Indicators */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
             {/* Total Clients */}
             <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
                     <Users className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
@@ -507,7 +398,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
 
             {/* Active Clients */}
             <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
                     <CheckCircle className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-status-success)]" />
@@ -527,7 +418,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
 
             {/* Overall Compliance */}
             <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
                     <Target className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-accent-purple)]" />
@@ -548,7 +439,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
 
             {/* Total Workouts */}
             <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
                     <Dumbbell className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-workouts)]" />
@@ -568,7 +459,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
 
             {/* Total Meals */}
             <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
                     <Apple className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-domain-meals)]" />
@@ -588,7 +479,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
 
             {/* Personal Bests */}
             <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 hover:scale-105">
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="p-2 sm:p-4 md:p-6">
                 <div className="flex items-center gap-2 sm:gap-4">
                   <div className="p-2 sm:p-3 bg-[color:var(--fc-glass-soft)] rounded-xl">
                     <Award className="w-4 h-4 sm:w-6 sm:h-6 text-[color:var(--fc-status-warning)]" />
@@ -608,14 +499,14 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
           </div>
 
           {/* Charts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
             {/* Client Growth Chart */}
             <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                      <LineChart className="w-5 h-5 text-[color:var(--fc-accent-cyan)]" />
+              <CardHeader className="p-3 sm:p-6 pb-2">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg min-w-0">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                      <LineChart className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-cyan)]" />
                     </div>
                     Client Growth Trend
                   </CardTitle>
@@ -629,10 +520,10 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="p-3 sm:p-6 pt-2">
+                <div className="space-y-3 sm:space-y-4">
                   {analyticsData.clientGrowthData.map((data, index) => (
-                    <div key={index} className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
+                    <div key={index} className="fc-glass rounded-xl p-2 sm:p-4 border border-[color:var(--fc-glass-border)]">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-[color:var(--fc-text-primary)]">{data.period}</span>
                         <div className="flex items-center gap-2">
@@ -660,11 +551,11 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
 
             {/* Compliance Breakdown */}
             <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                      <PieChart className="w-5 h-5 text-[color:var(--fc-accent-purple)]" />
+              <CardHeader className="p-3 sm:p-6 pb-2">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg min-w-0">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                      <PieChart className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-purple)]" />
                     </div>
                     Compliance Breakdown
                   </CardTitle>
@@ -678,12 +569,12 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="p-3 sm:p-6 pt-2">
+                <div className="space-y-3 sm:space-y-4">
                   {analyticsData.complianceBreakdown.map((item, index) => {
                     const Icon = item.icon
                     return (
-                      <div key={index} className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
+                      <div key={index} className="fc-glass rounded-xl p-2 sm:p-4 border border-[color:var(--fc-glass-border)]">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
@@ -709,18 +600,18 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
 
           {/* Program Effectiveness */}
           <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                  <BarChart3 className="w-5 h-5 text-[color:var(--fc-status-warning)]" />
+            <CardHeader className="p-3 sm:p-6 pb-2">
+              <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
+                <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                  <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-warning)]" />
                 </div>
                 Program Effectiveness
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <CardContent className="p-3 sm:p-6 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {analyticsData.programEffectiveness.map((program, index) => (
-                  <div key={index} className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)] hover:shadow-md transition-all duration-300">
+                  <div key={index} className="fc-glass rounded-xl p-2 sm:p-4 border border-[color:var(--fc-glass-border)] hover:shadow-md transition-all duration-300">
                     <div className="mb-3">
                       <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-1">{program.programName}</h4>
                       <p className="text-xs text-[color:var(--fc-text-dim)]">{program.clientCount} clients</p>
@@ -761,46 +652,46 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
 
           {/* Engagement Metrics */}
           <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                  <Activity className="w-5 h-5 text-[color:var(--fc-domain-meals)]" />
+            <CardHeader className="p-3 sm:p-6 pb-2">
+              <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
+                <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                  <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-meals)]" />
                 </div>
                 Engagement Metrics
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-4 h-4 text-[color:var(--fc-domain-workouts)]" />
-                    <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Avg Session Time</span>
+            <CardContent className="p-3 sm:p-6 pt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+                <div className="fc-glass rounded-xl p-2 sm:p-4 border border-[color:var(--fc-glass-border)]">
+                  <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                    <Clock className="w-4 h-4 text-[color:var(--fc-domain-workouts)] flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium text-[color:var(--fc-text-primary)]">Avg Session Time</span>
                   </div>
-                  <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{analyticsData.avgSessionTime} min</p>
+                  <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{analyticsData.avgSessionTime} min</p>
                 </div>
                 
-                <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="w-4 h-4 text-[color:var(--fc-domain-meals)]" />
-                    <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Sessions/Week</span>
+                <div className="fc-glass rounded-xl p-2 sm:p-4 border border-[color:var(--fc-glass-border)]">
+                  <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                    <Calendar className="w-4 h-4 text-[color:var(--fc-domain-meals)] flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium text-[color:var(--fc-text-primary)]">Sessions/Week</span>
                   </div>
-                  <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{analyticsData.sessionsPerWeek}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{analyticsData.sessionsPerWeek}</p>
                 </div>
                 
-                <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-4 h-4 text-[color:var(--fc-accent-purple)]" />
-                    <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Goals Achieved</span>
+                <div className="fc-glass rounded-xl p-2 sm:p-4 border border-[color:var(--fc-glass-border)]">
+                  <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                    <Target className="w-4 h-4 text-[color:var(--fc-accent-purple)] flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium text-[color:var(--fc-text-primary)]">Goals Achieved</span>
                   </div>
-                  <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{analyticsData.goalsAchieved}/{analyticsData.totalGoals}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{analyticsData.goalsAchieved}/{analyticsData.totalGoals}</p>
                 </div>
                 
-                <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-4 h-4 text-[color:var(--fc-status-warning)]" />
-                    <span className="text-sm font-medium text-[color:var(--fc-text-primary)]">Success Rate</span>
+                <div className="fc-glass rounded-xl p-2 sm:p-4 border border-[color:var(--fc-glass-border)]">
+                  <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                    <TrendingUp className="w-4 h-4 text-[color:var(--fc-status-warning)] flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium text-[color:var(--fc-text-primary)]">Success Rate</span>
                   </div>
-                  <p className="text-2xl font-bold text-[color:var(--fc-text-primary)]">{formatPercentage(analyticsData.successRate)}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">{formatPercentage(analyticsData.successRate)}</p>
                 </div>
               </div>
             </CardContent>
@@ -808,16 +699,16 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
 
           {/* Client Compliance Rankings */}
           <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                  <Target className="w-5 h-5 text-[color:var(--fc-accent-purple)]" />
+            <CardHeader className="p-3 sm:p-6 pb-2">
+              <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
+                <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                  <Target className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-purple)]" />
                 </div>
                 Client Compliance Rankings
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <CardContent className="p-3 sm:p-6 pt-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Top Performers */}
                 <div>
                   <div className="flex items-center gap-2 mb-4">
@@ -827,23 +718,23 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
                   <div className="space-y-3">
                     {topClients.length > 0 ? (
                       topClients.map((client, index) => (
-                        <div key={client.id} className="flex items-center gap-3 p-3 rounded-lg fc-glass border border-[color:var(--fc-glass-border)]">
-                          <div className="flex items-center gap-3 flex-1">
-                            <Badge className="bg-[color:var(--fc-status-success)] text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
+                        <div key={client.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg fc-glass border border-[color:var(--fc-glass-border)]">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                            <Badge className="bg-[color:var(--fc-status-success)] text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
                               {index + 1}
                             </Badge>
                             {client.avatar_url ? (
                               <img
                                 src={client.avatar_url}
                                 alt={client.name}
-                                className="w-10 h-10 rounded-full object-cover"
+                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0"
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-[color:var(--fc-status-success)] text-white flex items-center justify-center font-bold">
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[color:var(--fc-status-success)] text-white flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0">
                                 {client.name.split(' ').map(n => n[0]).join('')}
                               </div>
                             )}
-                            <span className="font-medium text-[color:var(--fc-text-primary)] truncate flex-1">{client.name}</span>
+                            <span className="font-medium text-sm sm:text-base text-[color:var(--fc-text-primary)] truncate min-w-0">{client.name}</span>
                           </div>
                           <Badge className="bg-[color:var(--fc-status-success)] text-white px-3 py-1">
                             {client.compliance}%
@@ -851,7 +742,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
                         </div>
                       ))
                     ) : (
-                      <p className="text-center py-6 text-[color:var(--fc-text-dim)]">No data available</p>
+                      <EmptyState variant="compact" title="No data yet" />
                     )}
                   </div>
                 </div>
@@ -865,23 +756,23 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
                   <div className="space-y-3">
                     {bottomClients.length > 0 ? (
                       bottomClients.map((client, index) => (
-                        <div key={client.id} className="flex items-center gap-3 p-3 rounded-lg fc-glass border border-[color:var(--fc-glass-border)]">
-                          <div className="flex items-center gap-3 flex-1">
-                            <Badge className="bg-[color:var(--fc-status-error)] text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
+                        <div key={client.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg fc-glass border border-[color:var(--fc-glass-border)]">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                            <Badge className="bg-[color:var(--fc-status-error)] text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
                               {bottomClients.length - index}
                             </Badge>
                             {client.avatar_url ? (
                               <img
                                 src={client.avatar_url}
                                 alt={client.name}
-                                className="w-10 h-10 rounded-full object-cover"
+                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0"
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-[color:var(--fc-status-error)] text-white flex items-center justify-center font-bold">
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[color:var(--fc-status-error)] text-white flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0">
                                 {client.name.split(' ').map(n => n[0]).join('')}
                               </div>
                             )}
-                            <span className="font-medium text-[color:var(--fc-text-primary)] truncate flex-1">{client.name}</span>
+                            <span className="font-medium text-sm sm:text-base text-[color:var(--fc-text-primary)] truncate min-w-0">{client.name}</span>
                           </div>
                           <Badge className="bg-[color:var(--fc-status-error)] text-white px-3 py-1">
                             {client.compliance}%
@@ -889,7 +780,7 @@ export default function OptimizedAnalyticsOverview({ coachId }: OptimizedAnalyti
                         </div>
                       ))
                     ) : (
-                      <p className="text-center py-6 text-[color:var(--fc-text-dim)]">No data available</p>
+                      <EmptyState variant="compact" title="No data yet" />
                     )}
                   </div>
                 </div>

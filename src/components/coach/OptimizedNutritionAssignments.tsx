@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { withTimeout } from '@/lib/withTimeout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -78,6 +79,7 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
 
   const [assignments, setAssignments] = useState<MealPlanAssignment[]>([])
   const [loading, setLoading] = useState(true)
+  const loadingRef = useRef(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedClient, setSelectedClient] = useState('all')
@@ -114,13 +116,17 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
   }, [])
 
   const loadAssignments = async () => {
+    if (loadingRef.current) return
+    loadingRef.current = true
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      setLoading(true)
+      await withTimeout(
+        (async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
 
-      try {
-        // Fetch assignments first
-        const { data: assignmentsData, error: assignmentsError } = await supabase
+          try {
+            const { data: assignmentsData, error: assignmentsError } = await supabase
           .from('meal_plan_assignments')
           .select('*')
           .eq('coach_id', user.id)
@@ -193,7 +199,6 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
 
         setAssignments(assignmentsWithCompliance as MealPlanAssignment[])
       } catch (dbError) {
-        console.log('Database not ready, using localStorage fallback')
         const savedAssignments = localStorage.getItem(`nutrition_assignments_${user.id}`)
         if (savedAssignments) {
           setAssignments(JSON.parse(savedAssignments))
@@ -297,10 +302,15 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
           localStorage.setItem(`nutrition_assignments_${user.id}`, JSON.stringify(sampleAssignments))
         }
       }
+        })(),
+        45000,
+        'loadAssignments'
+      )
     } catch (error) {
       console.error('Error loading nutrition assignments:', error)
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
   }
 
@@ -414,14 +424,14 @@ export default function OptimizedNutritionAssignments({ }: OptimizedNutritionAss
                 <div className="flex items-start gap-3 sm:gap-4">
                   <Button
                     variant="ghost"
-                    onClick={() => router.push('/coach')}
+                    onClick={() => router.push('/coach/nutrition')}
                     className="fc-btn fc-btn-ghost h-10 w-10"
                   >
                     <ArrowLeft className="w-5 h-5" />
                   </Button>
                   <div className="space-y-2">
                     <Badge className="fc-badge">Nutrition Assignments</Badge>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       Nutrition Assignments
                     </h1>
                     <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)]">

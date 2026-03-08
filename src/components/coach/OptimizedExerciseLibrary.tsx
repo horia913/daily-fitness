@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTheme } from '@/contexts/ThemeContext'
 import { 
@@ -24,8 +23,6 @@ import {
   RefreshCw,
   Play,
   Star,
-  Clock,
-  Users,
   TrendingUp,
   Grid3X3,
   List,
@@ -36,6 +33,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useToast } from '@/components/ui/toast-provider'
 import ExerciseForm from '@/components/ExerciseForm'
 import ExerciseAlternativesModal from '@/components/coach/ExerciseAlternativesModal'
 import VideoPlayerModal from '@/components/VideoPlayerModal'
@@ -73,12 +71,15 @@ interface OptimizedExerciseLibraryProps {
 
 export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryProps) {
   const { getThemeStyles, performanceSettings } = useTheme()
+  const { addToast } = useToast()
   const router = useRouter()
   const theme = getThemeStyles()
 
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [categories, setCategories] = useState<ExerciseCategory[]>([])
   const [loading, setLoading] = useState(true)
+  const loadingRef = useRef(false)
+  const didLoadRef = useRef(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedDifficulty, setSelectedDifficulty] = useState('all')
@@ -112,6 +113,31 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
     'advanced': 'Advanced'
   }
 
+  /** Difficulty as 1–5 filled dots (beginner=1, intermediate=2–3, advanced=4, athlete=5). */
+  function getDifficultyDotCount(difficulty: string): number {
+    const map: Record<string, number> = {
+      beginner: 1,
+      intermediate: 2,
+      advanced: 4,
+      athlete: 5,
+    }
+    return map[difficulty?.toLowerCase()] ?? 2
+  }
+
+  function DifficultyDots({ difficulty }: { difficulty: string }) {
+    const filled = getDifficultyDotCount(difficulty)
+    return (
+      <div className="flex items-center gap-0.5" title={difficultyLabels[difficulty as keyof typeof difficultyLabels] ?? difficulty}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <span
+            key={i}
+            className={`inline-block w-1.5 h-1.5 rounded-full ${i <= filled ? 'bg-[color:var(--fc-text-primary)]' : 'bg-[color:var(--fc-text-subtle)] opacity-50'}`}
+          />
+        ))}
+      </div>
+    )
+  }
+
   const equipmentOptions = [
     'Bodyweight', 'Dumbbells', 'Barbell', 'Kettlebell', 'Resistance Bands',
     'Cable Machine', 'Smith Machine', 'Bench', 'Pull-up Bar', 'Medicine Ball',
@@ -119,132 +145,45 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
     'Rowing Machine', 'Elliptical', 'Jump Rope'
   ]
 
-  useEffect(() => {
-    loadExercises()
-    loadCategories()
-  }, [])
-
-  const loadExercises = async () => {
+  const loadData = useCallback(async (signal?: AbortSignal) => {
+    if (didLoadRef.current) return
+    if (loadingRef.current) return
+    didLoadRef.current = true
+    loadingRef.current = true
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      let exercisesFromDB: Exercise[] = []
-      let useLocalStorage = false
-
-      try {
-        const { data, error } = await supabase
-          .from('exercises')
-          .select('*')
-          .eq('coach_id', user.id)
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-
-        exercisesFromDB = data || []
-      } catch (dbError) {
-        console.log('Database not ready, using localStorage fallback')
-        useLocalStorage = true
+      setLoading(true)
+      const res = await fetch('/api/coach/exercises', { signal: signal ?? null })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error ?? `HTTP ${res.status}`)
       }
-
-      // Always check localStorage as fallback or merge with DB data
-      const savedExercises = localStorage.getItem(`exercises_${user.id}`)
-      const exercisesFromStorage = savedExercises ? JSON.parse(savedExercises) : []
-
-      if (useLocalStorage) {
-        // Use localStorage if database failed
-        if (exercisesFromStorage.length > 0) {
-          setExercises(exercisesFromStorage)
-        } else {
-          // Initialize with sample exercises if nothing in localStorage
-          const sampleExercises = [
-            {
-              id: '1',
-              name: 'Push-ups',
-              description: 'Classic bodyweight exercise for chest, shoulders, and triceps',
-              category: 'Strength',
-              muscle_groups: ['Chest', 'Shoulders', 'Triceps'],
-              equipment: ['Bodyweight'],
-              difficulty: 'beginner',
-              instructions: ['Start in plank position', 'Lower body to ground', 'Push back up'],
-              tips: ['Keep core tight', 'Full range of motion'],
-              is_public: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              usage_count: 15,
-              rating: 4.5
-            },
-            {
-              id: '2',
-              name: 'Squats',
-              description: 'Fundamental lower body exercise',
-              category: 'Strength',
-              muscle_groups: ['Quadriceps', 'Glutes', 'Hamstrings'],
-              equipment: ['Bodyweight'],
-              difficulty: 'beginner',
-              instructions: ['Stand with feet shoulder-width apart', 'Lower down as if sitting', 'Return to standing'],
-              tips: ['Keep knees behind toes', 'Chest up'],
-              is_public: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              usage_count: 23,
-              rating: 4.8
-            },
-            {
-              id: '3',
-              name: 'Deadlifts',
-              description: 'Compound movement for posterior chain development',
-              category: 'Strength',
-              muscle_groups: ['Hamstrings', 'Glutes', 'Lower Back'],
-              equipment: ['Barbell'],
-              difficulty: 'advanced',
-              instructions: ['Stand with feet hip-width apart', 'Hinge at hips to lower bar', 'Drive hips forward to stand'],
-              tips: ['Keep bar close to body', 'Maintain neutral spine'],
-              is_public: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              usage_count: 8,
-              rating: 4.2
-            }
-          ]
-          setExercises(sampleExercises)
-          localStorage.setItem(`exercises_${user.id}`, JSON.stringify(sampleExercises))
-        }
-      } else {
-        // Database worked - use DB data, but merge with localStorage if DB is empty
-        if (exercisesFromDB.length > 0) {
-          setExercises(exercisesFromDB)
-        } else if (exercisesFromStorage.length > 0) {
-          // DB is empty but localStorage has data - use localStorage
-          setExercises(exercisesFromStorage)
-        } else {
-          setExercises([])
-        }
-      }
-    } catch (error) {
-      console.error('Error loading exercises:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadCategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('exercise_categories')
-        .select('*')
-        .order('name')
-
-      if (error) {
-        console.error('Error loading categories:', error)
+      const { exercises: exList, categories: catList } = await res.json()
+      setExercises(Array.isArray(exList) ? exList : [])
+      setCategories(Array.isArray(catList) ? catList : [])
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        didLoadRef.current = false
         return
       }
-
-      setCategories(data || [])
-    } catch (error) {
-      console.error('Error loading categories:', error)
+      console.error('Error loading exercises:', err)
+      didLoadRef.current = false
+      setExercises([])
+      setCategories([])
+    } finally {
+      setLoading(false)
+      loadingRef.current = false
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    const ac = new AbortController()
+    loadData(ac.signal)
+    return () => {
+      didLoadRef.current = false
+      loadingRef.current = false
+      ac.abort()
+    }
+  }, [loadData])
 
   const filteredAndSortedExercises = exercises
     .filter(exercise => {
@@ -289,19 +228,19 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
         
         // Check if it's a foreign key constraint error
         if (error.code === '23503' || error.message?.includes('foreign key constraint')) {
-          alert('Cannot delete this exercise because it is currently being used in workout templates. Please remove it from all workouts first, or deactivate it instead.')
+          addToast({ title: 'Cannot delete this exercise because it is currently being used in workout templates. Please remove it from all workouts first, or deactivate it instead.', variant: 'destructive' })
           return
         }
         
         // Generic error message
-        alert('Failed to delete exercise. Please try again.')
+        addToast({ title: 'Failed to delete exercise. Please try again.', variant: 'destructive' })
         return
       }
 
       setExercises(exercises.filter(exercise => exercise.id !== exerciseId))
     } catch (error) {
       console.error('Error deleting exercise:', error)
-      alert('An error occurred while deleting the exercise. Please try again.')
+      addToast({ title: 'An error occurred while deleting the exercise. Please try again.', variant: 'destructive' })
     }
   }
 
@@ -351,7 +290,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)] mb-1 sm:mb-2">
+                <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)] mb-1 sm:mb-2">
                   Exercise Library 💪
                 </h1>
                 <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)]">
@@ -363,7 +302,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
             <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
               <Button
                 variant="outline"
-                onClick={loadExercises}
+                onClick={() => { didLoadRef.current = false; loadData(); }}
                 className="fc-btn fc-btn-ghost flex items-center gap-2"
                 size="sm"
               >
@@ -595,34 +534,26 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredAndSortedExercises.map(exercise => {
                 const IconComponent = categoryIcons[exercise.category as keyof typeof categoryIcons] || Dumbbell
-                
+                const primaryMuscle = exercise.muscle_groups?.[0] ?? exercise.category ?? '—'
+                const equipmentStr = (exercise.equipment?.length ? exercise.equipment.slice(0, 2).join(', ') : 'No equipment') + (exercise.equipment?.length > 2 ? '…' : '')
                 return (
-                  <Card 
-                    key={exercise.id} 
+                  <Card
+                    key={exercise.id}
                     className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 group hover:scale-105"
                   >
-                    <CardContent className="p-4 sm:p-5 space-y-3 sm:space-y-4">
-                      {/* Header with Icon and Badges */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <div className="p-2 rounded-xl bg-[color:var(--fc-glass-soft)]">
-                            <IconComponent className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
-                        </div>
-                          <div className="flex flex-col gap-1">
-                            <Badge className={`${difficultyColors[exercise.difficulty as keyof typeof difficultyColors]} border-0 text-xs px-2 py-1 w-fit`}>
-                          {difficultyLabels[exercise.difficulty as keyof typeof difficultyLabels]}
-                        </Badge>
-                            {exercise.is_public ? (
-                              <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-0 text-xs px-2 py-1 w-fit">
-                                Public
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs px-2 py-1 w-fit">
-                                Private
-                              </Badge>
-                            )}
+                    <CardContent className="p-4 sm:p-5 space-y-3">
+                      {/* Image or placeholder */}
+                      <div className="aspect-video rounded-xl bg-[color:var(--fc-glass-highlight)] flex items-center justify-center overflow-hidden">
+                        {exercise.image_url ? (
+                          <img src={exercise.image_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <IconComponent className="w-10 h-10 text-[color:var(--fc-text-subtle)]" />
+                        )}
                       </div>
-                        </div>
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-bold text-[color:var(--fc-text-primary)] text-lg leading-tight line-clamp-2 flex-1 min-w-0">
+                          {exercise.name}
+                        </h3>
                         {exercise.video_url && (
                           <Button
                             variant="outline"
@@ -631,71 +562,19 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                               e.stopPropagation()
                               setVideoPlayerExercise(exercise)
                             }}
-                            className="fc-btn fc-btn-ghost p-2 text-[color:var(--fc-accent-purple)]"
+                            className="fc-btn fc-btn-ghost p-2 text-[color:var(--fc-accent-purple)] shrink-0"
                             title="Watch Video"
                           >
                             <Play className="w-4 h-4" />
                           </Button>
                         )}
-                    </div>
-
-                      {/* Exercise Name and Category */}
-                      <div>
-                        <h3 className="font-bold text-[color:var(--fc-text-primary)] text-lg sm:text-xl mb-2">
-                            {exercise.name}
-                          </h3>
-                          <div className="flex items-center gap-2">
-                          <IconComponent className="w-4 h-4 text-[color:var(--fc-domain-workouts)] flex-shrink-0" />
-                          <span className="text-sm text-[color:var(--fc-text-dim)]">
-                              {exercise.category}
-                            </span>
-                        </div>
                       </div>
-
-                      {/* Description */}
-                      {exercise.description && (
-                        <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] line-clamp-2">
-                          {exercise.description}
-                        </p>
-                      )}
-
-                      {/* Muscle Groups */}
-                      <div className="flex flex-wrap gap-1">
-                        {exercise.muscle_groups?.slice(0, 2).map(group => (
-                          <Badge key={group} variant="outline" className="text-xs px-2 py-1">
-                            {group}
-                          </Badge>
-                        ))}
-                        {exercise.muscle_groups && exercise.muscle_groups.length > 2 && (
-                          <Badge variant="outline" className="text-xs px-2 py-1">
-                            +{exercise.muscle_groups.length - 2}
-                          </Badge>
-                        )}
+                      <p className="text-sm text-[color:var(--fc-text-dim)]">
+                        {primaryMuscle} · {equipmentStr}
+                      </p>
+                      <div className="flex items-center justify-between pt-1">
+                        <DifficultyDots difficulty={exercise.difficulty} />
                       </div>
-
-                      {/* Equipment */}
-                      <div className="text-xs text-[color:var(--fc-text-dim)] truncate">
-                        {exercise.equipment?.join(', ') || 'No equipment'}
-                      </div>
-
-                      {/* Stats */}
-                      <div className="flex items-center justify-between text-xs text-[color:var(--fc-text-subtle)]">
-                        <div className="flex items-center gap-1">
-                          <Users className="w-3 h-3" />
-                          <span>{exercise.usage_count || 0}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Star className="w-3 h-3" />
-                          <span>{exercise.rating || 0}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          <span className="hidden sm:inline">{new Date(exercise.created_at).toLocaleDateString()}</span>
-                          <span className="sm:hidden">{new Date(exercise.created_at).toLocaleDateString().split('/')[0]}</span>
-                        </div>
-                      </div>
-
-                      {/* Quick Actions */}
                       <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[color:var(--fc-glass-border)]">
                         <Button
                           variant="outline"
@@ -743,22 +622,35 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
               })}
             </div>
           ) : (
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-3">
               {filteredAndSortedExercises.map(exercise => {
                 const IconComponent = categoryIcons[exercise.category as keyof typeof categoryIcons] || Dumbbell
-                
+                const primaryMuscle = exercise.muscle_groups?.[0] ?? exercise.category ?? '—'
+                const equipmentStr = (exercise.equipment?.length ? exercise.equipment.slice(0, 2).join(', ') : 'No equipment') + (exercise.equipment?.length > 2 ? '…' : '')
                 return (
-                  <Card 
-                    key={exercise.id} 
-                    className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300 group"
+                  <Card
+                    key={exercise.id}
+                    className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)] transition-all duration-300"
                   >
-                    <CardContent className="p-4 sm:p-6">
-                      <div className="flex items-start gap-3 sm:gap-4">
-                        {/* Icon and Badges */}
-                        <div className="flex flex-col gap-2 items-center">
-                          <div className="p-3 rounded-xl bg-[color:var(--fc-glass-soft)]">
-                            <IconComponent className="w-6 h-6 text-[color:var(--fc-domain-workouts)]" />
-                            </div>
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-[color:var(--fc-glass-highlight)] flex items-center justify-center shrink-0 overflow-hidden">
+                          {exercise.image_url ? (
+                            <img src={exercise.image_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <IconComponent className="w-6 h-6 text-[color:var(--fc-text-subtle)]" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-[color:var(--fc-text-primary)] truncate">
+                            {exercise.name}
+                          </h3>
+                          <p className="text-sm text-[color:var(--fc-text-dim)] truncate">
+                            {primaryMuscle} · {equipmentStr}
+                          </p>
+                        </div>
+                        <DifficultyDots difficulty={exercise.difficulty} />
+                        <div className="flex items-center gap-1 shrink-0">
                           {exercise.video_url && (
                             <Button
                               variant="outline"
@@ -773,60 +665,6 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                               <Play className="w-4 h-4" />
                             </Button>
                           )}
-                        </div>
-
-                        {/* Exercise Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-[color:var(--fc-text-primary)] text-lg sm:text-xl mb-2">
-                                {exercise.name}
-                              </h3>
-                              <div className="flex flex-wrap items-center gap-2 mb-3">
-                                <div className="flex items-center gap-1">
-                                  <IconComponent className="w-4 h-4 text-[color:var(--fc-domain-workouts)]" />
-                                  <span className="text-sm text-[color:var(--fc-text-dim)]">
-                                  {exercise.category}
-                                </span>
-                                </div>
-                                <Badge className={`${difficultyColors[exercise.difficulty as keyof typeof difficultyColors]} border-0 text-xs px-2 py-1`}>
-                                  {difficultyLabels[exercise.difficulty as keyof typeof difficultyLabels]}
-                                </Badge>
-                                {exercise.is_public ? (
-                                  <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-0 text-xs px-2 py-1">
-                                    Public
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs px-2 py-1">
-                                    Private
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {exercise.description && (
-                            <p className="text-sm text-[color:var(--fc-text-dim)] mb-3 line-clamp-2">
-                              {exercise.description}
-                            </p>
-                          )}
-
-                          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-[color:var(--fc-text-subtle)]">
-                            <span className="truncate">Muscles: {(exercise.muscle_groups || []).slice(0, 2).join(', ')}{(exercise.muscle_groups || []).length > 2 ? '...' : ''}</span>
-                            <span className="truncate">Equipment: {(exercise.equipment || []).slice(0, 2).join(', ')}{(exercise.equipment || []).length > 2 ? '...' : ''}</span>
-                            <div className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              <span>{exercise.usage_count || 0}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Star className="w-3 h-3" />
-                              <span>{exercise.rating || 0}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Actions - Mobile Optimized */}
-                        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                           <Button
                             variant="outline"
                             size="sm"
@@ -837,7 +675,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                             }}
                             className="fc-btn fc-btn-ghost p-2"
                           >
-                            <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <Edit className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="outline"
@@ -849,7 +687,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                             className="fc-btn fc-btn-ghost text-[color:var(--fc-status-warning)] p-2"
                             title="Manage Alternatives"
                           >
-                            <Shuffle className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <Shuffle className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="outline"
@@ -861,7 +699,7 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
                             className="fc-btn fc-btn-ghost text-[color:var(--fc-status-error)] p-2"
                             title="Delete Exercise"
                           >
-                            <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
@@ -921,7 +759,8 @@ export default function OptimizedExerciseLibrary({ }: OptimizedExerciseLibraryPr
               setEditingExercise(null)
             }}
             onSuccess={() => {
-              loadExercises()
+              didLoadRef.current = false
+              loadData()
               setShowCreateForm(false)
               setEditingExercise(null)
             }}

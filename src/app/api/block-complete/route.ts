@@ -10,9 +10,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
  * POST /api/block-complete
  *
  * Payload:
- * - workout_log_id (optional): use this log for the block completion record
+ * - workout_log_id (optional): use this log for the set entry completion record
  * - workout_assignment_id (required when workout_log_id is missing): used with auth.uid() to resolve or create today's active workout_log
- * - workout_block_id (required): block that was completed
+ * - workout_set_entry_id (required): set entry that was completed  [workout_block_id accepted as backward-compat alias]
  *
  * When workout_log_id is missing, the API resolves or creates today's active workout_log.
  * Always returns { workout_log_id } so the client can persist it (e.g. timer-only workouts).
@@ -26,24 +26,35 @@ export async function POST(req: NextRequest) {
     }
     const userId = user.id
 
-    const supabaseServiceKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseServiceKey) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not configured')
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 503 })
+    }
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       global: { fetch: getTrackedFetch() },
     })
 
-    let body: { workout_log_id?: string; workout_assignment_id?: string; workout_block_id?: string }
+    let body: { workout_log_id?: string; workout_assignment_id?: string; workout_set_entry_id?: string; workout_block_id?: string }
     try {
       body = await req.json()
     } catch {
       return createErrorResponse('Invalid JSON in request body', undefined, 'PARSE_ERROR', 400)
     }
 
-    const { workout_log_id: providedLogId, workout_assignment_id: assignmentId, workout_block_id: blockId } = body
+    const {
+      workout_log_id: providedLogId,
+      workout_assignment_id: assignmentId,
+      workout_set_entry_id: bodySetEntryId,
+      workout_block_id: bodyBlockId, // backward-compat alias
+    } = body
 
-    if (!blockId) {
+    // Prefer new name, fall back to old name for backward compat
+    const setEntryId = bodySetEntryId ?? bodyBlockId
+
+    if (!setEntryId) {
       return createErrorResponse(
-        'Missing required field: workout_block_id',
+        'Missing required field: workout_set_entry_id',
         undefined,
         'MISSING_FIELD',
         400
@@ -148,18 +159,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Upsert block completion (one row per workout_log + block)
+    // Upsert set entry completion (one row per workout_log + set entry)
     const { error: upsertError } = await supabaseAdmin
-      .from('workout_block_completions')
+      .from('workout_set_entry_completions')
       .upsert(
         {
           workout_log_id: workoutLogId,
-          workout_block_id: blockId,
+          workout_set_entry_id: setEntryId,
           completed_at: new Date().toISOString(),
           completion_type: 'block_complete',
         },
         {
-          onConflict: 'workout_log_id,workout_block_id',
+          onConflict: 'workout_log_id,workout_set_entry_id',
           ignoreDuplicates: false,
         }
       )

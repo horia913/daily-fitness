@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -29,8 +29,8 @@ import { WorkoutBlockService } from "@/lib/workoutBlockService";
 
 interface WorkoutSet {
   id: string;
-  block_id: string;
-  block_type: string;
+  set_entry_id: string;
+  set_type: string;
   exercise_id: string;
   weight: number | null;
   reps: number | null;
@@ -99,10 +99,10 @@ interface WorkoutSet {
 }
 
 interface BlockGroup {
-  block_id: string;
-  block_type: string;
-  block_name?: string;
-  block_order?: number;
+  set_entry_id: string;
+  set_type: string;
+  set_name?: string;
+  set_order?: number;
   sets: WorkoutSet[];
   exercises: Map<
     string,
@@ -160,10 +160,31 @@ export default function WorkoutLogDetailPage() {
     }
   }, [workoutLogId]);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (user && !authLoading && workoutLogId) {
-      loadWorkoutLog();
-    } else if (!authLoading && !user) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        timeoutRef.current = null;
+        setLoading(false);
+        setLoadError("Loading took too long. Tap Retry to try again.");
+      }, 20_000);
+      loadWorkoutLog().finally(() => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      });
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      };
+    }
+    if (!authLoading && !user) {
       setLoading(false);
     }
   }, [user, authLoading, workoutLogId]);
@@ -258,8 +279,8 @@ export default function WorkoutLogDetailPage() {
           `
           id,
           workout_log_id,
-          block_id,
-          block_type,
+          set_entry_id,
+          set_type,
           exercise_id,
           weight,
           reps,
@@ -350,7 +371,7 @@ export default function WorkoutLogDetailPage() {
         });
       }
 
-      // Group sets by block_id and populate exercise names from template
+      // Group sets by set_entry_id and populate exercise names from template
       const blocksMap = new Map<string, BlockGroup>();
 
       // First, create block groups for all blocks in the template (even if no sets)
@@ -380,10 +401,10 @@ export default function WorkoutLogDetailPage() {
         }
 
         blocksMap.set(block.id, {
-          block_id: block.id,
-          block_type: block.block_type || "unknown",
-          block_name: block.block_name || `Block ${block.block_order || ""}`,
-          block_order: block.block_order || 0,
+          set_entry_id: block.id,
+          set_type: block.set_type || "unknown",
+          set_name: block.set_name || `Set ${block.set_order || ""}`,
+          set_order: block.set_order || 0,
           sets: [],
           exercises: new Map(),
           totalSets: 0,
@@ -397,11 +418,11 @@ export default function WorkoutLogDetailPage() {
 
       // Then, add sets to their respective blocks
       sets?.forEach((set: any) => {
-        if (!set.block_id) return;
+        if (!set.set_entry_id) return;
 
-        const blockGroup = blocksMap.get(set.block_id);
+        const blockGroup = blocksMap.get(set.set_entry_id);
         if (!blockGroup) {
-          console.warn("Set found for block not in template:", set.block_id);
+          console.warn("Set found for block not in template:", set.set_entry_id);
           return;
         }
 
@@ -464,7 +485,7 @@ export default function WorkoutLogDetailPage() {
         if (
           set.exercise_id &&
           !["giant_set", "superset", "pre_exhaustion"].includes(
-            blockGroup.block_type
+            blockGroup.set_type
           )
         ) {
           const exerciseName =
@@ -489,7 +510,7 @@ export default function WorkoutLogDetailPage() {
 
         // For giant_set, superset, pre_exhaustion - add exercise names from their specific fields
         if (
-          blockGroup.block_type === "giant_set" &&
+          blockGroup.set_type === "giant_set" &&
           set.giant_set_exercises &&
           Array.isArray(set.giant_set_exercises)
         ) {
@@ -508,9 +529,9 @@ export default function WorkoutLogDetailPage() {
         }
       });
 
-      // Convert to array and sort by block_order - SHOW ALL BLOCKS (even if no sets)
+      // Convert to array and sort by set_order - SHOW ALL SET ENTRIES (even if no sets)
       const blocksArray = Array.from(blocksMap.values()).sort(
-        (a, b) => (a.block_order || 0) - (b.block_order || 0)
+        (a, b) => (a.set_order || 0) - (b.set_order || 0)
       );
 
       // Use totals from workout_log
@@ -543,7 +564,7 @@ export default function WorkoutLogDetailPage() {
 
       // Expand first block by default
       if (blocksArray.length > 0) {
-        setExpandedBlocks(new Set([blocksArray[0].block_id]));
+        setExpandedBlocks(new Set([blocksArray[0].set_entry_id]));
       }
     } catch (error) {
       console.error("Error loading workout log:", error);
@@ -844,7 +865,7 @@ export default function WorkoutLogDetailPage() {
     }
 
     const templateBlock = block.templateBlock;
-    const blockType = templateBlock.block_type;
+    const blockType = templateBlock.set_type;
 
     // For Tabata, show exercises with their time protocol data
     // Use exerciseNames as primary source since it's guaranteed to be populated (header shows it)
@@ -1066,12 +1087,30 @@ export default function WorkoutLogDetailPage() {
     );
   };
 
+  if (loadError) {
+    return (
+      <ProtectedRoute>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-6xl">
+              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+                <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+                <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+              </div>
+            </div>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
+
   if (authLoading || loading) {
     return (
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-6xl">
               <div className="fc-surface p-8">
                 <div className="animate-pulse space-y-4">
@@ -1092,7 +1131,7 @@ export default function WorkoutLogDetailPage() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-6xl">
               <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12">
                 <div className="text-center">
@@ -1241,21 +1280,21 @@ export default function WorkoutLogDetailPage() {
                 <span className="h-px flex-1 bg-[color:var(--fc-glass-border)]" />
               </h3>
               {blockGroups.map((block, blockIndex) => {
-                const isExpanded = expandedBlocks.has(block.block_id);
+                const isExpanded = expandedBlocks.has(block.set_entry_id);
                 const hasSets = block.totalSets > 0;
 
                 const firstExerciseName =
                   block.exerciseNames.size > 0
                     ? Array.from(block.exerciseNames.values())[0]
-                    : formatBlockType(block.block_type);
+                    : formatBlockType(block.set_type);
                 return (
                   <div
-                    key={block.block_id}
+                    key={block.set_entry_id}
                     className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] overflow-visible"
                   >
                     <div
                       className="flex items-center justify-between p-6 cursor-pointer transition-colors hover:bg-[color:var(--fc-glass-soft)]/50 rounded-t-2xl"
-                      onClick={() => toggleBlock(block.block_id)}
+                      onClick={() => toggleBlock(block.set_entry_id)}
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-[color:var(--fc-domain-workouts)]/10 flex items-center justify-center border border-[color:var(--fc-domain-workouts)]/20">
@@ -1266,7 +1305,7 @@ export default function WorkoutLogDetailPage() {
                             {firstExerciseName}
                           </h4>
                           <p className="text-sm fc-text-dim">
-                            {block.totalSets} sets • {formatBlockType(block.block_type)}
+                            {block.totalSets} sets • {formatBlockType(block.set_type)}
                           </p>
                         </div>
                       </div>
@@ -1289,7 +1328,7 @@ export default function WorkoutLogDetailPage() {
                                 "giant_set",
                                 "superset",
                                 "pre_exhaustion",
-                              ].includes(block.block_type) ? (
+                              ].includes(block.set_type) ? (
                                 <div className="space-y-1">
                                   {block.sets
                                     .sort((a, b) => {
@@ -1310,7 +1349,7 @@ export default function WorkoutLogDetailPage() {
                                       >
                                         {renderSetDisplay(
                                           set,
-                                          block.block_type,
+                                          block.set_type,
                                           block.exerciseNames,
                                           block.exerciseLetterMap
                                         )}
@@ -1355,7 +1394,7 @@ export default function WorkoutLogDetailPage() {
                                               >
                                                 {renderSetDisplay(
                                                   set,
-                                                  block.block_type,
+                                                  block.set_type,
                                                   block.exerciseNames
                                                 )}
                                               </div>
@@ -1397,7 +1436,7 @@ export default function WorkoutLogDetailPage() {
                                           >
                                             {renderSetDisplay(
                                               set,
-                                              block.block_type,
+                                              block.set_type,
                                               block.exerciseNames
                                             )}
                                           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -44,9 +44,28 @@ function LeaderboardPageContent() {
   const [showExerciseSearch, setShowExerciseSearch] = useState(false);
   const [exerciseSearchResults, setExerciseSearchResults] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    loadLeaderboardData();
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setLoading(false);
+      setLoadError("Loading took too long. Tap Retry to try again.");
+    }, 20_000);
+    loadLeaderboardData().finally(() => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
   }, [timeWindow, activeExercise, metricType, customExerciseId]);
 
   const loadLeaderboardData = async () => {
@@ -145,7 +164,7 @@ function LeaderboardPageContent() {
 
   function LeaderboardBody() {
     return (
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-8 sm:px-6 lg:px-10 fc-page space-y-8">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-8 sm:px-6 lg:px-10 fc-page space-y-8">
         <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
           <div className="flex items-center gap-4 flex-1 min-w-0">
             <Link href="/client/progress" className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
@@ -332,7 +351,12 @@ function LeaderboardPageContent() {
             </div>
           </div>
 
-          {loading ? (
+          {loadError ? (
+            <div className="text-center py-12">
+              <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+              <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+            </div>
+          ) : loading ? (
             <div className="text-center py-12">
               <div className="animate-spin w-10 h-10 border-4 border-[color:var(--fc-accent-cyan)] border-t-transparent rounded-full mx-auto"></div>
             </div>

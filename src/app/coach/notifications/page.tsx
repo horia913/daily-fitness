@@ -181,14 +181,6 @@ export default function CoachNotifications() {
 
   const handleSendNotification = useCallback(() => {
     // Handle sending notification
-    console.log("Sending notification:", {
-      notificationType,
-      notificationTitle,
-      messageContent,
-      selectedClients,
-      schedule,
-      priority,
-    });
   }, [
     notificationType,
     notificationTitle,
@@ -251,7 +243,7 @@ export default function CoachNotifications() {
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-green-500/5 rounded-full blur-3xl"></div>
           </div>
 
-          <div className="relative max-w-2xl mx-auto min-h-screen flex flex-col px-6 pb-24 pt-6">
+          <div className="relative max-w-2xl mx-auto min-h-screen flex flex-col px-6 pb-32 pt-6">
             <header className="sticky top-0 z-20 fc-glass/80 backdrop-blur-md py-6 pb-4 flex items-center justify-between -mx-6 px-6">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight fc-text-primary">Command Center</h1>
@@ -341,7 +333,7 @@ export default function CoachNotifications() {
                               className={`h-20 flex flex-col gap-2 justify-center rounded-xl border-2 transition-all duration-300 hover:scale-105 ${
                                 notificationType === type.value
                                   ? `border-purple-500 bg-purple-50 dark:bg-purple-900/20 ${theme.shadow}`
-                                  : `${theme.border} hover:bg-slate-50 dark:hover:bg-slate-800`
+                                  : `${theme.border} hover:bg-[color:var(--fc-glass-highlight)]`
                               }`}
                               onClick={() => setNotificationType(type.value)}
                             >
@@ -430,7 +422,7 @@ export default function CoachNotifications() {
                               className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:scale-105 ${
                                 selectedClients.includes(client.id)
                                   ? `border-purple-500 bg-purple-50 dark:bg-purple-900/20 ${theme.shadow}`
-                                  : `${theme.border} hover:bg-slate-50 dark:hover:bg-slate-800`
+                                  : `${theme.border} hover:bg-[color:var(--fc-glass-highlight)]`
                               }`}
                               onClick={() => handleClientToggle(client.id)}
                             >
@@ -670,7 +662,7 @@ export default function CoachNotifications() {
                           <div className="flex items-center gap-3">
                             <Button
                               variant="outline"
-                              className={`${theme.border} ${theme.text} rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all`}
+                              className={`${theme.border} ${theme.text} rounded-xl hover:bg-[color:var(--fc-glass-highlight)] transition-all`}
                             >
                               <Clock className="w-4 h-4 mr-2" />
                               Save Draft

@@ -60,7 +60,7 @@ export default function CoachDashboardHeader() {
             <span className="fc-pill fc-pill-glass fc-text-workouts">
               Coach overview
             </span>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold fc-text-primary mb-2 mt-2 truncate">
+            <h1 className="text-2xl font-bold fc-text-primary mb-2 mt-2 truncate">
               {getTimeBasedGreeting()}, {getCoachName()}!
             </h1>
             <p className="text-sm sm:text-base lg:text-lg fc-text-dim">
@@ -75,7 +75,7 @@ export default function CoachDashboardHeader() {
               className="fc-btn fc-btn-primary fc-press rounded-full px-3 sm:px-6"
             >
               <Plus className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Add Client</span>
+              <span className="text-xs sm:text-sm">Add Client</span>
             </Button>
           </div>
         </div>

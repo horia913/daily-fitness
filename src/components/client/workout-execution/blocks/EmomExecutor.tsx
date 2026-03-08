@@ -19,6 +19,7 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
@@ -44,7 +45,9 @@ export function EmomExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
+  onPlateCalculatorClick,
   onRestTimerClick,
+  previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -58,6 +61,8 @@ export function EmomExecutor({
   const loggedSetsList = loggedSets ?? [];
 
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  /** Collapsible set history: show all sets or only last 2 */
+  const [showAllSets, setShowAllSets] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -244,7 +249,7 @@ export function EmomExecutor({
   }
 
   const instructions =
-    currentExercise?.notes || block.block.block_notes || undefined;
+    currentExercise?.notes || block.block.set_notes || undefined;
 
   const handleEditSet = (setEntry: LoggedSet) => {
     setEditingSetId(setEntry.id);
@@ -262,7 +267,7 @@ export function EmomExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "EmomExecutor",
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -283,7 +288,7 @@ export function EmomExecutor({
       entry?.set_number ?? editDraft.set_number ?? viewingSetIndex;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.block_type, {
+      const payload = buildSetEditPatchPayload(block.block.set_type, {
         exercise_id: currentExercise?.exercise_id ?? undefined,
         weight: !isNaN(weightNum) && weightNum >= 0 ? weightNum : undefined,
         emom_minute_number: minuteNum,
@@ -293,7 +298,7 @@ export function EmomExecutor({
         console.log("[SAVE EDITS]", {
           executor: "EmomExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -308,7 +313,7 @@ export function EmomExecutor({
           id: editingSetId,
           exercise_id:
             current?.exercise_id ?? currentExercise?.exercise_id ?? "",
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: current?.set_number ?? 1,
           weight_kg: weightNum,
           reps_completed: repsNum,
@@ -377,7 +382,7 @@ export function EmomExecutor({
       const durationUsedThisMin = 60 - timeRemaining;
 
       const logData: any = {
-        block_type: "emom",
+        set_type: "emom",
         emom_minute_number: currentMinute,
         emom_mode: emomMode,
         emom_reps_per_round: emomMode === "target_reps" ? targetReps : null,
@@ -406,7 +411,7 @@ export function EmomExecutor({
             (result as { set_log_id?: string }).set_log_id ??
             `temp-${Date.now()}`,
           exercise_id: currentExercise.exercise_id,
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: currentMinute,
           weight_kg: weightNum,
           reps_completed: repsNum,
@@ -454,56 +459,122 @@ export function EmomExecutor({
             background: "var(--fc-surface-sunken)",
           }}
         >
-          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
-            Logged
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+              Logged
+            </div>
+            {loggedSetsList.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSets(!showAllSets)}
+                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
+              >
+                {showAllSets ? (
+                  <>Show less ▲</>
+                ) : (
+                  <>Show all {loggedSetsList.length} sets ▼</>
+                )}
+              </button>
+            )}
           </div>
           <ul className="space-y-1.5">
-            {loggedSetsList.map((setEntry) => (
+            {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
+              // Calculate the actual index in the full list for isLatestSet
+              const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
+              const isLatestSet = actualIndex === loggedSetsList.length - 1;
+              return (
               <li
                 key={setEntry.id}
-                className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
                 style={{ background: "var(--fc-surface-elevated)" }}
               >
-                <span className="text-sm fc-text-primary">
-                  Min {setEntry.set_number}:{" "}
-                  {setEntry.weight_kg != null && setEntry.weight_kg > 0
-                    ? `${setEntry.weight_kg} kg × `
-                    : ""}
-                  {setEntry.reps_completed ?? "—"} reps
-                </span>
-                <div className="relative flex items-center">
-                  <button
-                    type="button"
-                    className="p-1.5 rounded-md hover:bg-black/10"
-                    onClick={() =>
-                      setMenuOpenSetId(
-                        menuOpenSetId === setEntry.id ? null : setEntry.id,
-                      )
-                    }
-                    aria-label="Options"
-                  >
-                    <MoreVertical className="w-4 h-4 fc-text-dim" />
-                  </button>
-                  {menuOpenSetId === setEntry.id && (
-                    <div
-                      className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
-                      style={{
-                        background: "var(--fc-surface-elevated)",
-                        border: "1px solid var(--fc-surface-card-border)",
-                      }}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm fc-text-primary">
+                    Min {setEntry.set_number}:{" "}
+                    {setEntry.weight_kg != null && setEntry.weight_kg > 0
+                      ? `${setEntry.weight_kg} kg × `
+                      : ""}
+                    {setEntry.reps_completed ?? "—"} reps
+                  </span>
+                  <div className="relative flex items-center">
+                    <button
+                      type="button"
+                      className="p-1.5 rounded-md hover:bg-black/10"
+                      onClick={() =>
+                        setMenuOpenSetId(
+                          menuOpenSetId === setEntry.id ? null : setEntry.id,
+                        )
+                      }
+                      aria-label="Options"
                     >
-                      <button
-                        type="button"
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
-                        onClick={() => handleEditSet(setEntry)}
+                      <MoreVertical className="w-4 h-4 fc-text-dim" />
+                    </button>
+                    {menuOpenSetId === setEntry.id && (
+                      <div
+                        className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
+                        style={{
+                          background: "var(--fc-surface-elevated)",
+                          border: "1px solid var(--fc-surface-card-border)",
+                        }}
                       >
-                        <Pencil className="w-4 h-4" /> Edit
-                      </button>
-                    </div>
-                  )}
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
+                          onClick={() => handleEditSet(setEntry)}
+                        >
+                          <Pencil className="w-4 h-4" /> Edit
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+                <InlineRPERow
+                  setLogId={setEntry.id.startsWith("temp-") ? null : setEntry.id}
+                  currentRPE={setEntry.rpe ?? null}
+                  onRPESelect={async (rpe) => {
+                    const updatedEntry: LoggedSet = {
+                      ...setEntry,
+                      rpe,
+                    };
+                    onSetLogUpsert?.(block.block.id, updatedEntry, {
+                      replaceId: setEntry.id,
+                    });
+
+                    if (!setEntry.id.startsWith("temp-")) {
+                      try {
+                        const res = await fetch(`/api/sets/${setEntry.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ rpe }),
+                          credentials: "include",
+                        });
+                        if (!res.ok) {
+                          console.error("Failed to update RPE:", await res.text());
+                          const revertedEntry: LoggedSet = {
+                            ...setEntry,
+                            rpe: setEntry.rpe ?? undefined,
+                          };
+                          onSetLogUpsert?.(block.block.id, revertedEntry, {
+                            replaceId: setEntry.id,
+                          });
+                        }
+                      } catch (err) {
+                        console.error("Error updating RPE:", err);
+                        const revertedEntry: LoggedSet = {
+                          ...setEntry,
+                          rpe: setEntry.rpe ?? undefined,
+                        };
+                        onSetLogUpsert?.(block.block.id, revertedEntry, {
+                          replaceId: setEntry.id,
+                        });
+                      }
+                    }
+                  }}
+                  isLatestSet={isLatestSet}
+                />
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}
@@ -696,7 +767,9 @@ export function EmomExecutor({
         calculateSuggestedWeight,
         onVideoClick,
         onAlternativesClick,
+        onPlateCalculatorClick,
         onRestTimerClick,
+        previousPerformanceMap,
       }}
       exerciseName={currentExercise?.exercise?.name || "Exercise"}
       blockDetails={blockDetails}

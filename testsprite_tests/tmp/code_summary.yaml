@@ -1,0 +1,495 @@
+version: "2"
+type: frontend
+tech_stack:
+  - TypeScript
+  - Next.js 15 (App Router)
+  - React 19
+  - Tailwind CSS 4
+  - Radix UI
+  - Supabase
+  - Playwright
+  - Jest
+routes:
+  - path: /
+    file: src/app/page.tsx
+    auth_required: false
+    description: Login page with Sign In and Sign Up tabs. Unauthenticated users see the login form here. After successful login, redirects to /coach or /client based on role. There is NO /login route — all authentication starts at /.
+  - path: /client
+    file: src/app/client/page.tsx
+    auth_required: true
+    description: Client home dashboard
+  - path: /coach
+    file: src/app/coach/page.tsx
+    auth_required: true
+    description: Coach home dashboard
+  - path: /client/train
+    file: src/app/client/train/page.tsx
+    auth_required: true
+    description: Client training launcher for starting workouts
+  - path: /client/workouts
+    file: src/app/client/workouts/page.tsx
+    auth_required: true
+    description: List of client workout assignments
+  - path: /client/workouts/[id]/start
+    file: src/app/client/workouts/[id]/start/page.tsx
+    auth_required: true
+    description: Start and run a specific workout session
+  - path: /client/workouts/[id]/complete
+    file: src/app/client/workouts/[id]/complete/page.tsx
+    auth_required: true
+    description: Review and complete a finished workout
+  - path: /client/check-ins
+    file: src/app/client/check-ins/page.tsx
+    auth_required: true
+    description: Client check-in and wellness submission page
+  - path: /client/progress
+    file: src/app/client/progress/page.tsx
+    auth_required: true
+    description: Client progress overview hub
+  - path: /client/progress/body-metrics
+    file: src/app/client/progress/body-metrics/page.tsx
+    auth_required: true
+    description: Body metrics tracking and history
+  - path: /client/habits
+    file: src/app/client/habits/page.tsx
+    auth_required: true
+    description: Client habit tracking dashboard
+  - path: /coach/clients
+    file: src/app/coach/clients/page.tsx
+    auth_required: true
+    description: Coach client list and selection
+  - path: /coach/programs
+    file: src/app/coach/programs/page.tsx
+    auth_required: true
+    description: Coach training programs list
+  - path: /coach/workouts/templates
+    file: src/app/coach/workouts/templates/page.tsx
+    auth_required: true
+    description: Workout templates library
+  - path: /coach/goals
+    file: src/app/coach/goals/page.tsx
+    auth_required: true
+    description: Coach goal management dashboard
+  - path: /create-user
+    file: src/app/create-user/page.tsx
+    auth_required: false
+    description: Public user creation and onboarding page
+features:
+  - name: Coach Workout Template Authoring
+    description: Coaches can create, edit, and manage workout templates that include multiple block types and manual fields.
+    files:
+      - src/app/coach/workouts/templates/page.tsx
+      - src/app/coach/workouts/templates/create/page.tsx
+      - src/app/coach/workouts/templates/[id]/page.tsx
+    entry_route: /coach/workouts/templates
+    user_interactions:
+      - Open workout templates library from coach Training section
+      - Create a new template with name, description, and optional metadata
+      - Add blocks such as Straight Set, Superset, Giant Set, Drop Set, Cluster Set, Rest-Pause, Pre-Exhaustion, and Time-based blocks
+      - Save a template and reopen it in edit mode
+    api_calls: []
+    auth_required: true
+  - name: Coach Multi-week Program Builder
+    description: Coaches can create multi-week training programs and configure weekly schedules using workout templates.
+    files:
+      - src/app/coach/programs/page.tsx
+      - src/app/coach/programs/[id]/page.tsx
+      - src/app/coach/programs/[id]/edit/page.tsx
+    entry_route: /coach/programs
+    user_interactions:
+      - Create a new multi-week program with basic info
+      - Configure weekly schedules with templates assigned to specific days
+      - Edit an existing program and adjust weekly schedule
+    api_calls: []
+    auth_required: true
+  - name: Coach Client Management and Assignments
+    description: Coaches can manage clients and assign workouts or programs to them.
+    files:
+      - src/app/coach/clients/page.tsx
+      - src/app/coach/clients/[id]/page.tsx
+    entry_route: /coach/clients
+    user_interactions:
+      - Open coach client list
+      - Open an individual client hub
+      - (Where available) assign workouts or programs to a client
+    api_calls: []
+    auth_required: true
+known_limitations: []
+version: "2"
+type: frontend
+tech_stack:
+  - TypeScript
+  - Next.js 15 (App Router)
+  - React 19
+  - Tailwind CSS 4
+  - Radix UI
+  - Supabase
+  - Playwright
+  - Jest
+routes:
+  - path: /
+    file: src/app/page.tsx
+    auth_required: false
+    description: Login page with Sign In and Sign Up tabs. Unauthenticated users see the login form here. After successful login, redirects to /coach or /client based on role. There is NO /login route — all authentication starts at /.
+  - path: /client
+    file: src/app/client/page.tsx
+    auth_required: true
+    description: Client home dashboard
+  - path: /coach
+    file: src/app/coach/page.tsx
+    auth_required: true
+    description: Coach home dashboard
+  - path: /client/train
+    file: src/app/client/train/page.tsx
+    auth_required: true
+    description: Client training launcher for starting workouts
+  - path: /client/workouts
+    file: src/app/client/workouts/page.tsx
+    auth_required: true
+    description: List of client workout assignments
+  - path: /client/workouts/[id]/start
+    file: src/app/client/workouts/[id]/start/page.tsx
+    auth_required: true
+    description: Start and run a specific workout session
+  - path: /client/workouts/[id]/complete
+    file: src/app/client/workouts/[id]/complete/page.tsx
+    auth_required: true
+    description: Review and complete a finished workout
+  - path: /client/check-ins
+    file: src/app/client/check-ins/page.tsx
+    auth_required: true
+    description: Client check-in and wellness submission page
+  - path: /client/progress
+    file: src/app/client/progress/page.tsx
+    auth_required: true
+    description: Client progress overview hub
+  - path: /client/progress/body-metrics
+    file: src/app/client/progress/body-metrics/page.tsx
+    auth_required: true
+    description: Body metrics tracking and history
+  - path: /client/habits
+    file: src/app/client/habits/page.tsx
+    auth_required: true
+    description: Client habit tracking dashboard
+  - path: /coach/clients
+    file: src/app/coach/clients/page.tsx
+    auth_required: true
+    description: Coach client list and selection
+  - path: /coach/programs
+    file: src/app/coach/programs/page.tsx
+    auth_required: true
+    description: Coach training programs list
+  - path: /coach/workouts/templates
+    file: src/app/coach/workouts/templates/page.tsx
+    auth_required: true
+    description: Workout templates library
+  - path: /coach/goals
+    file: src/app/coach/goals/page.tsx
+    auth_required: true
+    description: Coach goal management dashboard
+  - path: /create-user
+    file: src/app/create-user/page.tsx
+    auth_required: false
+    description: Public user creation and onboarding page
+features:
+  - name: Client Workout Logging
+    description: Clients can start assigned workouts, log sets, and complete workouts.
+    files:
+      - src/app/client/workouts/page.tsx
+      - src/app/client/workouts/[id]/start/page.tsx
+      - src/app/client/workouts/[id]/complete/page.tsx
+      - src/app/api/program-workouts/start/route.ts
+      - src/app/api/log-set/route.ts
+      - src/app/api/complete-workout/route.ts
+      - src/app/api/block-complete/route.ts
+      - src/app/api/set-rpe/route.ts
+    entry_route: /client/workouts
+    user_interactions:
+      - Select an assigned workout from the list
+      - Start a workout session for a given workout
+      - Log reps, weight, and RPE for each set
+      - Mark blocks and the entire workout as complete
+    api_calls:
+      - method: POST
+        endpoint: /api/program-workouts/start
+      - method: POST
+        endpoint: /api/log-set
+      - method: POST
+        endpoint: /api/block-complete
+      - method: POST
+        endpoint: /api/complete-workout
+      - method: POST
+        endpoint: /api/set-rpe
+    auth_required: true
+  - name: Coach Program and Template Management
+    description: Coaches can create and manage training programs and workout templates for clients.
+    files:
+      - src/app/coach/programs/page.tsx
+      - src/app/coach/programs/[id]/page.tsx
+      - src/app/coach/programs/[id]/edit/page.tsx
+      - src/app/coach/workouts/templates/page.tsx
+      - src/app/coach/workouts/templates/create/page.tsx
+      - src/app/coach/workouts/templates/[id]/page.tsx
+      - src/app/api/coach/programs/route.ts
+      - src/app/api/coach/workouts/templates/route.ts
+    entry_route: /coach/programs
+    user_interactions:
+      - Open the coach programs dashboard
+      - Create or edit a training program
+      - Navigate to workout templates and create or edit templates
+      - Assign or update templates within programs
+    api_calls:
+      - method: GET
+        endpoint: /api/coach/programs
+      - method: POST
+        endpoint: /api/coach/programs
+      - method: PATCH
+        endpoint: /api/coach/programs
+      - method: GET
+        endpoint: /api/coach/workouts/templates
+      - method: POST
+        endpoint: /api/coach/workouts/templates
+    auth_required: true
+  - name: Client Check-ins and Progress Analytics
+    description: Clients submit check-ins and review their progress analytics across metrics.
+    files:
+      - src/app/client/check-ins/page.tsx
+      - src/app/client/progress/page.tsx
+      - src/app/client/progress/body-metrics/page.tsx
+      - src/app/client/progress/workout-logs/page.tsx
+      - src/app/client/progress/analytics/page.tsx
+      - src/app/api/client/dashboard/route.ts
+      - src/app/api/client/program-week/route.ts
+      - src/app/api/client/workouts/summary/route.ts
+      - src/app/api/client/athlete-score/route.ts
+    entry_route: /client/progress
+    user_interactions:
+      - Open the client progress hub
+      - Submit a new check-in with wellness/body metrics
+      - Review workout logs, analytics, and trends
+    api_calls:
+      - method: GET
+        endpoint: /api/client/dashboard
+      - method: GET
+        endpoint: /api/client/program-week
+      - method: GET
+        endpoint: /api/client/workouts/summary
+      - method: GET
+        endpoint: /api/client/athlete-score
+    auth_required: true
+  - name: Coach Analytics and Compliance
+    description: Coaches view analytics, adherence, and compliance across their client base.
+    files:
+      - src/app/coach/analytics/page.tsx
+      - src/app/coach/reports/page.tsx
+      - src/app/coach/compliance/page.tsx
+      - src/app/coach/adherence/page.tsx
+      - src/app/api/coach/analytics/overview/route.ts
+      - src/app/api/coach/analytics/adherence/route.ts
+      - src/app/api/coach/reports/clients/route.ts
+      - src/app/api/coach/progress/overview/route.ts
+    entry_route: /coach/analytics
+    user_interactions:
+      - Open the coach analytics dashboard
+      - Filter or switch between adherence, compliance, and report views
+      - Inspect individual or aggregated client metrics
+    api_calls:
+      - method: GET
+        endpoint: /api/coach/analytics/overview
+      - method: GET
+        endpoint: /api/coach/analytics/adherence
+      - method: GET
+        endpoint: /api/coach/reports/clients
+      - method: GET
+        endpoint: /api/coach/progress/overview
+    auth_required: true
+known_limitations: []
+version: "2"
+type: frontend
+tech_stack:
+  - TypeScript
+  - Next.js 15 (App Router)
+  - React 19
+  - Tailwind CSS 4
+  - Radix UI
+  - Supabase
+  - Playwright
+  - Jest
+routes:
+  - path: /
+    file: src/app/page.tsx
+    auth_required: false
+    description: Login page with Sign In and Sign Up tabs. Unauthenticated users see the login form here. After successful login, redirects to /coach or /client based on role. There is NO /login route — all authentication starts at /.
+  - path: /client
+    file: src/app/client/page.tsx
+    auth_required: true
+    description: Client home dashboard
+  - path: /coach
+    file: src/app/coach/page.tsx
+    auth_required: true
+    description: Coach home dashboard
+  - path: /client/train
+    file: src/app/client/train/page.tsx
+    auth_required: true
+    description: Client training launcher for starting workouts
+  - path: /client/workouts
+    file: src/app/client/workouts/page.tsx
+    auth_required: true
+    description: List of client workout assignments
+  - path: /client/workouts/[id]/start
+    file: src/app/client/workouts/[id]/start/page.tsx
+    auth_required: true
+    description: Start and run a specific workout session
+  - path: /client/workouts/[id]/complete
+    file: src/app/client/workouts/[id]/complete/page.tsx
+    auth_required: true
+    description: Review and complete a finished workout
+  - path: /client/check-ins
+    file: src/app/client/check-ins/page.tsx
+    auth_required: true
+    description: Client check-in and wellness submission page
+  - path: /client/progress
+    file: src/app/client/progress/page.tsx
+    auth_required: true
+    description: Client progress overview hub
+  - path: /client/progress/body-metrics
+    file: src/app/client/progress/body-metrics/page.tsx
+    auth_required: true
+    description: Body metrics tracking and history
+  - path: /client/habits
+    file: src/app/client/habits/page.tsx
+    auth_required: true
+    description: Client habit tracking dashboard
+  - path: /coach/clients
+    file: src/app/coach/clients/page.tsx
+    auth_required: true
+    description: Coach client list and selection
+  - path: /coach/programs
+    file: src/app/coach/programs/page.tsx
+    auth_required: true
+    description: Coach training programs list
+  - path: /coach/workouts/templates
+    file: src/app/coach/workouts/templates/page.tsx
+    auth_required: true
+    description: Workout templates library
+  - path: /coach/goals
+    file: src/app/coach/goals/page.tsx
+    auth_required: true
+    description: Coach goal management dashboard
+  - path: /create-user
+    file: src/app/create-user/page.tsx
+    auth_required: false
+    description: Public user creation and onboarding page
+features:
+  - name: Client Workout Logging
+    description: Clients can start assigned workouts, log sets, and complete workouts.
+    files:
+      - src/app/client/workouts/page.tsx
+      - src/app/client/workouts/[id]/start/page.tsx
+      - src/app/client/workouts/[id]/complete/page.tsx
+      - src/app/api/program-workouts/start/route.ts
+      - src/app/api/log-set/route.ts
+      - src/app/api/complete-workout/route.ts
+      - src/app/api/block-complete/route.ts
+      - src/app/api/set-rpe/route.ts
+    entry_route: /client/workouts
+    user_interactions:
+      - Select an assigned workout from the list
+      - Start a workout session for a given workout
+      - Log reps, weight, and RPE for each set
+      - Mark blocks and the entire workout as complete
+    api_calls:
+      - method: POST
+        endpoint: /api/program-workouts/start
+      - method: POST
+        endpoint: /api/log-set
+      - method: POST
+        endpoint: /api/block-complete
+      - method: POST
+        endpoint: /api/complete-workout
+      - method: POST
+        endpoint: /api/set-rpe
+    auth_required: true
+  - name: Coach Program and Template Management
+    description: Coaches can create and manage training programs and workout templates for clients.
+    files:
+      - src/app/coach/programs/page.tsx
+      - src/app/coach/programs/[id]/page.tsx
+      - src/app/coach/programs/[id]/edit/page.tsx
+      - src/app/coach/workouts/templates/page.tsx
+      - src/app/coach/workouts/templates/create/page.tsx
+      - src/app/coach/workouts/templates/[id]/page.tsx
+      - src/app/api/coach/programs/route.ts
+      - src/app/api/coach/workouts/templates/route.ts
+    entry_route: /coach/programs
+    user_interactions:
+      - Open the coach programs dashboard
+      - Create or edit a training program
+      - Navigate to workout templates and create or edit templates
+      - Assign or update templates within programs
+    api_calls:
+      - method: GET
+        endpoint: /api/coach/programs
+      - method: POST
+        endpoint: /api/coach/programs
+      - method: PATCH
+        endpoint: /api/coach/programs
+      - method: GET
+        endpoint: /api/coach/workouts/templates
+      - method: POST
+        endpoint: /api/coach/workouts/templates
+    auth_required: true
+  - name: Client Check-ins and Progress Analytics
+    description: Clients submit check-ins and review their progress analytics across metrics.
+    files:
+      - src/app/client/check-ins/page.tsx
+      - src/app/client/progress/page.tsx
+      - src/app/client/progress/body-metrics/page.tsx
+      - src/app/client/progress/workout-logs/page.tsx
+      - src/app/client/progress/analytics/page.tsx
+      - src/app/api/client/dashboard/route.ts
+      - src/app/api/client/program-week/route.ts
+      - src/app/api/client/workouts/summary/route.ts
+      - src/app/api/client/athlete-score/route.ts
+    entry_route: /client/progress
+    user_interactions:
+      - Open the client progress hub
+      - Submit a new check-in with wellness/body metrics
+      - Review workout logs, analytics, and trends
+    api_calls:
+      - method: GET
+        endpoint: /api/client/dashboard
+      - method: GET
+        endpoint: /api/client/program-week
+      - method: GET
+        endpoint: /api/client/workouts/summary
+      - method: GET
+        endpoint: /api/client/athlete-score
+    auth_required: true
+  - name: Coach Analytics and Compliance
+    description: Coaches view analytics, adherence, and compliance across their client base.
+    files:
+      - src/app/coach/analytics/page.tsx
+      - src/app/coach/reports/page.tsx
+      - src/app/coach/compliance/page.tsx
+      - src/app/coach/adherence/page.tsx
+      - src/app/api/coach/analytics/overview/route.ts
+      - src/app/api/coach/analytics/adherence/route.ts
+      - src/app/api/coach/reports/clients/route.ts
+      - src/app/api/coach/progress/overview/route.ts
+    entry_route: /coach/analytics
+    user_interactions:
+      - Open the coach analytics dashboard
+      - Filter or switch between adherence, compliance, and report views
+      - Inspect individual or aggregated client metrics
+    api_calls:
+      - method: GET
+        endpoint: /api/coach/analytics/overview
+      - method: GET
+        endpoint: /api/coach/analytics/adherence
+      - method: GET
+        endpoint: /api/coach/reports/clients
+      - method: GET
+        endpoint: /api/coach/progress/overview
+    auth_required: true
+known_limitations: []

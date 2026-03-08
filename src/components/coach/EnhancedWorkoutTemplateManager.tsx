@@ -58,6 +58,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import WorkoutTemplateForm from "@/components/WorkoutTemplateForm";
 import WorkoutTemplateDetails from "./WorkoutTemplateDetails";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/toast-provider";
 
 interface EnhancedWorkoutTemplateManagerProps {
   coachId: string;
@@ -82,6 +83,7 @@ export default function EnhancedWorkoutTemplateManager({
   coachId,
 }: EnhancedWorkoutTemplateManagerProps) {
   const { getThemeStyles } = useTheme();
+  const { addToast } = useToast();
   const { user } = useAuth();
   const theme = getThemeStyles();
 
@@ -381,7 +383,7 @@ export default function EnhancedWorkoutTemplateManager({
           );
 
           if (availableClients.length === 0) {
-            alert("All clients already have this workout template assigned!");
+            addToast({ title: "All clients already have this workout template assigned!", variant: "destructive" });
             return;
           }
 
@@ -397,7 +399,7 @@ export default function EnhancedWorkoutTemplateManager({
         }
       } catch (error) {
         console.error("Error loading clients:", error);
-        alert("Error loading clients. Please try again.");
+        addToast({ title: "Error loading clients. Please try again.", variant: "destructive" });
         return;
       }
     }
@@ -460,11 +462,12 @@ export default function EnhancedWorkoutTemplateManager({
       }
 
       if (failureCount > 0) {
-        alert(
-          `Assigned ${successCount} workout(s), but ${failureCount} failed. Check console for details.`
-        );
+        addToast({
+          title: `Assigned ${successCount} workout(s), but ${failureCount} failed. Check console for details.`,
+          variant: "destructive",
+        });
       } else {
-        alert("Workout template assigned successfully!");
+        addToast({ title: "Workout template assigned successfully!", variant: "success" });
       }
 
       // Refresh template assignment counts
@@ -492,7 +495,7 @@ export default function EnhancedWorkoutTemplateManager({
       });
     } catch (error) {
       console.error("Error assigning template:", error);
-      alert("Error assigning workout template. Please try again.");
+      addToast({ title: "Error assigning workout template. Please try again.", variant: "destructive" });
       throw error;
     }
   };
@@ -1423,7 +1426,7 @@ export default function EnhancedWorkoutTemplateManager({
                       <Button
                         onClick={async () => {
                           if (selectedClients.length === 0) {
-                            alert("Please select at least one client.");
+                            addToast({ title: "Please select at least one client.", variant: "destructive" });
                             return;
                           }
 
@@ -1433,17 +1436,16 @@ export default function EnhancedWorkoutTemplateManager({
                               selectedClients,
                               user?.id || ""
                             );
-                            alert(
-                              `Workout template assigned to ${selectedClients.length} client(s) successfully!`
-                            );
+                            addToast({
+                              title: `Workout template assigned to ${selectedClients.length} client(s) successfully!`,
+                              variant: "success",
+                            });
                             setShowAssignmentModal(false);
                             setSelectedTemplateForAssignment(null);
                             setSelectedClients([]);
                           } catch (error) {
                             console.error("Error assigning template:", error);
-                            alert(
-                              "Error assigning template. Please try again."
-                            );
+                            addToast({ title: "Error assigning template. Please try again.", variant: "destructive" });
                           }
                         }}
                         disabled={selectedClients.length === 0}

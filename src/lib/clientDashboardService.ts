@@ -1,6 +1,6 @@
 /**
  * Client Dashboard Service
- * Handles real-time dashboard data: streak, weekly progress, sessions
+ * Handles real-time dashboard data: streak, weekly progress
  */
 
 import { supabase } from './supabase';
@@ -152,12 +152,10 @@ export async function getCoachWhatsAppPhone(clientId: string): Promise<string | 
       .maybeSingle();
 
     if (clientError) {
-      console.log('No clients table or coach assignment:', clientError.message);
       return null;
     }
 
     if (!clientData?.coach_id) {
-      console.log('No coach assigned to this client');
       return null;
     }
 
@@ -169,13 +167,11 @@ export async function getCoachWhatsAppPhone(clientId: string): Promise<string | 
       .maybeSingle();
 
     if (profileError) {
-      console.log('Phone field may not exist in profiles:', profileError.message);
       return null;
     }
 
     return coachProfile?.phone || null;
   } catch (error) {
-    console.log('Coach phone lookup not available:', error);
     return null;
   }
 }
@@ -203,41 +199,6 @@ export async function getClientType(clientId: string): Promise<'online' | 'in_gy
     return data.client_type as 'online' | 'in_gym' | null;
   } catch (error) {
     console.error('Error getting client type:', error);
-    return null;
-  }
-}
-
-/**
- * Get client's next upcoming in-gym session (for in_gym clients only)
- */
-export async function getNextSession(clientId: string): Promise<{
-  id: string;
-  scheduled_date: string;
-  start_time: string;
-  end_time: string;
-} | null> {
-  try {
-    const now = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from('sessions')
-      .select('id, scheduled_date, start_time, end_time')
-      .eq('client_id', clientId)
-      .in('status', ['scheduled', 'confirmed'])
-      .gte('scheduled_date', now.split('T')[0])
-      .order('scheduled_date', { ascending: true })
-      .order('start_time', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error fetching next session:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error getting next session:', error);
     return null;
   }
 }

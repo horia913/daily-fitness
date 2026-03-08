@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { supabase } from '@/lib/supabase'
@@ -136,13 +136,22 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d' | '1y'>('30d')
   const [selectedClientGroup, setSelectedClientGroup] = useState<'all' | 'on_track' | 'at_risk' | 'needs_attention'>('all')
   const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
+  const complianceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Fetch real compliance data from Supabase
   useEffect(() => {
+    if (complianceTimeoutRef.current) clearTimeout(complianceTimeoutRef.current)
+    complianceTimeoutRef.current = setTimeout(() => {
+      complianceTimeoutRef.current = null
+      setLoading(false)
+    }, 20_000)
+
     const fetchComplianceData = async () => {
       try {
         setLoading(true)
@@ -265,8 +274,20 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
       }
     }
 
-    fetchComplianceData()
-  }, [coachId, selectedPeriod])
+    fetchComplianceData().finally(() => {
+      if (complianceTimeoutRef.current) {
+        clearTimeout(complianceTimeoutRef.current)
+        complianceTimeoutRef.current = null
+      }
+    })
+
+    return () => {
+      if (complianceTimeoutRef.current) {
+        clearTimeout(complianceTimeoutRef.current)
+        complianceTimeoutRef.current = null
+      }
+    }
+  }, [coachId, selectedPeriod, refreshTrigger])
 
   // Helper functions to calculate compliance metrics
   const calculateWorkoutCompliance = (workoutData: any[]) => {
@@ -493,7 +514,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
                 <span className="fc-pill fc-pill-glass fc-text-workouts">
                   Compliance
                 </span>
-                <h1 className="text-2xl sm:text-3xl font-bold fc-text-primary mt-2 mb-1 sm:mb-2">
+                <h1 className="text-2xl font-bold fc-text-primary mt-2 mb-1 sm:mb-2">
                   Compliance Analytics 📊
                 </h1>
                 <p className="text-base sm:text-lg fc-text-dim">
@@ -505,7 +526,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
             <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
               <Button
                 variant="outline"
-                onClick={() => setLoading(true)}
+                onClick={() => setRefreshTrigger((t) => t + 1)}
                 className="fc-btn fc-btn-ghost flex items-center gap-2"
                 size="sm"
               >
@@ -766,7 +787,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
               {viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredClients.map(client => (
-                    <div key={client.client.id} className="rounded-lg p-4 transition-all duration-300">
+                    <div key={client.client.id} className="rounded-2xl p-4 transition-all duration-300">
                       <div className="flex items-center gap-3 mb-3">
                         <div className="fc-icon-tile fc-icon-workouts w-10 h-10 text-sm font-semibold">
                           {client.client.first_name[0]}{client.client.last_name[0]}
@@ -850,7 +871,7 @@ export default function OptimizedComplianceAnalytics({ coachId }: OptimizedCompl
               ) : (
                 <div className="space-y-3">
                   {filteredClients.map(client => (
-                    <div key={client.client.id} className="rounded-lg p-4 transition-all duration-300">
+                    <div key={client.client.id} className="rounded-2xl p-4 transition-all duration-300">
                       <div className="flex items-center gap-4">
                         <div className="fc-icon-tile fc-icon-workouts w-12 h-12 text-sm font-semibold flex-shrink-0">
                           {client.client.first_name[0]}{client.client.last_name[0]}

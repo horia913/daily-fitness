@@ -1,3 +1,9 @@
+/**
+ * @deprecated This component uses hardcoded placeholder data and is not currently used.
+ * Alerts are now handled directly in the coach dashboard page via getMorningBriefing().
+ * This file is kept for reference but should not be imported or used.
+ */
+
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
@@ -63,7 +69,7 @@ export default function ActionItems() {
       icon: CheckSquare,
       priority: "medium",
       urgency: "pending",
-      href: "/coach/programs-workouts",
+      href: "/coach/programs",
       timeAgo: "4 hours ago",
       clientName: "Sarah Wilson",
       actionText: "Update",
@@ -84,15 +90,15 @@ export default function ActionItems() {
     },
     {
       id: 6,
-      title: "New client onboarding scheduled",
-      description: "Welcome call with new client tomorrow",
+      title: "New client to onboard",
+      description: "Review new client profile and assign program",
       icon: Calendar,
       priority: "medium",
       urgency: "upcoming",
-      href: "/coach/scheduling",
+      href: "/coach/clients",
       timeAgo: "1 day ago",
       clientName: "Alex Brown",
-      actionText: "Prepare",
+      actionText: "Review",
       category: "onboarding"
     }
   ]
@@ -310,7 +316,7 @@ export default function ActionItems() {
                           </div>
                           
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <div className="flex items-center gap-2 text-xs fc-text-subtle">
                               <Clock className="w-3 h-3" />
                               <span>{item.timeAgo}</span>
                             </div>

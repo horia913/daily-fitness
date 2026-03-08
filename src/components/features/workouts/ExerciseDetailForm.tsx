@@ -233,8 +233,6 @@ export default function ExerciseDetailForm({
         return "Superset";
       case "giant_set":
         return "Giant Set";
-      case "circuit":
-        return "Circuit";
       case "tabata":
         return "Tabata";
       default:
@@ -261,7 +259,7 @@ export default function ExerciseDetailForm({
               <SelectValue placeholder="Select exercise type" />
             </SelectTrigger>
             <SelectContent className="z-[99999] max-h-60">
-              {/* Resistance Training Blocks */}
+              {/* Resistance Training */}
               <SelectItem
                 value="straight_set"
                 className="rounded-lg"
@@ -339,7 +337,7 @@ export default function ExerciseDetailForm({
               >
                 HR Sets
               </SelectItem>
-              {/* Time-Based Blocks - Hidden when filtering */}
+              {/* Time-Based - Hidden when filtering */}
               {(!allowedBlockTypes || allowedBlockTypes.length === 0) && (
                 <>
                   <SelectItem value="amrap" className="rounded-lg">

@@ -81,7 +81,6 @@ interface WorkoutExercise {
   work_seconds?: number;
   rest_after?: number;
   tabata_sets?: any[];
-  circuit_sets?: any[];
   amrap_duration?: number;
   emom_duration?: number;
   emom_reps?: number;
@@ -154,9 +153,9 @@ const loadWorkoutDetails = async (
             template_id: template.id,
             exercise_id: exercise.exercise_id,
             exercise: exercise.exercise,
-            order_index: block.block_order,
-            notes: exercise.notes || block.block_notes,
-            exercise_type: block.block_type,
+            order_index: block.set_order,
+            notes: exercise.notes || block.set_notes,
+            exercise_type: block.set_type,
             sets: exercise.sets || block.total_sets,
             reps: exercise.reps || block.reps_per_set,
             rest_seconds: exercise.rest_seconds || block.rest_seconds,
@@ -435,7 +434,6 @@ const saveWorkout = async (
                       work_seconds: exercise.work_seconds,
                       rest_after: exercise.rest_after,
                       tabata_sets: exercise.tabata_sets,
-                      circuit_sets: exercise.circuit_sets,
                       amrap_duration: exercise.amrap_duration,
                       emom_duration: exercise.emom_duration,
                       emom_reps: exercise.emom_reps,
@@ -509,11 +507,11 @@ const duplicateWorkout = async (
       for (const block of blocks) {
         const newBlock = await WorkoutBlockService.createWorkoutBlock(
           newTemplate.id,
-          block.block_type,
-          block.block_order,
+          block.set_type,
+          block.set_order,
           {
-            block_name: block.block_name,
-            block_notes: block.block_notes,
+            set_name: block.set_name,
+            set_notes: block.set_notes,
             total_sets: block.total_sets,
             reps_per_set: block.reps_per_set,
             rest_seconds: block.rest_seconds,
@@ -683,7 +681,7 @@ export default function WorkoutDetailModal({
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className={`p-2 rounded-xl transition-all duration-200 ${
+                className={`p-2 min-w-11 min-h-11 flex items-center justify-center rounded-xl transition-all duration-200 ${
                   theme.textSecondary
                 } hover:${theme.text} hover:${
                   isDark ? "bg-slate-700" : "bg-slate-100"
@@ -1136,9 +1134,6 @@ export default function WorkoutDetailModal({
                                       workoutExercise.exercise_type === "tabata"
                                         ? "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300"
                                         : workoutExercise.exercise_type ===
-                                          "circuit"
-                                        ? "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300"
-                                        : workoutExercise.exercise_type ===
                                           "amrap"
                                         ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300"
                                         : workoutExercise.exercise_type ===
@@ -1148,10 +1143,7 @@ export default function WorkoutDetailModal({
                                     }`}
                                   >
                                     {workoutExercise.exercise_type === "tabata"
-                                      ? "Tabata Circuit"
-                                      : workoutExercise.exercise_type ===
-                                        "circuit"
-                                      ? "Circuit"
+                                      ? "Tabata"
                                       : workoutExercise.exercise_type ===
                                         "amrap"
                                       ? "AMRAP"
@@ -1173,17 +1165,14 @@ export default function WorkoutDetailModal({
                                         "rest_pause"
                                       ? "Rest-Pause"
                                       : workoutExercise.exercise_type ===
-                                        "pyramid_set"
-                                      ? "Pyramid Set"
+                                        "drop_set"
+                                      ? "Drop Set"
                                       : workoutExercise.exercise_type ===
                                         "pre_exhaustion"
                                       ? "Pre-Exhaustion"
                                       : workoutExercise.exercise_type ===
                                         "for_time"
                                       ? "For Time"
-                                      : workoutExercise.exercise_type ===
-                                        "ladder"
-                                      ? "Ladder"
                                       : "Straight Set"}
                                   </Badge>
                                 )}

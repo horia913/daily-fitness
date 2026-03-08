@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -115,11 +115,27 @@ export default function FMSAssessmentPage() {
   });
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
+  const fmsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (user && !authLoading && clientId) {
-      loadClientInfo();
-      loadAssessments();
-    }
+    if (!user || authLoading || !clientId) return;
+    if (fmsTimeoutRef.current) clearTimeout(fmsTimeoutRef.current);
+    fmsTimeoutRef.current = setTimeout(() => {
+      fmsTimeoutRef.current = null;
+      setLoading(false);
+    }, 20_000);
+    Promise.all([loadClientInfo(), loadAssessments()]).finally(() => {
+      if (fmsTimeoutRef.current) {
+        clearTimeout(fmsTimeoutRef.current);
+        fmsTimeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (fmsTimeoutRef.current) {
+        clearTimeout(fmsTimeoutRef.current);
+        fmsTimeoutRef.current = null;
+      }
+    };
   }, [user, authLoading, clientId]);
 
   const loadClientInfo = async () => {
@@ -292,7 +308,7 @@ export default function FMSAssessmentPage() {
   };
 
   const getScoreColor = (score: number | undefined, maxScore: number) => {
-    if (!score) return "text-slate-400";
+    if (!score) return "text-[color:var(--fc-text-subtle)]";
     const percentage = (score / maxScore) * 100;
     if (percentage >= 80) return "text-green-600 dark:text-green-400";
     if (percentage >= 60) return "text-yellow-600 dark:text-yellow-400";
@@ -304,7 +320,7 @@ export default function FMSAssessmentPage() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <GlassCard elevation={2} className="fc-glass fc-card p-8">
               <div className="animate-pulse space-y-4">
                 <div className="h-12 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -321,12 +337,13 @@ export default function FMSAssessmentPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-10 sm:px-6 lg:px-10 space-y-6">
           <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
-                <Link href={`/coach/clients/${clientId}`} className="fc-glass fc-card w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
-                  <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
+                <Link href={`/coach/clients/${clientId}`} className="fc-glass fc-card inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-glass-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
+                  <ArrowLeft className="w-5 h-5 shrink-0" />
+                  Back to Client Hub
                 </Link>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">
@@ -442,7 +459,7 @@ export default function FMSAssessmentPage() {
                           return (
                             <div
                               key={test.key}
-                              className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
+                              className="p-3 rounded-xl bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-surface-card-border)]"
                             >
                               <p
                                 className={`text-xs font-medium ${theme.textSecondary} mb-2`}
@@ -470,7 +487,7 @@ export default function FMSAssessmentPage() {
                       </div>
 
                       {assessment.notes && (
-                        <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                        <div className="mt-4 p-3 rounded-xl bg-[color:var(--fc-glass-highlight)]">
                           <p className={`text-sm ${theme.textSecondary}`}>
                             {assessment.notes}
                           </p>
@@ -489,7 +506,7 @@ export default function FMSAssessmentPage() {
                             {assessment.photos.map((photoUrl, index) => (
                               <div
                                 key={index}
-                                className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700"
+                                className="relative aspect-square rounded-lg overflow-hidden border border-[color:var(--fc-surface-card-border)]"
                               >
                                 <Image
                                   src={photoUrl}
@@ -511,7 +528,7 @@ export default function FMSAssessmentPage() {
           ) : (
             <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl">
               <CardContent className="p-12 text-center">
-                <ClipboardCheck className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                <ClipboardCheck className="w-16 h-16 text-[color:var(--fc-text-subtle)] mx-auto mb-4" />
                 <h3 className={`text-xl font-semibold ${theme.text} mb-2`}>
                   No assessments yet
                 </h3>
@@ -653,7 +670,7 @@ export default function FMSAssessmentPage() {
                       {formData.photos.map((photoUrl, index) => (
                         <div
                           key={index}
-                          className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 group"
+                          className="relative aspect-square rounded-lg overflow-hidden border border-[color:var(--fc-surface-card-border)] group"
                         >
                           <Image
                             src={photoUrl}

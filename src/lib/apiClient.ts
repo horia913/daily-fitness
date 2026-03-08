@@ -116,7 +116,12 @@ export const fetchApi = async (
           if (!authRetryUsed) {
             authRetryUsed = true
             logAuthEvent('refresh_attempt', { source: 'fetchApi', url })
-            await supabase.auth.refreshSession()
+            await Promise.race([
+              supabase.auth.refreshSession(),
+              new Promise<void>((_, reject) =>
+                setTimeout(() => reject(new Error('refresh_timeout')), 3000)
+              ),
+            ]).catch(() => { /* proceed without refresh */ })
             continue
           }
 
@@ -162,7 +167,12 @@ export const fetchApi = async (
       if (!authRetryUsed) {
         authRetryUsed = true
         logAuthEvent('refresh_attempt', { source: 'fetchApi', url })
-        await supabase.auth.refreshSession()
+        await Promise.race([
+          supabase.auth.refreshSession(),
+          new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error('refresh_timeout')), 3000)
+          ),
+        ]).catch(() => { /* proceed without refresh */ })
         continue
       }
 

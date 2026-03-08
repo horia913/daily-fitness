@@ -4,7 +4,11 @@ export interface MealPlan {
   id: string
   name: string
   description?: string
+  notes?: string
   target_calories?: number
+  target_protein?: number
+  target_carbs?: number
+  target_fat?: number
   coach_id: string
   difficulty_level?: string
   is_active: boolean
@@ -13,12 +17,37 @@ export interface MealPlan {
   category?: string
   meal_count?: number
   usage_count?: number
-  // Calculated fields
+  generated_config?: unknown
+  // Cached computed macro totals (written by saveGeneratedPlan / plan editor)
+  computed_calories?: number
+  computed_protein?: number
+  computed_carbs?: number
+  computed_fat?: number
+  computed_fiber?: number
+  // Legacy calculated fields
   actual_calories?: number
   actual_protein?: number
   actual_carbs?: number
   actual_fat?: number
   actual_fiber?: number
+}
+
+// ============================================================================
+// Macro totals types
+// ============================================================================
+
+export interface PlanMacros {
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  fiber: number
+}
+
+export interface MealMacros extends PlanMacros {
+  mealId: string
+  mealName: string
+  mealType: string
 }
 
 export interface Food {
@@ -158,13 +187,14 @@ export class MealPlanService {
   }
 
   // Meal plan methods
-  static async getMealPlans(coachId: string): Promise<MealPlan[]> {
-    const { data, error } = await supabase
+  static async getMealPlans(coachId: string, signal?: AbortSignal): Promise<MealPlan[]> {
+    const query = supabase
       .from('meal_plans')
       .select('*')
       .eq('coach_id', coachId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
+    const { data, error } = await (signal ? query.abortSignal(signal) : query)
 
     if (error) {
       console.error('Error fetching meal plans:', error)
@@ -393,23 +423,21 @@ export class MealPlanService {
     })
   }
 
-  // Meal Plan Assignment functions
-  static async assignMealPlanToClients(mealPlanId: string, clientIds: string[], coachId: string): Promise<void> {
-    // For each client, deactivate existing active meal plans before assigning new one
-    for (const clientId of clientIds) {
-      await supabase
-        .from('meal_plan_assignments')
-        .update({ is_active: false })
-        .eq('client_id', clientId)
-        .eq('is_active', true)
-    }
-
+  // Meal Plan Assignment functions (Phase N4: multiple active assignments per client allowed; optional label)
+  static async assignMealPlanToClients(
+    mealPlanId: string,
+    clientIds: string[],
+    coachId: string,
+    label?: string | null
+  ): Promise<void> {
+    const today = new Date().toISOString().split('T')[0]
     const assignments = clientIds.map(clientId => ({
       meal_plan_id: mealPlanId,
       client_id: clientId,
       coach_id: coachId,
-      start_date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
-      is_active: true // Ensure assignment is active by default
+      start_date: today,
+      is_active: true,
+      ...(label != null && label.trim() !== '' ? { label: label.trim() } : {}),
     }))
 
     const { error } = await supabase
@@ -436,6 +464,24 @@ export class MealPlanService {
         timestamp: Date.now()
       }))
     })
+  }
+
+  /** Update label on a meal plan assignment (Phase N4). */
+  static async updateAssignmentLabel(assignmentId: string, label: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('meal_plan_assignments')
+      .update({ label: label?.trim() || null, updated_at: new Date().toISOString() })
+      .eq('id', assignmentId)
+    if (error) throw error
+  }
+
+  /** Deactivate a meal plan assignment (set is_active = false; does not delete). */
+  static async deactivateAssignment(assignmentId: string): Promise<void> {
+    const { error } = await supabase
+      .from('meal_plan_assignments')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', assignmentId)
+    if (error) throw error
   }
 
   // ============================================================================
@@ -929,4 +975,129 @@ export class MealPlanService {
       return false
     }
   }
+}
+
+// ============================================================================
+// calculateMealPlanMacros
+// Standalone utility — calculates per-meal and daily macro totals from the
+// database using 4 batch queries (no N+1).
+// For plans with meal_options it uses Option 1 (lowest order_index).
+// For legacy plans without options it sums items where meal_option_id IS NULL.
+// ============================================================================
+
+function zeroPlanMacros(): PlanMacros {
+  return { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
+}
+
+function roundPlanMacros(m: PlanMacros): PlanMacros {
+  return {
+    calories: Math.round(m.calories * 10) / 10,
+    protein:  Math.round(m.protein  * 10) / 10,
+    carbs:    Math.round(m.carbs    * 10) / 10,
+    fat:      Math.round(m.fat      * 10) / 10,
+    fiber:    Math.round(m.fiber    * 10) / 10,
+  }
+}
+
+export async function calculateMealPlanMacros(
+  mealPlanId: string
+): Promise<{ daily: PlanMacros; perMeal: MealMacros[] }> {
+  // Step 1: Load meals (no joins)
+  const { data: mealsData } = await supabase
+    .from('meals')
+    .select('id, name, meal_type, order_index')
+    .eq('meal_plan_id', mealPlanId)
+    .order('order_index', { ascending: true })
+
+  if (!mealsData || mealsData.length === 0) {
+    return { daily: zeroPlanMacros(), perMeal: [] }
+  }
+
+  const mealIds = mealsData.map((m: any) => m.id)
+
+  // Step 2: Load first option per meal
+  const { data: optionsData } = await supabase
+    .from('meal_options')
+    .select('id, meal_id, order_index')
+    .in('meal_id', mealIds)
+    .order('order_index', { ascending: true })
+
+  const firstOptByMeal = new Map<string, string>()
+  ;(optionsData ?? []).forEach((o: any) => {
+    if (!firstOptByMeal.has(o.meal_id)) firstOptByMeal.set(o.meal_id, o.id)
+  })
+  const firstOptIds = Array.from(firstOptByMeal.values())
+
+  // Step 3: Load food items — option-scoped or legacy (no options)
+  let foodItems: any[] = []
+  if (firstOptIds.length > 0) {
+    const { data: items } = await supabase
+      .from('meal_food_items')
+      .select('meal_id, meal_option_id, food_id, quantity')
+      .in('meal_option_id', firstOptIds)
+    foodItems = items ?? []
+  } else {
+    // Legacy plan: items stored directly on the meal (meal_option_id IS NULL)
+    const { data: items } = await supabase
+      .from('meal_food_items')
+      .select('meal_id, food_id, quantity')
+      .in('meal_id', mealIds)
+      .is('meal_option_id', null)
+    foodItems = items ?? []
+  }
+
+  // Step 4: Load all unique foods in one batch
+  const foodIds = [...new Set(foodItems.map((fi: any) => fi.food_id))] as string[]
+  let foodsById = new Map<string, any>()
+  if (foodIds.length > 0) {
+    const { data: foods } = await supabase
+      .from('foods')
+      .select('id, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g, calories_per_serving, protein, carbs, fat, fiber, serving_size')
+      .in('id', foodIds)
+    foodsById = new Map((foods ?? []).map((f: any) => [f.id, f]))
+  }
+
+  // Aggregate per-meal totals
+  const mealTotalsMap = new Map<string, PlanMacros>()
+  mealsData.forEach((m: any) => mealTotalsMap.set(m.id, zeroPlanMacros()))
+
+  foodItems.forEach((item: any) => {
+    const food = foodsById.get(item.food_id)
+    if (!food) return
+    const totals = mealTotalsMap.get(item.meal_id)
+    if (!totals) return
+
+    if (food.calories_per_100g != null) {
+      const ratio = item.quantity / 100
+      totals.calories += food.calories_per_100g * ratio
+      totals.protein  += (food.protein_per_100g  || 0) * ratio
+      totals.carbs    += (food.carbs_per_100g    || 0) * ratio
+      totals.fat      += (food.fat_per_100g      || 0) * ratio
+      totals.fiber    += (food.fiber_per_100g    || 0) * ratio
+    } else {
+      const m = item.quantity / (food.serving_size || 1)
+      totals.calories += (food.calories_per_serving || 0) * m
+      totals.protein  += (food.protein  || 0) * m
+      totals.carbs    += (food.carbs    || 0) * m
+      totals.fat      += (food.fat      || 0) * m
+      totals.fiber    += (food.fiber    || 0) * m
+    }
+  })
+
+  const perMeal: MealMacros[] = mealsData.map((m: any) => ({
+    mealId:   m.id,
+    mealName: m.name,
+    mealType: m.meal_type,
+    ...roundPlanMacros(mealTotalsMap.get(m.id) ?? zeroPlanMacros()),
+  }))
+
+  const daily = roundPlanMacros({
+    calories: perMeal.reduce((s, m) => s + m.calories, 0),
+    protein:  perMeal.reduce((s, m) => s + m.protein,  0),
+    carbs:    perMeal.reduce((s, m) => s + m.carbs,    0),
+    fat:      perMeal.reduce((s, m) => s + m.fat,      0),
+    fiber:    perMeal.reduce((s, m) => s + m.fiber,    0),
+  })
+
+  return { daily, perMeal }
 }

@@ -51,7 +51,7 @@ interface CircuitSet {
 interface TabataCircuitTimerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  sets: CircuitSet[]; // For both tabata_sets and circuit_sets
+  sets: CircuitSet[]; // For tabata_sets
   totalRounds: number;
   exerciseLookup: Record<string, { name: string }>;
   onComplete?: () => void;

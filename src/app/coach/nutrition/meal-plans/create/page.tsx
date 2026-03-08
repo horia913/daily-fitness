@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MealPlanService } from "@/lib/mealPlanService";
+import { useToast } from "@/components/ui/toast-provider";
 import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 
@@ -21,6 +22,7 @@ export default function CreateMealPlanPage() {
   const { getThemeStyles, performanceSettings } = useTheme();
   const theme = getThemeStyles();
   const router = useRouter();
+  const { addToast } = useToast();
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -33,7 +35,7 @@ export default function CreateMealPlanPage() {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      alert("Please enter a meal plan name.");
+      addToast({ title: "Required", description: "Please enter a meal plan name.", variant: "destructive" });
       return;
     }
 
@@ -56,7 +58,7 @@ export default function CreateMealPlanPage() {
       }
     } catch (error) {
       console.error("Error creating meal plan:", error);
-      alert("Error creating meal plan. Please try again.");
+      addToast({ title: "Error", description: "Error creating meal plan. Please try again.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -68,6 +70,10 @@ export default function CreateMealPlanPage() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="p-4 sm:p-6 md:p-8 pb-32 relative z-10">
           <div className="max-w-4xl mx-auto space-y-6">
+            <Link href="/coach/nutrition" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              Back to Nutrition
+            </Link>
             <header className="flex items-center justify-between mb-8">
               <Link
                 href="/coach/nutrition"
@@ -76,7 +82,7 @@ export default function CreateMealPlanPage() {
                 <ArrowLeft className="w-5 h-5 fc-text-primary" />
               </Link>
               <div className="text-center flex-1 px-4">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight fc-text-primary">
+                <h1 className="text-2xl font-bold tracking-tight fc-text-primary">
                   Create Meal Plan
                 </h1>
                 <p className="text-sm fc-text-dim mt-1">

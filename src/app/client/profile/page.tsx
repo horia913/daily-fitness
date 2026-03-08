@@ -4,10 +4,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
+import { useToast } from '@/components/ui/toast-provider'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { DatabaseService } from '@/lib/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -38,8 +38,6 @@ import {
   Info,
   Star,
   Globe,
-  Moon,
-  Sun,
   Palette,
   Users,
   MessageCircle,
@@ -59,11 +57,13 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
+import { ClientPageShell, ClientGlassCard, SectionHeader, SecondaryButton, PrimaryButton } from '@/components/client-ui'
 
 export default function ClientProfilePage() {
   const { user, signOut } = useAuth()
   const router = useRouter()
-  const { isDark, performanceSettings, toggleTheme } = useTheme()
+  const { addToast } = useToast()
+  const { performanceSettings } = useTheme()
   // Check if we're viewing as another user (for coach view)
   const [viewAsUserId, setViewAsUserId] = useState<string | null>(null)
   const PROFILE_LOAD_TIMEOUT_MS = 30000
@@ -174,10 +174,28 @@ export default function ClientProfilePage() {
     }
   }, [])
 
+  const profileTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     const userId = viewAsUserId || user?.id
-    if (userId) {
-      loadProfile(userId)
+    if (!userId) return
+    if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current)
+    profileTimeoutRef.current = setTimeout(() => {
+      profileTimeoutRef.current = null
+      setLoading(false)
+      setLoadError("Loading took too long. Tap Retry to try again.")
+    }, 20_000)
+    loadProfile(userId).finally(() => {
+      if (profileTimeoutRef.current) {
+        clearTimeout(profileTimeoutRef.current)
+        profileTimeoutRef.current = null
+      }
+    })
+    return () => {
+      if (profileTimeoutRef.current) {
+        clearTimeout(profileTimeoutRef.current)
+        profileTimeoutRef.current = null
+      }
     }
   }, [user?.id, viewAsUserId, loadProfile])
 
@@ -187,13 +205,13 @@ export default function ClientProfilePage() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file')
+      addToast({ title: 'Please select an image file', variant: 'default' })
       return
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image size should be less than 5MB')
+      addToast({ title: 'Image size should be less than 5MB', variant: 'default' })
       return
     }
 
@@ -217,7 +235,7 @@ export default function ClientProfilePage() {
           : msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('network')
             ? "Couldn't upload photo. Check your connection and try again. If it keeps failing, ask your coach to check storage setup."
             : `Upload failed: ${msg}`
-        alert(friendlyMessage)
+        addToast({ title: friendlyMessage, variant: 'destructive' })
         setUploadingImage(false)
         return
       }
@@ -235,7 +253,7 @@ export default function ClientProfilePage() {
 
       if (updateError) {
         console.error('Profile picture update error:', updateError)
-        alert('Photo uploaded but profile could not be updated. Please try again.')
+        addToast({ title: 'Photo uploaded but profile could not be updated. Please try again.', variant: 'destructive' })
         setUploadingImage(false)
         return
       }
@@ -246,11 +264,11 @@ export default function ClientProfilePage() {
         setProfile((prev: any) => (prev ? { ...prev, avatar_url: publicUrl } : prev))
       }
       setAvatarUrlKey(Date.now())
-      alert('Profile picture updated successfully!')
+      addToast({ title: 'Profile picture updated successfully', variant: 'success' })
       
     } catch (error) {
       console.error('Profile picture upload exception:', error)
-      alert("Couldn't upload photo. Check your connection and try again.")
+      addToast({ title: "Couldn't upload photo. Check your connection and try again.", variant: 'destructive' })
     } finally {
       setUploadingImage(false)
     }
@@ -266,7 +284,7 @@ export default function ClientProfilePage() {
 
       if (error) {
         console.error('Error updating profile:', error)
-        alert('Error updating profile. Please try again.')
+        addToast({ title: "Couldn't update profile. Please try again.", variant: 'destructive' })
         return
       }
 
@@ -274,7 +292,7 @@ export default function ClientProfilePage() {
       setEditing(false)
     } catch (error) {
       console.error('Error updating profile:', error)
-      alert('Error updating profile. Please try again.')
+      addToast({ title: "Couldn't update profile. Please try again.", variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -370,21 +388,19 @@ export default function ClientProfilePage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page flex items-center justify-center min-h-[60vh]">
-            <div className="fc-glass fc-card p-8 max-w-md w-full text-center space-y-4">
+          <ClientPageShell className="max-w-6xl flex items-center justify-center min-h-[60vh]">
+            <ClientGlassCard className="p-8 max-w-md w-full text-center space-y-4">
               <p className="fc-text-primary font-medium">{loadError}</p>
-              <Button
-                type="button"
+              <PrimaryButton
                 onClick={() => {
                   if (retryUserId) loadProfile(retryUserId)
                   else loadProfile(user?.id)
                 }}
-                className="fc-btn fc-btn-primary"
               >
                 Retry
-              </Button>
-            </div>
-          </div>
+              </PrimaryButton>
+            </ClientGlassCard>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     )
@@ -395,15 +411,15 @@ export default function ClientProfilePage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page">
-            <div className="fc-glass fc-card p-8">
+          <ClientPageShell className="max-w-6xl">
+            <ClientGlassCard className="p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
                 <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
                 <div className="h-64 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
               </div>
-            </div>
-          </div>
+            </ClientGlassCard>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     )
@@ -416,7 +432,7 @@ export default function ClientProfilePage() {
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-4xl fc-page pb-24" style={{ gap: 'var(--fc-gap-sections)' }}>
+        <ClientPageShell className="max-w-4xl pb-32" style={{ gap: 'var(--fc-gap-sections)' }}>
           {/* Header: avatar + name + email + joined (mockup layout) */}
           <header className="flex flex-col md:flex-row items-center gap-8 mb-8 mt-4">
             <div className="relative group">
@@ -483,46 +499,33 @@ export default function ClientProfilePage() {
             </div>
           </header>
 
-          <div className="grid grid-cols-1 gap-8">
-            {/* Personal Information — full width, first */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 rounded-lg bg-[color:var(--fc-domain-workouts)]/10 flex items-center justify-center border border-[color:var(--fc-domain-workouts)]/20">
-                  <User className="w-5 h-5 fc-text-workouts" />
+          {/* Profile Mini Hub — Achievements, Goal History, Profile Information, Menu */}
+          <section>
+            <SectionHeader title="Profile Hub" />
+            <ClientGlassCard className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-start gap-3" onClick={() => router.push("/client/progress/achievements")}>
+                <Award className="w-5 h-5 fc-text-warning" />
+                <div className="text-left">
+                  <span className="font-semibold">Achievements</span>
+                  <p className="text-xs fc-text-dim font-normal">All achievements across Training, Nutrition, Lifestyle</p>
                 </div>
-                <h2 className="text-xl font-semibold fc-text-primary">Personal Information</h2>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="first_name" className="text-sm font-medium fc-text-dim ml-1">First Name</Label>
-                  <Input id="first_name" value={formData.first_name} onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))} disabled={!editing} className="fc-input rounded-xl" />
+              </Button>
+              <Button variant="outline" className="fc-btn fc-btn-ghost h-12 rounded-xl justify-start gap-3" onClick={() => router.push("/client/goals/history")}>
+                <Target className="w-5 h-5 fc-text-success" />
+                <div className="text-left">
+                  <span className="font-semibold">Goal History</span>
+                  <p className="text-xs fc-text-dim font-normal">Track goals across the app</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="last_name" className="text-sm font-medium fc-text-dim ml-1">Last Name</Label>
-                  <Input id="last_name" value={formData.last_name} onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))} disabled={!editing} className="fc-input rounded-xl" />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="email" className="text-sm font-medium fc-text-dim ml-1">Email Address</Label>
-                  <Input id="email" type="email" value={formData.email} disabled className="fc-input rounded-xl opacity-70 cursor-not-allowed" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-sm font-medium fc-text-dim ml-1">Phone Number</Label>
-                  <Input id="phone" value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} disabled={!editing} placeholder="+1 (555) 000-0000" className="fc-input rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="date_of_birth" className="text-sm font-medium fc-text-dim ml-1">Date of Birth</Label>
-                  <Input id="date_of_birth" type="date" value={formData.date_of_birth} onChange={(e) => setFormData(prev => ({ ...prev, date_of_birth: e.target.value }))} disabled={!editing} className="fc-input rounded-xl" />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="bio" className="text-sm font-medium fc-text-dim ml-1">About Me</Label>
-                  <Textarea id="bio" value={formData.bio} onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))} disabled={!editing} rows={3} className="fc-input rounded-xl resize-none" />
-                </div>
-              </div>
-            </GlassCard>
+              </Button>
+            </div>
+          </ClientGlassCard>
+          </section>
 
+          <div className="grid grid-cols-1 gap-8">
             {/* Preferences | Notifications — two columns */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
+              <ClientGlassCard className="p-8">
                 <div className="flex items-center gap-3 mb-8">
                   <div className="w-10 h-10 rounded-lg bg-[color:var(--fc-status-success)]/10 flex items-center justify-center border border-[color:var(--fc-status-success)]/20">
                     <Settings className="w-5 h-5 fc-text-success" />
@@ -540,16 +543,6 @@ export default function ClientProfilePage() {
                       <button type="button" onClick={() => setAppSettings(prev => ({ ...prev, units: 'imperial' }))} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${appSettings.units === 'imperial' ? 'fc-glass border border-[color:var(--fc-glass-border)]' : 'fc-text-dim hover:fc-text-primary'}`}>LB</button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium fc-text-primary">Theme</div>
-                      <div className="text-xs fc-text-subtle">{isDark ? 'Dark' : 'Light'}</div>
-                    </div>
-                    <div className="flex fc-glass-soft p-1 rounded-xl border border-[color:var(--fc-glass-border)]">
-                      <button type="button" onClick={() => !isDark || toggleTheme()} className={`px-3 py-1.5 rounded-lg transition-colors ${!isDark ? 'fc-text-primary fc-glass border border-[color:var(--fc-glass-border)]' : 'fc-text-dim hover:fc-text-primary'}`}><Sun className="w-4 h-4" /></button>
-                      <button type="button" onClick={() => isDark || toggleTheme()} className={`px-3 py-1.5 rounded-lg transition-colors ${isDark ? 'fc-text-primary fc-glass border border-[color:var(--fc-glass-border)]' : 'fc-text-dim hover:fc-text-primary'}`}><Moon className="w-4 h-4" /></button>
-                    </div>
-                  </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold fc-text-subtle uppercase tracking-widest">Language</Label>
                     <Select value={appSettings.language} onValueChange={(v) => setAppSettings(prev => ({ ...prev, language: v }))}>
@@ -562,9 +555,9 @@ export default function ClientProfilePage() {
                     </Select>
                   </div>
                 </div>
-              </GlassCard>
+              </ClientGlassCard>
 
-              <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
+              <ClientGlassCard className="p-8">
                 <div className="flex items-center gap-3 mb-8">
                   <div className="w-10 h-10 rounded-lg bg-[color:var(--fc-status-error)]/10 flex items-center justify-center border border-[color:var(--fc-status-error)]/20">
                     <Bell className="w-5 h-5 fc-text-error" />
@@ -582,16 +575,16 @@ export default function ClientProfilePage() {
                       <span className="fc-text-primary flex items-center gap-2"><Icon className="w-4 h-4 fc-text-subtle" />{label}</span>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" checked={(notifications as any)[key]} onChange={(e) => setNotifications(prev => ({ ...prev, [key]: e.target.checked }))} className="sr-only peer" />
-                        <div className="relative w-12 h-6 rounded-full bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)] peer-checked:bg-[color:var(--fc-status-success)] peer-checked:border-[color:var(--fc-status-success)] transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-white after:border after:border-[color:var(--fc-glass-border)] after:transition-transform peer-checked:after:translate-x-6" />
+                        <div className="relative w-12 h-6 rounded-full bg-[color:var(--fc-glass-soft)] border border-[color:var(--fc-glass-border)] peer-checked:bg-[color:var(--fc-status-success)] peer-checked:border-[color:var(--fc-status-success)] transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:rounded-full after:bg-[color:var(--fc-surface)] after:border after:border-[color:var(--fc-glass-border)] after:transition-transform peer-checked:after:translate-x-6" />
                       </label>
                     </div>
                   ))}
                 </div>
-              </GlassCard>
+              </ClientGlassCard>
             </div>
 
             {/* Account & Privacy — toggles + action buttons */}
-            <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
+            <ClientGlassCard className="p-8">
               <div className="flex items-center gap-3 mb-8">
                 <div className="w-10 h-10 rounded-lg fc-glass-soft flex items-center justify-center border border-[color:var(--fc-glass-border)]">
                   <Shield className="w-5 h-5 fc-text-subtle" />
@@ -616,7 +609,7 @@ export default function ClientProfilePage() {
                   Delete
                 </Button>
               </div>
-            </GlassCard>
+            </ClientGlassCard>
 
           {/* Goals & Preferences */}
           <Card className="fc-glass fc-card rounded-3xl overflow-hidden">
@@ -859,7 +852,7 @@ export default function ClientProfilePage() {
           </Card>
 
           </div>
-        </div>
+        </ClientPageShell>
 
         {/* Password Change Modal */}
         {showPasswordModal && (
@@ -876,6 +869,7 @@ export default function ClientProfilePage() {
                     setPasswordError('')
                     setPasswordSuccess(false)
                   }}
+                  className="min-w-11 min-h-11"
                 >
                   <X className="w-5 h-5" />
                 </Button>

@@ -19,6 +19,7 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { InlineRPERow } from "../ui/InlineRPERow";
 import { supabase } from "@/lib/supabase";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
@@ -45,7 +46,9 @@ export function ForTimeExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
+  onPlateCalculatorClick,
   onRestTimerClick,
+  previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -56,6 +59,8 @@ export function ForTimeExecutor({
   const loggedSetsList = loggedSets ?? [];
 
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  /** Collapsible set history: show all sets or only last 2 */
+  const [showAllSets, setShowAllSets] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -108,7 +113,7 @@ export function ForTimeExecutor({
 
   console.log("ForTimeExecutor DEBUG:", {
     blockId: block?.block?.id,
-    blockType: block?.block?.block_type,
+    blockType: block?.block?.set_type,
     currentExercise: currentExercise,
     currentExerciseKeys: currentExercise
       ? Object.keys(currentExercise)
@@ -166,8 +171,8 @@ export function ForTimeExecutor({
     const loadExerciseName = async () => {
       // If no exercises, use block name or "For Time"
       if (exercises.length === 0) {
-        if (block.block.block_name) {
-          setExerciseNameState(block.block.block_name);
+        if (block.block.set_name) {
+          setExerciseNameState(block.block.set_name);
         } else {
           setExerciseNameState("For Time");
         }
@@ -186,8 +191,8 @@ export function ForTimeExecutor({
       }
 
       // Try block name
-      if (block.block.block_name) {
-        setExerciseNameState(block.block.block_name);
+      if (block.block.set_name) {
+        setExerciseNameState(block.block.set_name);
         return;
       }
 
@@ -219,7 +224,7 @@ export function ForTimeExecutor({
     };
 
     loadExerciseName();
-  }, [currentExercise, exercises, block.block.block_name]);
+  }, [currentExercise, exercises, block.block.set_name]);
 
   const exerciseName = exerciseNameState;
 
@@ -340,7 +345,7 @@ export function ForTimeExecutor({
 
   const instructions =
     currentExercise?.notes ||
-    block.block.block_notes ||
+    block.block.set_notes ||
     "Complete all exercises as fast as possible. Focus on form and efficiency.";
 
   const handleStartTimer = () => {
@@ -376,7 +381,7 @@ export function ForTimeExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "ForTimeExecutor",
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -395,7 +400,7 @@ export function ForTimeExecutor({
     if (isNaN(repsNum) || repsNum <= 0) return;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.block_type, {
+      const payload = buildSetEditPatchPayload(block.block.set_type, {
         exercise_id: exercises[0]?.exercise_id ?? undefined,
         weight: !isNaN(weightNum) && weightNum >= 0 ? weightNum : undefined,
         fortime_total_reps: repsNum,
@@ -404,7 +409,7 @@ export function ForTimeExecutor({
         console.log("[SAVE EDITS]", {
           executor: "ForTimeExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -419,7 +424,7 @@ export function ForTimeExecutor({
           id: editingSetId,
           exercise_id:
             current?.exercise_id ?? currentExercise?.exercise_id ?? "",
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: current?.set_number ?? 1,
           weight_kg: weightNum,
           reps_completed: repsNum,
@@ -537,7 +542,7 @@ export function ForTimeExecutor({
 
       // Build the log data - exercise_id is optional for fortime blocks
       const logData: any = {
-        block_type: "fortime",
+        set_type: "fortime",
         fortime_total_reps: repsNum,
         fortime_time_taken_sec: completionTimeToLog,
         fortime_time_cap_sec: timeCapMinutes * 60,
@@ -565,7 +570,7 @@ export function ForTimeExecutor({
         const newEntry: LoggedSet = {
           id: setLogId,
           exercise_id: exerciseIdToUse || "",
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: 1,
           weight_kg: weightNum > 0 ? weightNum : 0,
           reps_completed: repsNum,
@@ -627,55 +632,121 @@ export function ForTimeExecutor({
             background: "var(--fc-surface-sunken)",
           }}
         >
-          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
-            Logged
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+              Logged
+            </div>
+            {loggedSetsList.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSets(!showAllSets)}
+                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
+              >
+                {showAllSets ? (
+                  <>Show less ▲</>
+                ) : (
+                  <>Show all {loggedSetsList.length} sets ▼</>
+                )}
+              </button>
+            )}
           </div>
           <ul className="space-y-1.5">
-            {loggedSetsList.map((setEntry) => (
+            {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
+              // Calculate the actual index in the full list for isLatestSet
+              const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
+              const isLatestSet = actualIndex === loggedSetsList.length - 1;
+              return (
               <li
                 key={setEntry.id}
-                className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
                 style={{ background: "var(--fc-surface-elevated)" }}
               >
-                <span className="text-sm fc-text-primary">
-                  {setEntry.weight_kg != null && setEntry.weight_kg > 0
-                    ? `${setEntry.weight_kg} kg × `
-                    : ""}
-                  {setEntry.reps_completed ?? "—"} reps
-                </span>
-                <div className="relative flex items-center">
-                  <button
-                    type="button"
-                    className="p-1.5 rounded-md hover:bg-black/10"
-                    onClick={() =>
-                      setMenuOpenSetId(
-                        menuOpenSetId === setEntry.id ? null : setEntry.id,
-                      )
-                    }
-                    aria-label="Options"
-                  >
-                    <MoreVertical className="w-4 h-4 fc-text-dim" />
-                  </button>
-                  {menuOpenSetId === setEntry.id && (
-                    <div
-                      className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
-                      style={{
-                        background: "var(--fc-surface-elevated)",
-                        border: "1px solid var(--fc-surface-card-border)",
-                      }}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm fc-text-primary">
+                    {setEntry.weight_kg != null && setEntry.weight_kg > 0
+                      ? `${setEntry.weight_kg} kg × `
+                      : ""}
+                    {setEntry.reps_completed ?? "—"} reps
+                  </span>
+                  <div className="relative flex items-center">
+                    <button
+                      type="button"
+                      className="p-1.5 rounded-md hover:bg-black/10"
+                      onClick={() =>
+                        setMenuOpenSetId(
+                          menuOpenSetId === setEntry.id ? null : setEntry.id,
+                        )
+                      }
+                      aria-label="Options"
                     >
-                      <button
-                        type="button"
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
-                        onClick={() => handleEditSet(setEntry)}
+                      <MoreVertical className="w-4 h-4 fc-text-dim" />
+                    </button>
+                    {menuOpenSetId === setEntry.id && (
+                      <div
+                        className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
+                        style={{
+                          background: "var(--fc-surface-elevated)",
+                          border: "1px solid var(--fc-surface-card-border)",
+                        }}
                       >
-                        <Pencil className="w-4 h-4" /> Edit
-                      </button>
-                    </div>
-                  )}
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
+                          onClick={() => handleEditSet(setEntry)}
+                        >
+                          <Pencil className="w-4 h-4" /> Edit
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+                <InlineRPERow
+                  setLogId={setEntry.id.startsWith("temp-") ? null : setEntry.id}
+                  currentRPE={setEntry.rpe ?? null}
+                  onRPESelect={async (rpe) => {
+                    const updatedEntry: LoggedSet = {
+                      ...setEntry,
+                      rpe,
+                    };
+                    onSetLogUpsert?.(block.block.id, updatedEntry, {
+                      replaceId: setEntry.id,
+                    });
+
+                    if (!setEntry.id.startsWith("temp-")) {
+                      try {
+                        const res = await fetch(`/api/sets/${setEntry.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ rpe }),
+                          credentials: "include",
+                        });
+                        if (!res.ok) {
+                          console.error("Failed to update RPE:", await res.text());
+                          const revertedEntry: LoggedSet = {
+                            ...setEntry,
+                            rpe: setEntry.rpe ?? undefined,
+                          };
+                          onSetLogUpsert?.(block.block.id, revertedEntry, {
+                            replaceId: setEntry.id,
+                          });
+                        }
+                      } catch (err) {
+                        console.error("Error updating RPE:", err);
+                        const revertedEntry: LoggedSet = {
+                          ...setEntry,
+                          rpe: setEntry.rpe ?? undefined,
+                        };
+                        onSetLogUpsert?.(block.block.id, revertedEntry, {
+                          replaceId: setEntry.id,
+                        });
+                      }
+                    }
+                  }}
+                  isLatestSet={isLatestSet}
+                />
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}
@@ -961,7 +1032,9 @@ export function ForTimeExecutor({
         calculateSuggestedWeight,
         onVideoClick,
         onAlternativesClick,
+        onPlateCalculatorClick,
         onRestTimerClick,
+        previousPerformanceMap,
       }}
       exerciseName={exerciseName}
       blockDetails={blockDetails}

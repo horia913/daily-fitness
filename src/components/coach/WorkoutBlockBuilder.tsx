@@ -28,6 +28,7 @@ import {
   GripVertical,
   Timer,
 } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
   WorkoutBlock,
   WorkoutBlockExercise,
@@ -73,8 +74,8 @@ export default function WorkoutBlockBuilder({
         selectedBlockType,
         blocks.length + 1,
         {
-          block_name: WORKOUT_BLOCK_CONFIGS[selectedBlockType].name,
-          block_notes: "",
+          set_name: WORKOUT_BLOCK_CONFIGS[selectedBlockType].name,
+          set_notes: "",
           rest_seconds: 60,
           total_sets: 3,
           reps_per_set: "10-12",
@@ -94,7 +95,7 @@ export default function WorkoutBlockBuilder({
 
   // Delete block
   const handleDeleteBlock = async (blockId: string) => {
-    if (confirm("Are you sure you want to delete this block?")) {
+    if (confirm("Are you sure you want to delete this set entry?")) {
       setLoading(true);
       try {
         const success = await WorkoutBlockService.deleteWorkoutBlock(blockId);
@@ -167,7 +168,7 @@ export default function WorkoutBlockBuilder({
         onBlocksChange(
           reorderedBlocks.map((block, index) => ({
             ...block,
-            block_order: index + 1,
+            set_order: index + 1,
           }))
         );
       }
@@ -184,7 +185,7 @@ export default function WorkoutBlockBuilder({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-xl font-bold fc-text-primary">
-            Workout Blocks
+            Exercises
           </h3>
           <p className="text-sm fc-text-dim">
             Build your workout using different training protocols
@@ -192,10 +193,10 @@ export default function WorkoutBlockBuilder({
         </div>
         <Button
           onClick={() => setShowAddBlock(true)}
-          className="fc-btn fc-btn-primary fc-press"
+          variant="fc-primary"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Add Block
+          Add Exercise
         </Button>
       </div>
 
@@ -205,13 +206,12 @@ export default function WorkoutBlockBuilder({
           <div className="p-4 sm:p-6 border-b border-[color:var(--fc-glass-border)]">
             <div className="flex items-center justify-between">
               <div className="text-lg font-semibold fc-text-primary">
-                Add New Block
+                Add New Set Entry
               </div>
               <Button
-                variant="ghost"
+                variant="fc-ghost"
                 size="sm"
                 onClick={() => setShowAddBlock(false)}
-                className="fc-btn fc-btn-ghost"
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -226,8 +226,8 @@ export default function WorkoutBlockBuilder({
                   <div className="text-xs fc-text-dim">
                     <p className="font-semibold mb-1">Volume Calculator Active</p>
                     <p>
-                      Only resistance training blocks are available. Time-based blocks
-                      (AMRAP, EMOM, For Time, Tabata, Circuit) are excluded from volume calculations.
+                      Only resistance training exercises are available. Time-based exercises
+                      (AMRAP, EMOM, For Time, Tabata) are excluded from volume calculations.
                     </p>
                   </div>
                 </div>
@@ -261,11 +261,11 @@ export default function WorkoutBlockBuilder({
               <Button
                 onClick={handleAddBlock}
                 disabled={loading}
-                className="fc-btn fc-btn-primary fc-press"
+                variant="fc-primary"
               >
-                {loading ? "Adding..." : "Add Block"}
+                {loading ? "Adding..." : "Add Exercise"}
               </Button>
-              <Button variant="outline" onClick={() => setShowAddBlock(false)} className="fc-btn fc-btn-secondary">
+              <Button variant="fc-secondary" onClick={() => setShowAddBlock(false)}>
                 Cancel
               </Button>
             </div>
@@ -273,10 +273,10 @@ export default function WorkoutBlockBuilder({
         </div>
       )}
 
-      {/* Blocks List */}
+      {/* Exercises list */}
       <div className="space-y-4">
         {blocks.map((block, index) => {
-          const config = WORKOUT_BLOCK_CONFIGS[block.block_type];
+          const config = WORKOUT_BLOCK_CONFIGS[block.set_type];
 
           return (
             <div
@@ -287,12 +287,12 @@ export default function WorkoutBlockBuilder({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="fc-icon-tile fc-icon-workouts text-sm font-bold">
-                      {block.block_order}
+                      {block.set_order}
                     </div>
                     <div>
                       <div className="text-lg font-semibold fc-text-primary flex items-center gap-2">
                         <span className="text-xl">{config.icon}</span>
-                        {block.block_name || config.name}
+                        {block.set_name || config.name}
                       </div>
                       <p className="text-sm fc-text-dim">
                         {config.description}
@@ -303,40 +303,36 @@ export default function WorkoutBlockBuilder({
                   <div className="flex items-center gap-2">
                     {/* Reorder Buttons */}
                     <Button
-                      variant="ghost"
+                      variant="fc-ghost"
                       size="sm"
                       onClick={() => handleReorderBlocks(block.id, "up")}
                       disabled={index === 0 || loading}
-                      className="fc-btn fc-btn-ghost"
                     >
                       <ArrowUp className="w-4 h-4" />
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="fc-ghost"
                       size="sm"
                       onClick={() => handleReorderBlocks(block.id, "down")}
                       disabled={index === blocks.length - 1 || loading}
-                      className="fc-btn fc-btn-ghost"
                     >
                       <ArrowDown className="w-4 h-4" />
                     </Button>
 
                     {/* Edit Button */}
                     <Button
-                      variant="ghost"
+                      variant="fc-ghost"
                       size="sm"
                       onClick={() => setEditingBlock(block)}
-                      className="fc-btn fc-btn-ghost"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
 
                     {/* Delete Button */}
                     <Button
-                      variant="ghost"
+                      variant="fc-destructive"
                       size="sm"
                       onClick={() => handleDeleteBlock(block.id)}
-                      className="fc-btn fc-btn-ghost fc-text-error"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -345,7 +341,7 @@ export default function WorkoutBlockBuilder({
               </div>
 
               <div className="p-4 sm:p-6">
-                {/* Block Info */}
+                {/* Set entry info */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   {block.rest_seconds != null && (
                     <div className="flex items-center gap-2">
@@ -381,11 +377,11 @@ export default function WorkoutBlockBuilder({
                   )}
                 </div>
 
-                {/* Block Notes */}
-                {block.block_notes && (
+                {/* Set Notes */}
+                {block.set_notes && (
                   <div className="fc-glass-soft rounded-lg p-3 mb-4 border border-[color:var(--fc-glass-border)]">
                     <p className="text-sm fc-text-dim">
-                      {block.block_notes}
+                      {block.set_notes}
                     </p>
                   </div>
                 )}
@@ -438,19 +434,20 @@ export default function WorkoutBlockBuilder({
                         ))}
                     </div>
                   ) : (
-                    <div className="text-center py-6 fc-text-dim">
-                      <Dumbbell className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                      <p>No exercises added to this block</p>
+                    <div className="py-6">
+                      <EmptyState
+                        variant="inline"
+                        title="No exercises in this set entry"
+                      />
                       <Button
-                        variant="outline"
+                        variant="fc-secondary"
                         size="sm"
-                        className="mt-2 fc-btn fc-btn-secondary"
                         onClick={() => {
                           // TODO: Open exercise selector
                         }}
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        Add Exercise
+                        Add exercise
                       </Button>
                     </div>
                   )}
@@ -464,24 +461,13 @@ export default function WorkoutBlockBuilder({
       {/* Empty State */}
       {blocks.length === 0 && (
         <div className="fc-glass fc-card border border-[color:var(--fc-glass-border)] rounded-2xl">
-          <div className="text-center py-12 px-6">
-            <div className="w-16 h-16 fc-glass-soft rounded-full flex items-center justify-center mx-auto mb-4 border border-[color:var(--fc-glass-border)]">
-              <Dumbbell className="w-8 h-8 fc-text-subtle" />
-            </div>
-            <h3 className="text-lg font-semibold fc-text-primary mb-2">
-              No Workout Blocks Yet
-            </h3>
-            <p className="fc-text-dim mb-4">
-              Start building your workout by adding different training blocks
-            </p>
-            <Button
-              onClick={() => setShowAddBlock(true)}
-              className="fc-btn fc-btn-primary fc-press"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Your First Block
-            </Button>
-          </div>
+          <EmptyState
+            icon={Dumbbell}
+            title="No set entries yet"
+            description="Add your first set entry to build this workout."
+            actionLabel="Add set entry"
+            onAction={() => setShowAddBlock(true)}
+          />
         </div>
       )}
     </div>

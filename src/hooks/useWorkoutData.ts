@@ -88,13 +88,13 @@ export function useWorkoutAssignments(userId: string) {
             .filter(Boolean)
         )]
 
-        // Batch query for exercise counts using workout_blocks (exercises are nested under blocks)
+        // Batch query for exercise counts using workout_set_entries (exercises are nested under set entries)
         const exerciseCountMap = new Map<string, number>()
         
         if (templateIds.length > 0) {
-          // Get blocks for all templates in one query
+          // Get set entries for all templates in one query
           const { data: blocksData, error: blocksError } = await supabase
-            .from('workout_blocks')
+            .from('workout_set_entries')
             .select('template_id, id')
             .in('template_id', templateIds)
 
@@ -102,19 +102,19 @@ export function useWorkoutAssignments(userId: string) {
             const blockIds = blocksData.map(b => b.id)
             
             if (blockIds.length > 0) {
-              // Get exercise counts from workout_block_exercises in one query
+              // Get exercise counts from workout_set_entry_exercises in one query
               const { data: exercisesData } = await supabase
-                .from('workout_block_exercises')
-                .select('block_id')
-                .in('block_id', blockIds)
+                .from('workout_set_entry_exercises')
+                .select('set_entry_id')
+                .in('set_entry_id', blockIds)
 
-              // Build block to template mapping
+              // Build set entry to template mapping
               const blockToTemplate = new Map<string, string>()
               blocksData.forEach(b => blockToTemplate.set(b.id, b.template_id))
 
               // Count exercises per template
               exercisesData?.forEach(ex => {
-                const templateId = blockToTemplate.get(ex.block_id)
+                const templateId = blockToTemplate.get(ex.set_entry_id)
                 if (templateId) {
                   exerciseCountMap.set(templateId, (exerciseCountMap.get(templateId) || 0) + 1)
                 }

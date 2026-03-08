@@ -168,7 +168,7 @@ export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreator
 
   return (
     <div 
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center p-4 pt-20 pb-20 z-[9999]"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]"
       onClick={(e) => {
         // Don't close if clicking on Select dropdown
         if ((e.target as HTMLElement).closest('[data-slot="select-content"]')) {
@@ -199,7 +199,7 @@ export default function MealCreator({ mealPlanId, onClose, onSave }: MealCreator
             onClick={onClose}
             variant="ghost"
             size="sm"
-            className="p-2 fc-btn fc-btn-ghost"
+            className="p-2 min-w-11 min-h-11 flex items-center justify-center fc-btn fc-btn-ghost"
           >
             <X className="w-4 h-4" />
           </Button>

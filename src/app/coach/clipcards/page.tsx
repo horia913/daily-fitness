@@ -125,14 +125,11 @@ export default function CoachClipCards() {
         .order('sessions_count')
 
       if (typesError) {
-          console.log('ClipCard types table error:', typesError)
         setClipcardTypes([])
       } else {
-          console.log('ClipCard types loaded successfully:', typesData?.length || 0, 'items')
         setClipcardTypes(typesData || [])
         }
-      } catch (error) {
-        console.log('ClipCard types table error:', error)
+      } catch {
         setClipcardTypes([])
       }
 
@@ -146,14 +143,11 @@ export default function CoachClipCards() {
         .order('created_at', { ascending: false })
 
       if (clipcardsError) {
-          console.log('ClipCards table error:', clipcardsError)
         setClipcards([])
       } else {
-          console.log('ClipCards loaded successfully:', clipcardsData?.length || 0, 'items')
         setClipcards(clipcardsData || [])
         }
-      } catch (error) {
-        console.log('ClipCards table error:', error)
+      } catch {
         setClipcards([])
       }
 
@@ -164,7 +158,6 @@ export default function CoachClipCards() {
         .eq('role', 'client')
 
       if (clientsError) {
-        console.log('Clients not found, using empty array')
         setClients([])
       } else {
         setClients(clientsData || [])
@@ -295,7 +288,7 @@ export default function CoachClipCards() {
                   <ChevronRight className="w-3 h-3" />
                   <span className="fc-text-primary">CLIPCARDS</span>
                 </nav>
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight fc-text-primary">Voucher Matrix</h1>
+                <h1 className="text-2xl font-bold tracking-tight fc-text-primary">Voucher Matrix</h1>
                 <p className="fc-text-dim mt-2">Manage session packages and client accessibility.</p>
               </div>
               <div className="flex items-center gap-3">
@@ -479,13 +472,7 @@ export default function CoachClipCards() {
 
             {/* Create Package Modal */}
           <Dialog open={showCreateType} onOpenChange={setShowCreateType}>
-              <DialogContent className={`${theme.card} ${theme.shadow} rounded-2xl border-0 shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[90vh] !w-[min(500px,95vw)] !m-0 !p-6`} style={{
-                backgroundColor: theme.card.includes('dark') ? '#1E1E1E' : '#FFFFFF',
-                border: theme.card.includes('dark') ? '1px solid #374151' : '1px solid #E5E7EB',
-                boxShadow: theme.card.includes('dark') 
-                  ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05)' 
-                  : '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-              }}>
+              <DialogContent className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[90vh] !w-[min(500px,95vw)] !m-0 !p-6">
                 <DialogHeader className="space-y-3">
                   <DialogTitle className={`text-2xl font-bold ${theme.text} leading-tight`}>Create ClipCard Package</DialogTitle>
                   <DialogDescription className={`text-base ${theme.textSecondary} leading-relaxed`}>
@@ -549,13 +536,7 @@ export default function CoachClipCards() {
 
             {/* Create ClipCard Modal */}
           <Dialog open={showCreateClipCard} onOpenChange={setShowCreateClipCard}>
-              <DialogContent className={`${theme.card} ${theme.shadow} rounded-2xl border-0 shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[90vh] !w-[min(500px,95vw)] !m-0 !p-6`} style={{
-                backgroundColor: theme.card.includes('dark') ? '#1E1E1E' : '#FFFFFF',
-                border: theme.card.includes('dark') ? '1px solid #374151' : '1px solid #E5E7EB',
-                boxShadow: theme.card.includes('dark') 
-                  ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05)' 
-                  : '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-              }}>
+              <DialogContent className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[90vh] !w-[min(500px,95vw)] !m-0 !p-6">
                 <DialogHeader className="space-y-3">
                   <DialogTitle className={`text-2xl font-bold ${theme.text} leading-tight`}>Assign ClipCard to Client</DialogTitle>
                   <DialogDescription className={`text-base ${theme.textSecondary} leading-relaxed`}>

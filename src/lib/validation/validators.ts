@@ -61,23 +61,21 @@ export const WorkoutBlockTypeSchema = z.enum([
   'drop_set',
   'cluster_set',
   'rest_pause',
-  'pyramid_set',
   'ladder',
   'pre_exhaustion',
   'amrap',
   'emom',
   'for_time',
   'tabata',
-  'circuit',
   'hr_sets'
 ])
 
 export const WorkoutBlockSchema = z.object({
   template_id: z.string().uuid('Invalid template ID'),
-  block_type: WorkoutBlockTypeSchema,
-  block_order: z.number().int('Block order must be an integer').min(1, 'Block order must be at least 1'),
-  block_name: z.string().max(255, 'Block name must be 255 characters or less').optional().nullable(),
-  block_notes: z.string().max(2000, 'Block notes must be 2000 characters or less').optional().nullable(),
+  set_type: WorkoutBlockTypeSchema,
+  set_order: z.number().int('Set order must be an integer').min(1, 'Set order must be at least 1'),
+  set_name: z.string().max(255, 'Set name must be 255 characters or less').optional().nullable(),
+  set_notes: z.string().max(2000, 'Set notes must be 2000 characters or less').optional().nullable(),
   duration_seconds: z.number().int('Duration must be an integer').min(1).max(36000).optional().nullable(),
   rest_seconds: z.number().int('Rest seconds must be an integer').min(0).max(3600).optional().nullable(),
   total_sets: z.number().int('Total sets must be an integer').min(1).max(100).optional().nullable(),

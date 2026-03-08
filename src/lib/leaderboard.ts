@@ -21,10 +21,15 @@ export interface LeaderboardEntry {
 export interface PersonalRecord {
   id: string
   client_id: string
-  exercise_name: string
-  weight: number
-  reps: number
-  achieved_at: string
+  exercise_id: string
+  record_type: string
+  record_value: number
+  record_unit: string
+  achieved_date: string
+  exercises?: {
+    id: string
+    name: string
+  }
 }
 
 /**
@@ -74,37 +79,53 @@ export async function fetchLeaderboardData(
 
     // Fetch all personal records for these users within time filter
     const userIds = profiles.map(p => p.id)
+    const cutoffDateStr = cutoffDate.split('T')[0] // Convert to DATE format YYYY-MM-DD
     const { data: prs, error: prError } = await supabase
       .from('personal_records')
-      .select('*')
+      .select(`
+        *,
+        exercises (
+          id,
+          name
+        )
+      `)
       .in('client_id', userIds)
-      .gte('achieved_at', cutoffDate)
-      .order('achieved_at', { ascending: false })
+      .eq('is_current_record', true)
+      .gte('achieved_date', cutoffDateStr)
+      .order('achieved_date', { ascending: false })
 
     if (prError) throw prError
 
     // Process data into leaderboard entries
     const leaderboard: LeaderboardEntry[] = profiles.map(profile => {
       // Get the best record for each exercise for this user
-      const userPRs = prs?.filter(pr => pr.client_id === profile.id) || []
+      const userPRs = (prs || []).filter((pr: PersonalRecord) => pr.client_id === profile.id)
       
       const getBestLift = (exerciseName: string): number => {
-        const exercisePRs = userPRs.filter(pr => 
-          pr.exercise_name.toLowerCase().includes(exerciseName.toLowerCase())
-        )
+        const exercisePRs = userPRs.filter((pr: PersonalRecord) => {
+          const prExerciseName = pr.exercises?.name?.toLowerCase() || ''
+          return prExerciseName.includes(exerciseName.toLowerCase())
+        })
         if (exercisePRs.length === 0) return 0
         
-        // For bodyweight exercises (pushups, chinups), use reps
+        // For bodyweight exercises (pushups, chinups), use reps (record_type = 'reps')
         if (exerciseName === 'pushup' || exerciseName === 'chinup') {
-          return Math.max(...exercisePRs.map(pr => pr.reps || 0))
+          const repsPRs = exercisePRs.filter((pr: PersonalRecord) => pr.record_type === 'reps')
+          if (repsPRs.length === 0) return 0
+          return Math.max(...repsPRs.map((pr: PersonalRecord) => pr.record_value || 0))
         }
         
-        // For weighted exercises, calculate 1RM estimate
+        // For weighted exercises, use weight PRs and calculate 1RM estimate
         // Formula: Weight × (1 + Reps/30)
-        return Math.max(...exercisePRs.map(pr => {
-          const weight = pr.weight || 0
-          const reps = pr.reps || 1
-          return weight * (1 + reps / 30)
+        // Note: We only have record_value for weight, not reps, so we estimate conservatively
+        const weightPRs = exercisePRs.filter((pr: PersonalRecord) => pr.record_type === 'weight')
+        if (weightPRs.length === 0) return 0
+        
+        // Use the max weight value (conservative 1RM estimate assumes 1 rep)
+        return Math.max(...weightPRs.map((pr: PersonalRecord) => {
+          const weight = pr.record_value || 0
+          // Since we don't have reps stored with weight PRs, estimate conservatively as 1RM
+          return weight
         }))
       }
 

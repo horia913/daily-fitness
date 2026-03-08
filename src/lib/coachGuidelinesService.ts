@@ -4,7 +4,7 @@
  * Data is loaded from database tables with in-memory caching for performance
  */
 
-import type { WorkoutBlock, WorkoutBlockExercise } from '@/types/workoutBlocks';
+import type { WorkoutSetEntry as WorkoutBlock, WorkoutSetEntryExercise as WorkoutBlockExercise } from '@/types/workoutSetEntries';
 import { getVolumeCalculationMuscleGroups } from './constants/muscleGroups';
 import { supabase } from './supabase';
 
@@ -294,24 +294,21 @@ const GUIDELINE_CATEGORIES = [
 // BLOCK TYPES FOR VOLUME CALCULATOR
 // ============================================================================
 
-const VOLUME_CALCULATOR_BLOCK_TYPES: WorkoutBlock['block_type'][] = [
+const VOLUME_CALCULATOR_BLOCK_TYPES: WorkoutBlock['set_type'][] = [
   'straight_set',
   'superset',
   'giant_set',
   'drop_set',
   'cluster_set',
   'rest_pause',
-  'pyramid_set',
-  'ladder',
   'pre_exhaustion',
 ];
 
-const TIME_BASED_BLOCK_TYPES: WorkoutBlock['block_type'][] = [
+const TIME_BASED_BLOCK_TYPES: WorkoutBlock['set_type'][] = [
   'amrap',
   'emom',
   'for_time',
   'tabata',
-  'circuit',
 ];
 
 // ============================================================================
@@ -329,7 +326,7 @@ export function isGuidelineCategory(category: string): boolean {
  * Get allowed block types for volume calculator
  * Returns only block types that contribute to volume (excludes time-based blocks)
  */
-export function getAllowedBlockTypesForVolumeCalculator(): WorkoutBlock['block_type'][] {
+export function getAllowedBlockTypesForVolumeCalculator(): WorkoutBlock['set_type'][] {
   return [...VOLUME_CALCULATOR_BLOCK_TYPES];
 }
 
@@ -431,7 +428,7 @@ export function calculateVolumePerMuscleGroup(
   
   // Filter out time-based blocks
   const resistanceBlocks = blocks.filter(
-    (block) => !TIME_BASED_BLOCK_TYPES.includes(block.block_type)
+    (block) => !TIME_BASED_BLOCK_TYPES.includes(block.set_type)
   );
   
   for (const block of resistanceBlocks) {
@@ -443,7 +440,7 @@ export function calculateVolumePerMuscleGroup(
     const setsForBlock = block.total_sets || 1;
     
     // For pre_exhaustion blocks, count both exercises separately
-    if (block.block_type === 'pre_exhaustion') {
+    if (block.set_type === 'pre_exhaustion') {
       for (const exercise of block.exercises) {
         const sets = exercise.sets || setsForBlock;
         const muscleGroup = getPrimaryMuscleGroup(exercise.exercise as ExerciseWithMuscleGroup);

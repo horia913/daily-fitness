@@ -19,9 +19,11 @@ import WorkoutTemplateService from "@/lib/workoutTemplateService";
 import { supabase } from "@/lib/supabase";
 import { BookOpen, ArrowLeft, Info } from "lucide-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useToast } from "@/components/ui/toast-provider";
 
 function CreateProgramContent() {
   const { user } = useAuth();
+  const { addToast } = useToast();
   const { isDark, getSemanticColor, performanceSettings } = useTheme();
 
   const [name, setName] = useState("");
@@ -89,23 +91,18 @@ function CreateProgramContent() {
         coach_id: user.id,
         is_active: true,
       };
-      
-      console.log("🔍 Creating program with payload:", payload);
-      
+
       const created = await WorkoutTemplateService.createProgram(payload);
-      
-      console.log("🔍 Create program result:", created);
-      
+
       if (created?.id) {
-        console.log("✅ Program created successfully, redirecting to:", `/coach/programs/${created.id}/edit`);
         window.location.href = `/coach/programs/${created.id}/edit`;
       } else {
         console.error("❌ Program creation failed: createProgram returned null");
-        alert("Failed to create program. Please check the console for details and try again.");
+        addToast({ title: "Failed to create program. Please check the console for details and try again.", variant: "destructive" });
       }
     } catch (error) {
       console.error("❌ Error creating program:", error);
-      alert(`Error creating program: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`);
+      addToast({ title: `Error creating program: ${error instanceof Error ? error.message : "Unknown error"}. Please try again.`, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -128,7 +125,7 @@ function CreateProgramContent() {
             <span className="fc-text-primary">New Creation</span>
           </nav>
           <header className="mb-10">
-            <h1 className="text-3xl font-bold tracking-tight fc-text-primary mb-2">
+            <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">
               Create Training Program
             </h1>
             <p className="fc-text-dim">

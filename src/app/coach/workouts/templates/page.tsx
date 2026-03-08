@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useRouter } from "next/navigation";
@@ -35,12 +35,16 @@ import {
   Copy as CopyIcon,
   Trash2,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import WorkoutTemplateCard from "@/components/features/workouts/WorkoutTemplateCard";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ui/toast-provider";
 
 export default function WorkoutTemplatesPage() {
   const { user } = useAuth();
+  const { addToast } = useToast();
   const { getSemanticColor, performanceSettings } = useTheme();
   const router = useRouter();
 
@@ -65,49 +69,55 @@ export default function WorkoutTemplatesPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const coachId = user?.id || "";
+  const loadingRef = useRef(false);
+  const didLoadRef = useRef(false);
 
-  const loadAssignmentCounts = useCallback(async (cid: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("workout_assignments")
-        .select("workout_template_id")
-        .eq("coach_id", cid);
-
-      if (error) {
-        console.warn("Could not load assignment counts:", error.message);
-        return;
-      }
-
-      const counts: Record<string, number> = {};
-      (data || []).forEach((row: any) => {
-        const templateId = row.workout_template_id;
-        if (templateId) {
-          counts[templateId] = (counts[templateId] || 0) + 1;
-        }
-      });
-      setAssignmentCountByTemplate(counts);
-    } catch (err) {
-      console.warn("Error loading assignment counts:", err);
-    }
-  }, []);
-
-  const loadTemplates = useCallback(async (cid: string) => {
+  const loadData = useCallback(async (signal?: AbortSignal) => {
+    if (!coachId) return;
+    if (didLoadRef.current) return;
+    if (loadingRef.current) return;
+    didLoadRef.current = true;
+    loadingRef.current = true;
     setLoading(true);
     try {
-      const list = await WorkoutTemplateService.getWorkoutTemplates(cid);
-      setTemplates(list || []);
-    } catch {
+      const res = await fetch("/api/coach/workouts/templates", { signal: signal ?? null });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
+      const { templates: list, assignmentCountByTemplate: counts } = await res.json();
+      setTemplates(Array.isArray(list) ? list : []);
+      setAssignmentCountByTemplate(counts && typeof counts === "object" ? counts : {});
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
+        didLoadRef.current = false;
+        return;
+      }
+      console.error("Error loading templates:", err);
+      didLoadRef.current = false;
       setTemplates([]);
+      setAssignmentCountByTemplate({});
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
-  }, []);
+  }, [coachId]);
 
   useEffect(() => {
     if (!coachId) return;
-    loadTemplates(coachId);
-    loadAssignmentCounts(coachId);
-  }, [coachId, loadTemplates, loadAssignmentCounts]);
+    const ac = new AbortController();
+    loadData(ac.signal);
+    return () => {
+      didLoadRef.current = false;
+      loadingRef.current = false;
+      ac.abort();
+    };
+  }, [coachId, loadData]);
+
+  const refetch = useCallback(() => {
+    didLoadRef.current = false;
+    loadData();
+  }, [loadData]);
 
   // Filter clients based on search query
   const filteredClients = useMemo(() => {
@@ -221,7 +231,7 @@ export default function WorkoutTemplatesPage() {
   const submitAssign = useCallback(async () => {
     if (!assignTemplateId || selectedClients.length === 0) return;
     if (!coachId) {
-      alert("You must be signed in as a coach to assign workouts.");
+      addToast({ title: "You must be signed in as a coach to assign workouts.", variant: "destructive" });
       return;
     }
 
@@ -278,31 +288,33 @@ export default function WorkoutTemplatesPage() {
       }
 
       if (failureCount > 0) {
-        alert(
-          `Assigned ${successCount} workout(s), but ${failureCount} failed. Check console for details.`
-        );
+        addToast({
+          title: `Assigned ${successCount} workout(s), but ${failureCount} failed. Check console for details.`,
+          variant: "destructive",
+        });
       } else if (successCount > 0) {
-        alert(
-          `Workout template assigned to ${selectedClients.length} client(s) successfully!`
-        );
+        addToast({
+          title: `Workout template assigned to ${selectedClients.length} client(s) successfully!`,
+          variant: "success",
+        });
       }
 
       if (successCount > 0) {
-        await loadAssignmentCounts(coachId);
+        refetch();
       }
       setShowAssignModal(false);
       setClientSearchQuery("");
       setSelectedClients([]);
     } catch (error) {
       console.error("Error assigning template:", error);
-      alert("Error assigning template. Please try again.");
+      addToast({ title: "Error assigning template. Please try again.", variant: "destructive" });
     }
   }, [
     assignTemplateId,
     selectedClients,
     coachId,
     assignStartDate,
-    loadAssignmentCounts,
+    refetch,
     clients,
   ]);
 
@@ -376,7 +388,14 @@ export default function WorkoutTemplatesPage() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
 
-        <div className="relative z-10 min-h-screen pb-24">
+        <div className="relative z-10 min-h-screen pb-32">
+          {/* Back to Training */}
+          <div className="max-w-6xl mx-auto px-4 pt-4 sm:px-6">
+            <Link href="/coach/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-2">
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              Back to Training
+            </Link>
+          </div>
           {/* Sticky search bar */}
           <nav className="sticky top-0 z-50 fc-glass border-b border-[color:var(--fc-glass-border)] backdrop-blur-md px-4 py-4 sm:px-6">
             <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-4 items-center">
@@ -426,7 +445,7 @@ export default function WorkoutTemplatesPage() {
                     <span className="fc-badge fc-glass-soft text-[color:var(--fc-text-primary)]">
                       Template Library
                     </span>
-                    <h1 className="mt-3 text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    <h1 className="mt-3 text-2xl font-bold fc-text-primary">
                       Workout Templates
                     </h1>
                     <p className="text-sm text-[color:var(--fc-text-dim)]">
@@ -440,8 +459,7 @@ export default function WorkoutTemplatesPage() {
                     variant="ghost"
                     onClick={() => {
                       if (coachId) {
-                        loadTemplates(coachId);
-                        loadAssignmentCounts(coachId);
+                        refetch();
                       }
                     }}
                     className="fc-btn fc-btn-ghost"
@@ -620,31 +638,33 @@ export default function WorkoutTemplatesPage() {
 
             {/* Templates List */}
             {filteredAndSortedTemplates.length === 0 ? (
-              <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-12 text-center">
-                <Dumbbell
-                  className="w-24 h-24 mx-auto mb-6 fc-text-dim"
-                />
-                <h3 className="text-2xl font-bold mb-3 text-[color:var(--fc-text-primary)]">
-                  {searchTerm ||
+              <EmptyState
+                icon={<Dumbbell className="h-8 w-8" />}
+                title={
+                  searchTerm ||
                   selectedDifficulty !== "all" ||
                   selectedDuration !== "all"
                     ? "No templates found"
-                    : "No workout templates yet"}
-                </h3>
-                <p className="text-sm mb-6 max-w-md mx-auto text-[color:var(--fc-text-dim)]">
-                  {searchTerm ||
+                    : "No workout templates yet"
+                }
+                description={
+                  searchTerm ||
                   selectedDifficulty !== "all" ||
                   selectedDuration !== "all"
-                    ? "Try adjusting your filters"
-                    : "Create your first workout template to get started"}
-                </p>
-                <Link href="/coach/workouts/templates/create">
-                  <Button className="fc-btn fc-btn-primary">
-                    <Plus className="w-5 h-5 mr-2" />
-                    Create Your First Template
-                  </Button>
-                </Link>
-              </div>
+                    ? "Try adjusting your search or filter criteria to find the templates you're looking for."
+                    : "Create your first workout template to get started building your training library."
+                }
+                action={
+                  !searchTerm &&
+                  selectedDifficulty === "all" &&
+                  selectedDuration === "all"
+                    ? {
+                        label: "Create Your First Template",
+                        onClick: () => router.push("/coach/workouts/templates/create"),
+                      }
+                    : undefined
+                }
+              />
             ) : (
               <div
                 className={
@@ -673,7 +693,7 @@ export default function WorkoutTemplatesPage() {
                         WorkoutTemplateService.deleteWorkoutTemplate(
                           template.id
                         ).then(() => {
-                          loadTemplates(coachId);
+                          refetch();
                         });
                       }
                     }}
@@ -683,7 +703,7 @@ export default function WorkoutTemplatesPage() {
                           template.id,
                           `${template.name} (Copy)`
                         );
-                      if (dup) loadTemplates(coachId);
+                      if (dup) refetch();
                     }}
                     onAssign={() => openAssignModal(template.id)}
                   />

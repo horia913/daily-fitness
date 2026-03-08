@@ -52,9 +52,12 @@ export interface SetLoggingOrchestrator {
   /** Manual retry for a syncFailed entry */
   retrySync: (key: IdempotencyKey) => void;
 
+  /** Update RPE for a pending entry (for inline RPE updates) */
+  updateRPE: (setLogId: string, rpe: number) => void;
+
   // --- State for UI bindings ---
 
-  /** True when RPE modal should be shown */
+  /** True when RPE modal should be shown (deprecated - kept for compatibility, always false now) */
   showRpeModal: boolean;
 
   /** True when rest timer should be shown (UI-only, does not gate sync) */
@@ -262,16 +265,21 @@ export function useSetLoggingOrchestrator(
         params.payload,
       );
 
-      // Transition: idle → pendingLocal → awaitingRPE
-      entry.state = SetInstanceState.AwaitingRPE;
+      // Transition: idle → pendingLocal → pendingSync (skip RPE modal)
+      // RPE is now handled inline after set logging, not blocking
+      entry.state = SetInstanceState.PendingSync;
+      entry.rpe = null; // No RPE initially, can be added later via inline row
 
       usedKeysRef.current.add(key);
       pendingRef.current.set(key, entry);
       persist();
 
-      // Open RPE modal
+      // Start background sync immediately (no RPE modal delay)
+      startBackgroundSync(key);
+
+      // Signal rest timer should open immediately (no RPE delay)
+      setShouldOpenRestTimer(true);
       setActiveKey(key);
-      setShowRpeModal(true);
       setPendingVersion((v) => v + 1);
 
       return { accepted: true, key };
@@ -349,6 +357,63 @@ export function useSetLoggingOrchestrator(
     [sessionId, persist],
   );
 
+  // ---- updateRPE (for inline RPE updates after set is logged) ----
+  const updateRPE = useCallback(
+    (setLogId: string, rpe: number) => {
+      // Find the pending entry by serverSetLogId (if synced) or by matching temp ID pattern
+      // For optimistic sets, we match by finding the most recent entry with matching block/exercise
+      let targetEntry: PendingSetEntry | null = null;
+      
+      // First try to find by serverSetLogId (synced sets)
+      for (const entry of pendingRef.current.values()) {
+        if (entry.serverSetLogId === setLogId) {
+          targetEntry = entry;
+          break;
+        }
+      }
+
+      // If not found and setLogId looks like a temp ID, find the most recent pending entry
+      // that hasn't synced yet (for optimistic sets)
+      if (!targetEntry && setLogId.startsWith("temp-")) {
+        const entries = Array.from(pendingRef.current.values())
+          .filter(e => e.state === SetInstanceState.PendingSync || e.state === SetInstanceState.AwaitingRPE)
+          .sort((a, b) => b.createdAt - a.createdAt);
+        if (entries.length > 0) {
+          targetEntry = entries[0]; // Most recent pending entry
+        }
+      }
+
+      if (targetEntry) {
+        targetEntry.rpe = rpe;
+        persist();
+        setPendingVersion((v) => v + 1);
+
+        // If entry hasn't synced yet, update the payload so RPE is included in sync
+        if (targetEntry.state === SetInstanceState.PendingSync || targetEntry.state === SetInstanceState.AwaitingRPE) {
+          // RPE will be included in the next sync via buildSyncPayload
+        } else if (targetEntry.state === SetInstanceState.Synced && targetEntry.serverSetLogId) {
+          // Set is already synced, update via API
+          (async () => {
+            try {
+              const res = await fetch(`/api/sets/${targetEntry!.serverSetLogId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rpe }),
+                credentials: "include",
+              });
+              if (!res.ok) {
+                console.error("Failed to update RPE for synced set:", await res.text());
+              }
+            } catch (err) {
+              console.error("Error updating RPE for synced set:", err);
+            }
+          })();
+        }
+      }
+    },
+    [persist],
+  );
+
   // ---- Derive activeEntry for UI ----
   const activeEntry = activeKey ? pendingRef.current.get(activeKey) ?? null : null;
 
@@ -358,7 +423,8 @@ export function useSetLoggingOrchestrator(
     confirmRpe,
     skipRpe,
     retrySync: retrySyncFn,
-    showRpeModal,
+    updateRPE,
+    showRpeModal: false, // Always false now - RPE modal is deprecated
     shouldOpenRestTimer,
     ackRestTimerOpened,
     activeEntry,

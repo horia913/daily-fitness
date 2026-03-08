@@ -258,7 +258,7 @@ export default function HabitCategoriesPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 pb-24">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6 pb-32">
       {/* Header */}
       <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

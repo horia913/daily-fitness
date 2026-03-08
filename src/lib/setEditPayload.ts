@@ -1,8 +1,8 @@
 /**
  * Build PATCH payload for /api/sets/[id] — edit set log.
- * Single source of truth: only whitelisted keys per block_type, no undefined values.
+ * Single source of truth: only whitelisted keys per set_type, no undefined values.
  * Mirrors server whitelist in src/app/api/sets/[id]/route.ts.
- * App block_type (e.g. drop_set, pre_exhaustion, for_time) is normalized to API names.
+ * App set_type (e.g. drop_set, pre_exhaustion, for_time) is normalized to API names.
  */
 const BLOCK_TYPE_TO_API: Record<string, string> = {
   drop_set: 'dropset',

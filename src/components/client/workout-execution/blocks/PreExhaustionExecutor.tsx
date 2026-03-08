@@ -20,8 +20,10 @@ import { LargeInput } from "../ui/LargeInput";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
+import { ProgressionNudge } from "../ui/ProgressionNudge";
 import { getCoachSuggestedWeight } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
@@ -44,9 +46,12 @@ export function PreExhaustionExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
+  onPlateCalculatorClick,
   onRestTimerClick,
   onSetComplete,
   onLastSetLoggedForRest,
+  progressionSuggestionsMap,
+  previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -75,6 +80,8 @@ export function PreExhaustionExecutor({
   const [timerSeconds, setTimerSeconds] = useState(restBetween);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  /** Collapsible set history: show all sets or only last 2 */
+  const [showAllSets, setShowAllSets] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -265,7 +272,7 @@ export function PreExhaustionExecutor({
     }
   }
 
-  const instructions = block.block.block_notes || undefined;
+  const instructions = block.block.set_notes || undefined;
 
   const maxViewableSet =
     loggedSetsList.length === 0
@@ -300,7 +307,7 @@ export function PreExhaustionExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "PreExhaustionExecutor",
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -332,7 +339,7 @@ export function PreExhaustionExecutor({
     }
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.block_type, {
+      const payload = buildSetEditPatchPayload(block.block.set_type, {
         set_number: editDraft.set_number,
         preexhaust_isolation_exercise_id:
           isolationExercise?.exercise_id ?? undefined,
@@ -347,7 +354,7 @@ export function PreExhaustionExecutor({
         console.log("[SAVE EDITS]", {
           executor: "PreExhaustionExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -435,7 +442,7 @@ export function PreExhaustionExecutor({
     try {
       // Log pre-exhaustion as a single call with both exercises
       const logData: any = {
-        block_type: "preexhaust",
+        set_type: "preexhaust",
         set_number: completedSets + 1,
       };
 
@@ -465,7 +472,7 @@ export function PreExhaustionExecutor({
           {
             id: setLogId,
             exercise_id: isolationExercise.exercise_id,
-            block_id: block.block.id,
+            set_entry_id: block.block.id,
             set_number: setNumber,
             weight_kg: isolationWeightNum,
             reps_completed: isolationRepsNum,
@@ -474,7 +481,7 @@ export function PreExhaustionExecutor({
           {
             id: setLogId,
             exercise_id: compoundExercise.exercise_id,
-            block_id: block.block.id,
+            set_entry_id: block.block.id,
             set_number: setNumber,
             weight_kg: compoundWeightNum,
             reps_completed: compoundRepsNum,
@@ -534,11 +541,31 @@ export function PreExhaustionExecutor({
             background: "var(--fc-surface-sunken)",
           }}
         >
-          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
-            Logged sets
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+              Logged sets
+            </div>
+            {setNumbersLogged.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSets(!showAllSets)}
+                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
+              >
+                {showAllSets ? (
+                  <>Show less ▲</>
+                ) : (
+                  <>Show all {setNumbersLogged.length} sets ▼</>
+                )}
+              </button>
+            )}
           </div>
           <ul className="space-y-1.5">
-            {setNumbersLogged.map((setNum) => {
+            {(showAllSets ? setNumbersLogged : setNumbersLogged.slice(-2)).map((setNum) => {
+              // Calculate the actual index in the full list for isLatestSet
+              const actualIndex = showAllSets 
+                ? setNumbersLogged.indexOf(setNum)
+                : setNumbersLogged.length - 2 + setNumbersLogged.slice(-2).indexOf(setNum);
+              const isLatestSet = actualIndex === setNumbersLogged.length - 1;
               const forSet = loggedSetsList.filter(
                 (s) => s.set_number === setNum,
               );
@@ -552,44 +579,93 @@ export function PreExhaustionExecutor({
                 ) || forSet[1];
               const label = `Set ${setNum}: Iso ${iso?.weight_kg ?? "—"}×${iso?.reps_completed ?? "—"}${comp ? `, Comp ${comp.weight_kg ?? "—"}×${comp.reps_completed ?? "—"}` : ""}`;
               const firstId = forSet[0]?.id ?? "";
+              const rpeForSet = iso?.rpe ?? comp?.rpe ?? null;
               return (
                 <li
                   key={`set-${setNum}`}
-                  className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                  className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
                   style={{ background: "var(--fc-surface-elevated)" }}
                 >
-                  <span className="text-sm fc-text-primary">{label}</span>
-                  <div className="relative flex items-center">
-                    <button
-                      type="button"
-                      className="p-1.5 rounded-md hover:bg-black/10"
-                      onClick={() =>
-                        setMenuOpenSetId(
-                          menuOpenSetId === firstId ? null : firstId,
-                        )
-                      }
-                      aria-label="Options"
-                    >
-                      <MoreVertical className="w-4 h-4 fc-text-dim" />
-                    </button>
-                    {menuOpenSetId === firstId && (
-                      <div
-                        className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
-                        style={{
-                          background: "var(--fc-surface-elevated)",
-                          border: "1px solid var(--fc-surface-card-border)",
-                        }}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm fc-text-primary">{label}</span>
+                    <div className="relative flex items-center">
+                      <button
+                        type="button"
+                        className="p-1.5 rounded-md hover:bg-black/10"
+                        onClick={() =>
+                          setMenuOpenSetId(
+                            menuOpenSetId === firstId ? null : firstId,
+                          )
+                        }
+                        aria-label="Options"
                       >
-                        <button
-                          type="button"
-                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
-                          onClick={() => handleEditSet(forSet[0])}
+                        <MoreVertical className="w-4 h-4 fc-text-dim" />
+                      </button>
+                      {menuOpenSetId === firstId && (
+                        <div
+                          className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
+                          style={{
+                            background: "var(--fc-surface-elevated)",
+                            border: "1px solid var(--fc-surface-card-border)",
+                          }}
                         >
-                          <Pencil className="w-4 h-4" /> Edit
-                        </button>
-                      </div>
-                    )}
+                          <button
+                            type="button"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
+                            onClick={() => handleEditSet(forSet[0])}
+                          >
+                            <Pencil className="w-4 h-4" /> Edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  <InlineRPERow
+                    setLogId={firstId.startsWith("temp-") ? null : firstId}
+                    currentRPE={rpeForSet}
+                    onRPESelect={async (rpe) => {
+                      // Update RPE for the isolation exercise entry (represents the set)
+                      const updatedEntry: LoggedSet = {
+                        ...iso!,
+                        rpe,
+                      };
+                      onSetLogUpsert?.(block.block.id, updatedEntry, {
+                        replaceId: iso!.id,
+                      });
+
+                      // If set is synced, update via API
+                      if (!firstId.startsWith("temp-")) {
+                        try {
+                          const res = await fetch(`/api/sets/${firstId}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ rpe }),
+                            credentials: "include",
+                          });
+                          if (!res.ok) {
+                            console.error("Failed to update RPE:", await res.text());
+                            const revertedEntry: LoggedSet = {
+                              ...iso!,
+                              rpe: iso!.rpe ?? undefined,
+                            };
+                            onSetLogUpsert?.(block.block.id, revertedEntry, {
+                              replaceId: iso!.id,
+                            });
+                          }
+                        } catch (err) {
+                          console.error("Error updating RPE:", err);
+                          const revertedEntry: LoggedSet = {
+                            ...iso!,
+                            rpe: iso!.rpe ?? undefined,
+                          };
+                          onSetLogUpsert?.(block.block.id, revertedEntry, {
+                            replaceId: iso!.id,
+                          });
+                        }
+                      }
+                    }}
+                    isLatestSet={isLatestSet}
+                  />
                 </li>
               );
             })}
@@ -648,6 +724,16 @@ export function PreExhaustionExecutor({
             />
           )}
         </div>
+        {isolationExercise?.exercise_id && (
+          <ProgressionNudge
+            suggestion={progressionSuggestionsMap?.get(isolationExercise.exercise_id)}
+            previousPerformance={previousPerformanceMap?.get(isolationExercise.exercise_id) ?? null}
+            onApplySuggestion={(w, r) => {
+              if (w != null) setIsolationWeight(String(w));
+              if (r != null) setIsolationReps(String(r));
+            }}
+          />
+        )}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <LargeInput
@@ -732,6 +818,16 @@ export function PreExhaustionExecutor({
             />
           )}
         </div>
+        {compoundExercise?.exercise_id && (
+          <ProgressionNudge
+            suggestion={progressionSuggestionsMap?.get(compoundExercise.exercise_id)}
+            previousPerformance={previousPerformanceMap?.get(compoundExercise.exercise_id) ?? null}
+            onApplySuggestion={(w, r) => {
+              if (w != null) setCompoundWeight(String(w));
+              if (r != null) setCompoundReps(String(r));
+            }}
+          />
+        )}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <LargeInput
@@ -857,6 +953,7 @@ export function PreExhaustionExecutor({
         calculateSuggestedWeight,
         onVideoClick,
         onAlternativesClick,
+        onPlateCalculatorClick,
         onRestTimerClick,
       }}
       exerciseName={`${isolationExercise?.exercise?.name || "Isolation"} + ${

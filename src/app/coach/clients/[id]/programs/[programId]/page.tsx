@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -20,7 +20,9 @@ import {
   Play,
   Pause,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  SkipForward,
+  X,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -78,6 +80,12 @@ function ClientProgramDetailsContent() {
   const [client, setClient] = useState<ClientProfile | null>(null)
   const [progress, setProgress] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  // Skip-day state
+  const [completedScheduleIds, setCompletedScheduleIds] = useState<Set<string>>(new Set())
+  const [skippedScheduleIds, setSkippedScheduleIds] = useState<Set<string>>(new Set())
+  const [skippingId, setSkippingId] = useState<string | null>(null)
+  const [skipReason, setSkipReason] = useState('')
+  const [skipLoading, setSkipLoading] = useState(false)
 
   const difficultyColors: Record<string, string> = {
     'beginner': 'fc-text-success',
@@ -101,8 +109,26 @@ function ClientProgramDetailsContent() {
     'cancelled': 'fc-text-error'
   }
 
+  const programDetailTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
-    loadData()
+    if (programDetailTimeoutRef.current) clearTimeout(programDetailTimeoutRef.current)
+    programDetailTimeoutRef.current = setTimeout(() => {
+      programDetailTimeoutRef.current = null
+      setLoading(false)
+    }, 20_000)
+    loadData().finally(() => {
+      if (programDetailTimeoutRef.current) {
+        clearTimeout(programDetailTimeoutRef.current)
+        programDetailTimeoutRef.current = null
+      }
+    })
+    return () => {
+      if (programDetailTimeoutRef.current) {
+        clearTimeout(programDetailTimeoutRef.current)
+        programDetailTimeoutRef.current = null
+      }
+    }
   }, [clientId, programId])
 
   const loadData = async () => {
@@ -171,6 +197,26 @@ function ClientProgramDetailsContent() {
           .maybeSingle()
 
         if (progressData) setProgress(progressData)
+
+        // Load completed/skipped slots for skip-day UI badges
+        const { data: completionsData } = await supabase
+          .from('program_day_completions')
+          .select('program_schedule_id, notes')
+          .eq('program_assignment_id', assignmentData.id)
+
+        if (completionsData) {
+          const completedIds = new Set<string>()
+          const skippedIds = new Set<string>()
+          completionsData.forEach(c => {
+            if (c.notes?.startsWith('Skipped by coach')) {
+              skippedIds.add(c.program_schedule_id)
+            } else {
+              completedIds.add(c.program_schedule_id)
+            }
+          })
+          setCompletedScheduleIds(completedIds)
+          setSkippedScheduleIds(skippedIds)
+        }
       }
 
     } catch (error) {
@@ -196,6 +242,36 @@ function ClientProgramDetailsContent() {
     } catch (error) {
       console.error('Error updating status:', error)
       alert('Failed to update program status')
+    }
+  }
+
+  const handleSkipDay = async (scheduleId: string) => {
+    if (!assignment) return
+    setSkipLoading(true)
+    try {
+      const res = await fetch('/api/coach/program-assignments/skip-day', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          programAssignmentId: assignment.id,
+          programScheduleId: scheduleId,
+          reason: skipReason.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error || 'Failed to skip day')
+        return
+      }
+      // Update local state — move to skipped set
+      setSkippedScheduleIds(prev => new Set([...prev, scheduleId]))
+      setSkippingId(null)
+      setSkipReason('')
+    } catch (err) {
+      console.error('Error skipping day:', err)
+      alert('Unexpected error — please try again')
+    } finally {
+      setSkipLoading(false)
     }
   }
 
@@ -241,7 +317,7 @@ function ClientProgramDetailsContent() {
             <Link href={`/coach/clients/${clientId}`}>
               <Button className="fc-btn fc-btn-primary">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Client
+                Back to Client Hub
               </Button>
             </Link>
           </div>
@@ -256,9 +332,9 @@ function ClientProgramDetailsContent() {
       
       <div className="relative z-10 mx-auto w-full max-w-7xl fc-page flex flex-col" style={{ gap: "var(--fc-gap-sections)" }}>
         {/* Back */}
-        <Link href={`/coach/clients/${clientId}`} className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-4 py-2.5 w-fit text-[color:var(--fc-text-primary)]">
+        <Link href={`/coach/clients/${clientId}`} className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-4 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
           <ArrowLeft className="w-4 h-4" />
-          Back to {clientName}
+          Back to Client Hub
         </Link>
 
         {/* Header */}
@@ -275,7 +351,7 @@ function ClientProgramDetailsContent() {
                     {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
                   </span>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-bold fc-text-primary">
+                <h1 className="text-2xl font-bold fc-text-primary">
                   {program.name}
                 </h1>
                 <p className="fc-text-dim mt-1">
@@ -466,17 +542,47 @@ function ClientProgramDetailsContent() {
                   Week {weekNum}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {scheduleByWeek[weekNum].map((item, idx) => (
-                    <Link 
-                      key={item.id || idx}
-                      href={`/coach/workouts/templates/${item.template_id}`}
-                      className="block"
-                    >
-                      <div className="p-4 rounded-xl fc-glass-soft border border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-domain-workouts)] transition-colors cursor-pointer">
-                        <h4 className="font-semibold fc-text-primary mb-2 truncate">
-                          {item.workout_templates?.name || 'Workout'}
-                        </h4>
-                        <div className="flex flex-wrap items-center gap-2 text-xs fc-text-dim">
+                  {scheduleByWeek[weekNum].map((item, idx) => {
+                    const isCompleted = completedScheduleIds.has(item.id)
+                    const isSkipped = skippedScheduleIds.has(item.id)
+                    const isDone = isCompleted || isSkipped
+                    const isSkipping = skippingId === item.id
+
+                    return (
+                      <div
+                        key={item.id || idx}
+                        className={`p-4 rounded-xl fc-glass-soft border transition-colors ${
+                          isCompleted
+                            ? 'border-[color:var(--fc-text-success)] opacity-75'
+                            : isSkipped
+                            ? 'border-[color:var(--fc-text-warning)] opacity-75'
+                            : 'border-[color:var(--fc-glass-border)]'
+                        }`}
+                      >
+                        {/* Card header — name + status badge */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <Link
+                            href={`/coach/workouts/templates/${item.template_id}`}
+                            className="font-semibold fc-text-primary truncate hover:underline text-sm"
+                          >
+                            {item.workout_templates?.name || 'Workout'}
+                          </Link>
+                          {isCompleted && (
+                            <span className="shrink-0 flex items-center gap-1 text-xs fc-text-success">
+                              <CheckCircle className="w-3 h-3" />
+                              Done
+                            </span>
+                          )}
+                          {isSkipped && (
+                            <span className="shrink-0 flex items-center gap-1 text-xs fc-text-warning">
+                              <SkipForward className="w-3 h-3" />
+                              Skipped
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Day/duration meta */}
+                        <div className="flex flex-wrap items-center gap-2 text-xs fc-text-dim mb-3">
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
                             Day {item.day_of_week + 1}
@@ -486,14 +592,57 @@ function ClientProgramDetailsContent() {
                             {item.workout_templates?.estimated_duration || 60}m
                           </span>
                         </div>
+
                         {item.workout_templates?.difficulty_level && (
-                          <span className={`mt-2 inline-block fc-pill fc-pill-glass text-xs ${difficultyColors[item.workout_templates.difficulty_level]}`}>
+                          <span className={`mb-3 inline-block fc-pill fc-pill-glass text-xs ${difficultyColors[item.workout_templates.difficulty_level]}`}>
                             {item.workout_templates.difficulty_level}
                           </span>
                         )}
+
+                        {/* Skip action — only for incomplete days on active/paused programs */}
+                        {!isDone && assignment?.status !== 'completed' && assignment?.status !== 'cancelled' && (
+                          <>
+                            {!isSkipping ? (
+                              <button
+                                onClick={() => { setSkippingId(item.id); setSkipReason('') }}
+                                className="mt-1 flex items-center gap-1 text-xs fc-text-subtle hover:fc-text-warning transition-colors"
+                              >
+                                <SkipForward className="w-3 h-3" />
+                                Mark as skipped
+                              </button>
+                            ) : (
+                              <div className="mt-2 space-y-2">
+                                <input
+                                  type="text"
+                                  placeholder="Reason (optional)"
+                                  value={skipReason}
+                                  onChange={e => setSkipReason(e.target.value)}
+                                  className="w-full text-xs px-2 py-1.5 rounded-lg bg-[color:var(--fc-glass-highlight)] border border-[color:var(--fc-glass-border)] fc-text-primary placeholder:fc-text-subtle outline-none focus:border-[color:var(--fc-domain-workouts)]"
+                                  maxLength={200}
+                                />
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => handleSkipDay(item.id)}
+                                    disabled={skipLoading}
+                                    className="flex-1 text-xs py-1.5 rounded-lg fc-btn fc-btn-primary disabled:opacity-50"
+                                  >
+                                    {skipLoading ? 'Skipping...' : 'Confirm skip'}
+                                  </button>
+                                  <button
+                                    onClick={() => { setSkippingId(null); setSkipReason('') }}
+                                    disabled={skipLoading}
+                                    className="p-1.5 rounded-lg fc-btn fc-btn-ghost"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
-                    </Link>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ))}

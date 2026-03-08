@@ -3,8 +3,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { Button } from "@/components/ui/button";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import {
+  ClientPageShell,
+  ClientGlassCard,
+  SectionHeader,
+  PrimaryButton,
+  SecondaryButton,
+} from "@/components/client-ui";
 import {
   ArrowLeft,
   CheckCircle,
@@ -34,8 +40,8 @@ interface WorkoutAssignment {
 interface WorkoutSetLog {
   id: string;
   workout_log_id: string;
-  block_id: string;
-  block_type: string;
+  set_entry_id: string;
+  set_type: string;
   exercise_id: string;
   weight: number | null;
   reps: number | null;
@@ -94,16 +100,16 @@ interface WorkoutSetLog {
 
 interface WorkoutBlock {
   id: string;
-  block_type: string;
-  block_name?: string | null;
-  block_order: number;
+  set_type: string;
+  set_name?: string | null;
+  set_order: number;
 }
 
 interface BlockGroup {
-  block_id: string;
-  block_type: string;
-  block_name: string;
-  block_order: number;
+  set_entry_id: string;
+  set_type: string;
+  set_name: string;
+  set_order: number;
   sets: WorkoutSetLog[];
   exerciseNames: Map<string, string>;
   templateBlock?: any; // Store full template block data for blocks with no sets
@@ -146,21 +152,39 @@ export default function WorkoutComplete() {
   // Guard: prevent updateWorkoutTotals from running more than once per page load
   const completionDoneRef = useRef(false);
 
+  const completeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (assignmentId) {
-      loadAssignment()
-        .then(async (assignmentData: WorkoutAssignment | null) => {
-          if (assignmentData) {
-            await updateWorkoutTotals(
-              assignmentData.workout_template_id,
-              assignmentData.id
-            );
-          }
-        })
-        .catch((error) => {
-          console.error("Error loading assignment:", error);
-        });
-    }
+    if (!assignmentId) return;
+    if (completeTimeoutRef.current) clearTimeout(completeTimeoutRef.current);
+    completeTimeoutRef.current = setTimeout(() => {
+      completeTimeoutRef.current = null;
+      setLoading(false);
+    }, 20_000);
+    loadAssignment()
+      .then(async (assignmentData: WorkoutAssignment | null) => {
+        if (assignmentData) {
+          await updateWorkoutTotals(
+            assignmentData.workout_template_id,
+            assignmentData.id
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("Error loading assignment:", error);
+      })
+      .finally(() => {
+        if (completeTimeoutRef.current) {
+          clearTimeout(completeTimeoutRef.current);
+          completeTimeoutRef.current = null;
+        }
+      });
+    return () => {
+      if (completeTimeoutRef.current) {
+        clearTimeout(completeTimeoutRef.current);
+        completeTimeoutRef.current = null;
+      }
+    };
   }, [assignmentId]);
 
   useEffect(() => {
@@ -212,7 +236,6 @@ export default function WorkoutComplete() {
   ) => {
     // Guard: only run once per page load to prevent state overwrites
     if (completionDoneRef.current) {
-      console.log("⏭️ updateWorkoutTotals skipped — already completed this page load");
       return;
     }
 
@@ -371,7 +394,7 @@ export default function WorkoutComplete() {
                     .from('personal_records')
                     .select(`
                       *,
-                      exercise:exercises(id, name)
+                      exercises(id, name)
                     `)
                     .eq('client_id', user.id)
                     .eq('workout_assignment_id', effectiveAssignmentId)
@@ -383,7 +406,7 @@ export default function WorkoutComplete() {
                 }
               } catch (err) {
                 // Silently fail - this is optional data
-                console.log('Could not fetch personal records:', err);
+                // Could not fetch personal records
               }
 
               // Try to fetch next workout (optional - don't block if it fails)
@@ -410,7 +433,7 @@ export default function WorkoutComplete() {
                 }
               } catch (err) {
                 // Silently fail - this is optional data
-                console.log('Could not fetch next workout:', err);
+                // Could not fetch next workout
               }
             }
           } else {
@@ -435,7 +458,6 @@ export default function WorkoutComplete() {
 
   const loadBlocksAndSets = async (workoutLogId: string, userId: string) => {
     try {
-      console.log("📊 Loading blocks and sets for workout_log_id:", workoutLogId);
       // Get all set logs with special columns
       const { data: sets, error: setsError } = await supabase
         .from("workout_set_logs")
@@ -443,8 +465,8 @@ export default function WorkoutComplete() {
           `
           id,
           workout_log_id,
-          block_id,
-          block_type,
+          set_entry_id,
+          set_type,
           exercise_id,
           weight,
           reps,
@@ -533,20 +555,20 @@ export default function WorkoutComplete() {
       const blocksMap = new Map<string, BlockGroup>();
 
       sets?.forEach((set: any) => {
-        if (!set.block_id) return;
-        let blockGroup = blocksMap.get(set.block_id);
+        if (!set.set_entry_id) return;
+        let blockGroup = blocksMap.get(set.set_entry_id);
         if (!blockGroup) {
           const fallbackOrder = blocksMap.size + 1;
           blockGroup = {
-            block_id: set.block_id,
-            block_type: set.block_type || "straight_set",
-            block_name: `Block ${fallbackOrder}`,
-            block_order: fallbackOrder,
+    set_entry_id: set.set_entry_id,
+            set_type: set.set_type || "straight_set",
+            set_name: `Set ${fallbackOrder}`,
+            set_order: fallbackOrder,
             sets: [],
             exerciseNames: new Map<string, string>(),
             templateBlock: undefined,
           };
-          blocksMap.set(set.block_id, blockGroup);
+          blocksMap.set(set.set_entry_id, blockGroup);
         }
 
         blockGroup.sets.push(set as WorkoutSetLog);
@@ -620,26 +642,13 @@ export default function WorkoutComplete() {
       // Show all blocks from template, even if they have no sets logged
       // This ensures blocks like Tabata (which may not log sets) are still displayed
       const blocksArray = Array.from(blocksMap.values())
-        .sort((a, b) => a.block_order - b.block_order);
-
-      console.log("✅ Loaded blocks and sets:", {
-        totalBlocks: blocksArray.length,
-        blocks: blocksArray.map((b) => ({
-          block_id: b.block_id,
-          block_type: b.block_type,
-          block_order: b.block_order,
-          setCount: b.sets.length,
-          exerciseCount: b.exerciseNames.size,
-          hasTemplateBlock: !!b.templateBlock,
-          templateExercisesCount: b.templateBlock?.exercises?.length || 0,
-        })),
-      });
+        .sort((a, b) => a.set_order - b.set_order);
 
       setBlockGroups(blocksArray);
 
       // Expand first block by default
       if (blocksArray.length > 0 && expandedBlocks.size === 0) {
-        setExpandedBlocks(new Set([blocksArray[0].block_id]));
+        setExpandedBlocks(new Set([blocksArray[0].set_entry_id]));
       }
     } catch (error) {
       console.error("❌ Error loading blocks and sets:", error);
@@ -750,8 +759,7 @@ export default function WorkoutComplete() {
 
     // Idempotent: if assignment is already completed, just navigate
     if (assignment.status === "completed") {
-      console.log("⏭️ Assignment already completed, navigating to workouts");
-      router.push("/client/workouts");
+      router.push("/client/train");
       return;
     }
 
@@ -790,7 +798,7 @@ export default function WorkoutComplete() {
         );
       }
 
-      router.push("/client/workouts");
+      router.push("/client/train");
     } catch (error) {
       console.error("❌ Error completing workout:", error);
     } finally {
@@ -1116,7 +1124,7 @@ export default function WorkoutComplete() {
     }
 
     const templateBlock = block.templateBlock;
-    const blockType = templateBlock.block_type;
+    const blockType = templateBlock.set_type;
 
     // For Tabata, show exercises with their time protocol data
     // Use exerciseNames as primary source since it's guaranteed to be populated (header shows it)
@@ -1314,8 +1322,8 @@ export default function WorkoutComplete() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <div className="relative z-10 min-h-screen fc-page" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
-            <div className="mx-auto w-full max-w-2xl pt-12 space-y-6">
+          <ClientPageShell className="min-h-screen max-w-2xl pt-12">
+            <div className="space-y-6">
               <div className="text-center space-y-4">
                 <div className="fc-skeleton w-20 h-20 rounded-full mx-auto" />
                 <div className="fc-skeleton h-8 w-64 rounded mx-auto" />
@@ -1326,7 +1334,7 @@ export default function WorkoutComplete() {
               </div>
               <div className="fc-skeleton h-24 rounded-2xl" />
             </div>
-          </div>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -1336,48 +1344,41 @@ export default function WorkoutComplete() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <div className="relative z-10 min-h-screen fc-page" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
-            <div className="mx-auto w-full max-w-2xl flex items-center justify-center min-h-[60vh]">
-              <div className="fc-surface rounded-2xl p-8 text-center border border-[color:var(--fc-surface-card-border)]">
-                <p className="fc-text-dim mb-4">{loadError}</p>
-                <div className="flex flex-wrap justify-center gap-3">
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setLoadError(null);
-                      setLoading(true);
-                      loadAssignment()
-                        .then(async (assignmentData: WorkoutAssignment | null) => {
-                          if (assignmentData) {
-                            await updateWorkoutTotals(
-                              assignmentData.workout_template_id,
-                              assignmentData.id
-                            );
-                          }
-                        })
-                        .catch((err) => {
-                          console.error("Error loading assignment:", err);
-                          setLoadError(err?.message === "timeout" ? "Loading took too long. Please try again." : (err?.message || "Failed to load workout"));
-                        });
-                    }}
-                    variant="fc-primary"
-                    className="fc-btn"
-                  >
-                    Retry
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => router.push("/client/workouts")}
-                    variant="fc-secondary"
-                    className="fc-btn"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Workouts
-                  </Button>
-                </div>
+          <ClientPageShell className="min-h-screen max-w-2xl flex items-center justify-center min-h-[60vh]">
+            <ClientGlassCard className="p-8 text-center w-full max-w-md">
+              <p className="fc-text-dim mb-4">{loadError}</p>
+              <div className="flex flex-wrap justify-center gap-3">
+                <PrimaryButton
+                  onClick={() => {
+                    setLoadError(null);
+                    setLoading(true);
+                    loadAssignment()
+                      .then(async (assignmentData: WorkoutAssignment | null) => {
+                        if (assignmentData) {
+                          await updateWorkoutTotals(
+                            assignmentData.workout_template_id,
+                            assignmentData.id
+                          );
+                        }
+                      })
+                      .catch((err) => {
+                        console.error("Error loading assignment:", err);
+                        setLoadError(err?.message === "timeout" ? "Loading took too long. Please try again." : (err?.message || "Failed to load workout"));
+                      });
+                  }}
+                >
+                  Retry
+                </PrimaryButton>
+                <SecondaryButton
+                  className="w-auto"
+                  onClick={() => router.push("/client/train")}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Workouts
+                </SecondaryButton>
               </div>
-            </div>
-          </div>
+            </ClientGlassCard>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -1387,28 +1388,25 @@ export default function WorkoutComplete() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <div className="relative z-10 min-h-screen fc-page" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
-            <div className="mx-auto w-full max-w-2xl flex items-center justify-center min-h-[60vh]">
-              <div className="fc-surface rounded-2xl p-8 text-center border border-[color:var(--fc-surface-card-border)]">
-                <h3 className="text-xl font-semibold fc-text-primary">
-                  Workout not found
-                </h3>
-                <p className="mt-2 text-sm fc-text-dim">
-                  This workout does not exist or you do not have access to it.
-                </p>
-                <div className="mt-6 flex justify-center">
-                  <Button
-                    onClick={() => router.push("/client/workouts")}
-                    variant="fc-secondary"
-                    className="fc-btn"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Workouts
-                  </Button>
-                </div>
+          <ClientPageShell className="min-h-screen max-w-2xl flex items-center justify-center min-h-[60vh]">
+            <ClientGlassCard className="p-8 text-center w-full max-w-md">
+              <h3 className="text-xl font-semibold fc-text-primary">
+                Workout not found
+              </h3>
+              <p className="mt-2 text-sm fc-text-dim">
+                This workout does not exist or you do not have access to it.
+              </p>
+              <div className="mt-6 flex justify-center">
+                <SecondaryButton
+                  className="w-auto"
+                  onClick={() => router.push("/client/train")}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Workouts
+                </SecondaryButton>
               </div>
-            </div>
-          </div>
+            </ClientGlassCard>
+          </ClientPageShell>
         </AnimatedBackground>
       </ProtectedRoute>
     );
@@ -1443,8 +1441,7 @@ export default function WorkoutComplete() {
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
-        <div className="relative z-10 min-h-screen pb-40 fc-page">
-          <div className="mx-auto w-full max-w-2xl flex flex-col gap-6" style={{ paddingLeft: "var(--fc-page-px)", paddingRight: "var(--fc-page-px)" }}>
+        <ClientPageShell className="min-h-screen max-w-2xl pb-40 flex flex-col gap-6">
             {/* Celebration Hero */}
             <header className="text-center pt-10 pb-6">
               <div className="mb-5 relative inline-block">
@@ -1455,7 +1452,7 @@ export default function WorkoutComplete() {
                   <CheckCircle className="w-3.5 h-3.5 text-black" />
                 </div>
               </div>
-              <h1 className="text-2xl font-extrabold tracking-tight fc-text-primary mb-1">Workout Complete</h1>
+              <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-1">Workout Complete</h1>
               <div className="flex items-center justify-center gap-2 fc-text-dim font-mono text-sm">
                 <Clock className="w-3.5 h-3.5" />
                 <span>{Math.floor(workoutStats.duration || 0)}m {(Math.round(((workoutStats.duration || 0) % 1) * 60))}s</span>
@@ -1485,7 +1482,7 @@ export default function WorkoutComplete() {
             </section>
 
             {personalRecords.length > 0 && (
-              <section className="fc-surface rounded-2xl p-5 border border-[color:var(--fc-surface-card-border)]">
+              <ClientGlassCard className="p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--fc-accent-purple) 20%, transparent)" }}>
                     <Star className="h-4 w-4" style={{ color: "var(--fc-accent-purple)" }} />
@@ -1503,19 +1500,19 @@ export default function WorkoutComplete() {
                 <div className="space-y-2">
                   {personalRecords.slice(0, 5).map((pr: any) => {
                     const exerciseName =
-                      pr.exercise?.name || pr.exerciseName || "Exercise";
+                      pr.exercises?.name || pr.exercise?.name || "Exercise";
                     const recordType =
-                      pr.record_type === "max_weight"
+                      pr.record_type === "weight"
                         ? "Strength"
-                        : pr.record_type === "max_reps"
+                        : pr.record_type === "reps"
                         ? "Volume"
                         : "Record";
                     const deltaValue =
-                      pr.record_type === "max_weight"
-                        ? `+${pr.weight_kg || pr.value || 0} kg`
-                        : pr.record_type === "max_reps"
-                        ? `+${pr.reps || pr.value || 0} reps`
-                        : `+${pr.value || 0}`;
+                      pr.record_type === "weight"
+                        ? `+${pr.record_value || 0} ${pr.record_unit || "kg"}`
+                        : pr.record_type === "reps"
+                        ? `+${pr.record_value || 0} ${pr.record_unit || "reps"}`
+                        : `+${pr.record_value || 0} ${pr.record_unit || ""}`;
 
                     return (
                       <div
@@ -1538,11 +1535,11 @@ export default function WorkoutComplete() {
                     );
                   })}
                 </div>
-              </section>
+              </ClientGlassCard>
             )}
 
             {nextWorkout && (
-              <div className="fc-surface rounded-2xl p-4 border border-[color:var(--fc-surface-card-border)]">
+              <ClientGlassCard className="p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase tracking-wider fc-text-dim font-bold mb-1">
@@ -1560,21 +1557,21 @@ export default function WorkoutComplete() {
                     </div>
                   )}
                 </div>
-              </div>
+              </ClientGlassCard>
             )}
 
             {blockGroups.length > 0 && (
               <section className="space-y-3">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] fc-text-dim">
-                    Workout Summary
-                  </h3>
-                  <span className="text-xs font-mono fc-text-dim">{totalExercises} exercises</span>
-                </div>
+                <SectionHeader
+                  title="Workout Summary"
+                  action={
+                    <span className="text-xs font-mono fc-text-dim">{totalExercises} exercises</span>
+                  }
+                />
 
                 <div className="space-y-2">
                   {blockGroups.map((block) => {
-                    const isExpanded = expandedBlocks.has(block.block_id);
+                    const isExpanded = expandedBlocks.has(block.set_entry_id);
                     const setCount = block.sets.length;
                     const exerciseNamesList = Array.from(
                       block.exerciseNames.values()
@@ -1587,23 +1584,23 @@ export default function WorkoutComplete() {
                         : "Exercise";
 
                     return (
-                      <div
-                        key={block.block_id}
-                        className="fc-surface rounded-2xl overflow-hidden border border-[color:var(--fc-surface-card-border)]"
+                      <ClientGlassCard
+                        key={block.set_entry_id}
+                        className="overflow-hidden p-0"
                       >
                         <button
                           type="button"
-                          onClick={() => toggleBlock(block.block_id)}
+                          onClick={() => toggleBlock(block.set_entry_id)}
                           className="w-full p-4 text-left"
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-xs font-bold fc-text-dim" style={{ background: "var(--fc-surface-sunken)" }}>
-                              {String(block.block_order).padStart(2, "0")}
+                              {String(block.set_order).padStart(2, "0")}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <h3 className="text-sm font-semibold fc-text-primary truncate">
-                                  {formatBlockType(block.block_type)}
+                                  {formatBlockType(block.set_type)}
                                 </h3>
                                 {setCount > 0 && (
                                   <span className="text-xs fc-text-dim font-mono flex-shrink-0">
@@ -1643,7 +1640,7 @@ export default function WorkoutComplete() {
                                     >
                                       {renderSetDisplay(
                                         set,
-                                        block.block_type,
+                                        block.set_type,
                                         block.exerciseNames
                                       )}
                                     </div>
@@ -1652,7 +1649,7 @@ export default function WorkoutComplete() {
                             </div>
                           </div>
                         )}
-                      </div>
+                      </ClientGlassCard>
                     );
                   })}
                 </div>
@@ -1665,19 +1662,17 @@ export default function WorkoutComplete() {
             {/* Floating Bottom Action */}
             <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
               <div className="max-w-2xl mx-auto">
-                <Button
+                <PrimaryButton
                   onClick={() => router.push("/client")}
                   disabled={completing}
-                  variant="fc-primary"
-                  className="w-full h-14 rounded-2xl gap-3 font-bold text-base uppercase tracking-wider shadow-lg"
+                  className="h-14 rounded-2xl gap-3 font-bold text-base uppercase tracking-wider shadow-lg"
                 >
                   <LayoutDashboard className="w-5 h-5" />
                   Back to Dashboard
-                </Button>
+                </PrimaryButton>
               </div>
             </div>
-          </div>
-        </div>
+          </ClientPageShell>
       </AnimatedBackground>
     </ProtectedRoute>
   );

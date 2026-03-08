@@ -213,7 +213,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
     switch (trend) {
       case 'up': return <TrendingUp className="w-4 h-4 text-green-600" />
       case 'down': return <TrendingDown className="w-4 h-4 text-red-600" />
-      default: return <Minus className="w-4 h-4 text-slate-400" />
+      default: return <Minus className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
     }
   }
 
@@ -265,15 +265,15 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-slate-200 rounded mb-4"></div>
+          <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-24 bg-slate-200 rounded"></div>
+              <div key={i} className="h-24 bg-[color:var(--fc-glass-highlight)] rounded"></div>
             ))}
           </div>
           <div className="space-y-4">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-32 bg-slate-200 rounded"></div>
+              <div key={i} className="h-32 bg-[color:var(--fc-glass-highlight)] rounded"></div>
             ))}
           </div>
         </div>
@@ -288,8 +288,8 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Client Compliance Dashboard</h2>
-          <p className="text-slate-600">Monitor client progress and engagement across all areas</p>
+          <h2 className="text-lg font-semibold fc-text-primary">Client Compliance Dashboard</h2>
+          <p className="text-sm fc-text-dim">Monitor client progress and engagement across all areas</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -366,7 +366,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
         <CardContent className="p-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Search className="w-4 h-4 text-slate-400" />
+              <Search className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
               <Select value={selectedClient} onValueChange={setSelectedClient}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="All Clients" />
@@ -383,7 +383,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
             </div>
             
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-slate-400" />
+              <Filter className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
               <Select value={filterLevel} onValueChange={setFilterLevel}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="All Levels" />
@@ -400,7 +400,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
             </div>
 
             <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-slate-400" />
+              <BarChart3 className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
               <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Sort By" />
@@ -430,7 +430,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
                     <CardTitle className="text-lg">
                       {client.client.first_name} {client.client.last_name}
                     </CardTitle>
-                    <p className="text-sm text-slate-600">{client.client.email}</p>
+                    <p className="text-sm fc-text-dim">{client.client.email}</p>
                     <div className="flex items-center gap-2 mt-2">
                       <Badge 
                         variant="outline" 
@@ -469,7 +469,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Workouts</span>
+                      <span className="text-sm fc-text-dim">Workouts</span>
                       <span className="font-medium">{client.compliance.workout_compliance.toFixed(1)}%</span>
                     </div>
                     <Progress value={client.compliance.workout_compliance} className="h-2" />
@@ -477,7 +477,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
                   
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Nutrition</span>
+                      <span className="text-sm fc-text-dim">Nutrition</span>
                       <span className="font-medium">{client.compliance.nutrition_compliance.toFixed(1)}%</span>
                     </div>
                     <Progress value={client.compliance.nutrition_compliance} className="h-2" />
@@ -485,7 +485,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
                   
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Habits</span>
+                      <span className="text-sm fc-text-dim">Habits</span>
                       <span className="font-medium">{client.compliance.habit_compliance.toFixed(1)}%</span>
                     </div>
                     <Progress value={client.compliance.habit_compliance} className="h-2" />
@@ -493,7 +493,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
                   
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Sessions</span>
+                      <span className="text-sm fc-text-dim">Sessions</span>
                       <span className="font-medium">{client.compliance.session_attendance.toFixed(1)}%</span>
                     </div>
                     <Progress value={client.compliance.session_attendance} className="h-2" />
@@ -547,7 +547,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
                       {client.insights.slice(0, 2).map((insight, index) => (
                         <div key={index} className="flex items-start gap-2 text-sm">
                           <Star className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-                          <span className="text-slate-600">{insight}</span>
+                          <span className="text-sm fc-text-dim">{insight}</span>
                         </div>
                       ))}
                     </div>
@@ -564,7 +564,7 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
                             alert.alert_level === 'critical' ? 'text-red-500' : 
                             alert.alert_level === 'warning' ? 'text-orange-500' : 'text-blue-500'
                           }`} />
-                          <span className="text-slate-600">{alert.alert_message}</span>
+                          <span className="text-sm fc-text-dim">{alert.alert_message}</span>
                         </div>
                       ))}
                     </div>
@@ -579,9 +579,9 @@ export default function ClientComplianceDashboardComponent({ coachId }: ClientCo
       {filteredAndSortedClients.length === 0 && (
         <Card className="text-center py-12">
           <CardContent>
-            <Users className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-slate-800 mb-2">No clients found</h3>
-            <p className="text-slate-600 mb-4">
+            <Users className="w-16 h-16 fc-text-subtle mx-auto mb-4" />
+            <h3 className="text-base font-semibold fc-text-primary mb-2">No clients found</h3>
+            <p className="text-sm fc-text-dim mb-4">
               {selectedClient !== 'all' || filterLevel !== 'all'
                 ? 'Try adjusting your filters to see more clients'
                 : 'No clients are currently assigned to you'

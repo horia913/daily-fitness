@@ -98,7 +98,7 @@ export function LargeInput({
           <div className="flex items-center justify-center gap-3">
             <button
               type="button"
-              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl text-lg sm:text-xl font-semibold fc-text-dim transition-all active:scale-95"
+              className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl text-lg sm:text-xl font-semibold fc-text-dim transition-all active:scale-95"
               style={{
                 background: 'var(--fc-surface-sunken)',
                 border: '1px solid var(--fc-surface-card-border)',
@@ -111,7 +111,7 @@ export function LargeInput({
             </button>
             <button
               type="button"
-              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl text-lg sm:text-xl font-semibold fc-text-dim transition-all active:scale-95"
+              className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl text-lg sm:text-xl font-semibold fc-text-dim transition-all active:scale-95"
               style={{
                 background: 'var(--fc-surface-sunken)',
                 border: '1px solid var(--fc-surface-card-border)',

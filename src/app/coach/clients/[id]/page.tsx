@@ -8,31 +8,30 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
   MessageCircle,
   Dumbbell,
-  Apple,
-  Calendar,
   Mail,
   Phone,
-  MapPin,
-  TrendingUp,
-  TrendingDown,
-  Flame,
+  Calendar,
   Target,
   Activity,
-  Clock,
-  Award,
   BarChart3,
+  TrendingUp,
+  User,
+  ChevronRight,
+  Layers,
+  ClipboardList,
+  Utensils,
+  BookOpen,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { calculateStreak, calculateWeeklyProgress } from "@/lib/clientDashboardService";
 import WorkoutAssignmentModal from "@/components/WorkoutAssignmentModal";
-import ClientWorkoutsView from "@/components/coach/client-views/ClientWorkoutsView";
 
 interface ClientData {
   id: string;
@@ -43,78 +42,24 @@ interface ClientData {
   avatar?: string;
   joinedDate: string;
   status: "active" | "inactive" | "at-risk";
-  stats: {
-    workoutsThisWeek: number;
-    workoutGoal: number;
-    compliance: number;
-    streak: number;
-    totalWorkouts: number;
-    lastActive: string;
-  };
-  recentActivity: Array<{
-    type: "workout" | "meal" | "check-in";
-    title: string;
-    date: string;
-    status: "completed" | "missed" | "scheduled";
-  }>;
 }
-
-type TabView = "overview" | "workouts" | "nutrition" | "progress";
 
 function ClientDetailContent() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const { isDark, getSemanticColor, performanceSettings } = useTheme();
+  const { getSemanticColor, performanceSettings } = useTheme();
   const clientId = params.id as string;
 
-  const [activeTab, setActiveTab] = useState<TabView>("overview");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showAssignWorkoutModal, setShowAssignWorkoutModal] = useState(false);
-  
-  // Mock client data - Replace with actual API call
   const [client, setClient] = useState<ClientData>({
     id: clientId,
-    name: "Sarah Johnson",
-    email: "sarah.j@email.com",
-    phone: "+1 (555) 123-4567",
-    location: "New York, NY",
-    joinedDate: "Jan 15, 2024",
+    name: "Client",
+    email: "",
+    joinedDate: "",
     status: "active",
-    stats: {
-      workoutsThisWeek: 4,
-      workoutGoal: 4,
-      compliance: 95,
-      streak: 12,
-      totalWorkouts: 87,
-      lastActive: "2 hours ago",
-    },
-    recentActivity: [
-      {
-        type: "workout",
-        title: "Upper Body Strength",
-        date: "Today, 9:30 AM",
-        status: "completed",
-      },
-      {
-        type: "meal",
-        title: "Breakfast logged",
-        date: "Today, 8:15 AM",
-        status: "completed",
-      },
-      {
-        type: "workout",
-        title: "HIIT Cardio",
-        date: "Yesterday, 6:00 PM",
-        status: "completed",
-      },
-      {
-        type: "check-in",
-        title: "Weekly Check-in",
-        date: "2 days ago",
-        status: "completed",
-      },
-    ],
   });
 
   useEffect(() => {
@@ -126,8 +71,8 @@ function ClientDetailContent() {
 
     try {
       setLoading(true);
+      setError(null);
 
-      // Get client profile
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
@@ -135,112 +80,21 @@ function ClientDetailContent() {
         .single();
 
       if (profileError || !profile) {
-        console.error("Error loading client profile:", profileError);
-        setLoading(false);
-        return;
+        throw new Error("Failed to load client profile. Please try again.");
       }
 
-      // Calculate real stats
-      const [streak, weeklyProgress] = await Promise.all([
+      const [, weeklyProgress] = await Promise.all([
         calculateStreak(clientId),
         calculateWeeklyProgress(clientId),
       ]);
 
-      // Get total completed workouts
-      const { data: completedWorkouts } = await supabase
-        .from("workout_logs")
-        .select("id")
-        .eq("client_id", clientId)
-        .not("completed_at", "is", null);
-
-      const totalWorkouts = completedWorkouts?.length || 0;
-
-      // Calculate compliance (completed / assigned this week)
       const compliance =
         weeklyProgress.goal > 0
           ? Math.round((weeklyProgress.current / weeklyProgress.goal) * 100)
           : 0;
-
-      // Get last activity
-      const { data: lastLog } = await supabase
-        .from("workout_logs")
-        .select("completed_at")
-        .eq("client_id", clientId)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const lastActive = lastLog?.completed_at
-        ? getRelativeTime(new Date(lastLog.completed_at))
-        : "Never";
-
-      // Get recent activity (workouts + meal photos)
-      const { data: recentWorkouts } = await supabase
-        .from("workout_logs")
-        .select(`
-          completed_at,
-          workout_assignment_id,
-          workout_assignments!inner(
-            workout_template_id,
-            workout_templates(
-              name
-            )
-          )
-        `)
-        .eq("client_id", clientId)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: false })
-        .limit(5);
-
-      const { data: recentMeals } = await supabase
-        .from("meal_photo_logs")
-        .select("created_at, meal:meals(name, meal_type)")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      const recentActivity: ClientData["recentActivity"] = [];
-
-      // Add workouts
-      (recentWorkouts || []).forEach((log: any) => {
-        const assignment = Array.isArray(log.workout_assignments) 
-          ? log.workout_assignments[0] 
-          : log.workout_assignments;
-        const template = Array.isArray(assignment?.workout_templates) 
-          ? assignment.workout_templates[0] 
-          : assignment?.workout_templates;
-        recentActivity.push({
-          type: "workout",
-          title: template?.name || "Workout",
-          date: getRelativeTime(new Date(log.completed_at!)),
-          status: "completed",
-        });
-      });
-
-      // Add meals
-      (recentMeals || []).forEach((log: any) => {
-        const meal = Array.isArray(log.meal) ? log.meal[0] : log.meal;
-        recentActivity.push({
-          type: "meal",
-          title: `${meal?.meal_type || "Meal"} logged`,
-          date: getRelativeTime(new Date(log.created_at)),
-          status: "completed",
-        });
-      });
-
-      // Sort by date and take top 10
-      recentActivity.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-
-      // Determine status
       let status: ClientData["status"] = "active";
-      if (compliance < 50) {
-        status = "at-risk";
-      } else if (compliance === 0 && weeklyProgress.goal > 0) {
-        status = "inactive";
-      }
+      if (compliance < 50) status = "at-risk";
+      else if (compliance === 0 && weeklyProgress.goal > 0) status = "inactive";
 
       setClient({
         id: clientId,
@@ -254,40 +108,19 @@ function ClientDetailContent() {
           year: "numeric",
         }),
         status,
-        stats: {
-          workoutsThisWeek: weeklyProgress.current,
-          workoutGoal: weeklyProgress.goal,
-          compliance,
-          streak,
-          totalWorkouts,
-          lastActive,
-        },
-        recentActivity: recentActivity.slice(0, 10),
       });
 
-      setLoading(false);
     } catch (error) {
       console.error("Error loading client data:", error);
+      setError(error instanceof Error ? error.message : "Failed to load client data. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
 
-  const getRelativeTime = (date: Date) => {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) {
-      return `${diffMins} min${diffMins !== 1 ? "s" : ""} ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
-    } else if (diffDays < 7) {
-      return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
-    } else {
-      return date.toLocaleDateString();
-    }
+  const handleRetry = () => {
+    setError(null);
+    loadClientData();
   };
 
   const getStatusColor = (status: ClientData["status"]) => {
@@ -297,6 +130,8 @@ function ClientDetailContent() {
       case "at-risk":
         return getSemanticColor("warning").primary;
       case "inactive":
+        return getSemanticColor("neutral").primary;
+      default:
         return getSemanticColor("neutral").primary;
     }
   };
@@ -309,46 +144,127 @@ function ClientDetailContent() {
         return "At Risk";
       case "inactive":
         return "Inactive";
-    }
-  };
-
-  const getComplianceColor = (compliance: number) => {
-    if (compliance >= 80) return getSemanticColor("success").primary;
-    if (compliance >= 50) return getSemanticColor("warning").primary;
-    return getSemanticColor("critical").primary;
-  };
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "workout":
-        return Dumbbell;
-      case "meal":
-        return Apple;
-      case "check-in":
-        return Activity;
       default:
-        return Activity;
+        return status;
     }
   };
 
-  const getActivityColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return getSemanticColor("success").primary;
-      case "missed":
-        return getSemanticColor("critical").primary;
-      case "scheduled":
-        return getSemanticColor("trust").primary;
-      default:
-        return getSemanticColor("neutral").primary;
-    }
-  };
+  if (loading) {
+    return (
+      <ProtectedRoute requiredRole="coach">
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 mx-auto w-full max-w-6xl fc-page p-4 sm:p-6 pb-32">
+            <Link href="/coach/clients" className="inline-flex mb-4">
+              <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Clients
+              </Button>
+            </Link>
+            <div className="animate-pulse space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-6 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-4 w-24 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                ))}
+              </div>
+              <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+            </div>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
+
+  if (error) {
+    return (
+      <ProtectedRoute requiredRole="coach">
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-6 sm:px-6 lg:px-10">
+            <Link href="/coach/clients" className="inline-flex mb-4">
+              <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Clients
+              </Button>
+            </Link>
+            <div className="flex flex-col items-center justify-center px-4 py-20">
+              <div className="fc-surface rounded-2xl p-8 text-center max-w-md w-full">
+                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="h-6 w-6 text-red-400" />
+                </div>
+                <h3 className="text-lg font-semibold fc-text-primary mb-2">Something went wrong</h3>
+                <p className="text-sm fc-text-dim mb-6">{error}</p>
+                <div className="flex gap-3 justify-center">
+                  <Button variant="fc-secondary" onClick={() => router.back()}>Go Back</Button>
+                  <Button variant="fc-primary" onClick={handleRetry}>Try Again</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
+
+  const navCards: { section: string; items: { label: string; href: string; icon: React.ElementType }[] }[] = [
+    {
+      section: "Training",
+      items: [
+        { label: "Workouts / Assignments", href: `/coach/clients/${clientId}/workouts`, icon: Dumbbell },
+        { label: "Programs", href: `/coach/clients/${clientId}/workouts`, icon: Layers },
+        { label: "Adherence", href: `/coach/clients/${clientId}/adherence`, icon: ClipboardList },
+      ],
+    },
+    {
+      section: "Nutrition",
+      items: [
+        { label: "Meals / Meal plans", href: `/coach/clients/${clientId}/meals`, icon: Utensils },
+      ],
+    },
+    {
+      section: "Goals",
+      items: [
+        { label: "Goals", href: `/coach/clients/${clientId}/goals`, icon: Target },
+      ],
+    },
+    {
+      section: "Habits",
+      items: [
+        { label: "Habits", href: `/coach/clients/${clientId}/habits`, icon: Activity },
+      ],
+    },
+    {
+      section: "Progress / Analytics",
+      items: [
+        { label: "Progress", href: `/coach/clients/${clientId}/progress`, icon: TrendingUp },
+        { label: "Analytics", href: `/coach/clients/${clientId}/analytics`, icon: BarChart3 },
+      ],
+    },
+    {
+      section: "Profile",
+      items: [
+        { label: "Profile", href: `/coach/clients/${clientId}/profile`, icon: User },
+      ],
+    },
+  ];
+
+  const moreLinks = [
+    { label: "Clipcards", href: `/coach/clients/${clientId}/clipcards`, icon: BookOpen },
+    { label: "FMS", href: `/coach/clients/${clientId}/fms`, icon: Activity },
+  ];
 
   return (
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl fc-page flex flex-col" style={{ gap: "var(--fc-gap-sections)" }}>
+      <div className="relative z-10 mx-auto w-full max-w-6xl fc-page flex flex-col min-w-0 overflow-x-hidden px-4 sm:p-6 pb-32" style={{ gap: "var(--fc-gap-sections)" }}>
         <Link href="/coach/clients" className="inline-flex">
           <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -357,11 +273,10 @@ function ClientDetailContent() {
         </Link>
 
         <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
-          <div className="flex items-start justify-between flex-wrap gap-4">
-            {/* Left: Avatar + Info */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-center gap-4">
               <div
-                className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold flex-shrink-0"
+                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-bold flex-shrink-0"
                 style={{
                   background: getSemanticColor("trust").gradient,
                   color: "#fff",
@@ -369,10 +284,9 @@ function ClientDetailContent() {
               >
                 {client.name.charAt(0)}
               </div>
-
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <h1 className="text-2xl font-bold fc-text-primary">
                     {client.name}
                   </h1>
                   <span
@@ -385,470 +299,127 @@ function ClientDetailContent() {
                     {getStatusLabel(client.status)}
                   </span>
                 </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      {client.email}
-                    </p>
-                  </div>
+                <div className="space-y-0.5 text-sm text-[color:var(--fc-text-dim)]">
+                  {client.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{client.email}</span>
+                    </div>
+                  )}
                   {client.phone && (
                     <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        {client.phone}
-                      </p>
+                      <Phone className="w-4 h-4 flex-shrink-0" />
+                      <span>{client.phone}</span>
                     </div>
                   )}
-                  {client.location && (
+                  {client.joinedDate && (
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
-                      <p className="text-sm text-[color:var(--fc-text-dim)]">
-                        {client.location}
-                      </p>
+                      <Calendar className="w-4 h-4 flex-shrink-0" />
+                      <span>Client since {client.joinedDate}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-[color:var(--fc-text-subtle)]" />
-                    <p className="text-sm text-[color:var(--fc-text-dim)]">
-                      Client since {client.joinedDate}
-                    </p>
-                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Right: Quick Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Button
-                variant="default"
-                className="fc-btn fc-btn-secondary"
-                style={{
-                  background: getSemanticColor("trust").gradient,
-                  boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
+                variant="outline"
+                className="fc-btn fc-btn-secondary min-h-[44px]"
+                onClick={() => {
+                  const phone = client?.phone;
+                  const email = client?.email;
+                  if (phone) {
+                    const cleanPhone = phone.replace(/[\s\-\(\)]/g, "");
+                    window.open(`https://wa.me/${cleanPhone}`, "_blank");
+                  } else if (email) {
+                    window.open(`mailto:${email}`, "_blank");
+                  } else {
+                    alert("No phone number or email available for this client.");
+                  }
                 }}
               >
-                <MessageCircle className="w-5 h-5 mr-2" />
-                Message
+                <MessageCircle className="w-4 h-4 mr-2" />
+                <span>{client?.phone ? "WhatsApp" : client?.email ? "Email" : "Message"}</span>
               </Button>
               <Button
-                variant="default"
-                onClick={() => setShowAssignWorkoutModal(true)}
                 className="fc-btn fc-btn-primary"
                 style={{
                   background: getSemanticColor("energy").gradient,
                   boxShadow: `0 4px 12px ${getSemanticColor("energy").primary}30`,
                 }}
+                onClick={() => setShowAssignWorkoutModal(true)}
               >
-                <Dumbbell className="w-5 h-5 mr-2" />
-                Assign Workout
+                <Dumbbell className="w-4 h-4 mr-2" />
+                <span>Assign Workout</span>
               </Button>
             </div>
           </div>
         </GlassCard>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Workouts This Week */}
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{
-                  background: getSemanticColor("trust").gradient,
-                  boxShadow: `0 4px 12px ${getSemanticColor("trust").primary}30`,
-                }}
-              >
-                <Dumbbell className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-xs text-[color:var(--fc-text-subtle)]">
-                  This Week
-                </p>
-                <div className="flex items-baseline gap-1">
-                  <AnimatedNumber
-                    value={client.stats.workoutsThisWeek}
-                    className="text-2xl font-bold"
-                    color={isDark ? "#fff" : "#1A1A1A"}
-                  />
-                  <span
-                    className="text-sm"
-                    style={{
-                      color: isDark
-                        ? "rgba(255,255,255,0.6)"
-                        : "rgba(0,0,0,0.6)",
-                    }}
-                  >
-                    / {client.stats.workoutGoal}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div
-              className="h-2 rounded-full overflow-hidden"
-              style={{
-                background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-              }}
-            >
-              <div
-                className="h-full transition-all duration-500"
-                style={{
-                  width: `${(client.stats.workoutsThisWeek / client.stats.workoutGoal) * 100}%`,
-                  background: getSemanticColor("trust").gradient,
-                }}
-              />
-            </div>
-          </GlassCard>
-
-          {/* Compliance */}
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{
-                  background: getSemanticColor("success").gradient,
-                  boxShadow: `0 4px 12px ${
-                    getSemanticColor("success").primary
-                  }30`,
-                }}
-              >
-                <BarChart3 className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-xs text-[color:var(--fc-text-subtle)]">
-                  Compliance
-                </p>
-                <AnimatedNumber
-                  value={client.stats.compliance}
-                  suffix="%"
-                  className="text-2xl font-bold"
-                  color={getComplianceColor(client.stats.compliance)}
-                />
-              </div>
-            </div>
-            <div
-              className="h-2 rounded-full overflow-hidden"
-              style={{
-                background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-              }}
-            >
-              <div
-                className="h-full transition-all duration-500"
-                style={{
-                  width: `${client.stats.compliance}%`,
-                  background: getComplianceColor(client.stats.compliance),
-                }}
-              />
-            </div>
-          </GlassCard>
-
-          {/* Streak */}
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{
-                  background: getSemanticColor("energy").gradient,
-                  boxShadow: `0 4px 12px ${getSemanticColor("energy").primary}30`,
-                }}
-              >
-                <Flame className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-xs text-[color:var(--fc-text-subtle)]">
-                  Day Streak
-                </p>
-                <AnimatedNumber
-                  value={client.stats.streak}
-                  className="text-2xl font-bold"
-                  color={getSemanticColor("energy").primary}
-                />
-              </div>
-            </div>
-            <p className="text-xs text-[color:var(--fc-text-subtle)]">
-              {client.stats.streak >= 7 ? "🔥 On fire!" : "Keep it going!"}
-            </p>
-          </GlassCard>
-
-          {/* Total Workouts */}
-          <GlassCard elevation={2} className="fc-glass fc-card p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{
-                  background: isDark
-                    ? "rgba(255,255,255,0.15)"
-                    : "rgba(0,0,0,0.1)",
-                }}
-              >
-                <Award className="w-6 h-6" style={{ color: getSemanticColor("neutral").primary }} />
-              </div>
-              <div>
-                <p className="text-xs text-[color:var(--fc-text-subtle)]">
-                  Total Workouts
-                </p>
-                <AnimatedNumber
-                  value={client.stats.totalWorkouts}
-                  className="text-2xl font-bold"
-                  color={isDark ? "#fff" : "#1A1A1A"}
-                />
-              </div>
-            </div>
-            <p className="text-xs text-[color:var(--fc-text-subtle)]">
-              Last active: {client.stats.lastActive}
-            </p>
-          </GlassCard>
-        </div>
-
-        {/* Tabs */}
-        <GlassCard elevation={2} className="fc-glass fc-card p-2">
-          <div className="flex items-center gap-2">
-              {[
-                { id: "overview", label: "Overview", icon: Activity },
-                { id: "workouts", label: "Workouts", icon: Dumbbell },
-                { id: "nutrition", label: "Nutrition", icon: Apple },
-                { id: "progress", label: "Progress", icon: TrendingUp },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-[color:var(--fc-text-dim)] mb-3">
+            Quick access
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {navCards.map(({ section, items }) =>
+              items.map((item) => {
+                const Icon = item.icon;
                 return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as TabView)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all"
-                    style={{
-                      background: isActive
-                        ? getSemanticColor("trust").gradient
-                        : "transparent",
-                      color: isActive ? "#fff" : isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)",
-                      boxShadow: isActive
-                        ? `0 4px 12px ${getSemanticColor("trust").primary}30`
-                        : "none",
-                    }}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="font-semibold">{tab.label}</span>
-                  </button>
-                );
-              })}
-          </div>
-        </GlassCard>
-
-        {/* Tab Content */}
-        {activeTab === "overview" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Activity */}
-            <GlassCard elevation={2} className="p-6">
-              <h3
-                className="text-xl font-bold mb-6"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
-                Recent Activity
-              </h3>
-
-              <div className="space-y-4">
-                {client.recentActivity.map((activity, index) => {
-                  const Icon = getActivityIcon(activity.type);
-                  return (
-                    <div
-                      key={index}
-                      className="flex items-center gap-4 p-4 rounded-lg"
-                      style={{
-                        background: isDark
-                          ? "rgba(255,255,255,0.05)"
-                          : "rgba(0,0,0,0.02)",
-                      }}
+                  <Link key={item.href} href={item.href}>
+                    <GlassCard
+                      elevation={2}
+                      className="fc-glass fc-card p-4 flex items-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                     >
                       <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{
-                          background: `${getActivityColor(activity.status)}20`,
+                          background: `${getSemanticColor("trust").primary}20`,
+                          color: getSemanticColor("trust").primary,
                         }}
                       >
-                        <Icon
-                          className="w-5 h-5"
-                          style={{ color: getActivityColor(activity.status) }}
-                        />
+                        <Icon className="w-5 h-5" />
                       </div>
-
                       <div className="flex-1 min-w-0">
-                        <p
-                          className="font-semibold truncate"
-                          style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                        >
-                          {activity.title}
+                        <p className="font-semibold text-[color:var(--fc-text-primary)] truncate">
+                          {item.label}
                         </p>
-                        <p
-                          className="text-sm"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.6)"
-                              : "rgba(0,0,0,0.6)",
-                          }}
-                        >
-                          {activity.date}
-                        </p>
+                        <p className="text-xs text-[color:var(--fc-text-dim)]">{section}</p>
                       </div>
-
-                      <span
-                        className="px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0"
-                        style={{
-                          background: `${getActivityColor(activity.status)}20`,
-                          color: getActivityColor(activity.status),
-                        }}
-                      >
-                        {activity.status}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </GlassCard>
-
-            {/* Quick Links */}
-            <GlassCard elevation={2} className="p-6">
-              <h3
-                className="text-xl font-bold mb-6"
-                style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-              >
-                Quick Actions
-              </h3>
-
-              <div className="space-y-3">
-                {[
-                  { label: "View Full Profile", icon: Activity, href: "profile" },
-                  { label: "Assign Meal Plan", icon: Apple, href: "meals" },
-                  { label: "Schedule Check-in", icon: Calendar, href: "progress" },
-                  { label: "View Goals", icon: Target, href: "goals" },
-                ].map((action, index) => {
-                  const Icon = action.icon;
-                  return (
-                    <Link key={index} href={`/coach/clients/${clientId}/${action.href}`}>
-                      <div
-                        className="flex items-center justify-between p-4 rounded-lg cursor-pointer transition-all hover:scale-102"
-                        style={{
-                          background: isDark
-                            ? "rgba(255,255,255,0.05)"
-                            : "rgba(0,0,0,0.02)",
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon
-                            className="w-5 h-5"
-                            style={{
-                              color: isDark
-                                ? "rgba(255,255,255,0.7)"
-                                : "rgba(0,0,0,0.7)",
-                            }}
-                          />
-                          <span
-                            className="font-semibold"
-                            style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-                          >
-                            {action.label}
-                          </span>
-                        </div>
-                        <Clock
-                          className="w-5 h-5"
-                          style={{
-                            color: isDark
-                              ? "rgba(255,255,255,0.4)"
-                              : "rgba(0,0,0,0.4)",
-                          }}
-                        />
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </GlassCard>
+                      <ChevronRight className="w-5 h-5 text-[color:var(--fc-text-subtle)] flex-shrink-0" />
+                    </GlassCard>
+                  </Link>
+                );
+              })
+            )}
           </div>
-        )}
+        </section>
 
-        {activeTab === "workouts" && (
-          <ClientWorkoutsView clientId={clientId} />
-        )}
-
-        {activeTab === "nutrition" && (
-          <GlassCard elevation={2} className="p-12 text-center">
-            <Apple
-              className="w-24 h-24 mx-auto mb-6"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-              }}
-            />
-            <h3
-              className="text-2xl font-bold mb-2"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
-              Nutrition View
-            </h3>
-            <p
-              className="text-sm mb-6"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
-            >
-              View and manage meal plans for {client.name}
-            </p>
-            <Button
-              variant="default"
-              style={{
-                background: getSemanticColor("success").gradient,
-                boxShadow: `0 4px 12px ${getSemanticColor("success").primary}30`,
-              }}
-            >
-              Assign Meal Plan
-            </Button>
-          </GlassCard>
-        )}
-
-        {activeTab === "progress" && (
-          <GlassCard elevation={2} className="p-12 text-center">
-            <TrendingUp
-              className="w-24 h-24 mx-auto mb-6"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)",
-              }}
-            />
-            <h3
-              className="text-2xl font-bold mb-2"
-              style={{ color: isDark ? "#fff" : "#1A1A1A" }}
-            >
-              Progress View
-            </h3>
-            <p
-              className="text-sm mb-6"
-              style={{
-                color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)",
-              }}
-            >
-              Track check-ins, measurements, and photos for {client.name}
-            </p>
-            <Button
-              variant="default"
-              style={{
-                background: getSemanticColor("energy").gradient,
-                boxShadow: `0 4px 12px ${getSemanticColor("energy").primary}30`,
-              }}
-            >
-              Schedule Check-in
-            </Button>
-          </GlassCard>
-        )}
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-[color:var(--fc-text-dim)] mb-3">
+            More
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {moreLinks.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.href} href={item.href}>
+                  <Button variant="ghost" size="sm" className="fc-btn fc-btn-ghost gap-2">
+                    <Icon className="w-4 h-4" />
+                    {item.label}
+                  </Button>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
       </div>
 
-      {/* Workout Assignment Modal */}
       {showAssignWorkoutModal && (
         <WorkoutAssignmentModal
           isOpen={showAssignWorkoutModal}
           onClose={() => setShowAssignWorkoutModal(false)}
           onSuccess={() => {
             setShowAssignWorkoutModal(false);
-            // Reload client data if needed
-            if (clientId) {
-              // You may want to reload client data here
-            }
           }}
         />
       )}
@@ -863,4 +434,3 @@ export default function ClientDetailPage() {
     </ProtectedRoute>
   );
 }
-

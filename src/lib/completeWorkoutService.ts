@@ -193,9 +193,43 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
   // ========================================================================
   let programProgression: CompleteWorkoutResult['programProgression'] = null
 
-  if (workoutLog.program_assignment_id && workoutLog.program_schedule_id) {
-    const programAssignmentId = workoutLog.program_assignment_id
-    const programScheduleId = workoutLog.program_schedule_id
+  let programAssignmentId: string | null = workoutLog.program_assignment_id
+  let programScheduleId: string | null = workoutLog.program_schedule_id
+
+  // Fix C: Fallback when workout_log lacks program context (e.g. created via /api/log-set)
+  // Trace: workout_assignments → program_day_assignments → program_assignments + program_schedule
+  if ((!programAssignmentId || !programScheduleId) && workoutLog.workout_assignment_id) {
+    const { data: pda } = await supabaseAdmin
+      .from('program_day_assignments')
+      .select('program_assignment_id, day_number')
+      .eq('workout_assignment_id', workoutLog.workout_assignment_id)
+      .maybeSingle()
+
+    if (pda?.program_assignment_id != null && pda?.day_number != null) {
+      const { data: pa } = await supabaseAdmin
+        .from('program_assignments')
+        .select('program_id')
+        .eq('id', pda.program_assignment_id)
+        .maybeSingle()
+
+      if (pa?.program_id) {
+        const { data: ps } = await supabaseAdmin
+          .from('program_schedule')
+          .select('id')
+          .eq('program_id', pa.program_id)
+          .eq('day_number', pda.day_number)
+          .maybeSingle()
+
+        if (ps?.id) {
+          programAssignmentId = pda.program_assignment_id
+          programScheduleId = ps.id
+          console.log('[completeWorkoutService] Resolved program context via fallback:', { programAssignmentId, programScheduleId })
+        }
+      }
+    }
+  }
+
+  if (programAssignmentId && programScheduleId) {
 
     // 6-pre. Get program_id, slots, and completions for week lock check + progression
     const { data: assignment } = await supabaseAdmin
@@ -245,7 +279,7 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
       })
 
       // 6a. INSERT into ledger (idempotent via ON CONFLICT DO NOTHING)
-      const { error: ledgerError, data: ledgerData } = await supabaseAdmin
+      const { error: ledgerError } = await supabaseAdmin
         .from('program_day_completions')
         .insert({
           program_assignment_id: programAssignmentId,
@@ -257,54 +291,56 @@ export async function completeWorkout(params: CompleteWorkoutParams): Promise<Co
         .select('id')
         .maybeSingle()
 
-      if (ledgerError) {
-        // Check for unique violation (already recorded) — this is expected and fine
-        if (ledgerError.code === '23505') {
-          console.log('[completeWorkoutService] Day already recorded in ledger (idempotent)')
-          programProgression = {
-            status: 'already_recorded',
-            programAssignmentId,
-            programScheduleId,
-          }
-        } else {
-          console.error('[completeWorkoutService] Error writing to ledger:', ledgerError)
-          // Non-fatal: workout is already marked complete, ledger write failed
-        }
+      const isAlreadyRecorded = ledgerError?.code === '23505'
+      if (ledgerError && !isAlreadyRecorded) {
+        console.error('[completeWorkoutService] Error writing to ledger:', ledgerError)
+      }
+      if (isAlreadyRecorded) {
+        console.log('[completeWorkoutService] Day already recorded in ledger (idempotent)')
       }
 
-      // 6b. Find next uncompleted slot and update progress cache
-      if (!programProgression) {
-        const nextSlotResult = await getNextSlot(supabaseAdmin, programAssignmentId, assignment.program_id)
-        const lastSlot = allSlots[allSlots.length - 1]
+      // 6b. ALWAYS run completion check — even on already_recorded (Fix A)
+      // Refetch so we have current ledger state (getNextSlot does this internally)
+      const nextSlotResult = await getNextSlot(supabaseAdmin, programAssignmentId, assignment.program_id)
+      const lastSlot = allSlots[allSlots.length - 1]
 
-        // 6c. Update progress cache
-        if (lastSlot) {
-          await updateProgressCache(supabaseAdmin, programAssignmentId, nextSlotResult, lastSlot)
-        }
+      // 6c. Update progress cache
+      if (lastSlot) {
+        await updateProgressCache(supabaseAdmin, programAssignmentId, nextSlotResult, lastSlot)
+      }
 
-        const isComplete = nextSlotResult === null && allSlots.length > 0
-        const referenceSlot = nextSlotResult ?? lastSlot
+      const isComplete = nextSlotResult === null && allSlots.length > 0
+      const referenceSlot = nextSlotResult ?? lastSlot
 
-        // If program is fully completed, update assignment status
-        if (isComplete) {
-          const { error: assignmentUpdateError } = await supabaseAdmin
+      // 6d. If program fully completed, update assignment status (Fix B: non-blocking + 1 retry)
+      if (isComplete) {
+        const doStatusUpdate = async () => {
+          const { error } = await supabaseAdmin
             .from('program_assignments')
             .update({ status: 'completed' })
             .eq('id', programAssignmentId)
-
+          return error
+        }
+        let assignmentUpdateError = await doStatusUpdate()
+        if (assignmentUpdateError) {
+          assignmentUpdateError = await doStatusUpdate()
           if (assignmentUpdateError) {
-            console.warn('[completeWorkoutService] Failed to mark assignment completed (non-blocking):', assignmentUpdateError)
+            console.error(
+              '[completeWorkoutService] Failed to mark assignment completed after retry. program_assignment_id=',
+              programAssignmentId,
+              assignmentUpdateError
+            )
           }
         }
+      }
 
-        programProgression = {
-          status: isComplete ? 'program_completed' : 'advanced',
-          currentWeekNumber: referenceSlot?.week_number,
-          currentDayNumber: referenceSlot?.day_number,
-          isCompleted: isComplete,
-          programAssignmentId,
-          programScheduleId,
-        }
+      programProgression = {
+        status: isAlreadyRecorded ? 'already_recorded' : (isComplete ? 'program_completed' : 'advanced'),
+        currentWeekNumber: referenceSlot?.week_number,
+        currentDayNumber: referenceSlot?.day_number,
+        isCompleted: isComplete,
+        programAssignmentId,
+        programScheduleId,
       }
     }
   } else {

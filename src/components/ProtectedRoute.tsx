@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -15,25 +15,33 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children, requiredRole, allowedRoles }: ProtectedRouteProps) {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const [timeoutReached, setTimeoutReached] = useState(false)
+  
+  // Timeout fallback: if loading takes more than 8 seconds, fail open
+  useEffect(() => {
+    if (loading) {
+      const timeoutId = setTimeout(() => {
+        setTimeoutReached(true);
+        if (!user) {
+          router.push('/');
+        }
+      }, 8000);
+      return () => clearTimeout(timeoutId);
+    } else {
+      setTimeoutReached(false);
+    }
+  }, [loading, user, router]);
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !timeoutReached) {
       if (!user) {
-        // No user, redirect to login
         router.push('/')
       } else if (requiredRole || allowedRoles) {
-        // Check user role (we'll implement this with user metadata later)
-        // For now, we'll redirect based on the current path
-        const currentPath = window.location.pathname
-        
-        // If allowedRoles is provided, check if any of them match
-        // For now, treat 'admin' as having coach permissions
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
         const effectiveRoles = allowedRoles || (requiredRole ? [requiredRole] : [])
-        
         if (effectiveRoles.length > 0) {
           const hasCoachAccess = effectiveRoles.includes('coach') || effectiveRoles.includes('admin')
           const hasClientAccess = effectiveRoles.includes('client')
-          
           if (hasCoachAccess && currentPath.startsWith('/client')) {
             router.push('/coach')
           } else if (hasClientAccess && !hasCoachAccess && currentPath.startsWith('/coach')) {
@@ -42,9 +50,9 @@ export default function ProtectedRoute({ children, requiredRole, allowedRoles }:
         }
       }
     }
-  }, [user, loading, router, requiredRole, allowedRoles])
+  }, [user, loading, timeoutReached, router, requiredRole, allowedRoles])
 
-  if (loading) {
+  if (loading && !timeoutReached) {
     return (
       <div className="min-h-screen fc-app-bg flex flex-col items-center justify-center gap-4">
         <div

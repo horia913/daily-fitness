@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
@@ -326,8 +326,26 @@ export default function CoachHabitsManagement() {
     }
   }, [user])
 
+  const habitsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
-    loadData()
+    if (habitsTimeoutRef.current) clearTimeout(habitsTimeoutRef.current)
+    habitsTimeoutRef.current = setTimeout(() => {
+      habitsTimeoutRef.current = null
+      setLoading(false)
+    }, 20_000)
+    loadData().finally(() => {
+      if (habitsTimeoutRef.current) {
+        clearTimeout(habitsTimeoutRef.current)
+        habitsTimeoutRef.current = null
+      }
+    })
+    return () => {
+      if (habitsTimeoutRef.current) {
+        clearTimeout(habitsTimeoutRef.current)
+        habitsTimeoutRef.current = null
+      }
+    }
   }, [loadData])
 
   // Helper functions
@@ -921,15 +939,15 @@ export default function CoachHabitsManagement() {
       <ProtectedRoute requiredRole="coach">
         <div className={`min-h-screen ${theme.background}`}>
           <div className="animate-pulse">
-            <div className="h-64 bg-slate-200 dark:bg-slate-800"></div>
+            <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
             <div className="p-6 space-y-6">
               <div className="max-w-7xl mx-auto space-y-6">
                 <div className={`${theme.card} rounded-2xl p-6`}>
-                  <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
+                  <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                   <div className="space-y-4">
-                    <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                    <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
-                    <div className="h-16 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                    <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                    <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
+                    <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
                   </div>
                 </div>
               </div>
@@ -945,7 +963,7 @@ export default function CoachHabitsManagement() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen">
-        <div className="relative px-4 sm:px-6 pb-24 pt-6">
+        <div className="relative px-4 sm:px-6 pb-32 pt-6">
           <div className="max-w-7xl mx-auto space-y-6">
             <GlassCard elevation={2} className="fc-glass fc-card p-6 md:p-8">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">

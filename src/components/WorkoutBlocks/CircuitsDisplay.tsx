@@ -27,7 +27,7 @@ function formatSecondsValue(value?: number | string | null) {
 }
 
 export function CircuitsDisplay({ block, index }: BlockVariantProps) {
-  const normalizedType = (block.blockType || "circuit").toLowerCase();
+  const normalizedType = (block.blockType || "tabata").toLowerCase();
   const isTabata = normalizedType === "tabata";
   const parameters = block.parameters || {};
   const allMetas = block.exercises.map((exercise) => exercise.meta || {});

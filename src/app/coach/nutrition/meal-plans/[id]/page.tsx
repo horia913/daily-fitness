@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -15,7 +15,7 @@ import { MealPlanService, MealPlan, Meal } from "@/lib/mealPlanService";
 import MealCreator from "@/components/coach/MealCreator";
 import MealOptionEditor from "@/components/coach/MealOptionEditor";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
-import { ArrowLeft, Plus, ChefHat, Edit, Settings2, X } from "lucide-react";
+import { ArrowLeft, Plus, ChefHat, Edit, Settings2, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -34,21 +34,60 @@ export default function MealPlanDetailPage() {
   const [showMealCreator, setShowMealCreator] = useState(false);
   const [editingMealOptions, setEditingMealOptions] = useState<{ id: string; name: string } | null>(null);
 
+  // Sum option-1 macro totals across all loaded meals
+  const dailyTotals = useMemo(() => {
+    if (meals.length === 0) return null;
+    return {
+      calories: meals.reduce((s, m) => s + m.total_calories, 0),
+      protein:  meals.reduce((s, m) => s + m.total_protein,  0),
+      carbs:    meals.reduce((s, m) => s + m.total_carbs,    0),
+      fat:      meals.reduce((s, m) => s + m.total_fat,      0),
+      fiber:    meals.reduce((s, m) => s + m.total_fiber,    0),
+    };
+  }, [meals]);
+
+  // Wait for both mealPlanId and user before loading — on a hard refresh,
+  // user is null until the auth context resolves, so we must not fire early.
+  const mealPlanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (mealPlanId) {
-      loadMealPlan();
-      loadMeals();
-    }
-  }, [mealPlanId]);
+    if (!mealPlanId || !user) return;
+    if (mealPlanTimeoutRef.current) clearTimeout(mealPlanTimeoutRef.current);
+    mealPlanTimeoutRef.current = setTimeout(() => {
+      mealPlanTimeoutRef.current = null;
+      setLoading(false);
+    }, 20_000);
+    Promise.all([loadMealPlan(), loadMeals()]).finally(() => {
+      if (mealPlanTimeoutRef.current) {
+        clearTimeout(mealPlanTimeoutRef.current);
+        mealPlanTimeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (mealPlanTimeoutRef.current) {
+        clearTimeout(mealPlanTimeoutRef.current);
+        mealPlanTimeoutRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mealPlanId, user]);
 
   const loadMealPlan = async () => {
     try {
-      if (!user) return;
       setLoading(true);
+      // Query the specific plan directly — no need to fetch all plans
+      const { data, error } = await supabase
+        .from("meal_plans")
+        .select("*")
+        .eq("id", mealPlanId)
+        .single();
 
-      const mealPlans = await MealPlanService.getMealPlans(user.id);
-      const found = mealPlans.find((p) => p.id === mealPlanId);
-      setMealPlan(found || null);
+      if (error) {
+        console.error("Error loading meal plan:", error);
+        setMealPlan(null);
+      } else {
+        setMealPlan(data as MealPlan);
+      }
     } catch (error) {
       console.error("Error loading meal plan:", error);
     } finally {
@@ -58,133 +97,141 @@ export default function MealPlanDetailPage() {
 
   const loadMeals = async () => {
     try {
-      console.log("Loading meals for mealPlanId:", mealPlanId);
-      
-      // Load meals from the meals table (new format - proper meal entities)
+      // ----------------------------------------------------------------
+      // IMPORTANT: Do NOT use deep nested joins like
+      //   meals(*,meal_food_items(*,foods(*)))
+      // The meal_food_items RLS policy evaluates a subquery per row,
+      // which causes statement timeouts with even moderate row counts.
+      //
+      // Instead we use 4 lightweight batch queries and join in JS.
+      // We also only load Option 1's food items so calorie totals are
+      // per-option, not the sum of all options.
+      // ----------------------------------------------------------------
+
+      // Step 1: Load meals (no joins)
       const { data: mealsData, error: mealsError } = await supabase
         .from('meals')
-        .select(`
-          *,
-          meal_food_items (
-            *,
-            foods (*)
-          )
-        `)
+        .select('id, name, meal_type, order_index, created_at')
         .eq('meal_plan_id', mealPlanId)
-        .order('created_at', { ascending: true });
+        .order('order_index', { ascending: true });
 
       if (mealsError) {
-        console.error("Error loading meals from meals table:", mealsError);
+        console.error("Error loading meals:", mealsError);
+        setMeals([]);
+        return;
       }
 
-      // Also load from meal_plan_items table (old format for backward compatibility)
-      const { data: mealPlanItems, error: itemsError } = await supabase
-        .from('meal_plan_items')
-        .select(`
-          *,
-          foods (*)
-        `)
-        .eq('meal_plan_id', mealPlanId)
-        .order('created_at', { ascending: true });
+      if (!mealsData || mealsData.length === 0) {
+        // Fall back to legacy meal_plan_items table
+        const { data: legacyItems } = await supabase
+          .from('meal_plan_items')
+          .select('*, foods(*)')
+          .eq('meal_plan_id', mealPlanId)
+          .order('created_at', { ascending: true });
 
-      if (itemsError) {
-        console.error("Error loading meals from meal_plan_items table:", itemsError);
-      }
+        if (!legacyItems || legacyItems.length === 0) { setMeals([]); return; }
 
-      const allMeals: Meal[] = [];
-
-      // Transform meals from meals table (new format)
-      if (mealsData && mealsData.length > 0) {
-        const newFormatMeals: Meal[] = mealsData.map((meal: any) => {
-          const foodItems = (meal.meal_food_items || []).map((item: any) => ({
-            id: item.id,
-            meal_plan_id: mealPlanId,
-            food_id: item.food_id,
-            meal_type: meal.meal_type,
-            quantity: item.quantity,
-            food: item.foods,
-            created_at: item.created_at
-          }));
-
-          // Calculate totals
-          const totals = foodItems.reduce((acc: any, item: any) => {
-            if (!item.food) return acc;
-            const multiplier = item.quantity / (item.food.serving_size || 1);
-            return {
-              total_calories: acc.total_calories + (item.food.calories_per_serving * multiplier),
-              total_protein: acc.total_protein + (item.food.protein * multiplier),
-              total_carbs: acc.total_carbs + (item.food.carbs * multiplier),
-              total_fat: acc.total_fat + (item.food.fat * multiplier),
-              total_fiber: acc.total_fiber + (item.food.fiber * multiplier)
-            };
-          }, {
-            total_calories: 0,
-            total_protein: 0,
-            total_carbs: 0,
-            total_fat: 0,
-            total_fiber: 0
-          });
-
-          return {
-            meal_type: meal.meal_type,
-            day_of_week: undefined,
-            items: foodItems,
-            ...totals,
-            id: meal.id, // Store meal ID for potential future use
-            name: meal.name // Store meal name
-          };
+        const grouped = new Map<string, any[]>();
+        legacyItems.forEach((item: any) => {
+          if (!grouped.has(item.meal_type)) grouped.set(item.meal_type, []);
+          grouped.get(item.meal_type)!.push({ ...item, food: item.foods });
         });
-        allMeals.push(...newFormatMeals);
-      }
-
-      // Transform meal_plan_items (old format) - group by meal_type
-      if (mealPlanItems && mealPlanItems.length > 0) {
-        // Group items by meal_type
-        const groupedItems = new Map<string, any[]>();
-        mealPlanItems.forEach((item: any) => {
-          const key = item.meal_type;
-          if (!groupedItems.has(key)) {
-            groupedItems.set(key, []);
-          }
-          groupedItems.get(key)!.push({
-            id: item.id,
-            meal_plan_id: mealPlanId,
-            food_id: item.food_id,
-            meal_type: item.meal_type,
-            quantity: item.quantity,
-            food: item.foods,
-            created_at: item.created_at
-          });
-        });
-
-        // Convert grouped items to Meal objects
-        groupedItems.forEach((items, meal_type) => {
+        const legacy: Meal[] = [];
+        grouped.forEach((items, meal_type) => {
           const totals = items.reduce((acc: any, item: any) => {
             if (!item.food) return acc;
-            const multiplier = item.quantity / (item.food.serving_size || 1);
+            const m = item.quantity / (item.food.serving_size || 1);
             return {
-              total_calories: acc.total_calories + (item.food.calories_per_serving * multiplier),
-              total_protein: acc.total_protein + (item.food.protein * multiplier),
-              total_carbs: acc.total_carbs + (item.food.carbs * multiplier),
-              total_fat: acc.total_fat + (item.food.fat * multiplier),
-              total_fiber: acc.total_fiber + (item.food.fiber * multiplier)
+              total_calories: acc.total_calories + item.food.calories_per_serving * m,
+              total_protein: acc.total_protein + item.food.protein * m,
+              total_carbs: acc.total_carbs + item.food.carbs * m,
+              total_fat: acc.total_fat + item.food.fat * m,
+              total_fiber: acc.total_fiber + (item.food.fiber || 0) * m,
             };
-          }, {
-            total_calories: 0,
-            total_protein: 0,
-            total_carbs: 0,
-            total_fat: 0,
-            total_fiber: 0
-          });
+          }, { total_calories: 0, total_protein: 0, total_carbs: 0, total_fat: 0, total_fiber: 0 });
+          legacy.push({ meal_type: meal_type as any, day_of_week: undefined, items, ...totals });
+        });
+        setMeals(legacy);
+        return;
+      }
 
-          allMeals.push({
-            meal_type: meal_type as 'breakfast' | 'lunch' | 'dinner' | 'snack',
-            day_of_week: undefined,
-            items: items,
-            ...totals
-          });
+      const mealIds = mealsData.map((m: any) => m.id);
+
+      // Step 2: Load first option per meal in one batch
+      const { data: optionsData } = await supabase
+        .from('meal_options')
+        .select('id, meal_id, name, order_index')
+        .in('meal_id', mealIds)
+        .order('order_index', { ascending: true });
+
+      const firstOptionByMeal = new Map<string, string>();
+      (optionsData ?? []).forEach((opt: any) => {
+        if (!firstOptionByMeal.has(opt.meal_id)) firstOptionByMeal.set(opt.meal_id, opt.id);
+      });
+      const firstOptionIds = Array.from(firstOptionByMeal.values());
+
+      // Step 3: Load food items for option 1 only — avoids multiplying calories
+      let itemsByMeal = new Map<string, any[]>();
+      if (firstOptionIds.length > 0) {
+        const { data: foodItemsData } = await supabase
+          .from('meal_food_items')
+          .select('id, meal_id, meal_option_id, food_id, quantity, unit')
+          .in('meal_option_id', firstOptionIds);
+
+        // Step 4: Load all unique foods in one batch
+        const foodIds = [...new Set((foodItemsData ?? []).map((fi: any) => fi.food_id))] as string[];
+        let foodsById = new Map<string, any>();
+        if (foodIds.length > 0) {
+          const { data: foodsData } = await supabase
+            .from('foods')
+            .select('id, name, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g, calories_per_serving, protein, carbs, fat, fiber, serving_size')
+            .in('id', foodIds);
+          foodsById = new Map((foodsData ?? []).map((f: any) => [f.id, f]));
+        }
+
+        (foodItemsData ?? []).forEach((item: any) => {
+          if (!itemsByMeal.has(item.meal_id)) itemsByMeal.set(item.meal_id, []);
+          itemsByMeal.get(item.meal_id)!.push({ ...item, food: foodsById.get(item.food_id) || null });
         });
       }
+
+      // Build Meal objects using only Option 1's macros
+      const allMeals: Meal[] = mealsData.map((meal: any) => {
+        const items = itemsByMeal.get(meal.id) ?? [];
+        const totals = items.reduce((acc: any, item: any) => {
+          const food = item.food;
+          if (!food) return acc;
+          // Prefer per-100g macros (generator format) — quantity is stored in grams
+          if (food.calories_per_100g != null) {
+            const ratio = item.quantity / 100;
+            return {
+              total_calories: acc.total_calories + food.calories_per_100g * ratio,
+              total_protein: acc.total_protein + (food.protein_per_100g || 0) * ratio,
+              total_carbs: acc.total_carbs + (food.carbs_per_100g || 0) * ratio,
+              total_fat: acc.total_fat + (food.fat_per_100g || 0) * ratio,
+              total_fiber: acc.total_fiber + (food.fiber_per_100g || 0) * ratio,
+            };
+          }
+          // Legacy fallback: per-serving macros
+          const m = item.quantity / (food.serving_size || 1);
+          return {
+            total_calories: acc.total_calories + (food.calories_per_serving || 0) * m,
+            total_protein: acc.total_protein + (food.protein || 0) * m,
+            total_carbs: acc.total_carbs + (food.carbs || 0) * m,
+            total_fat: acc.total_fat + (food.fat || 0) * m,
+            total_fiber: acc.total_fiber + (food.fiber || 0) * m,
+          };
+        }, { total_calories: 0, total_protein: 0, total_carbs: 0, total_fat: 0, total_fiber: 0 });
+
+        return {
+          id: meal.id,
+          name: meal.name,
+          meal_type: meal.meal_type as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+          day_of_week: undefined,
+          items,
+          ...totals,
+        };
+      });
 
       console.log("Loaded meals:", allMeals);
       setMeals(allMeals);
@@ -246,6 +293,10 @@ export default function MealPlanDetailPage() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="p-4 sm:p-6">
           <div className="max-w-4xl mx-auto space-y-6">
+            <Link href="/coach/nutrition" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              Back to Nutrition
+            </Link>
             <GlassCard elevation={2} className="fc-glass fc-card p-6 sm:p-10">
               <div className="flex items-start gap-4">
                 <Link href="/coach/nutrition" className="fc-glass fc-card w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-glass-border)]">
@@ -275,9 +326,54 @@ export default function MealPlanDetailPage() {
                       Target: {mealPlan.target_calories} calories
                     </p>
                   )}
+                  {/* Raw portions notice — shown for generated plans */}
+                  {(mealPlan as any).generated_config && (
+                    <p className="text-xs mt-2 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium w-fit">
+                      🥩 All portions are for <strong>raw / uncooked</strong> ingredients
+                    </p>
+                  )}
                 </div>
               </div>
             </GlassCard>
+
+            {/* Daily totals summary — derived from Option 1 of each meal */}
+            {dailyTotals && (
+              <GlassCard elevation={2} className="fc-glass fc-card p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="w-4 h-4 text-[color:var(--fc-accent)]" />
+                  <span className="text-sm font-semibold text-[color:var(--fc-text-primary)]">
+                    Daily Totals
+                    <span className="text-xs font-normal text-[color:var(--fc-text-dim)] ml-2">(Option 1 of each meal)</span>
+                  </span>
+                  {mealPlan?.target_calories && (
+                    <span className="text-xs text-[color:var(--fc-text-dim)] ml-auto">
+                      target: {mealPlan.target_calories.toLocaleString()} kcal
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { label: "kcal",    value: dailyTotals.calories, color: "text-[color:var(--fc-accent)]",    unit: "" },
+                    { label: "Protein", value: dailyTotals.protein,  color: "text-green-500",                   unit: "g" },
+                    { label: "Carbs",   value: dailyTotals.carbs,    color: "text-blue-500",                    unit: "g" },
+                    { label: "Fat",     value: dailyTotals.fat,      color: "text-yellow-500",                  unit: "g" },
+                    { label: "Fiber",   value: dailyTotals.fiber,    color: "text-purple-500",                  unit: "g" },
+                  ].map(({ label, value, color, unit }) => (
+                    <div key={label} className="text-center p-2.5 fc-surface rounded-xl border border-[color:var(--fc-surface-card-border)]">
+                      <div className={`text-base font-bold ${color}`}>
+                        {label === "kcal"
+                          ? Math.round(value).toLocaleString()
+                          : Math.round(value)}
+                        <span className="text-xs font-normal ml-0.5">{unit}</span>
+                      </div>
+                      <div className="text-[10px] text-[color:var(--fc-text-dim)] font-medium uppercase tracking-wide mt-0.5">
+                        {label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
+            )}
 
             {/* Actions */}
             <div className="flex gap-3">
@@ -471,7 +567,7 @@ export default function MealPlanDetailPage() {
       {editingMealOptions && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => e.target === e.currentTarget && setEditingMealOptions(null)}
+          onClick={(e) => { if (e.target === e.currentTarget) { setEditingMealOptions(null); loadMeals(); } }}
         >
           <div className={`${theme.card} fc-glass fc-card rounded-3xl border ${theme.border} max-w-3xl max-h-[90vh] w-full overflow-hidden`}>
             {/* Modal Header */}
@@ -487,7 +583,7 @@ export default function MealPlanDetailPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setEditingMealOptions(null)}
+                onClick={() => { setEditingMealOptions(null); loadMeals(); }}
                 className="h-10 w-10 rounded-xl"
               >
                 <X className="w-5 h-5" />
@@ -500,8 +596,10 @@ export default function MealPlanDetailPage() {
                 mealId={editingMealOptions.id}
                 mealPlanId={mealPlanId}
                 onOptionsChange={() => {
-                  // Reload meals when options change
-                  loadMeals();
+                  // No-op: reloading on every options state change causes
+                  // an infinite re-render loop because MealOptionEditor
+                  // fires this callback on initial mount as well.
+                  // The meal summary will refresh next time the modal closes.
                 }}
               />
             </div>

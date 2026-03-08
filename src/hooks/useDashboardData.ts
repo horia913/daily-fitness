@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { DatabaseService, Profile, WorkoutSession, WorkoutAssignment, Achievement, Session } from '@/lib/database'
+import { DatabaseService, Profile, WorkoutSession, WorkoutAssignment, Achievement } from '@/lib/database'
 import { PrefetchService, cache } from '@/lib/prefetch'
 
 // Client dashboard data hook with pre-fetching
@@ -90,7 +90,6 @@ export function useCoachDashboardData() {
   const [data, setData] = useState<{
     profile: Profile | null
     stats: { activeClients: number; workoutsCreated: number }
-    todaysSessions: Session[]
     clientProgress: Array<{
       client: Profile
       progress: number
@@ -99,7 +98,6 @@ export function useCoachDashboardData() {
   }>({
     profile: null,
     stats: { activeClients: 0, workoutsCreated: 0 },
-    todaysSessions: [],
     clientProgress: []
   })
 
@@ -115,7 +113,6 @@ export function useCoachDashboardData() {
         const cachedData = cache.get<{
           profile: Profile | null
           stats: { activeClients: number; workoutsCreated: number }
-          todaysSessions: Session[]
           clientProgress: Array<{
             client: Profile
             progress: number
@@ -132,17 +129,15 @@ export function useCoachDashboardData() {
         }
 
         // Fetch fresh data if not in cache
-        const [profile, stats, todaysSessions, clientProgress] = await Promise.all([
+        const [profile, stats, clientProgress] = await Promise.all([
           DatabaseService.getProfile(user.id),
           DatabaseService.getCoachStats(user.id),
-          DatabaseService.getTodaysSessions(user.id),
           DatabaseService.getClientProgress(user.id)
         ])
 
         const freshData = {
           profile,
           stats,
-          todaysSessions,
           clientProgress
         }
 
@@ -155,7 +150,6 @@ export function useCoachDashboardData() {
         setData({
           profile: null,
           stats: { activeClients: 0, workoutsCreated: 0 },
-          todaysSessions: [],
           clientProgress: []
         })
       } finally {

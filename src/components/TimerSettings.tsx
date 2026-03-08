@@ -200,15 +200,15 @@ export function TimerSettings({ userId, isOpen, onClose }: TimerSettingsProps) {
               <TabsList className={`grid w-full grid-cols-3 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
                 <TabsTrigger value="preferences" className="rounded-xl flex items-center gap-2">
                   <Settings className="w-4 h-4" />
-                  <span className="hidden sm:inline">Preferences</span>
+                  <span className="text-[10px] sm:text-xs">Preferences</span>
                 </TabsTrigger>
                 <TabsTrigger value="analytics" className="rounded-xl flex items-center gap-2">
                   <BarChart3 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Analytics</span>
+                  <span className="text-[10px] sm:text-xs">Analytics</span>
                 </TabsTrigger>
                 <TabsTrigger value="data" className="rounded-xl flex items-center gap-2">
                   <Download className="w-4 h-4" />
-                  <span className="hidden sm:inline">Data</span>
+                  <span className="text-[10px] sm:text-xs">Data</span>
                 </TabsTrigger>
               </TabsList>
 

@@ -117,7 +117,7 @@ export class OneSignalSender {
   static async sendAchievement(userId: string, achievementName: string, description: string): Promise<boolean> {
     return this.sendToUser(userId, '🎉 Achievement Unlocked!', `${achievementName}: ${description}`, {
       action: 'open_achievements',
-      url: '/client/achievements',
+      url: '/client/progress/achievements',
       type: 'achievement'
     })
   }

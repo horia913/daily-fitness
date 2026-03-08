@@ -8,6 +8,7 @@ import {
   ChevronRight,
   MoreVertical,
   Pencil,
+  Calculator,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast-provider";
 import {
@@ -19,12 +20,14 @@ import { LargeInput } from "../ui/LargeInput";
 import { ExerciseActionButtons } from "../ui/ExerciseActionButtons";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import {
   getWeightDefaultAndSuggestion,
   getCoachSuggestedWeight,
 } from "@/lib/weightDefaultService";
 import { ApplySuggestedWeightButton } from "../ui/ApplySuggestedWeightButton";
+import { ProgressionNudge } from "../ui/ProgressionNudge";
 import { fetchApi } from "@/lib/apiClient";
 import { buildSetEditPatchPayload } from "@/lib/setEditPayload";
 
@@ -48,9 +51,12 @@ export function SupersetExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
+  onPlateCalculatorClick,
   onRestTimerClick,
   onSetComplete,
   onLastSetLoggedForRest,
+  progressionSuggestionsMap,
+  previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -76,6 +82,8 @@ export function SupersetExecutor({
   const [isWeightAPristine, setIsWeightAPristine] = useState(true);
   const [isWeightBPristine, setIsWeightBPristine] = useState(true);
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  /** Collapsible set history: show all sets or only last 2 */
+  const [showAllSets, setShowAllSets] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -261,7 +269,7 @@ export function SupersetExecutor({
     }
   }
 
-  const instructions = block.block.block_notes || undefined;
+  const instructions = block.block.set_notes || undefined;
 
   const maxViewableSet =
     loggedSetsList.length === 0
@@ -295,7 +303,7 @@ export function SupersetExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "SupersetExecutor",
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -327,7 +335,7 @@ export function SupersetExecutor({
     }
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.block_type, {
+      const payload = buildSetEditPatchPayload(block.block.set_type, {
         set_number: editDraft.set_number,
         superset_exercise_a_id: exerciseA?.exercise_id ?? undefined,
         superset_weight_a: weightANum,
@@ -340,7 +348,7 @@ export function SupersetExecutor({
         console.log("[SAVE EDITS]", {
           executor: "SupersetExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -430,7 +438,7 @@ export function SupersetExecutor({
       const setNumber = completedSets + 1;
 
       const logData: any = {
-        block_type: "superset",
+        set_type: "superset",
         set_number: setNumber,
       };
 
@@ -458,7 +466,7 @@ export function SupersetExecutor({
           {
             id: setLogId,
             exercise_id: exerciseA.exercise_id,
-            block_id: block.block.id,
+            set_entry_id: block.block.id,
             set_number: setNumber,
             weight_kg: weightANum,
             reps_completed: repsANum,
@@ -467,7 +475,7 @@ export function SupersetExecutor({
           {
             id: setLogId,
             exercise_id: exerciseB.exercise_id,
-            block_id: block.block.id,
+            set_entry_id: block.block.id,
             set_number: setNumber,
             weight_kg: weightBNum,
             reps_completed: repsBNum,
@@ -533,11 +541,31 @@ export function SupersetExecutor({
             background: "var(--fc-surface-sunken)",
           }}
         >
-          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
-            Logged sets
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+              Logged sets
+            </div>
+            {setNumbersLogged.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSets(!showAllSets)}
+                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
+              >
+                {showAllSets ? (
+                  <>Show less ▲</>
+                ) : (
+                  <>Show all {setNumbersLogged.length} sets ▼</>
+                )}
+              </button>
+            )}
           </div>
           <ul className="space-y-1.5">
-            {setNumbersLogged.map((setNum) => {
+            {(showAllSets ? setNumbersLogged : setNumbersLogged.slice(-2)).map((setNum) => {
+              // Calculate the actual index in the full list for isLatestSet
+              const actualIndex = showAllSets 
+                ? setNumbersLogged.indexOf(setNum)
+                : setNumbersLogged.length - 2 + setNumbersLogged.slice(-2).indexOf(setNum);
+              const isLatestSet = actualIndex === setNumbersLogged.length - 1;
               const forSet = loggedSetsList.filter(
                 (s) => s.set_number === setNum,
               );
@@ -549,44 +577,93 @@ export function SupersetExecutor({
                 forSet[1];
               const label = `Set ${setNum}: A ${entryA?.weight_kg ?? "—"}×${entryA?.reps_completed ?? "—"}${entryB ? `, B ${entryB.weight_kg ?? "—"}×${entryB.reps_completed ?? "—"}` : ""}`;
               const firstId = forSet[0]?.id ?? "";
+              const rpeForSet = entryA?.rpe ?? entryB?.rpe ?? null;
               return (
                 <li
                   key={`set-${setNum}`}
-                  className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg"
+                  className="flex flex-col gap-1.5 py-1.5 px-2 rounded-lg"
                   style={{ background: "var(--fc-surface-elevated)" }}
                 >
-                  <span className="text-sm fc-text-primary">{label}</span>
-                  <div className="relative flex items-center">
-                    <button
-                      type="button"
-                      className="p-1.5 rounded-md hover:bg-black/10"
-                      onClick={() =>
-                        setMenuOpenSetId(
-                          menuOpenSetId === firstId ? null : firstId,
-                        )
-                      }
-                      aria-label="Options"
-                    >
-                      <MoreVertical className="w-4 h-4 fc-text-dim" />
-                    </button>
-                    {menuOpenSetId === firstId && (
-                      <div
-                        className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
-                        style={{
-                          background: "var(--fc-surface-elevated)",
-                          border: "1px solid var(--fc-surface-card-border)",
-                        }}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm fc-text-primary">{label}</span>
+                    <div className="relative flex items-center">
+                      <button
+                        type="button"
+                        className="p-1.5 rounded-md hover:bg-black/10"
+                        onClick={() =>
+                          setMenuOpenSetId(
+                            menuOpenSetId === firstId ? null : firstId,
+                          )
+                        }
+                        aria-label="Options"
                       >
-                        <button
-                          type="button"
-                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
-                          onClick={() => handleEditSet(forSet[0])}
+                        <MoreVertical className="w-4 h-4 fc-text-dim" />
+                      </button>
+                      {menuOpenSetId === firstId && (
+                        <div
+                          className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10 min-w-[120px]"
+                          style={{
+                            background: "var(--fc-surface-elevated)",
+                            border: "1px solid var(--fc-surface-card-border)",
+                          }}
                         >
-                          <Pencil className="w-4 h-4" /> Edit
-                        </button>
-                      </div>
-                    )}
+                          <button
+                            type="button"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black/10"
+                            onClick={() => handleEditSet(forSet[0])}
+                          >
+                            <Pencil className="w-4 h-4" /> Edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  <InlineRPERow
+                    setLogId={firstId.startsWith("temp-") ? null : firstId}
+                    currentRPE={rpeForSet}
+                    onRPESelect={async (rpe) => {
+                      // Update RPE for the first entry (entryA represents the set)
+                      const updatedEntry: LoggedSet = {
+                        ...entryA!,
+                        rpe,
+                      };
+                      onSetLogUpsert?.(block.block.id, updatedEntry, {
+                        replaceId: entryA!.id,
+                      });
+
+                      // If set is synced, update via API
+                      if (!firstId.startsWith("temp-")) {
+                        try {
+                          const res = await fetch(`/api/sets/${firstId}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ rpe }),
+                            credentials: "include",
+                          });
+                          if (!res.ok) {
+                            console.error("Failed to update RPE:", await res.text());
+                            const revertedEntry: LoggedSet = {
+                              ...entryA!,
+                              rpe: entryA!.rpe ?? undefined,
+                            };
+                            onSetLogUpsert?.(block.block.id, revertedEntry, {
+                              replaceId: entryA!.id,
+                            });
+                          }
+                        } catch (err) {
+                          console.error("Error updating RPE:", err);
+                          const revertedEntry: LoggedSet = {
+                            ...entryA!,
+                            rpe: entryA!.rpe ?? undefined,
+                          };
+                          onSetLogUpsert?.(block.block.id, revertedEntry, {
+                            replaceId: entryA!.id,
+                          });
+                        }
+                      }
+                    }}
+                    isLatestSet={isLatestSet}
+                  />
                 </li>
               );
             })}
@@ -645,25 +722,49 @@ export function SupersetExecutor({
               />
             )}
           </div>
+          {exerciseA?.exercise_id && (
+            <ProgressionNudge
+              suggestion={progressionSuggestionsMap?.get(exerciseA.exercise_id)}
+              previousPerformance={previousPerformanceMap?.get(exerciseA.exercise_id) ?? null}
+              onApplySuggestion={(w, r) => {
+                if (w != null) { setIsWeightAPristine(false); setWeightA(String(w)); }
+                if (r != null) setRepsA(String(r));
+              }}
+            />
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <LargeInput
-                label="Weight"
-                value={editDraft ? editDraft.weightA : weightA}
-                onChange={(val) => {
-                  if (editDraft)
-                    setEditDraft((d) => (d ? { ...d, weightA: val } : null));
-                  else {
-                    setIsWeightAPristine(false);
-                    setWeightA(val);
-                  }
-                }}
-                placeholder="0"
-                step="0.5"
-                unit="kg"
-                showStepper
-                stepAmount={2.5}
-              />
+              <div className="relative">
+                <LargeInput
+                  label="Weight"
+                  value={editDraft ? editDraft.weightA : weightA}
+                  onChange={(val) => {
+                    if (editDraft)
+                      setEditDraft((d) => (d ? { ...d, weightA: val } : null));
+                    else {
+                      setIsWeightAPristine(false);
+                      setWeightA(val);
+                    }
+                  }}
+                  placeholder="0"
+                  step="0.5"
+                  unit="kg"
+                  showStepper
+                  stepAmount={2.5}
+                />
+                {onPlateCalculatorClick && (
+                  <button
+                    type="button"
+                    onClick={() => onPlateCalculatorClick()}
+                    className="absolute right-2 top-[1.75rem] p-1.5 rounded-lg transition-colors hover:bg-white/10 focus:outline-none focus:ring-2"
+                    style={{ color: "var(--fc-domain-workouts)" }}
+                    title="Plate Calculator"
+                    aria-label="Open plate calculator"
+                  >
+                    <Calculator className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
               {!editDraft && coachSuggestedA != null && coachSuggestedA > 0 && (
                 <ApplySuggestedWeightButton
                   suggestedKg={coachSuggestedA}
@@ -710,25 +811,49 @@ export function SupersetExecutor({
               />
             )}
           </div>
+          {exerciseB?.exercise_id && (
+            <ProgressionNudge
+              suggestion={progressionSuggestionsMap?.get(exerciseB.exercise_id)}
+              previousPerformance={previousPerformanceMap?.get(exerciseB.exercise_id) ?? null}
+              onApplySuggestion={(w, r) => {
+                if (w != null) { setIsWeightBPristine(false); setWeightB(String(w)); }
+                if (r != null) setRepsB(String(r));
+              }}
+            />
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <LargeInput
-                label="Weight"
-                value={editDraft ? editDraft.weightB : weightB}
-                onChange={(val) => {
-                  if (editDraft)
-                    setEditDraft((d) => (d ? { ...d, weightB: val } : null));
-                  else {
-                    setIsWeightBPristine(false);
-                    setWeightB(val);
-                  }
-                }}
-                placeholder="0"
-                step="0.5"
-                unit="kg"
-                showStepper
-                stepAmount={2.5}
-              />
+              <div className="relative">
+                <LargeInput
+                  label="Weight"
+                  value={editDraft ? editDraft.weightB : weightB}
+                  onChange={(val) => {
+                    if (editDraft)
+                      setEditDraft((d) => (d ? { ...d, weightB: val } : null));
+                    else {
+                      setIsWeightBPristine(false);
+                      setWeightB(val);
+                    }
+                  }}
+                  placeholder="0"
+                  step="0.5"
+                  unit="kg"
+                  showStepper
+                  stepAmount={2.5}
+                />
+                {onPlateCalculatorClick && (
+                  <button
+                    type="button"
+                    onClick={() => onPlateCalculatorClick()}
+                    className="absolute right-2 top-[1.75rem] p-1.5 rounded-lg transition-colors hover:bg-white/10 focus:outline-none focus:ring-2"
+                    style={{ color: "var(--fc-domain-workouts)" }}
+                    title="Plate Calculator"
+                    aria-label="Open plate calculator"
+                  >
+                    <Calculator className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
               {!editDraft && coachSuggestedB != null && coachSuggestedB > 0 && (
                 <ApplySuggestedWeightButton
                   suggestedKg={coachSuggestedB}

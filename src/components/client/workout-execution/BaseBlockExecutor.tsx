@@ -7,7 +7,7 @@ import { ProgressIndicator } from "./ui/ProgressIndicator";
 import { InstructionsBox } from "./ui/InstructionsBox";
 import { BlockTypeBadge } from "./ui/BlockTypeBadge";
 import { NavigationControls } from "./ui/NavigationControls";
-import { ProgressionBadge } from "./ui/ProgressionBadge";
+import { ProgressionNudge } from "./ui/ProgressionNudge";
 import { ExerciseActionButtons } from "./ui/ExerciseActionButtons";
 import { BaseBlockExecutorProps } from "./types";
 import { WorkoutBlockType, WorkoutBlockExercise } from "@/types/workoutBlocks";
@@ -39,9 +39,12 @@ interface BaseBlockExecutorLayoutProps extends BaseBlockExecutorProps {
   // Optional: Exercise actions
   currentExercise?: WorkoutBlockExercise;
   showRestTimer?: boolean;
-  
+
   // Progression suggestion (inherited from BaseBlockExecutorProps)
   progressionSuggestion?: import("@/lib/clientProgressionService").ProgressionSuggestion | null;
+
+  // Apply suggestion callback — pass from executor so layout can wire the nudge Apply button
+  onApplySuggestion?: (weight: number | null, reps: number | null) => void;
 }
 
 export function BaseBlockExecutorLayout({
@@ -64,6 +67,8 @@ export function BaseBlockExecutorLayout({
   onAlternativesClick,
   onRestTimerClick,
   progressionSuggestion,
+  previousPerformanceMap,
+  onApplySuggestion,
 }: BaseBlockExecutorLayoutProps) {
   const { getThemeStyles } = useTheme();
   const theme = getThemeStyles();
@@ -90,23 +95,26 @@ export function BaseBlockExecutorLayout({
     <div className="fc-surface rounded-2xl p-5 border border-[color:var(--fc-surface-card-border)]">
       <div className="flex items-center justify-between mb-4">
         <BlockTypeBadge
-          blockType={block.block.block_type}
-          blockName={block.block.block_name}
+          blockType={block.block.set_type}
+          blockName={block.block.set_name}
         />
         <div className="text-right">
           <div className="text-xs fc-text-dim font-mono">
-            Block {block.block.block_order}
+            Set {block.block.set_order}
           </div>
         </div>
       </div>
 
-      {/* Progression Badge (if suggestion exists) */}
-      {progressionSuggestion && (
-        <ProgressionBadge
-          suggestion={progressionSuggestion}
-          exerciseId={currentExercise?.exercise_id || ""}
-        />
-      )}
+      {/* Progression Nudge — shows "Last time" context + suggestion + Apply button */}
+      <ProgressionNudge
+        suggestion={progressionSuggestion}
+        previousPerformance={
+          currentExercise?.exercise_id && previousPerformanceMap
+            ? previousPerformanceMap.get(currentExercise.exercise_id) ?? null
+            : null
+        }
+        onApplySuggestion={onApplySuggestion}
+      />
 
       {/* Section 1: Exercise Name */}
       <div className="mb-4">

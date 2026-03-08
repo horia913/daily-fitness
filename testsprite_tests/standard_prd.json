@@ -1,0 +1,258 @@
+{
+  "meta": {
+    "project": "DailyFitness — PRD v6 (Self-Contained Coach CRUD Tests)",
+    "date": "2026-02-27",
+    "prepared_by": "TestSprite + AI assistant"
+  },
+  "product_overview": "Coach-facing web app for creating workout templates, building multi-week programs, and assigning training to clients. This PRD focuses on self-contained coach CRUD flows where every test logs in fresh at '/', never uses /login, and creates its own data.",
+  "core_goals": [
+    "Verify coach login from root '/' with Sign In / Sign Up tabs and redirect to /coach",
+    "Create a workout template containing all supported block types with Volume Calculator ON",
+    "Edit templates and confirm key field values (like reps) persist after save and reopen",
+    "Create a 4-week program, configure weekly schedules with templates, and verify persistence",
+    "Assign workouts (and, if available, programs) to clients from coach-facing UIs"
+  ],
+  "features": [
+    {
+      "name": "Authentication & Login",
+      "description": "Coach users authenticate via the root page '/'. Tests must begin at '/', and /login must never be used.",
+      "user_flows": [
+        "Navigate to / -> See Sign In and Sign Up tabs -> Click Sign In tab if not already active -> Fill email field -> Fill password field -> Click Sign In button -> See redirect to /coach",
+        "Ensure /login is never used; any attempt to hit /login should be treated as a redirect path only, not a primary login route"
+      ]
+    },
+    {
+      "name": "Flow 1: Create Workout Template with All Block Types",
+      "description": "Create a workout template 'TS Full Blocks Test' with one block of each supported type, Volume Calculator ON, and two sets per block with fields filled.",
+      "user_flows": [
+        "Login at / as coach -> Open side menu -> Training -> Workout Templates -> Click Create New / +",
+        "Fill template name 'TS Full Blocks Test' and description 'All block types' -> Turn Volume Calculator ON -> Select optional category and difficulty if available",
+        "Add Straight Set block: choose any exercise, 2 sets, reps 10, weight 60, rest 90 if available",
+        "Add Superset block: 2 exercises, 2 sets, reps 12, weight 40, rest 60 if available",
+        "Add Giant Set block: 3 exercises, 2 sets, reps 15, weight 30",
+        "Add Drop Set, Cluster Set, Rest-Pause, Pre-Exhaustion with field values as specified in the PRD",
+        "Add Time-Based blocks via Time-Based -> AMRAP, EMOM, For Time, Tabata with appropriate time/interval fields where present",
+        "Add HR Sets block with any heart rate zone if field exists",
+        "Save template and verify success + detail page shows 'TS Full Blocks Test'; if certain block types are not present in the UI, skip and note as missing"
+      ]
+    },
+    {
+      "name": "Flow 2: Edit Existing Template — Change Values and Verify Persistence",
+      "description": "Open an existing template, change reps on a block to 99, save, and confirm the change persists after reopening.",
+      "user_flows": [
+        "Login at / as coach -> Open side menu -> Training -> Workout Templates",
+        "Open any existing template (first in list is fine) -> Click Edit Template",
+        "Verify template name field is non-empty -> Find any reps input on any block -> Note current reps value",
+        "Change reps to 99 -> Click Update / Save Template",
+        "After success, reopen Edit Template for the same template -> Verify the same reps field now shows 99"
+      ]
+    },
+    {
+      "name": "Flow 3: Create 4-Week Program with Weekly Schedule",
+      "description": "Create 'TS 4-Week Program', configure 4-week duration, assign templates to specific days in Week 1 and Week 2, and set basic progression rules if available.",
+      "user_flows": [
+        "Login at / as coach -> Click Training in bottom nav -> Click Create New / + program",
+        "On Basic Info tab: set name 'TS 4-Week Program', description 'Schedule and progression test', duration 4 weeks, optional goal/difficulty",
+        "On Schedule tab: for Week 1, assign templates to Monday, Wednesday, and Friday; leave other days as Rest Day",
+        "If week selector exists, switch to Week 2 and assign templates to Monday, Tuesday, Wednesday, Friday; leave other days as Rest Day; if week selector is missing, record as limitation",
+        "On Progression Rules tab (if present), set weight progression and/or reps progression as described; if the tab is empty or missing, record as limitation",
+        "Save program and verify detail page shows 'TS 4-Week Program'"
+      ]
+    },
+    {
+      "name": "Flow 4: Edit Program — Verify Schedule Persisted and Modify",
+      "description": "Open an existing program, verify schedule data is present, change a day, save, and verify the change persists.",
+      "user_flows": [
+        "Login at / as coach -> Training bottom nav -> Open any existing program -> Click Edit Program",
+        "On Schedule tab, verify at least one day has a template (not all Rest Day)",
+        "Change one assigned day to Rest Day or a different template -> Save",
+        "Reopen the same program edit screen and confirm the changed day reflects the new value"
+      ]
+    },
+    {
+      "name": "Flow 5: Assign Workout to Client",
+      "description": "From the coach client hub, assign a workout template to a client and verify assignment.",
+      "user_flows": [
+        "Login at / as coach -> Click Clients in bottom nav -> Open any client hub",
+        "Click Assign Workout -> Choose any available template -> Optionally set date -> Confirm assignment",
+        "Verify a success message and presence of the assigned workout in upcoming / assignments area"
+      ]
+    },
+    {
+      "name": "Flow 6: Locate Program Assignment Feature",
+      "description": "Try to find and exercise the program assignment feature either from program detail or client hub; if not found, record as missing.",
+      "user_flows": [
+        "Login at / as coach -> Training bottom nav -> Open a program detail page",
+        "Look for Assign or Assign Program controls on tabs (including any Clients tab) and attempt to assign to a client; verify success if present",
+        "If not found, go to Clients bottom nav -> open client hub -> search all tabs for Assign Program controls",
+        "If still not found, record that program assignment feature could not be located"
+      ]
+    }
+  ],
+  "code_summary": {
+    "version": "2",
+    "type": "frontend",
+    "tech_stack": [
+      "TypeScript",
+      "Next.js 15 (App Router)",
+      "React 19",
+      "Tailwind CSS 4",
+      "Radix UI",
+      "Supabase",
+      "Playwright",
+      "Jest"
+    ],
+    "routes": [
+      {
+        "path": "/",
+        "file": "src/app/page.tsx",
+        "auth_required": false,
+        "description": "Login page with Sign In and Sign Up tabs. Unauthenticated users see the login form here. After successful login, redirects to /coach or /client based on role. There is NO /login route — all authentication starts at /."
+      },
+      {
+        "path": "/client",
+        "file": "src/app/client/page.tsx",
+        "auth_required": true,
+        "description": "Client home dashboard"
+      },
+      {
+        "path": "/coach",
+        "file": "src/app/coach/page.tsx",
+        "auth_required": true,
+        "description": "Coach home dashboard"
+      },
+      {
+        "path": "/client/train",
+        "file": "src/app/client/train/page.tsx",
+        "auth_required": true,
+        "description": "Client training launcher for starting workouts"
+      },
+      {
+        "path": "/client/workouts",
+        "file": "src/app/client/workouts/page.tsx",
+        "auth_required": true,
+        "description": "List of client workout assignments"
+      },
+      {
+        "path": "/client/workouts/[id]/start",
+        "file": "src/app/client/workouts/[id]/start/page.tsx",
+        "auth_required": true,
+        "description": "Start and run a specific workout session"
+      },
+      {
+        "path": "/client/workouts/[id]/complete",
+        "file": "src/app/client/workouts/[id]/complete/page.tsx",
+        "auth_required": true,
+        "description": "Review and complete a finished workout"
+      },
+      {
+        "path": "/client/check-ins",
+        "file": "src/app/client/check-ins/page.tsx",
+        "auth_required": true,
+        "description": "Client check-in and wellness submission page"
+      },
+      {
+        "path": "/client/progress",
+        "file": "src/app/client/progress/page.tsx",
+        "auth_required": true,
+        "description": "Client progress overview hub"
+      },
+      {
+        "path": "/client/progress/body-metrics",
+        "file": "src/app/client/progress/body-metrics/page.tsx",
+        "auth_required": true,
+        "description": "Body metrics tracking and history"
+      },
+      {
+        "path": "/client/habits",
+        "file": "src/app/client/habits/page.tsx",
+        "auth_required": true,
+        "description": "Client habit tracking dashboard"
+      },
+      {
+        "path": "/coach/clients",
+        "file": "src/app/coach/clients/page.tsx",
+        "auth_required": true,
+        "description": "Coach client list and selection"
+      },
+      {
+        "path": "/coach/programs",
+        "file": "src/app/coach/programs/page.tsx",
+        "auth_required": true,
+        "description": "Coach training programs list"
+      },
+      {
+        "path": "/coach/workouts/templates",
+        "file": "src/app/coach/workouts/templates/page.tsx",
+        "auth_required": true,
+        "description": "Workout templates library"
+      },
+      {
+        "path": "/coach/goals",
+        "file": "src/app/coach/goals/page.tsx",
+        "auth_required": true,
+        "description": "Coach goal management dashboard"
+      },
+      {
+        "path": "/create-user",
+        "file": "src/app/create-user/page.tsx",
+        "auth_required": false,
+        "description": "Public user creation and onboarding page"
+      }
+    ],
+    "features": [
+      {
+        "name": "Coach Workout Template Authoring",
+        "description": "Coaches can create, edit, and manage workout templates that include multiple block types and manual fields.",
+        "files": [
+          "src/app/coach/workouts/templates/page.tsx",
+          "src/app/coach/workouts/templates/create/page.tsx",
+          "src/app/coach/workouts/templates/[id]/page.tsx"
+        ],
+        "entry_route": "/coach/workouts/templates",
+        "user_interactions": [
+          "Open workout templates library from coach Training section",
+          "Create a new template with name, description, and optional metadata",
+          "Add blocks such as Straight Set, Superset, Giant Set, Drop Set, Cluster Set, Rest-Pause, Pre-Exhaustion, and Time-based blocks",
+          "Save a template and reopen it in edit mode"
+        ],
+        "api_calls": [],
+        "auth_required": true
+      },
+      {
+        "name": "Coach Multi-week Program Builder",
+        "description": "Coaches can create multi-week training programs and configure weekly schedules using workout templates.",
+        "files": [
+          "src/app/coach/programs/page.tsx",
+          "src/app/coach/programs/[id]/page.tsx",
+          "src/app/coach/programs/[id]/edit/page.tsx"
+        ],
+        "entry_route": "/coach/programs",
+        "user_interactions": [
+          "Create a new multi-week program with basic info",
+          "Configure weekly schedules with templates assigned to specific days",
+          "Edit an existing program and adjust weekly schedule"
+        ],
+        "api_calls": [],
+        "auth_required": true
+      },
+      {
+        "name": "Coach Client Management and Assignments",
+        "description": "Coaches can manage clients and assign workouts or programs to them.",
+        "files": [
+          "src/app/coach/clients/page.tsx",
+          "src/app/coach/clients/[id]/page.tsx"
+        ],
+        "entry_route": "/coach/clients",
+        "user_interactions": [
+          "Open coach client list",
+          "Open an individual client hub",
+          "(Where available) assign workouts or programs to a client"
+        ],
+        "api_calls": [],
+        "auth_required": true
+      }
+    ],
+    "known_limitations": []
+  }
+}

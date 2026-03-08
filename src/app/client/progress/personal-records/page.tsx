@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -16,6 +16,7 @@ import {
   Filter,
 } from "lucide-react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 import {
   Select,
   SelectContent,
@@ -29,6 +30,13 @@ import {
   formatRecordDisplay,
   getRecordType,
 } from "@/lib/personalRecords";
+import {
+  getPRTimeline,
+  getPRStats,
+  backfillPRs,
+  type PersonalRecord as StoredPR,
+} from "@/lib/prService";
+import { PRTimelineChart, type PRMilestone } from "@/components/progress/PRTimelineChart";
 
 function formatRelative(dateStr: string): string {
   const d = new Date(dateStr);
@@ -44,11 +52,11 @@ function formatRelative(dateStr: string): string {
 }
 
 const EXERCISE_ICON_CLASSES = [
-  "bg-red-500/10 text-red-400 border border-red-500/20",
-  "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+  "bg-[color:var(--fc-status-error)]/10 text-[color:var(--fc-status-error)] border border-[color:var(--fc-status-error)]/20",
+  "bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)] border border-[color:var(--fc-accent-cyan)]/20",
   "bg-[color:var(--fc-status-success)]/10 fc-text-success border border-[color:var(--fc-status-success)]/20",
-  "bg-amber-500/10 text-amber-400 border border-amber-500/20",
-  "bg-purple-500/10 text-purple-400 border border-purple-500/20",
+  "bg-[color:var(--fc-status-warning)]/10 text-[color:var(--fc-status-warning)] border border-[color:var(--fc-status-warning)]/20",
+  "bg-[color:var(--fc-accent-primary)]/10 text-[color:var(--fc-accent-primary)] border border-[color:var(--fc-accent-primary)]/20",
 ];
 
 function getExerciseIconClass(exerciseName: string, index: number): string {
@@ -60,20 +68,89 @@ export default function PersonalRecordsPage() {
   const { performanceSettings } = useTheme();
 
   const [loading, setLoading] = useState(true);
+  const [backfilling, setBackfilling] = useState(false);
   const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
+  const [prTimeline, setPRTimeline] = useState<StoredPR[]>([]);
+  const [prStats, setPRStats] = useState<{
+    totalPRs: number;
+    prsThisMonth: number;
+    prsThisWeek: number;
+    latestPR: StoredPR | null;
+    mostImproved: StoredPR | null;
+  } | null>(null);
   const [filterExercise, setFilterExercise] = useState<string | null>(null);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grouped" | "timeline">("grouped");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (user && !authLoading) {
-      loadPersonalRecords();
-    }
+    if (!user || authLoading) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setLoading(false);
+      setLoadError("Loading took too long. Tap Retry to try again.");
+    }, 20_000);
+    loadPersonalRecords().finally(() => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
   }, [user, authLoading]);
 
   const loadPersonalRecords = async () => {
     if (!user?.id) return;
     setLoading(true);
     try {
+      // Load stats and timeline from stored table
+      const [stats, timeline] = await Promise.all([
+        getPRStats(user.id),
+        getPRTimeline(user.id, 100),
+      ]);
+      
+      setPRStats(stats);
+      setPRTimeline(timeline);
+
+      // Check if backfill is needed
+      if (stats.totalPRs === 0) {
+        // Check if there's workout data to backfill from
+        const { data: workoutLogs } = await supabase
+          .from("workout_logs")
+          .select("id")
+          .eq("client_id", user.id)
+          .limit(1);
+        
+        if (workoutLogs && workoutLogs.length > 0) {
+          // Has workout data but no PRs - trigger backfill
+          setBackfilling(true);
+          try {
+            const count = await backfillPRs(user.id);
+            if (count > 0) {
+              // Reload after backfill
+              const [newStats, newTimeline] = await Promise.all([
+                getPRStats(user.id),
+                getPRTimeline(user.id, 100),
+              ]);
+              setPRStats(newStats);
+              setPRTimeline(newTimeline);
+            }
+          } catch (error) {
+            console.error("Error backfilling PRs:", error);
+          } finally {
+            setBackfilling(false);
+          }
+        }
+      }
+
+      // Also load legacy format for compatibility
       const records = await fetchPersonalRecords(user.id);
       setPersonalRecords(records);
     } catch (error) {
@@ -119,17 +196,86 @@ export default function PersonalRecordsPage() {
     }));
   }, [filteredRecords]);
 
+  /** Weight PR milestones by exercise (from stored personal_records). Used for PR timeline chart. */
+  const weightPRMilestonesByExercise = useMemo(() => {
+    const byExercise = new Map<
+      string,
+      { name: string; milestones: PRMilestone[] }
+    >();
+    const weightPRs = prTimeline.filter((pr) => pr.record_type === "weight");
+    for (const pr of weightPRs) {
+      const id = pr.exercise_id;
+      const name = pr.exercises?.name ?? "Unknown Exercise";
+      if (!byExercise.has(id)) {
+        byExercise.set(id, { name, milestones: [] });
+      }
+      byExercise.get(id)!.milestones.push({
+        date: pr.achieved_date,
+        weight: pr.record_value ?? 0,
+      });
+    }
+    byExercise.forEach((data) => {
+      data.milestones.sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+    });
+    return byExercise;
+  }, [prTimeline]);
+
+  /** Exercise to show in the PR timeline chart: filter selection or the one with most weight PRs. */
+  const chartExercise = useMemo(() => {
+    const entries = Array.from(weightPRMilestonesByExercise.entries());
+    if (entries.length === 0) return null;
+    if (filterExercise) {
+      const match = entries.find(([, data]) => data.name === filterExercise);
+      if (match) return { id: match[0], name: match[1].name, milestones: match[1].milestones };
+    }
+    const withMost = entries.reduce<
+      [string, { name: string; milestones: PRMilestone[] }] | null
+    >(
+      (best, [id, data]) =>
+        data.milestones.length > (best?.[1].milestones.length ?? 0)
+          ? [id, data]
+          : best,
+      null
+    );
+    if (!withMost) return null;
+    return {
+      id: withMost[0],
+      name: withMost[1].name,
+      milestones: withMost[1].milestones,
+    };
+  }, [weightPRMilestonesByExercise, filterExercise]);
+
   const recentRecords = useMemo(
     () => personalRecords.slice(0, 5),
     [personalRecords]
   );
+
+  if (loadError) {
+    return (
+      <ProtectedRoute>
+        <AnimatedBackground>
+          {performanceSettings.floatingParticles && <FloatingParticles />}
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10 fc-page">
+            <div className="mx-auto w-full max-w-6xl">
+              <div className="fc-surface p-8 rounded-2xl border border-[color:var(--fc-surface-card-border)] text-center">
+                <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
+                <button type="button" onClick={() => window.location.reload()} className="fc-btn fc-btn-secondary fc-press h-10 px-6 text-sm">Retry</button>
+              </div>
+            </div>
+          </div>
+        </AnimatedBackground>
+      </ProtectedRoute>
+    );
+  }
 
   if (authLoading || loading) {
     return (
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-24 pt-10 sm:px-6 lg:px-10 fc-page">
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-10 sm:px-6 lg:px-10 fc-page">
             <div className="mx-auto w-full max-w-6xl">
               <div className="fc-surface p-8 rounded-2xl">
                 <div className="animate-pulse space-y-6">
@@ -178,14 +324,21 @@ export default function PersonalRecordsPage() {
             </div>
           </div>
 
-          {totalRecords > 0 ? (
+          {backfilling ? (
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8 text-center">
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-[color:var(--fc-accent)] border-t-transparent mb-4" />
+              <p className="text-sm text-[color:var(--fc-text-dim)]">
+                Analyzing your workout history...
+              </p>
+            </div>
+          ) : (prStats && prStats.totalPRs > 0) || totalRecords > 0 ? (
             <>
-              {/* PR Summary Hero */}
+              {/* PR Summary Hero (Enhanced) */}
               <div
                 className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-8 mb-8"
               >
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                  <div className="text-center md:text-left">
+                  <div className="text-center md:text-left flex-1">
                     <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
                       <span className="text-xs font-semibold fc-text-success uppercase tracking-widest">
                         Personal records
@@ -193,24 +346,34 @@ export default function PersonalRecordsPage() {
                       <div className="h-px w-8 bg-[color:var(--fc-status-success)]/30" />
                     </div>
                     <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-none fc-text-primary mb-2">
-                      {totalRecords}{" "}
+                      {prStats?.totalPRs || totalRecords}{" "}
                       <span className="text-lg font-light fc-text-subtle italic">
                         PRs
                       </span>
                     </h1>
-                    <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
-                      {thisMonthCount > 0 && (
+                    <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start mb-4">
+                      {prStats && prStats.prsThisWeek > 0 && (
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)]">
                           <Zap className="w-4 h-4 fc-text-success" />
                           <span className="text-sm font-semibold fc-text-success">
-                            {thisMonthCount} this month
+                            {prStats.prsThisWeek} this week
                           </span>
                         </div>
                       )}
-                      <span className="text-sm fc-text-subtle italic">
-                        Best lifts tracked
-                      </span>
+                      {(prStats?.prsThisMonth || thisMonthCount) > 0 && (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full fc-glass-soft border border-[color:var(--fc-glass-border)]">
+                          <Zap className="w-4 h-4 fc-text-success" />
+                          <span className="text-sm font-semibold fc-text-success">
+                            {prStats?.prsThisMonth || thisMonthCount} this month
+                          </span>
+                        </div>
+                      )}
                     </div>
+                    {prStats?.latestPR && (
+                      <div className="text-sm fc-text-subtle">
+                        Latest: <span className="font-semibold fc-text-primary">{prStats.latestPR.exercises?.name || "Unknown Exercise"}</span> — {prStats.latestPR.record_value}{prStats.latestPR.record_unit} ({prStats.latestPR.record_type === "weight" ? "weight" : "reps"}) ({new Date(prStats.latestPR.achieved_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })})
+                      </div>
+                    )}
                   </div>
                   <div className="flex-shrink-0">
                     <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl fc-glass-soft border border-[color:var(--fc-glass-border)] flex items-center justify-center">
@@ -218,6 +381,43 @@ export default function PersonalRecordsPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* PR Progress — timeline chart (collapsible), wired to exercise filter */}
+              <section className="mb-6">
+                <PRTimelineChart
+                  milestones={chartExercise?.milestones ?? []}
+                  exerciseName={chartExercise?.name ?? "—"}
+                  unit="kg"
+                  defaultTimeRange="3M"
+                  defaultExpanded={true}
+                />
+              </section>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-3 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grouped")}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    viewMode === "grouped"
+                      ? "fc-surface fc-text-primary shadow-sm"
+                      : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
+                  }`}
+                >
+                  Grouped
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("timeline")}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    viewMode === "timeline"
+                      ? "fc-surface fc-text-primary shadow-sm"
+                      : "text-[color:var(--fc-text-dim)] hover:text-[color:var(--fc-text-primary)]"
+                  }`}
+                >
+                  Timeline
+                </button>
               </div>
 
               {/* Recent Breakthroughs — grid on mobile (no horizontal scroll) */}
@@ -231,10 +431,10 @@ export default function PersonalRecordsPage() {
                     const type = getRecordType(record.weight, record.reps);
                     const iconClass =
                       type.type === "power"
-                        ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                        ? "bg-[color:var(--fc-status-warning)]/10 text-[color:var(--fc-status-warning)] border border-[color:var(--fc-status-warning)]/20"
                         : type.type === "endurance"
                           ? "bg-[color:var(--fc-status-success)]/10 fc-text-success border border-[color:var(--fc-status-success)]/20"
-                          : "bg-blue-500/10 text-blue-400 border border-blue-500/20";
+                          : "bg-[color:var(--fc-accent-cyan)]/10 text-[color:var(--fc-accent-cyan)] border border-[color:var(--fc-accent-cyan)]/20";
                     return (
                       <div
                         key={record.id}
@@ -291,7 +491,61 @@ export default function PersonalRecordsPage() {
                 </Select>
               </div>
 
+              {/* Timeline View */}
+              {viewMode === "timeline" && prTimeline.length > 0 && (
+                <main className="space-y-3">
+                  {prTimeline
+                    .filter((pr) => !filterExercise || pr.exercises?.name === filterExercise)
+                    .map((pr) => {
+                      const exerciseName = pr.exercises?.name || "Unknown Exercise";
+                      const isRecent = new Date(pr.achieved_date + "T12:00:00") >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                      const achievementText = 
+                        pr.record_type === "weight"
+                          ? `${exerciseName}: ${pr.record_value}${pr.record_unit}`
+                          : pr.record_type === "reps"
+                          ? `${exerciseName}: ${pr.record_value} ${pr.record_unit}`
+                          : `${exerciseName}: ${pr.record_value} ${pr.record_unit}`;
+                      
+                      return (
+                        <div
+                          key={pr.id}
+                          className={`fc-surface rounded-2xl border p-4 transition-all ${
+                            isRecent
+                              ? "border-[color:var(--fc-status-success)]/30 bg-[color:var(--fc-status-success)]/5"
+                              : "border-[color:var(--fc-surface-card-border)]"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-semibold fc-text-primary">
+                                  {achievementText}
+                                </span>
+                                {isRecent && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-[color:var(--fc-status-success)]/20 text-[color:var(--fc-status-success)]">
+                                    Recent
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 text-xs fc-text-subtle">
+                                <span>{new Date(pr.achieved_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                                {pr.improvement_percentage != null && pr.improvement_percentage > 0 && (
+                                  <span className="fc-text-success font-medium">
+                                    +{pr.improvement_percentage.toFixed(1)}% improvement
+                                  </span>
+                                )}
+                                <span className="capitalize">{pr.record_type.replace("_", " ")}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </main>
+              )}
+
               {/* Grouped PR list (collapsible) */}
+              {viewMode === "grouped" && (
               <main className="space-y-4">
                 {groupedByExercise.map(({ exerciseName, records }, groupIdx) => {
                   const latest = records[0];
@@ -373,6 +627,7 @@ export default function PersonalRecordsPage() {
                   );
                 })}
               </main>
+              )}
 
             </>
           ) : (

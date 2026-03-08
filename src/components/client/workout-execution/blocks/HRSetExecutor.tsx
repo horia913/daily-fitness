@@ -208,7 +208,7 @@ export function HRSetExecutor({
   }
 
   const instructions =
-    currentExercise?.notes || block.block.block_notes || undefined;
+    currentExercise?.notes || block.block.set_notes || undefined;
 
   const handleStartTimer = () => {
     setIsActive(true);
@@ -301,7 +301,7 @@ export function HRSetExecutor({
         const newLoggedSet: LoggedSet = {
           id: setLogId,
           exercise_id: currentExercise.exercise_id,
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: isIntervals ? currentRound : loggedSetsList.length + 1,
           completed_at: new Date(),
         };

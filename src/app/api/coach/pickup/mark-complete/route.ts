@@ -72,7 +72,6 @@ export async function POST(request: NextRequest) {
     // ========================================================================
     // 5. Get client's program state using canonical resolver
     // ========================================================================
-    console.log(`[pickup/mark-complete] Getting program state for client: ${clientId}`)
     const state = await getProgramState(supabaseAdmin, clientId)
 
     if (!state.assignment) {
@@ -100,13 +99,6 @@ export async function POST(request: NextRequest) {
     const programScheduleId = state.nextSlot.id
     const templateId = state.nextSlot.template_id
 
-    console.log(`[pickup/mark-complete] Next slot:`, {
-      schedule_id: programScheduleId,
-      week: state.nextSlot.week_number,
-      day: state.nextSlot.day_number,
-      template_id: templateId,
-    })
-
     // ========================================================================
     // 6. Reuse or create workout_log for this slot
     //    Same logic as start-from-progress: check for existing incomplete log
@@ -127,7 +119,6 @@ export async function POST(request: NextRequest) {
 
     if (existingLog) {
       workoutLogId = existingLog.id
-      console.log(`[pickup/mark-complete] Reusing existing incomplete log: ${workoutLogId}`)
     } else {
       // Need to create workout_assignment + workout_log
       // Get template info
@@ -198,14 +189,11 @@ export async function POST(request: NextRequest) {
       }
 
       workoutLogId = newLog.id
-      console.log(`[pickup/mark-complete] Created new assignment + log: ${workoutLogId}`)
     }
 
     // ========================================================================
     // 7. Call unified completion pipeline
     // ========================================================================
-    console.log(`[pickup/mark-complete] Calling completeWorkout for log: ${workoutLogId}`)
-    
     const result = await completeWorkout({
       supabaseAdmin,
       supabaseAuth,
@@ -249,7 +237,6 @@ export async function POST(request: NextRequest) {
       is_completed: result.programProgression?.isCompleted || false,
     }
 
-    console.log(`[pickup/mark-complete] Success:`, response)
     return NextResponse.json(response)
     
   } catch (error: any) {

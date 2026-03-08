@@ -300,7 +300,7 @@ export class DynamicSummaryGenerator {
         color: 'text-yellow-600',
         actionable: true,
         actionText: 'Share your achievement',
-        actionUrl: '/client/achievements'
+        actionUrl: '/client/progress/achievements'
       })
     }
 
@@ -394,7 +394,7 @@ export class DynamicSummaryGenerator {
       recommendations.push('Focus on progressive overload - try increasing weight or reps next session')
     }
     if (userProfile.goals.includes('endurance')) {
-      recommendations.push('Consider adding cardio or circuit training to your routine')
+      recommendations.push('Consider adding cardio or conditioning to your routine')
     }
 
     return recommendations

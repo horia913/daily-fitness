@@ -24,7 +24,7 @@ export default function ClientWorkoutsPage() {
       <ProtectedRoute requiredRole="coach">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-8">
               <div className="animate-pulse space-y-4">
                 <div className="h-16 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -41,11 +41,12 @@ export default function ClientWorkoutsPage() {
     <ProtectedRoute requiredRole="coach">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 lg:px-10 space-y-6">
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-32 pt-10 sm:px-6 lg:px-10 space-y-6">
           <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6 sm:p-10">
             <div className="flex items-center gap-4">
-              <Link href={`/coach/clients/${clientId}`} className="fc-surface w-10 h-10 flex items-center justify-center rounded-xl shrink-0 border border-[color:var(--fc-surface-card-border)]">
-                <ArrowLeft className="w-5 h-5 text-[color:var(--fc-text-primary)]" />
+              <Link href={`/coach/clients/${clientId}`} className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium">
+                <ArrowLeft className="w-5 h-5 shrink-0" />
+                Back to Client Hub
               </Link>
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] shrink-0">

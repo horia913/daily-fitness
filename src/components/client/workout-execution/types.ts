@@ -34,6 +34,8 @@ export interface BaseBlockExecutorProps {
   ) => number | null;
   onVideoClick?: (videoUrl: string, title?: string) => void;
   onAlternativesClick?: (exerciseId: string) => void;
+  onPlateCalculatorClick?: () => void;
+  onToolsClick?: () => void;
   onRestTimerClick?: () => void;
   onSetComplete?: (completedSets: number) => void;
   /** Called when a set is logged and rest timer will show; pass data for completion hero + next preview */
@@ -45,6 +47,19 @@ export interface BaseBlockExecutorProps {
     isPr?: boolean;
   }) => void;
   progressionSuggestion?: import("@/lib/clientProgressionService").ProgressionSuggestion | null;
+  /**
+   * Full suggestions map (keyed by exerciseId). Multi-exercise executors
+   * (Superset, GiantSet, PreExhaustion) use this to look up per-exercise suggestions.
+   */
+  progressionSuggestionsMap?: Map<string, import("@/lib/clientProgressionService").ProgressionSuggestion>;
+  /**
+   * Previous performance map (keyed by exerciseId). Contains lastWorkout + personalBest data
+   * fetched from workout_exercise_logs → workout_set_details.
+   */
+  previousPerformanceMap?: Map<string, {
+    lastWorkout: { weight: number | null; reps: number | null; sets: number; avgRpe: number | null; date: string } | null;
+    personalBest: { maxWeight: number | null; maxReps: number | null; date: string } | null;
+  }>;
   /** Register undo handler for the last logged set (for "Set saved — Undo" toast). Called with a function that removes last set from local state. */
   registerUndo?: (undoFn: () => void) => void;
   /** When true, show Logged Sets list and Edit per set (only while workout is in progress). Delete is not supported. */

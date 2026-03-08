@@ -2,17 +2,14 @@ export type ExerciseGroupType =
   | 'straight_set'
   | 'superset'
   | 'giant_set'
-  | 'circuit'
   | 'tabata'
   | 'amrap'
   | 'emom'
   | 'drop_set'
   | 'cluster_set'
   | 'rest_pause'
-  | 'pyramid_set'
   | 'pre_exhaustion'
   | 'for_time'
-  | 'ladder'
 
 export interface WorkoutExerciseGroup {
   id: string

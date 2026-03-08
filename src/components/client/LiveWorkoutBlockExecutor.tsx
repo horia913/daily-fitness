@@ -81,6 +81,13 @@ interface LiveWorkoutBlockExecutorProps {
     string,
     import("@/lib/clientProgressionService").ProgressionSuggestion
   >;
+  previousPerformanceMap?: Map<string, {
+    lastWorkout: { weight: number | null; reps: number | null; sets: number; avgRpe: number | null; date: string } | null;
+    personalBest: { maxWeight: number | null; maxReps: number | null; date: string } | null;
+  }>;
+  onPlateCalculatorClick?: () => void;
+  /** Called whenever the active exercise changes (by exercise_id). Used to trigger per-exercise data fetches in the parent. */
+  onExerciseChanged?: (exerciseId: string) => void;
 }
 
 export default function LiveWorkoutBlockExecutor({
@@ -104,31 +111,12 @@ export default function LiveWorkoutBlockExecutor({
   loggedSets,
   onExerciseComplete,
   progressionSuggestions,
+  previousPerformanceMap,
+  onPlateCalculatorClick,
+  onExerciseChanged,
 }: LiveWorkoutBlockExecutorProps) {
   const { addToast } = useToast();
   const { ensureFreshSession, user: authUser } = useAuth();
-
-  // Debug: Log assignmentId received as prop
-  console.log("📍 LiveWorkoutBlockExecutor received:", {
-    assignmentId,
-    blockId: block.block.id,
-    blockType: (block.block as any).type || block.block.block_type,
-  });
-
-  useEffect(() => {
-    console.log(
-      "🔍 [LiveWorkoutBlockExecutor] assignmentId received:",
-      assignmentId,
-    );
-    console.log(
-      "🔍 [LiveWorkoutBlockExecutor] assignmentId type:",
-      typeof assignmentId,
-    );
-    console.log(
-      "🔍 [LiveWorkoutBlockExecutor] assignmentId truthy:",
-      !!assignmentId,
-    );
-  }, [assignmentId]);
 
   // Sync local exercise index with block's currentExerciseIndex
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(
@@ -361,11 +349,11 @@ export default function LiveWorkoutBlockExecutor({
 
       // Build the enriched payload (same fields the old function built)
       const enrichedPayload: Record<string, unknown> = {
-        block_id: block.block.id,
-        block_type:
-          data.block_type ||
+        set_entry_id: block.block.id,
+        set_type:
+          data.set_type ||
           (block.block as any).type ||
-          block.block.block_type,
+          block.block.set_type,
         client_id: authUser?.id || undefined,
         workout_assignment_id: assignmentId || undefined,
         session_id: String(sessionId).trim(),
@@ -379,9 +367,9 @@ export default function LiveWorkoutBlockExecutor({
         sessionId,
         blockId: block.block.id,
         blockType:
-          data.block_type ||
+          data.set_type ||
           (block.block as any).type ||
-          block.block.block_type ||
+          block.block.set_type ||
           "straight_set",
         exerciseId,
         setNumber,
@@ -393,7 +381,6 @@ export default function LiveWorkoutBlockExecutor({
         return { success: false, error: result.reason };
       }
 
-      console.log("[goldenFlow] logSet accepted (optimistic):", result.key);
       return { success: true, set_log_id: undefined, isNewPR: false };
     },
     [
@@ -435,25 +422,13 @@ export default function LiveWorkoutBlockExecutor({
 
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const payloadSummary = {
-      block_id: data?.block_id,
-      block_type: data?.block_type,
+      set_entry_id: data?.set_entry_id,
+      set_type: data?.set_type,
       exercise_id: data?.exercise_id,
       set_number: data?.set_number,
     };
 
     try {
-      console.log("[log-set] start", {
-        route: window.location.pathname,
-        assignmentId,
-        blockId: block.block.id,
-        payload: {
-          exercise_id: data?.exercise_id,
-          reps: data?.reps,
-          weight: data?.weight,
-          set_number: data?.set_number,
-        },
-      });
-      console.log("[log-set] ensureFreshSession: begin");
       try {
         await Promise.race([
           ensureFreshSession(),
@@ -464,7 +439,6 @@ export default function LiveWorkoutBlockExecutor({
             ),
           ),
         ]);
-        console.log("[log-set] ensureFreshSession: done");
       } catch (refreshError) {
         console.warn(
           "[log-set] ensureFreshSession failed or timed out",
@@ -507,36 +481,11 @@ export default function LiveWorkoutBlockExecutor({
         );
       }
 
-      const logSessionInfo = {
-        hasSession: !!activeSession,
-        expiresAt: activeSession?.expires_at ?? null,
-        expiresInSec: activeSession?.expires_at
-          ? Math.round(activeSession.expires_at - Date.now() / 1000)
-          : null,
-        hasAccessToken: !!activeSession?.access_token,
-      };
-
       // Call /api/log-set to:
       // 1. Get/create workout_log_id (for session tracking)
       // 2. Insert into workout_set_logs (individual set data)
       // 3. Calculate and update e1RM in user_exercise_metrics
       try {
-        // Debug: Log assignmentId before building request
-        console.log(
-          "🔍 [logSetToDatabase] assignmentId from closure:",
-          assignmentId,
-        );
-        console.log(
-          "🔍 [logSetToDatabase] assignmentId type:",
-          typeof assignmentId,
-        );
-        console.log(
-          "🔍 [logSetToDatabase] assignmentId truthy:",
-          !!assignmentId,
-        );
-
-        console.log("[log-set] resolvedUserId:", resolvedUserId);
-
         // Build request body with all data passed from executor + required fields
         if (!resolvedUserId) {
           console.warn(
@@ -546,11 +495,11 @@ export default function LiveWorkoutBlockExecutor({
 
         const requestBody: any = {
           // Required for workout_set_logs
-          block_id: block.block.id,
-          block_type:
-            data.block_type ||
+          set_entry_id: block.block.id,
+          set_type:
+            data.set_type ||
             (block.block as any).type ||
-            block.block.block_type,
+            block.block.set_type,
           client_id: resolvedUserId || undefined,
           workout_assignment_id: assignmentId || undefined,
           // For API to get/create workout_log_id (session tracking)
@@ -559,30 +508,8 @@ export default function LiveWorkoutBlockExecutor({
           // Spread all data from executor (block-type-specific fields)
           ...data,
         };
-        console.log("[log-set] requestBody ready", {
-          block_id: requestBody.block_id,
-          workout_assignment_id: requestBody.workout_assignment_id,
-          session_id: requestBody.session_id,
-          exercise_id: requestBody.exercise_id,
-          reps: requestBody.reps,
-          weight: requestBody.weight,
-        });
 
         const sendLogSet = async (attempt: number) => {
-          console.log("🚀 About to send to /api/log-set:", {
-            requestId,
-            attempt,
-            route: window.location.pathname,
-            session: logSessionInfo,
-            workout_assignment_id: requestBody.workout_assignment_id,
-            block_id: requestBody.block_id,
-            client_id: requestBody.client_id,
-            block_type: requestBody.block_type,
-            exercise_id: requestBody.exercise_id,
-            weight: requestBody.weight,
-            reps: requestBody.reps,
-          });
-
           const controller = new AbortController();
           inFlightLogRef.current = {
             startedAt: Date.now(),
@@ -617,13 +544,6 @@ export default function LiveWorkoutBlockExecutor({
           inFlightLogRef.current = null;
 
           const responseText = await response.text().catch(() => "");
-          console.log("[log-set]", {
-            requestId,
-            attempt,
-            status: response.status,
-            payloadSummary,
-            responseText,
-          });
 
           let parsed: any = {};
           if (responseText && responseText.trim().length > 0) {
@@ -849,18 +769,7 @@ export default function LiveWorkoutBlockExecutor({
 
   // Handle set complete - update parent state and check for exercise completion
   const handleSetComplete = (newCompletedSets: number) => {
-    // Update parent's completedSets
     onSetLogged?.(block.block.id, newCompletedSets);
-    console.log("[block complete detected]", {
-      blockId: block.block.id,
-      completedSets: newCompletedSets,
-      totalSets:
-        block.block.exercises?.[currentExerciseIndex]?.sets ||
-        block.block.total_sets ||
-        1,
-      currentExerciseIndex,
-      source: "handleSetComplete",
-    });
 
     // Check if all sets of current exercise are complete
     const currentExercise = block.block.exercises?.[currentExerciseIndex];
@@ -897,13 +806,6 @@ export default function LiveWorkoutBlockExecutor({
         // Guard against duplicate completion calls
         if (!completedBlockRef.current.has(block.block.id)) {
           completedBlockRef.current.add(block.block.id);
-          console.log("[block complete detected]", {
-            blockId: block.block.id,
-            completedSets: newCompletedSets,
-            totalSets: currentExercise?.sets || block.block.total_sets || 1,
-            currentExerciseIndex,
-            source: "handleSetComplete-finalExercise",
-          });
           onBlockComplete?.(block.block.id, []);
         }
       }
@@ -940,19 +842,6 @@ export default function LiveWorkoutBlockExecutor({
     if (completedBlockRef.current.has(block.block.id)) return;
     completedBlockRef.current.add(block.block.id);
 
-    console.log("✅ Auto-completing block from effect", {
-      blockId: block.block.id,
-      completedSets,
-      totalSetsForExercise,
-      currentExIndex,
-    });
-    console.log("[block complete detected]", {
-      blockId: block.block.id,
-      completedSets,
-      totalSets: totalSetsForExercise,
-      currentExerciseIndex: currentExIndex,
-      source: "completionEffect",
-    });
     onBlockComplete?.(block.block.id, []);
   }, [
     block.block.id,
@@ -1043,6 +932,16 @@ export default function LiveWorkoutBlockExecutor({
       ? progressionSuggestions.get(currentExercise.exercise_id)
       : undefined;
 
+  // Notify parent whenever the active exercise changes so it can fetch
+  // per-exercise data (e.g. previousPerformanceMap) that is managed at the
+  // page level but keyed by exercise_id tracked here.
+  useEffect(() => {
+    if (currentExercise?.exercise_id && onExerciseChanged) {
+      onExerciseChanged(currentExercise.exercise_id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentExercise?.exercise_id]);
+
   // Common props for all block executors
   const commonProps: BaseBlockExecutorProps = {
     block,
@@ -1071,10 +970,13 @@ export default function LiveWorkoutBlockExecutor({
       setAlternativesExerciseId(exerciseId);
       setShowAlternativesModal(true);
     },
+    onPlateCalculatorClick: onPlateCalculatorClick || (() => {}),
     onRestTimerClick: handleRestTimerClick,
     onSetComplete: handleSetComplete,
     onLastSetLoggedForRest: handleLastSetLoggedForRest,
     progressionSuggestion,
+    progressionSuggestionsMap: progressionSuggestions,
+    previousPerformanceMap,
     registerUndo: (fn) => {
       undoFnRef.current = fn;
     },
@@ -1090,106 +992,34 @@ export default function LiveWorkoutBlockExecutor({
 
   // Route to appropriate component based on block type
   const renderBlockExecutor = () => {
-    const blockType = block.block.block_type;
-
-    // Debug: trace which executor is rendered
-    // Note: kept minimal and gated to avoid noisy logs in production builds if env is set
-    try {
-      // eslint-disable-next-line no-console
-      console.log("LiveWorkoutBlockExecutor: rendering type", blockType, {
-        blockId: block.block.id,
-        blockOrder: block.block.block_order,
-        exerciseCount: block.block.exercises?.length || 0,
-      });
-    } catch {}
+    const blockType = block.block.set_type;
 
     switch (blockType) {
       case "straight_set":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: StraightSetExecutor");
-        } catch {}
         return <StraightSetExecutor {...commonProps} />;
       case "superset":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: SupersetExecutor");
-        } catch {}
         return <SupersetExecutor {...commonProps} />;
       case "giant_set":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: GiantSetExecutor");
-        } catch {}
         return <GiantSetExecutor {...commonProps} />;
       case "drop_set":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: DropSetExecutor");
-        } catch {}
         return <DropSetExecutor {...commonProps} />;
       case "cluster_set":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: ClusterSetExecutor");
-        } catch {}
         return <ClusterSetExecutor {...commonProps} />;
       case "rest_pause":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: RestPauseExecutor");
-        } catch {}
         return <RestPauseExecutor {...commonProps} />;
-      // DEPRECATED: pyramid_set, ladder, and circuit block types have been removed
-      // case "pyramid_set": - REMOVED
-      // case "ladder": - REMOVED
-      // case "circuit": - REMOVED
       case "pre_exhaustion":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: PreExhaustionExecutor");
-        } catch {}
         return <PreExhaustionExecutor {...commonProps} />;
       case "amrap":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: AmrapExecutor");
-        } catch {}
         return <AmrapExecutor {...commonProps} />;
       case "emom":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: EmomExecutor");
-        } catch {}
         return <EmomExecutor {...commonProps} />;
       case "tabata":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: TabataExecutor");
-        } catch {}
         return <TabataExecutor {...commonProps} />;
-      // DEPRECATED: circuit block type has been removed
-      // case "circuit": - REMOVED
       case "for_time":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: ForTimeExecutor");
-        } catch {}
         return <ForTimeExecutor {...commonProps} />;
       case "hr_sets":
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: HRSetExecutor");
-        } catch {}
         return <HRSetExecutor {...commonProps} />;
-      // DEPRECATED: ladder block type has been removed
-      // case "ladder": - REMOVED
       default:
-        // Fallback to straight set if unknown type
-        try {
-          // eslint-disable-next-line no-console
-          console.log("Executor: Fallback -> StraightSetExecutor");
-        } catch {}
         return <StraightSetExecutor {...commonProps} />;
     }
   };
@@ -1238,12 +1068,8 @@ export default function LiveWorkoutBlockExecutor({
           );
         })()}
 
-      {/* Golden Logging Flow: RPE Modal (blocking, all executors) */}
-      <RPEModal
-        isOpen={orchestrator.showRpeModal}
-        onSelect={(rpe) => orchestrator.confirmRpe(rpe)}
-        onSkip={() => orchestrator.skipRpe()}
-      />
+      {/* RPE Modal - Deprecated: RPE is now collected inline via InlineRPERow component */}
+      {/* Keeping component import but never rendering it */}
 
       {/* Rest Timer Modal */}
       <RestTimerModal
@@ -1255,6 +1081,7 @@ export default function LiveWorkoutBlockExecutor({
         lastSet={restModalData?.lastSet ?? null}
         nextSetPreview={restModalData?.nextSetPreview ?? null}
       />
+
     </>
   );
 }

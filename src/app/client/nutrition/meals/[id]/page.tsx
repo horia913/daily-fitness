@@ -55,15 +55,15 @@ const getMealIcon = (mealType: string) => {
 const getMealTypeColor = (mealType: string) => {
   switch (mealType) {
     case "breakfast":
-      return "bg-orange-500";
+      return "bg-amber-500";
     case "lunch":
-      return "bg-green-500";
+      return "bg-[color:var(--fc-domain-meals)]";
     case "dinner":
-      return "bg-blue-500";
+      return "bg-violet-500";
     case "snack":
-      return "bg-purple-500";
+      return "bg-[color:var(--fc-accent-cyan)]";
     default:
-      return "bg-gray-500";
+      return "bg-[color:var(--fc-text-subtle)]";
   }
 };
 
@@ -218,7 +218,7 @@ export default function MealDetailPage() {
     return (
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
-          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10 flex items-center justify-center">
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10 flex items-center justify-center">
             <div className="fc-surface rounded-2xl p-8 text-center max-w-md">
               <p className="fc-text-dim mb-4">{loadError}</p>
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
@@ -237,7 +237,7 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-5xl">
                 <div className="fc-surface p-6 sm:p-10">
                 <div className="animate-pulse space-y-4">
@@ -258,7 +258,7 @@ export default function MealDetailPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 min-h-screen px-4 pb-28 pt-20 sm:px-6 lg:px-10">
+          <div className="relative z-10 min-h-screen px-4 pb-32 pt-20 sm:px-6 lg:px-10">
             <div className="mx-auto w-full max-w-5xl">
               <div className="fc-surface p-10 text-center">
                 <h2 className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">
@@ -322,11 +322,11 @@ export default function MealDetailPage() {
             <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--fc-bg-base)] via-transparent to-transparent opacity-80" />
             <div className="absolute bottom-6 left-6 right-6">
               <div className="flex items-center gap-3 mb-2">
-                <span className="bg-[color:var(--fc-domain-workouts)]/20 fc-text-workouts px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-[color:var(--fc-domain-workouts)]/30">
+                <span className={`${getMealTypeColor(meal.meal_type)}/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${getMealTypeColor(meal.meal_type)}/30 text-[color:var(--fc-text-primary)]`}>
                   {meal.meal_type}
                 </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight fc-text-primary">
+              <h1 className="text-2xl font-bold tracking-tight fc-text-primary">
                 {meal.name}
               </h1>
             </div>
@@ -459,11 +459,11 @@ export default function MealDetailPage() {
                                     className="absolute inset-0 rounded-full"
                                     style={{
                                       background: `conic-gradient(
-                                        #3b82f6 0deg ${itemProteinPercent * 360}deg,
-                                        #eab308 ${itemProteinPercent * 360}deg ${
+                                        var(--fc-domain-workouts) 0deg ${itemProteinPercent * 360}deg,
+                                        var(--fc-status-success) ${itemProteinPercent * 360}deg ${
                                         (itemProteinPercent + itemCarbsPercent) * 360
                                       }deg,
-                                        #f97316 ${
+                                        var(--fc-status-error) ${
                                           (itemProteinPercent + itemCarbsPercent) *
                                           360
                                         }deg 360deg
@@ -486,7 +486,7 @@ export default function MealDetailPage() {
 
                             <div className="space-y-2">
                               <div className="flex items-center gap-2">
-                                <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                                <div className="h-2.5 w-2.5 rounded-full bg-[color:var(--fc-domain-workouts)]" />
                                 <div className="flex-1">
                                   <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
                                     Protein
@@ -497,7 +497,7 @@ export default function MealDetailPage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <div className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
+                                <div className="h-2.5 w-2.5 rounded-full bg-[color:var(--fc-status-success)]" />
                                 <div className="flex-1">
                                   <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
                                     Carbs
@@ -508,7 +508,7 @@ export default function MealDetailPage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <div className="h-2.5 w-2.5 rounded-full bg-orange-500" />
+                                <div className="h-2.5 w-2.5 rounded-full bg-[color:var(--fc-status-error)]" />
                                 <div className="flex-1">
                                   <div className="text-xs font-semibold text-[color:var(--fc-text-primary)]">
                                     Fat
@@ -543,11 +543,11 @@ export default function MealDetailPage() {
                             className="absolute inset-0 rounded-full"
                             style={{
                               background: `conic-gradient(
-                                #3b82f6 0deg ${proteinPercent * 360}deg,
-                                #eab308 ${proteinPercent * 360}deg ${
+                                var(--fc-domain-workouts) 0deg ${proteinPercent * 360}deg,
+                                var(--fc-status-success) ${proteinPercent * 360}deg ${
                                 (proteinPercent + carbsPercent) * 360
                               }deg,
-                                #f97316 ${
+                                var(--fc-status-error) ${
                                   (proteinPercent + carbsPercent) * 360
                                 }deg 360deg
                               )`,
@@ -568,7 +568,7 @@ export default function MealDetailPage() {
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-3 w-3 rounded-full bg-blue-500" />
+                        <div className="h-3 w-3 rounded-full bg-[color:var(--fc-domain-workouts)]" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between text-sm font-semibold text-[color:var(--fc-text-primary)]">
                             <span>Protein</span>
@@ -583,7 +583,7 @@ export default function MealDetailPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="h-3 w-3 rounded-full bg-yellow-400" />
+                        <div className="h-3 w-3 rounded-full bg-[color:var(--fc-status-success)]" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between text-sm font-semibold text-[color:var(--fc-text-primary)]">
                             <span>Carbs</span>
@@ -598,7 +598,7 @@ export default function MealDetailPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="h-3 w-3 rounded-full bg-orange-500" />
+                        <div className="h-3 w-3 rounded-full bg-[color:var(--fc-status-error)]" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between text-sm font-semibold text-[color:var(--fc-text-primary)]">
                             <span>Fat</span>

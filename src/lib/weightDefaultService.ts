@@ -120,7 +120,7 @@ function getWeightFromSetLog(
     superset_weight_b?: number | null
     dropset_initial_weight?: number | null
     rest_pause_initial_weight?: number | null
-    block_type?: string | null
+    set_type?: string | null
   },
   exerciseId: string
 ): number | null {
@@ -156,7 +156,7 @@ export async function fetchLastSessionWeightForExercise(
     const { data: rows, error } = await supabase
       .from('workout_set_logs')
       .select(
-        'set_number, created_at, weight, exercise_id, superset_exercise_a_id, superset_exercise_b_id, superset_weight_a, superset_weight_b, dropset_initial_weight, rest_pause_initial_weight, block_type, workout_logs!inner(completed_at, client_id)'
+        'set_number, created_at, weight, exercise_id, superset_exercise_a_id, superset_exercise_b_id, superset_weight_a, superset_weight_b, dropset_initial_weight, rest_pause_initial_weight, set_type, workout_logs!inner(completed_at, client_id)'
       )
       .eq('workout_logs.client_id', userId)
       .not('workout_logs.completed_at', 'is', null)

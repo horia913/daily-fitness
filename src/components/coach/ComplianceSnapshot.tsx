@@ -250,7 +250,7 @@ export default function ComplianceSnapshot() {
           <TrendingDown className="w-3 h-3 text-red-600 dark:text-red-400" />
         );
       default:
-        return <Activity className="w-3 h-3 text-slate-400" />;
+        return <Activity className="w-3 h-3 fc-text-subtle" />;
     }
   };
 
@@ -363,7 +363,7 @@ export default function ComplianceSnapshot() {
 
   if (loading) {
     return (
-      <Card className="bg-white">
+      <Card className="fc-surface">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5 text-blue-600" />
@@ -375,14 +375,14 @@ export default function ComplianceSnapshot() {
             {[...Array(3)].map((_, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg"
+                className="flex items-center gap-3 p-3 fc-surface rounded-lg border border-[color:var(--fc-surface-card-border)]"
               >
-                <div className="w-10 h-10 bg-slate-200 rounded-full"></div>
+                <div className="w-10 h-10 bg-[color:var(--fc-glass-highlight)] rounded-full"></div>
                 <div className="flex-1">
-                  <div className="h-4 bg-slate-200 rounded w-1/3 mb-2"></div>
-                  <div className="h-3 bg-slate-200 rounded w-1/4"></div>
+                  <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-1/3 mb-2"></div>
+                  <div className="h-3 bg-[color:var(--fc-glass-highlight)] rounded w-1/4"></div>
                 </div>
-                <div className="h-8 bg-slate-200 rounded w-20"></div>
+                <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded w-20"></div>
               </div>
             ))}
           </div>
@@ -406,24 +406,24 @@ export default function ComplianceSnapshot() {
           <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl"></div>
         </div>
 
-        <CardHeader className="pb-4 relative z-10">
-          <div className="flex items-center justify-between">
-            <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
-              <div className="p-2 bg-gradient-to-br from-green-100 to-blue-100 dark:from-green-900/30 dark:to-blue-900/30 rounded-xl">
-                <BarChart3 className="w-5 h-5 text-green-600 dark:text-green-400" />
+        <CardHeader className="p-4 sm:p-6 pb-4 relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle className={`flex items-center gap-2 sm:gap-3 ${theme.text} min-w-0`}>
+              <div className="p-2 bg-gradient-to-br from-green-100 to-blue-100 dark:from-green-900/30 dark:to-blue-900/30 rounded-xl flex-shrink-0">
+                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 dark:text-green-400" />
               </div>
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold">
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg md:text-xl font-bold truncate">
                   Compliance Snapshot
                 </h2>
-                <p className={`text-sm ${theme.textSecondary}`}>
+                <p className={`text-xs sm:text-sm ${theme.textSecondary}`}>
                   Overall client adherence overview
                 </p>
               </div>
             </CardTitle>
 
-            <div className="flex items-center gap-2">
-              <Badge className="bg-gradient-to-r from-green-500 to-blue-500 text-white px-3 py-1">
+            <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+              <Badge className="bg-gradient-to-r from-green-500 to-blue-500 text-white px-3 py-1 text-xs sm:text-sm">
                 {overallCompliance}% overall
               </Badge>
               <Button
@@ -432,7 +432,7 @@ export default function ComplianceSnapshot() {
                 onClick={() =>
                   setViewMode(viewMode === "overview" ? "detailed" : "overview")
                 }
-                className="text-xs"
+                className="text-xs min-h-[44px]"
               >
                 {viewMode === "overview" ? "Detailed View" : "Overview"}
                 <Eye className="w-3 h-3 ml-1" />
@@ -712,7 +712,7 @@ export default function ComplianceSnapshot() {
                                       client.compliance_score
                                     )}`}
                                   >
-                                    {client.compliance_score.toFixed(1)}%
+                                    {(client.compliance_score ?? 0).toFixed(1)}%
                                   </span>
                                 </div>
                                 <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
@@ -727,7 +727,7 @@ export default function ComplianceSnapshot() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-4 mt-2 text-xs text-slate-500 dark:text-slate-400">
+                              <div className="flex items-center gap-4 mt-2 text-xs fc-text-subtle">
                                 <div className="flex items-center gap-1">
                                   <Activity className="w-3 h-3" />
                                   <span>
@@ -775,9 +775,9 @@ export default function ComplianceSnapshot() {
 
               {/* Summary Stats */}
               <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                  <div className={`${theme.card} rounded-xl p-4 border-2`}>
-                    <p className={`text-2xl font-bold ${theme.text}`}>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-center">
+                  <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2`}>
+                    <p className={`text-xl sm:text-2xl font-bold ${theme.text}`}>
                       {clients.length}
                     </p>
                     <p className={`text-xs ${theme.textSecondary}`}>
@@ -785,10 +785,10 @@ export default function ComplianceSnapshot() {
                     </p>
                   </div>
                   <div
-                    className={`${theme.card} rounded-xl p-4 border-2 border-green-200 dark:border-green-800`}
+                    className={`${theme.card} rounded-xl p-3 sm:p-4 border-2 border-green-200 dark:border-green-800`}
                   >
                     <p
-                      className={`text-2xl font-bold text-green-600 dark:text-green-400`}
+                      className={`text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400`}
                     >
                       {clients.filter((c) => c.compliance_score >= 80).length}
                     </p>
@@ -797,10 +797,10 @@ export default function ComplianceSnapshot() {
                     </p>
                   </div>
                   <div
-                    className={`${theme.card} rounded-xl p-4 border-2 border-yellow-200 dark:border-yellow-800`}
+                    className={`${theme.card} rounded-xl p-3 sm:p-4 border-2 border-yellow-200 dark:border-yellow-800`}
                   >
                     <p
-                      className={`text-2xl font-bold text-yellow-600 dark:text-yellow-400`}
+                      className={`text-xl sm:text-2xl font-bold text-yellow-600 dark:text-yellow-400`}
                     >
                       {
                         clients.filter(
@@ -814,10 +814,10 @@ export default function ComplianceSnapshot() {
                     </p>
                   </div>
                   <div
-                    className={`${theme.card} rounded-xl p-4 border-2 border-red-200 dark:border-red-800`}
+                    className={`${theme.card} rounded-xl p-3 sm:p-4 border-2 border-red-200 dark:border-red-800`}
                   >
                     <p
-                      className={`text-2xl font-bold text-red-600 dark:text-red-400`}
+                      className={`text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400`}
                     >
                       {clients.filter((c) => c.compliance_score < 60).length}
                     </p>

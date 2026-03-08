@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { GlassCard } from '@/components/ui/GlassCard'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
@@ -316,17 +317,11 @@ export default function CreateUserPage() {
 
         {/* Error Message */}
         {error && (
-          <Card className="bg-white/80 backdrop-blur-sm shadow-xl border-0 rounded-3xl border-l-4 border-l-red-500">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-6 h-6 text-red-600" />
-                <div>
-                  <h3 className="font-semibold text-red-800 text-lg">Error</h3>
-                  <p className="text-red-700">{error}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ErrorBanner
+            title="Couldn't create user"
+            message="Please check your input and try again."
+            onDismiss={() => setError('')}
+          />
         )}
 
         {/* Main Form */}

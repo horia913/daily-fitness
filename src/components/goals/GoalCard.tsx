@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, Edit, Trash, Calendar, Clock, Target, RefreshCw, Scale, Dumbbell, Activity, ChevronDown } from "lucide-react";
+import { CheckCircle, Edit, Trash, Calendar } from "lucide-react";
 
 interface Goal {
   id: string;
@@ -30,6 +30,8 @@ interface Goal {
   created_at: string;
   updated_at: string;
   progress_percentage?: number;
+  pillar: "training" | "nutrition" | "lifestyle" | "checkins" | "general";
+  goal_type?: string | null;
 }
 
 interface GoalCardProps {
@@ -42,27 +44,39 @@ interface GoalCardProps {
   compact?: boolean;
 }
 
-function getCategoryIconTile(category: string) {
-  const map: Record<string, { Icon: typeof Scale; bg: string; text: string }> = {
-    weight_loss: { Icon: Scale, bg: "bg-blue-500/10", text: "text-blue-400" },
-    muscle_gain: { Icon: Dumbbell, bg: "bg-red-500/10", text: "text-red-400" },
-    body_composition: { Icon: Scale, bg: "bg-blue-500/10", text: "text-blue-400" },
-    strength: { Icon: Dumbbell, bg: "bg-red-500/10", text: "text-red-400" },
-    endurance: { Icon: Activity, bg: "bg-green-500/10", text: "text-green-400" },
-    performance: { Icon: Activity, bg: "bg-green-500/10", text: "text-green-400" },
-    mobility: { Icon: Activity, bg: "bg-indigo-500/10", text: "text-indigo-400" },
-    other: { Icon: Target, bg: "bg-slate-500/10", text: "text-slate-400" },
+function getPillarEmoji(pillar: string): string {
+  const map: Record<string, string> = {
+    training: "🏋️",
+    nutrition: "🥗",
+    lifestyle: "🌱",
+    checkins: "✅",
+    general: "🎯",
   };
-  return map[category] || map.other;
+  return map[pillar] ?? "🎯";
+}
+
+function getPillarLabel(pillar: string): string {
+  return pillar.charAt(0).toUpperCase() + pillar.slice(1);
+}
+
+function getPillarAccentColor(pillar: string): string {
+  const map: Record<string, string> = {
+    training: "var(--fc-accent-cyan)",
+    nutrition: "var(--fc-domain-meals)",
+    checkins: "var(--fc-status-warning)",
+    lifestyle: "var(--fc-accent-purple)",
+    general: "var(--fc-domain-neutral)",
+  };
+  return map[pillar] ?? "var(--fc-domain-neutral)";
 }
 
 function getTrajectoryStatusTag(goal: Goal): { label: string; className: string } {
   if (goal.status === "completed") return { label: "Completed", className: "fc-text-success bg-[color:var(--fc-status-success)]/20 border-[color:var(--fc-status-success)]/30" };
   if (goal.status === "cancelled") return { label: "Cancelled", className: "fc-text-error bg-[color:var(--fc-status-error)]/20 border-[color:var(--fc-status-error)]/30" };
   if (goal.status === "paused") return { label: "Paused", className: "fc-text-warning bg-[color:var(--fc-status-warning)]/20 border-[color:var(--fc-status-warning)]/30" };
-  const statusLabel = goal.status === "in_progress" ? "Active" : "Active";
-  const priorityLabel = goal.priority.charAt(0).toUpperCase() + goal.priority.slice(1);
-  return { label: `${statusLabel} · ${priorityLabel}`, className: "fc-text-workouts bg-[color:var(--fc-domain-workouts)]/20 border-[color:var(--fc-domain-workouts)]/30" };
+  const statusLabel = "Active";
+  const prioritySuffix = goal.priority === "high" ? " · High" : "";
+  return { label: `${statusLabel}${prioritySuffix}`, className: "fc-text-workouts bg-[color:var(--fc-domain-workouts)]/20 border-[color:var(--fc-domain-workouts)]/30" };
 }
 
 export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, compact = false }: GoalCardProps) {
@@ -74,34 +88,6 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, comp
   const progressPercent = Math.min(goal.progress_percentage || 0, 100);
   const isCompleted = goal.status === "completed";
   const isCancelled = goal.status === "cancelled";
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "fc-text-error";
-      case "medium":
-        return "fc-text-warning";
-      case "low":
-        return "fc-text-success";
-      default:
-        return "fc-text-subtle";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "fc-text-success";
-      case "active":
-        return "fc-text-workouts";
-      case "paused":
-        return "fc-text-warning";
-      case "cancelled":
-        return "fc-text-subtle";
-      default:
-        return "fc-text-subtle";
-    }
-  };
 
   const handleUpdate = async () => {
     if (!onUpdate) return;
@@ -131,8 +117,8 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, comp
     ? getDaysUntilDeadline(goal.target_date)
     : null;
 
-  const { Icon: CategoryIcon, bg: iconBg, text: iconText } = getCategoryIconTile(goal.category);
   const trajectoryTag = getTrajectoryStatusTag(goal);
+  const eyebrow = `${getPillarEmoji(goal.pillar)} ${getPillarLabel(goal.pillar).toUpperCase()} · ${trajectoryTag.label}`;
 
   /* Compact row for completed-goals list */
   if (compact && isCompleted) {
@@ -152,41 +138,40 @@ export function GoalCard({ goal, isAutoTracked, onDelete, onUpdate, onEdit, comp
     );
   }
 
-  /* Trajectory card (mockup layout) */
+  /* Trajectory card */
+  const accentColor = getPillarAccentColor(goal.pillar);
   return (
-    <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-6 transition-all duration-300 fc-hover-rise flex flex-col justify-between">
+    <div
+      className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] border-l-[3px] p-6 transition-all duration-200 fc-hover-rise flex flex-col justify-between hover:border-[color:var(--fc-glass-border-strong)] hover:shadow-[var(--fc-shadow-card)]"
+      style={{ borderLeftColor: accentColor }}
+    >
       <div>
-        <div className="flex justify-between items-start mb-6">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconBg} ${iconText}`}>
-            <CategoryIcon className="w-6 h-6" />
-          </div>
-          <span className={`status-tag text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border ${trajectoryTag.className}`}>
-            {trajectoryTag.label}
-          </span>
-        </div>
+        <p className="text-xs uppercase tracking-wide font-semibold text-[color:var(--fc-text-dim)] mb-1">
+          {eyebrow}
+        </p>
         <h3 className="text-xl font-bold fc-text-primary mb-1">{goal.title}</h3>
         {goal.description && (
-          <p className="text-sm fc-text-dim mb-6">{goal.description}</p>
+          <p className="text-sm fc-text-dim mb-4">{goal.description}</p>
         )}
       </div>
 
       <div className="space-y-4">
-        <div className="flex justify-between text-sm font-mono">
-          <span className="fc-text-dim">Current: {goal.current_value ?? 0}{goal.target_unit ? ` ${goal.target_unit}` : ""}</span>
-          <span className="fc-text-primary">Target: {goal.target_value ?? "—"}{goal.target_unit ? ` ${goal.target_unit}` : ""}</span>
-        </div>
+        <p className="text-sm font-mono fc-text-primary">
+          {goal.current_value ?? 0}{goal.target_unit ? ` ${goal.target_unit}` : ""} / {goal.target_value ?? "—"}{goal.target_unit ? ` ${goal.target_unit}` : ""}
+        </p>
         <div className="w-full h-2 rounded-full overflow-hidden fc-progress-track border border-[color:var(--fc-glass-border)]">
           <div
             className="h-full rounded-full transition-all duration-500 fc-progress-fill"
             style={{ width: `${Math.min(progressPercent, 100)}%` }}
           />
         </div>
-        <div className="flex justify-between items-center pt-2">
-          <div className="flex items-center gap-2 text-xs fc-text-subtle">
-            <Calendar className="w-3.5 h-3.5" />
-            <span>{goal.target_date ? `Deadline: ${new Date(goal.target_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "No deadline"}</span>
-          </div>
-          <span className="font-mono text-xs font-bold fc-text-error">{Math.round(progressPercent)}% DONE</span>
+        <div className="flex items-center gap-2 text-xs fc-text-dim pt-1">
+          <Calendar className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            {goal.target_date
+              ? `Deadline: ${new Date(goal.target_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}${daysUntilDeadline != null ? ` (${daysUntilDeadline} day${daysUntilDeadline !== 1 ? "s" : ""} left)` : ""}`
+              : "No deadline"}
+          </span>
         </div>
       </div>
 

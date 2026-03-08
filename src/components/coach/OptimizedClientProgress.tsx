@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
+import { getCheckinStreak, getCompletionStats, getTodayLog } from '@/lib/wellnessService'
 import { 
   BarChart3, 
   Users, 
@@ -146,6 +147,13 @@ interface ClientProgressData {
     date: string
     notes?: string
   }[]
+  wellness: {
+    checkinStreak: number
+    lastCheckinDate: string | null
+    lastCheckinDaysAgo: number | null
+    sevenDayCompliance: number
+    sevenDayAverages: Record<string, number>
+  }
 }
 
 interface OptimizedClientProgressProps {
@@ -168,15 +176,40 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
 
   const [clientProgressData, setClientProgressData] = useState<ClientProgressData | null>(null)
 
+  const progressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
-    if (selectedClient) {
-      loadClientProgress(selectedClient)
+    if (!selectedClient) return
+    if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current)
+    progressTimeoutRef.current = setTimeout(() => {
+      progressTimeoutRef.current = null
+      setLoading(false)
+    }, 20_000)
+    loadClientProgress(selectedClient).finally(() => {
+      if (progressTimeoutRef.current) {
+        clearTimeout(progressTimeoutRef.current)
+        progressTimeoutRef.current = null
+      }
+    })
+    return () => {
+      if (progressTimeoutRef.current) {
+        clearTimeout(progressTimeoutRef.current)
+        progressTimeoutRef.current = null
+      }
     }
   }, [selectedClient, selectedPeriod])
 
 
+  const fetchClientsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Fetch real client data from Supabase
   useEffect(() => {
+    if (fetchClientsTimeoutRef.current) clearTimeout(fetchClientsTimeoutRef.current)
+    fetchClientsTimeoutRef.current = setTimeout(() => {
+      fetchClientsTimeoutRef.current = null
+      setLoading(false)
+    }, 20_000)
+
     const fetchClients = async () => {
       try {
         setLoading(true)
@@ -229,13 +262,24 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
       }
     }
 
-    fetchClients()
+    fetchClients().finally(() => {
+      if (fetchClientsTimeoutRef.current) {
+        clearTimeout(fetchClientsTimeoutRef.current)
+        fetchClientsTimeoutRef.current = null
+      }
+    })
+
+    return () => {
+      if (fetchClientsTimeoutRef.current) {
+        clearTimeout(fetchClientsTimeoutRef.current)
+        fetchClientsTimeoutRef.current = null
+      }
+    }
   }, [coachId])
 
   const loadClientProgress = async (clientId: string) => {
     setLoading(true)
     try {
-      // Fetch real client progress data from Supabase
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('*')
@@ -247,27 +291,44 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
       const selectedClientData = clientData
       const clientUserId = selectedClientData.client_id
 
-      // Completed workouts from workout_logs; compliance = completed / assigned
-      const { data: workoutLogs } = await supabase
-        .from('workout_logs')
-        .select('id, completed_at')
-        .eq('client_id', clientUserId)
-        .not('completed_at', 'is', null)
+      const period = (await import('@/lib/metrics/period')).getPeriodBounds('this_month')
+
+      const [
+        { data: workoutLogs },
+        { count: assignedCount },
+        { data: bodyMetricsList },
+        { data: profile },
+        { data: recentWorkouts },
+        { data: recentMeals },
+        { data: latestWellnessLog },
+        prList,
+        wellnessStreak,
+        wellnessStats,
+        todayLog,
+        nutritionCompliance,
+        habitCompliance,
+        achievementsList
+      ] = await Promise.all([
+        supabase.from('workout_logs').select('id, completed_at').eq('client_id', clientUserId).not('completed_at', 'is', null),
+        supabase.from('workout_assignments').select('*', { count: 'exact', head: true }).eq('client_id', clientUserId),
+        supabase.from('body_metrics').select('weight_kg, body_fat_percentage, measured_date').eq('client_id', clientUserId).order('measured_date', { ascending: false }).limit(30),
+        supabase.from('profiles').select('*').eq('id', selectedClientData.client_id).single(),
+        supabase.from('workout_logs').select('id, completed_at, total_duration_minutes, workout_assignments(name)').eq('client_id', clientUserId).order('completed_at', { ascending: false }).limit(5),
+        supabase.from('meal_completions').select('id, completed_at').eq('client_id', clientUserId).order('completed_at', { ascending: false }).limit(3),
+        supabase.from('daily_wellness_logs').select('log_date').eq('client_id', clientUserId).order('log_date', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('personal_records').select('exercise_id, record_value, achieved_date, record_type').eq('client_id', clientUserId).order('achieved_date', { ascending: false }).limit(10),
+        getCheckinStreak(clientUserId),
+        getCompletionStats(clientUserId, 7),
+        getTodayLog(clientUserId),
+        import('@/lib/metrics/nutrition').then((m) => m.getNutritionCompliance(clientUserId, period, 'this_month')),
+        import('@/lib/metrics/habit').then((m) => m.getHabitCompliance(clientUserId, period, 'this_month')),
+        import('@/lib/metrics/achievements').then((m) => m.getAchievementsList(clientUserId, 10))
+      ])
+
       const completedWorkouts = workoutLogs?.length || 0
-      const { count: assignedCount } = await supabase
-        .from('workout_assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('client_id', clientUserId)
       const totalWorkouts = assignedCount ?? 0
       const workoutCompletionRate = totalWorkouts > 0 ? Math.round((completedWorkouts / totalWorkouts) * 100) : 0
 
-      // Body metrics from body_metrics table
-      const { data: bodyMetricsList } = await supabase
-        .from('body_metrics')
-        .select('weight_kg, body_fat_percentage, measured_date')
-        .eq('client_id', clientUserId)
-        .order('measured_date', { ascending: false })
-        .limit(30)
       const weightData = (bodyMetricsList || []).map((r) => ({ weight: r.weight_kg, date: r.measured_date, bodyFat: r.body_fat_percentage }))
       const recentWeight = weightData?.[0]?.weight ?? 0
       const oldestWeight = weightData?.length ? (weightData[weightData.length - 1]?.weight ?? recentWeight) : recentWeight
@@ -277,14 +338,6 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
         ? Number(weightData[0].bodyFat) - Number(weightData[weightData.length - 1].bodyFat)
         : 0
 
-      // Get the profile for this client
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', selectedClientData.client_id)
-        .single()
-
-      // Map the client data with profile information
       const mappedClient = {
         id: selectedClientData.id,
         first_name: profile?.first_name || 'Unknown',
@@ -294,23 +347,8 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
         program: 'General Fitness',
         goals: ['Stay healthy']
       }
-      
-      // Fetch real recent activity from database
+
       const activities: ClientProgressData['recentActivity'] = []
-      
-      // Fetch recent workout logs (total_duration_minutes per schema; workout_assignments for name)
-      const { data: recentWorkouts } = await supabase
-        .from('workout_logs')
-        .select(`
-          id,
-          completed_at,
-          total_duration_minutes,
-          workout_assignments(name)
-        `)
-        .eq('client_id', clientUserId)
-        .order('completed_at', { ascending: false })
-        .limit(5)
-      
       if (recentWorkouts) {
         recentWorkouts.forEach((workout: any) => {
           if (workout.completed_at) {
@@ -326,15 +364,6 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
           }
         })
       }
-      
-      // Meal completions (meal_logs table does not exist)
-      const { data: recentMeals } = await supabase
-        .from('meal_completions')
-        .select('id, completed_at')
-        .eq('client_id', clientUserId)
-        .order('completed_at', { ascending: false })
-        .limit(3)
-      
       if (recentMeals) {
         recentMeals.forEach((meal: any) => {
           activities.push({
@@ -347,20 +376,20 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
           })
         })
       }
-      
-      // Sort by date (most recent first) and limit to 10
       const sortedActivities = activities
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 10)
 
-      // Nutrition and habit compliance from metrics
-      const period = (await import('@/lib/metrics/period')).getPeriodBounds('this_month')
-      const [nutritionCompliance, habitCompliance, achievementsList, prList] = await Promise.all([
-        import('@/lib/metrics/nutrition').then((m) => m.getNutritionCompliance(clientUserId, period, 'this_month')),
-        import('@/lib/metrics/habit').then((m) => m.getHabitCompliance(clientUserId, period, 'this_month')),
-        import('@/lib/metrics/achievements').then((m) => m.getAchievementsList(clientUserId, 10)),
-        supabase.from('personal_records').select('exercise_id, record_value, achieved_date, record_type').eq('client_id', clientUserId).order('achieved_date', { ascending: false }).limit(10)
-      ])
+      const lastCheckinDate = latestWellnessLog?.log_date || null
+      let lastCheckinDaysAgo: number | null = null
+      if (lastCheckinDate) {
+        const today = new Date().toISOString().split('T')[0]
+        const lastDate = new Date(lastCheckinDate + 'T12:00:00')
+        const todayDate = new Date(today + 'T12:00:00')
+        const diffTime = todayDate.getTime() - lastDate.getTime()
+        lastCheckinDaysAgo = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+      }
+
       const { data: prData } = prList
       const strengthGains = (prData || []).slice(0, 3).map((pr: any) => ({
         exercise: pr.record_type || 'PR',
@@ -397,7 +426,14 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
           date: a.achieved_date,
           type: a.achievement_type as any
         })),
-        photos: []
+        photos: [],
+        wellness: {
+          checkinStreak: wellnessStreak,
+          lastCheckinDate,
+          lastCheckinDaysAgo,
+          sevenDayCompliance: wellnessStats.completionRate,
+          sevenDayAverages: wellnessStats.averages
+        }
       }
       setClientProgressData(realProgressData)
     } catch (error) {
@@ -453,9 +489,9 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
       <div className={`min-h-screen ${theme.background}`}>
         <div className="animate-pulse">
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
-          <div className="p-6 space-y-6">
-            <div className="max-w-7xl mx-auto space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-6">
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+              <div className="fc-glass fc-card rounded-2xl p-4 sm:p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -471,8 +507,9 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
   }
 
   return (
-    <div className={`min-h-screen ${theme.background}`}>
-      {/* Enhanced Header */}
+    <div className={`min-h-screen flex flex-col gap-0 sm:gap-6 ${theme.background}`}>
+      {/* Hero header - hidden on mobile to save vertical space */}
+      <div className="hidden sm:block shrink-0">
       <div className={`p-4 sm:p-6 ${theme.background} relative overflow-hidden`}>
         {/* Floating background elements */}
         <div className="absolute inset-0 overflow-hidden">
@@ -483,9 +520,9 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
 
         <div className="max-w-7xl mx-auto relative z-10">
           <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
-            <CardContent className="p-5 sm:p-6 space-y-6">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div className="flex items-start gap-3 sm:gap-4">
+            <CardContent className="p-4 sm:p-5 md:p-6 space-y-4 sm:space-y-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
+                <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                   <Button
                     variant="ghost"
                     onClick={() => router.push('/coach/analytics')}
@@ -495,7 +532,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
                   </Button>
                   <div className="space-y-2">
                     <Badge className="fc-badge">Client Intelligence</Badge>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                    <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                       Client Progress 📈
                     </h1>
                     <p className="text-base sm:text-lg text-[color:var(--fc-text-dim)]">
@@ -507,7 +544,7 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
                 <div className="flex items-center gap-2 sm:gap-3">
                   <Button
                     variant="outline"
-                    onClick={() => setLoading(true)}
+                    onClick={() => selectedClient && loadClientProgress(selectedClient)}
                     className="fc-btn fc-btn-ghost flex items-center gap-2"
                     size="sm"
                   >
@@ -559,22 +596,23 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
           </Card>
         </div>
       </div>
+      </div>
 
-      {/* Main Content */}
+      {/* Main Content - no top spacing on mobile when hero is hidden */}
       {clientProgressData && (
-        <div className="p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        <div className="p-4 sm:p-6 pt-0 sm:pt-6 min-w-0">
+          <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
             <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.65fr] gap-6">
               {/* Client Info Header */}
               <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <CardContent className="p-3 sm:p-4 md:p-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                     <div className="w-16 h-16 rounded-2xl bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center text-xl font-bold">
                       {clientProgressData.client.first_name[0]}{clientProgressData.client.last_name[0]}
                     </div>
                     <div className="flex-1 space-y-2">
                       <div>
-                        <h2 className="text-xl sm:text-2xl font-bold text-[color:var(--fc-text-primary)]">
+                        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[color:var(--fc-text-primary)]">
                           {clientProgressData.client.first_name} {clientProgressData.client.last_name}
                         </h2>
                         <p className="text-sm sm:text-base text-[color:var(--fc-text-dim)]">
@@ -587,6 +625,34 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
                             {goal}
                           </Badge>
                         ))}
+                      </div>
+                      {/* Wellness Indicators */}
+                      <div className="flex flex-wrap items-center gap-3 mt-2">
+                        {clientProgressData.wellness.checkinStreak > 0 && (
+                          <Badge variant="outline" className="text-xs rounded-lg flex items-center gap-1">
+                            <Flame className="w-3 h-3 text-orange-500" />
+                            {clientProgressData.wellness.checkinStreak}-day streak
+                          </Badge>
+                        )}
+                        {clientProgressData.wellness.lastCheckinDaysAgo !== null && (
+                          <Badge variant="outline" className="text-xs rounded-lg">
+                            {clientProgressData.wellness.lastCheckinDaysAgo === 0
+                              ? 'Checked in today'
+                              : clientProgressData.wellness.lastCheckinDaysAgo === 1
+                              ? '1 day ago'
+                              : `${clientProgressData.wellness.lastCheckinDaysAgo} days ago`}
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-xs rounded-lg">
+                          {(clientProgressData.wellness?.sevenDayCompliance ?? 0)}% compliance
+                        </Badge>
+                        <div className="flex items-center gap-1 text-xs text-[color:var(--fc-text-subtle)]">
+                          <span>⚡</span>
+                          <span>{(clientProgressData.wellness?.sevenDayAverages?.energy ?? 0).toFixed(1)}</span>
+                          <span className="mx-1">•</span>
+                          <span>😊</span>
+                          <span>{(clientProgressData.wellness?.sevenDayAverages?.mood ?? 0).toFixed(1)}</span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -742,35 +808,35 @@ export default function OptimizedClientProgress({ coachId }: OptimizedClientProg
                   className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
                 >
                   <BarChart3 className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Overview</span>
+                  <span className="text-[10px] sm:text-xs">Overview</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="weight" 
                   className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
                 >
                   <Scale className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Weight</span>
+                  <span className="text-[10px] sm:text-xs">Weight</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="strength" 
                   className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
                 >
                   <Activity className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Strength</span>
+                  <span className="text-[10px] sm:text-xs">Strength</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="compliance" 
                   className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
                 >
                   <CheckCircle className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Compliance</span>
+                  <span className="text-[10px] sm:text-xs">Compliance</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="photos" 
                   className="data-[state=active]:bg-[color:var(--fc-accent-cyan)] data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:text-[color:var(--fc-text-dim)] rounded-md px-2 py-3 text-xs font-semibold transition-all duration-200 flex-1 flex items-center justify-center min-h-[48px] touch-manipulation cursor-pointer select-none hover:bg-[color:var(--fc-glass-soft)] hover:text-[color:var(--fc-text-primary)]"
                 >
                   <Camera className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Photos</span>
+                  <span className="text-[10px] sm:text-xs">Photos</span>
                 </TabsTrigger>
               </TabsList>
 

@@ -1,120 +1,122 @@
-/**
- * Loading Skeleton Component
- * Reusable skeleton loader for consistent loading states
- */
-
-import { useTheme } from '@/contexts/ThemeContext'
+import React from 'react'
 
 interface LoadingSkeletonProps {
-  variant?: 'card' | 'text' | 'circle' | 'rect'
-  width?: string | number
-  height?: string | number
+  variant: 'page' | 'card' | 'list' | 'chart' | 'form'
+  count?: number      // for list variant: how many items
+  fields?: number     // for form variant: how many fields
   className?: string
-  count?: number
 }
 
 export function LoadingSkeleton({
-  variant = 'rect',
-  width,
-  height,
+  variant,
+  count = 3,
+  fields = 3,
   className = '',
-  count = 1
 }: LoadingSkeletonProps) {
-  const { isDark } = useTheme()
+  const baseClasses = 'animate-pulse'
 
-  const baseStyles = {
-    background: `linear-gradient(90deg, color-mix(in srgb, var(--fc-text-primary) 5%, transparent) 25%, color-mix(in srgb, var(--fc-text-primary) 12%, transparent) 50%, color-mix(in srgb, var(--fc-text-primary) 5%, transparent) 75%)`,
-    backgroundSize: '200% 100%',
-    animation: 'skeleton-loading 1.5s ease-in-out infinite',
-    borderRadius: variant === 'circle' ? '50%' : variant === 'card' ? '12px' : '4px',
-  }
-
-  const getDimensions = () => {
-    if (width && height) {
-      return { width: typeof width === 'number' ? `${width}px` : width, height: typeof height === 'number' ? `${height}px` : height }
-    }
-    
-    switch (variant) {
-      case 'circle':
-        return { width: '48px', height: '48px' }
-      case 'text':
-        return { width: '100%', height: '16px' }
-      case 'card':
-        return { width: '100%', height: '200px' }
-      default:
-        return { width: width || '100%', height: height || '20px' }
-    }
-  }
-
-  const dimensions = getDimensions()
-
-  return (
-    <>
-      {Array.from({ length: count }).map((_, index) => (
-        <div
-          key={index}
-          className={className}
-          style={{
-            ...baseStyles,
-            ...dimensions,
-            marginBottom: count > 1 && index < count - 1 ? '8px' : '0',
-          }}
-        />
-      ))}
-      <style jsx>{`
-        @keyframes skeleton-loading {
-          0% {
-            background-position: 200% 0;
-          }
-          100% {
-            background-position: -200% 0;
-          }
-        }
-      `}</style>
-    </>
-  )
-}
-
-/**
- * Card Skeleton - For loading card components
- */
-export function CardSkeleton({ count = 1 }: { count?: number }) {
-  return (
-    <div className="space-y-4">
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className="p-6 rounded-2xl"
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-          }}
-        >
-          <LoadingSkeleton variant="text" width="60%" height="24px" className="mb-4" />
-          <LoadingSkeleton variant="text" width="100%" height="16px" className="mb-2" />
-          <LoadingSkeleton variant="text" width="80%" height="16px" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/**
- * List Skeleton - For loading lists
- */
-export function ListSkeleton({ count = 5 }: { count?: number }) {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4">
-          <LoadingSkeleton variant="circle" width={48} height={48} />
-          <div className="flex-1 space-y-2">
-            <LoadingSkeleton variant="text" width="40%" height="16px" />
-            <LoadingSkeleton variant="text" width="60%" height="14px" />
+  switch (variant) {
+    case 'page':
+      return (
+        <div className={`${baseClasses} space-y-6 ${className}`}>
+          {/* Header skeleton */}
+          <div className="space-y-3">
+            <div className="h-8 w-40 rounded-full bg-[color:var(--fc-glass-highlight)]" />
+            <div className="h-4 w-64 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+          </div>
+          {/* Card skeletons */}
+          <div className="space-y-4">
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="h-6 w-3/4 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-4" />
+              <div className="h-4 w-full rounded-lg bg-[color:var(--fc-glass-highlight)] mb-2" />
+              <div className="h-4 w-5/6 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+            </div>
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="h-6 w-3/4 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-4" />
+              <div className="h-4 w-full rounded-lg bg-[color:var(--fc-glass-highlight)] mb-2" />
+              <div className="h-4 w-5/6 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+            </div>
+            <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+              <div className="h-6 w-3/4 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-4" />
+              <div className="h-4 w-full rounded-lg bg-[color:var(--fc-glass-highlight)] mb-2" />
+              <div className="h-4 w-5/6 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+            </div>
           </div>
         </div>
-      ))}
-    </div>
-  )
-}
+      )
 
+    case 'card':
+      return (
+        <div className={`${baseClasses} ${className}`}>
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            <div className="h-6 w-3/4 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-4" />
+            <div className="h-4 w-full rounded-lg bg-[color:var(--fc-glass-highlight)] mb-2" />
+            <div className="h-4 w-5/6 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-2" />
+            <div className="h-4 w-4/6 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+          </div>
+        </div>
+      )
+
+    case 'list':
+      return (
+        <div className={`${baseClasses} space-y-3 ${className}`}>
+          {Array.from({ length: count }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-[color:var(--fc-glass-highlight)] flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-3/4 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+                <div className="h-3 w-1/2 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+
+    case 'chart':
+      return (
+        <div className={`${baseClasses} ${className}`}>
+          <div className="fc-surface rounded-2xl border border-[color:var(--fc-surface-card-border)] p-6">
+            {/* Chart header */}
+            <div className="h-6 w-48 rounded-lg bg-[color:var(--fc-glass-highlight)] mb-6" />
+            {/* Chart area with grid lines */}
+            <div className="relative h-64 rounded-xl bg-[color:var(--fc-glass-highlight)]/30 border border-[color:var(--fc-glass-border)]">
+              {/* Grid lines */}
+              <div className="absolute inset-0 flex flex-col justify-between p-4">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="h-px w-full bg-[color:var(--fc-glass-border)] opacity-30"
+                  />
+                ))}
+              </div>
+              {/* Chart bars placeholder */}
+              <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-2 h-[calc(100%-2rem)]">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className="flex-1 rounded-t-lg bg-[color:var(--fc-glass-highlight)]"
+                    style={{ height: `${30 + Math.random() * 50}%` }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+
+    case 'form':
+      return (
+        <div className={`${baseClasses} space-y-4 ${className}`}>
+          {Array.from({ length: fields }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-4 w-24 rounded-lg bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-11 rounded-xl bg-[color:var(--fc-glass-highlight)]" />
+            </div>
+          ))}
+        </div>
+      )
+
+    default:
+      return null
+  }
+}

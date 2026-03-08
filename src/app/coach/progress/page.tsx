@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { Skeleton, SkeletonCard } from '@/components/ui/Skeleton'
+import { useToast } from '@/components/ui/toast-provider'
 import { 
   TrendingUp, 
   Calendar, 
@@ -58,10 +60,10 @@ import {
   Hexagon,
   Download
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { DatabaseService } from '@/lib/database'
-import { getStreak } from '@/lib/programService'
+import { getTodayLog, getCompletionStats, getLogRange } from '@/lib/wellnessService'
+import AnalyticsNav from '@/components/coach/AnalyticsNav'
+import { supabase } from '@/lib/supabase'
 
 interface ClientProgress {
   id: string
@@ -83,8 +85,18 @@ interface WorkoutStats {
   averageCompletionRate: number
 }
 
+interface WellnessOverview {
+  checkedInToday: number
+  totalClients: number
+  averageEnergy: number
+  highStressCount: number
+  highStressClients: Array<{ id: string; name: string; stress: number }>
+  inactiveClients: Array<{ id: string; name: string; daysSince: number }>
+}
+
 export default function CoachProgress() {
   const { user } = useAuth()
+  const { addToast } = useToast()
   const { isDark, getThemeStyles, performanceSettings } = useTheme()
   const theme = getThemeStyles()
   
@@ -96,6 +108,15 @@ export default function CoachProgress() {
     thisWeek: 0,
     thisMonth: 0,
     averageCompletionRate: 0
+  })
+  
+  const [wellnessOverview, setWellnessOverview] = useState<WellnessOverview>({
+    checkedInToday: 0,
+    totalClients: 0,
+    averageEnergy: 0,
+    highStressCount: 0,
+    highStressClients: [],
+    inactiveClients: []
   })
   
   // Enhanced filtering and search
@@ -115,11 +136,91 @@ export default function CoachProgress() {
   const [clientGroup, setClientGroup] = useState<string>('all')
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['adherence', 'workouts', 'strength'])
 
+  const loadingRef = useRef(false)
+  const didLoadRef = useRef(false)
+
+  const loadData = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!user) return
+      if (didLoadRef.current) return
+      if (loadingRef.current) return
+      didLoadRef.current = true
+      loadingRef.current = true
+      setLoading(true)
+      try {
+        const res = await fetch('/api/coach/progress/overview', {
+          signal: signal ?? null,
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body?.error ?? `HTTP ${res.status}`)
+        }
+        const data = await res.json()
+        setClientProgress(data.clientProgress ?? [])
+        setWorkoutStats(
+          data.workoutStats ?? {
+            totalSessions: 0,
+            completedSessions: 0,
+            thisWeek: 0,
+            thisMonth: 0,
+            averageCompletionRate: 0,
+          }
+        )
+        setWellnessOverview(
+          data.wellnessOverview ?? {
+            checkedInToday: 0,
+            totalClients: 0,
+            averageEnergy: 0,
+            highStressCount: 0,
+            highStressClients: [],
+            inactiveClients: [],
+          }
+        )
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          didLoadRef.current = false
+          return
+        }
+        console.error('Error loading progress overview:', err)
+        didLoadRef.current = false
+        setClientProgress([])
+        setWorkoutStats({
+          totalSessions: 0,
+          completedSessions: 0,
+          thisWeek: 0,
+          thisMonth: 0,
+          averageCompletionRate: 0,
+        })
+        setWellnessOverview({
+          checkedInToday: 0,
+          totalClients: 0,
+          averageEnergy: 0,
+          highStressCount: 0,
+          highStressClients: [],
+          inactiveClients: [],
+        })
+      } finally {
+        setLoading(false)
+        loadingRef.current = false
+      }
+    },
+    [user]
+  )
+
   useEffect(() => {
-    if (user) {
-      loadProgressData()
+    if (!user) {
+      setLoading(false)
+      setClientProgress([])
+      return
     }
-  }, [user])
+    const ac = new AbortController()
+    loadData(ac.signal)
+    return () => {
+      didLoadRef.current = false
+      loadingRef.current = false
+      ac.abort()
+    }
+  }, [user, loadData])
 
   useEffect(() => {
     if (!selectedClient) {
@@ -141,144 +242,6 @@ export default function CoachProgress() {
     }
   }, [selectedClient, clientProgress])
 
-  const loadProgressData = useCallback(async () => {
-    if (!user) return
-    
-    setLoading(true)
-    try {
-      // Load coach's clients (not all clients)
-      const coachClients = await DatabaseService.getClients(user.id)
-      
-      if (!coachClients || coachClients.length === 0) {
-        setClientProgress([])
-        setWorkoutStats({
-          totalSessions: 0,
-          completedSessions: 0,
-          thisWeek: 0,
-          thisMonth: 0,
-          averageCompletionRate: 0
-        })
-        return
-      }
-
-      // Process each client
-      const processedClients: ClientProgress[] = []
-      
-      for (const clientRelationship of coachClients) {
-        const clientId = clientRelationship.client_id
-        const profile = clientRelationship.profiles
-        
-        if (!profile) continue
-        
-        // Load workout_logs (not workout_sessions) for this client
-        const { data: workoutLogs, error: logsError } = await supabase
-          .from('workout_logs')
-          .select('completed_at')
-          .eq('client_id', clientId)
-          .not('completed_at', 'is', null)
-          .order('completed_at', { ascending: false })
-
-        if (logsError) {
-          console.error(`Error fetching workout logs for client ${clientId}:`, logsError)
-          continue
-        }
-
-        const completedWorkouts = workoutLogs || []
-        const now = new Date()
-        
-        // Calculate this week's workouts
-        const weekStart = new Date(now)
-        weekStart.setDate(now.getDate() - now.getDay())
-        weekStart.setHours(0, 0, 0, 0)
-        const thisWeekWorkouts = completedWorkouts.filter(log => 
-          log.completed_at && new Date(log.completed_at) >= weekStart
-        )
-        
-        // Calculate this month's workouts
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-        const thisMonthWorkouts = completedWorkouts.filter(log => 
-          log.completed_at && new Date(log.completed_at) >= monthStart
-        )
-        
-        // Calculate streak using program_day_assignments (complete weeks)
-        const streak = await getStreak(clientId)
-        
-        // Calculate completion rate - get assigned workouts count
-        const { count: assignedCount } = await supabase
-          .from('workout_assignments')
-          .select('*', { count: 'exact', head: true })
-          .eq('client_id', clientId)
-        
-        const completionRate = assignedCount && assignedCount > 0
-          ? Math.round((completedWorkouts.length / assignedCount) * 100)
-          : 0
-        
-        // Calculate adherence - use active program weekly goal
-        const { data: activeProgram } = await supabase
-          .from('program_assignments')
-          .select('total_days, duration_weeks')
-          .eq('client_id', clientId)
-          .eq('status', 'active')
-          .maybeSingle()
-        
-        let adherence = 0
-        if (activeProgram && activeProgram.total_days > 0 && activeProgram.duration_weeks > 0) {
-          const weeklyGoal = activeProgram.total_days / activeProgram.duration_weeks
-          const expectedThisMonth = weeklyGoal * 4 // Approximate weeks in month
-          adherence = expectedThisMonth > 0
-            ? Math.min(100, Math.round((thisMonthWorkouts.length / expectedThisMonth) * 100))
-            : 0
-        }
-        
-        const lastWorkout = completedWorkouts[0]?.completed_at || ''
-        
-        processedClients.push({
-          id: clientId,
-          name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown',
-          totalWorkouts: completedWorkouts.length,
-          thisWeek: thisWeekWorkouts.length,
-          thisMonth: thisMonthWorkouts.length,
-          streak,
-          completionRate,
-          lastWorkout,
-          adherence
-        })
-      }
-      
-      setClientProgress(processedClients)
-      
-      // Calculate overall workout stats
-      const totalSessions = processedClients.reduce((sum, client) => sum + client.totalWorkouts, 0)
-      const thisWeekTotal = processedClients.reduce((sum, client) => sum + client.thisWeek, 0)
-      const thisMonthTotal = processedClients.reduce((sum, client) => sum + client.thisMonth, 0)
-      const avgCompletionRate = processedClients.length > 0 
-        ? Math.round(processedClients.reduce((sum, client) => sum + client.completionRate, 0) / processedClients.length)
-        : 0
-      
-      setWorkoutStats({
-        totalSessions,
-        completedSessions: totalSessions,
-        thisWeek: thisWeekTotal,
-        thisMonth: thisMonthTotal,
-        averageCompletionRate: avgCompletionRate
-      })
-
-    } catch (error) {
-      console.error('Error loading progress data:', error)
-      
-      // Return empty arrays on error - no fallback mock data
-      setClientProgress([])
-      setWorkoutStats({
-        totalSessions: 0,
-        completedSessions: 0,
-        thisWeek: 0,
-        thisMonth: 0,
-        averageCompletionRate: 0
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [user])
 
   // Enhanced filtering and sorting functions
   const filteredClientProgress = clientProgress.filter(client => {
@@ -497,7 +460,7 @@ export default function CoachProgress() {
     switch (trend) {
       case 'up': return 'text-green-600'
       case 'down': return 'text-red-600'
-      default: return 'text-slate-600'
+      default: return 'text-[color:var(--fc-text-dim)]'
     }
   }
 
@@ -587,34 +550,22 @@ export default function CoachProgress() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div style={{ backgroundColor: '#E8E9F3', minHeight: '100vh', paddingBottom: '100px' }}>
-          <div style={{ padding: '24px 20px' }}>
-            <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ backgroundColor: '#FFFFFF', borderRadius: '24px', padding: '32px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-                <div className="animate-pulse">
-                  <div className="h-8 bg-slate-200 rounded-xl mb-4"></div>
-                  <div className="h-4 bg-slate-200 rounded-lg w-3/4 mb-2"></div>
-                  <div className="h-4 bg-slate-200 rounded-lg w-1/2"></div>
-                </div>
+        <AnimatedBackground>
+          <div className="min-h-screen pb-24 bg-[color:var(--fc-bg-page)]">
+            <div className="p-6 max-w-7xl mx-auto space-y-6">
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-48 rounded-xl" />
+                <Skeleton className="h-4 w-3/4 rounded-lg" />
+                <Skeleton className="h-4 w-1/2 rounded-lg" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4" style={{ gap: '24px' }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[...Array(4)].map((_, i) => (
-                  <div key={i} style={{ 
-                    height: '128px',
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '24px',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
-                  }}>
-                    <div className="animate-pulse p-6">
-                      <div className="h-6 bg-slate-200 rounded-lg mb-3"></div>
-                      <div className="h-4 bg-slate-200 rounded-lg w-3/4"></div>
-                    </div>
-                  </div>
+                  <SkeletonCard key={i} className="h-32 rounded-2xl" />
                 ))}
               </div>
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     )
   }
@@ -626,18 +577,19 @@ export default function CoachProgress() {
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen w-full">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24 space-y-6">
-            <GlassCard elevation={2} className="fc-glass fc-card p-6 md:p-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)]">
-                    <BarChart3 className="h-6 w-6" />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-32 space-y-4 sm:space-y-6">
+            <AnalyticsNav />
+            <GlassCard elevation={2} className="fc-glass fc-card p-3 sm:p-6 md:p-8">
+              <div className="flex flex-col gap-3 sm:gap-6 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                  <div className="hidden sm:flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-[color:var(--fc-aurora)]/20 text-[color:var(--fc-accent)] flex-shrink-0">
+                    <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)]">
+                  <div className="min-w-0">
+                    <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-[color:var(--fc-text-primary)] truncate">
                       Progress Dashboard
                     </h1>
-                    <p className="text-sm text-[color:var(--fc-text-dim)] mt-1">
+                    <p className="text-xs sm:text-sm text-[color:var(--fc-text-dim)] mt-1 hidden sm:block">
                       Monitor client momentum, streaks, and completion metrics.
                     </p>
                   </div>
@@ -701,40 +653,40 @@ export default function CoachProgress() {
                   </div>
                 </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="flex items-center gap-4 p-4 rounded-lg">
-                  <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 p-3 text-white">
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+                <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg min-w-0">
+                  <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 p-2 sm:p-3 text-white flex-shrink-0">
                     <Users className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-2xl font-semibold text-[color:var(--fc-text-primary)]">{clientProgress.length}</p>
+                    <p className="text-xl sm:text-2xl font-semibold text-[color:var(--fc-text-primary)]">{clientProgress.length}</p>
                     <p className="text-sm text-[color:var(--fc-text-dim)]">Active Clients</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 p-4 rounded-lg">
-                  <div className="p-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600">
-                    <Dumbbell className="w-6 h-6 text-white" />
+                <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg min-w-0">
+                  <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600 flex-shrink-0">
+                    <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                   </div>
                   <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{workoutStats.totalSessions}</p>
+                    <p className={`text-xl sm:text-2xl font-bold ${theme.text}`}>{workoutStats.totalSessions}</p>
                     <p className={`text-sm ${theme.textSecondary}`}>Total Workouts</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 p-4 rounded-lg">
-                  <div className="p-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600">
+                <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg min-w-0">
+                  <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 flex-shrink-0">
                     <BarChart3 className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{workoutStats.averageCompletionRate}%</p>
+                    <p className={`text-xl sm:text-2xl font-bold ${theme.text}`}>{workoutStats.averageCompletionRate}%</p>
                     <p className={`text-sm ${theme.textSecondary}`}>Avg Completion</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 p-4 rounded-lg">
-                  <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600">
+                <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-lg min-w-0">
+                  <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 flex-shrink-0">
                     <TrendingUp className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className={`text-2xl font-bold ${theme.text}`}>{workoutStats.thisMonth}</p>
+                    <p className={`text-xl sm:text-2xl font-bold ${theme.text}`}>{workoutStats.thisMonth}</p>
                     <p className={`text-sm ${theme.textSecondary}`}>This Month</p>
                   </div>
                 </div>
@@ -744,9 +696,24 @@ export default function CoachProgress() {
             <div className="relative">
               <Tabs defaultValue="overview" className="space-y-6">
                 <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 gap-2 relative z-50 rounded-lg p-1 bg-transparent border-0">
-                  <TabsTrigger value="overview" className="text-sm relative z-50 rounded-lg" style={{ color: '#1A1A1A' }}>Overview</TabsTrigger>
-                  <TabsTrigger value="clients" className="text-sm relative z-50 rounded-lg" style={{ color: '#1A1A1A' }}>Client Details</TabsTrigger>
-                  <TabsTrigger value="analytics" className="text-sm relative z-50 rounded-lg" style={{ color: '#1A1A1A' }}>Analytics</TabsTrigger>
+                  <TabsTrigger
+                    value="overview"
+                    className="text-sm relative z-50 rounded-lg fc-text-primary"
+                  >
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="clients"
+                    className="text-sm relative z-50 rounded-lg fc-text-primary"
+                  >
+                    Client Details
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="analytics"
+                    className="text-sm relative z-50 rounded-lg fc-text-primary"
+                  >
+                    Analytics
+                  </TabsTrigger>
                 </TabsList>
 
                 {/* Enhanced Overview Tab */}
@@ -815,7 +782,7 @@ export default function CoachProgress() {
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-purple-100'}`}>
+                        <div className={`p-2 rounded-xl ${isDark ? 'bg-[color:var(--fc-glass-highlight)]' : 'bg-purple-100'}`}>
                           <Users className={`w-5 h-5 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
                         </div>
                         <h2 className={`text-2xl font-bold ${theme.text}`}>Client Progress Overview</h2>
@@ -934,6 +901,70 @@ export default function CoachProgress() {
                     </div>
                   )}
 
+                  {/* Wellness Overview */}
+                  <div className="p-6 mb-6">
+                    <div className="p-6">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 ${theme.shadow}`}>
+                          <Heart className="w-5 h-5 text-white" />
+                        </div>
+                        <CardTitle className={`text-xl font-bold ${theme.text}`}>Wellness Overview</CardTitle>
+                      </div>
+                    </div>
+                    <div className="p-6 pt-0 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className={`p-4 ${theme.card} rounded-2xl border ${theme.border}`}>
+                          <p className={`text-sm ${theme.textSecondary} mb-1`}>Checked In Today</p>
+                          <p className={`text-2xl font-bold ${theme.text}`}>
+                            {wellnessOverview.checkedInToday} / {wellnessOverview.totalClients}
+                          </p>
+                        </div>
+                        <div className={`p-4 ${theme.card} rounded-2xl border ${theme.border}`}>
+                          <p className={`text-sm ${theme.textSecondary} mb-1`}>Avg Energy</p>
+                          <p className={`text-2xl font-bold ${theme.text}`}>
+                            {wellnessOverview.averageEnergy > 0 ? wellnessOverview.averageEnergy.toFixed(1) : '—'} / 10
+                          </p>
+                        </div>
+                      </div>
+
+                      {wellnessOverview.highStressCount > 0 && (
+                        <div className={`p-4 ${theme.card} rounded-2xl border ${theme.border} border-yellow-500/50 bg-yellow-500/10`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                            <p className={`font-semibold ${theme.text}`}>
+                              High Stress ({wellnessOverview.highStressCount} clients)
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            {wellnessOverview.highStressClients.slice(0, 5).map((client) => (
+                              <p key={client.id} className={`text-sm ${theme.textSecondary}`}>
+                                {client.name} — Stress: {client.stress}/10
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {wellnessOverview.inactiveClients.length > 0 && (
+                        <div className={`p-4 ${theme.card} rounded-2xl border ${theme.border} border-orange-500/50 bg-orange-500/10`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="w-5 h-5 text-orange-500" />
+                            <p className={`font-semibold ${theme.text}`}>
+                              Inactive Check-ins ({wellnessOverview.inactiveClients.length} clients)
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            {wellnessOverview.inactiveClients.map((client) => (
+                              <p key={client.id} className={`text-sm ${theme.textSecondary}`}>
+                                {client.name} — {client.daysSince === 999 ? 'Never checked in' : `${client.daysSince} days ago`}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Enhanced Weekly Progress and Top Performers */}
                   <div className="grid md:grid-cols-2 gap-6">
                     {/* Weekly Progress */}
@@ -981,22 +1012,6 @@ export default function CoachProgress() {
                           </div>
                         </div>
 
-                        {/* Quick Actions */}
-                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 rounded-xl"
-                              onClick={() => {
-                                alert('Schedule Check-ins feature coming soon! This will allow you to schedule check-in sessions with clients.')
-                              }}
-                            >
-                              <Calendar className="w-4 h-4 mr-2" />
-                              Schedule Check-ins
-                            </Button>
-                          </div>
-                        </div>
                       </div>
                     </div>
 
@@ -1128,17 +1143,7 @@ export default function CoachProgress() {
                               variant="outline"
                               className="w-full rounded-xl py-3"
                               onClick={() => {
-                                alert('Schedule Group Check-in feature coming soon! This will allow you to schedule group check-in sessions with multiple clients.')
-                              }}
-                            >
-                              <Calendar className="w-4 h-4 mr-2" />
-                              Schedule Group Check-in
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="w-full rounded-xl py-3"
-                              onClick={() => {
-                                alert('Generate Progress Report feature coming soon! This will generate a comprehensive progress report for your clients.')
+                                addToast({ title: 'Generate Progress Report coming soon', variant: 'default' })
                               }}
                             >
                               <BarChart3 className="w-4 h-4 mr-2" />
@@ -1160,7 +1165,7 @@ export default function CoachProgress() {
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-blue-100'}`}>
+                          <div className={`p-2 rounded-xl ${isDark ? 'bg-[color:var(--fc-glass-highlight)]' : 'bg-blue-100'}`}>
                             <Users className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                           </div>
                           <h2 className={`text-2xl font-bold ${theme.text}`}>Client Details</h2>
@@ -1421,7 +1426,7 @@ export default function CoachProgress() {
                                 <div className="p-6 pt-0 space-y-6">
                                   <div className="space-y-4">
                                     {Object.entries(clientData.strength).map(([exercise, data]: [string, any]) => (
-                                      <div key={exercise} className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'} border ${theme.border}`}>
+                                      <div key={exercise} className={`p-4 rounded-xl ${isDark ? 'bg-[color:var(--fc-glass-highlight)]/50' : 'bg-[color:var(--fc-glass-highlight)]'} border ${theme.border}`}>
                                         <div className="flex items-center justify-between mb-2">
                                           <span className={`font-semibold ${theme.text} capitalize`}>{exercise}</span>
                                           <div className="flex items-center gap-2">
@@ -1454,7 +1459,7 @@ export default function CoachProgress() {
                               <div className="p-6 pt-0">
                                 <div className="space-y-4">
                                   {clientData.recentActivity.map((activity: any, index: number) => (
-                                    <div key={index} className={`flex items-center gap-4 p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'} border ${theme.border}`}>
+                                    <div key={index} className={`flex items-center gap-4 p-4 rounded-xl ${isDark ? 'bg-[color:var(--fc-glass-highlight)]/50' : 'bg-[color:var(--fc-glass-highlight)]'} border ${theme.border}`}>
                                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                                         activity.type === 'workout' ? 'bg-blue-100 dark:bg-blue-900/20' :
                                         activity.type === 'meal' ? 'bg-green-100 dark:bg-green-900/20' :
@@ -1502,7 +1507,7 @@ export default function CoachProgress() {
                         <div className="space-y-6">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-purple-100'}`}>
+                              <div className={`p-2 rounded-xl ${isDark ? 'bg-[color:var(--fc-glass-highlight)]' : 'bg-purple-100'}`}>
                                 <BarChart3 className={`w-5 h-5 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
                               </div>
                               <h2 className={`text-2xl font-bold ${theme.text}`}>Advanced Analytics</h2>
@@ -1554,7 +1559,7 @@ export default function CoachProgress() {
                                     variant="outline"
                                     className="rounded-xl h-12"
                                     onClick={() => {
-                                      alert('Export Data feature coming soon! This will export client progress data in CSV or Excel format.')
+                                      addToast({ title: 'Export Data coming soon', variant: 'default' })
                                     }}
                                   >
                                     <Download className="w-4 h-4 mr-2" />
@@ -1671,7 +1676,7 @@ export default function CoachProgress() {
                                       />
                                     ))}
                                   </div>
-                                  <div className="flex justify-between text-xs text-slate-500">
+                                  <div className="flex justify-between text-xs text-[color:var(--fc-text-subtle)]">
                                     <span>Jan</span>
                                     <span>Dec</span>
                                   </div>
@@ -1693,7 +1698,7 @@ export default function CoachProgress() {
                                       />
                                     ))}
                                   </div>
-                                  <div className="flex justify-between text-xs text-slate-500">
+                                  <div className="flex justify-between text-xs text-[color:var(--fc-text-subtle)]">
                                     <span>Jan</span>
                                     <span>Dec</span>
                                   </div>
@@ -1723,7 +1728,7 @@ export default function CoachProgress() {
                                       <span className={`text-sm font-bold ${theme.text}`}>{data.rate}%</span>
                                     </div>
                                     <Progress value={data.rate} className="h-3 rounded-full" />
-                                    <div className="flex justify-between text-xs text-slate-500">
+                                    <div className="flex justify-between text-xs text-[color:var(--fc-text-subtle)]">
                                       <span>{data.completed} completed</span>
                                       <span>{data.total} total</span>
                                     </div>

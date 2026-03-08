@@ -12,7 +12,7 @@ function Card({
   const baseClass =
     variant === "fc"
       ? "fc-glass fc-card text-white"
-      : "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm"
+      : "bg-card text-card-foreground flex flex-col gap-6 rounded-2xl border py-6 shadow-sm"
 
   return (
     <div

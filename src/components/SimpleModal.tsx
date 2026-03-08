@@ -123,7 +123,7 @@ export default function SimpleModal({
             </div>
             <button 
               onClick={onClose}
-              className={`p-2 rounded-xl transition-all duration-200 ${theme.textSecondary} hover:${theme.text} hover:${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}
+              className={`p-2 min-w-11 min-h-11 flex items-center justify-center rounded-xl transition-all duration-200 ${theme.textSecondary} hover:${theme.text} hover:${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}
               aria-label="Close modal"
             >
               <X className="w-5 h-5" />

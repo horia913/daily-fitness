@@ -24,6 +24,8 @@ export interface BodyMetrics {
   measured_date: string
   measurement_method?: string
   notes?: string
+  /** Storage paths in progress-photos bucket (use signed URLs for display) */
+  photos?: string[]
   created_at?: string
   updated_at?: string
 }
@@ -168,6 +170,7 @@ export interface Goal {
   metric_unit?: string
   status: 'active' | 'completed' | 'paused' | 'cancelled'
   progress_percentage?: number
+  pillar?: string
   created_at?: string
   updated_at?: string
 }
@@ -362,7 +365,7 @@ export class PersonalRecordsService {
         .from('personal_records')
         .select(`
           *,
-          exercise:exercises(id, name, category)
+          exercises(id, name, category)
         `)
         .eq('client_id', clientId)
         .order('achieved_date', { ascending: false })

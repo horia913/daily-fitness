@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -58,7 +57,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { GoalCard } from "@/components/goals/GoalCard";
 import { CustomGoalForm } from "@/components/goals/CustomGoalForm";
+import { AddGoalModal } from "@/components/goals/AddGoalModal";
 import { withTimeout } from "@/lib/withTimeout";
+import { getGoalStats as getGoalStatsFromService } from "@/lib/goalAdherenceService";
+
+const PILLAR_SECTIONS: { id: Goal["pillar"]; label: string; emoji: string }[] = [
+  { id: "training", label: "Training", emoji: "🏋️" },
+  { id: "nutrition", label: "Nutrition", emoji: "🍎" },
+  { id: "checkins", label: "Check-ins", emoji: "📊" },
+  { id: "lifestyle", label: "Lifestyle", emoji: "🌿" },
+  { id: "general", label: "General", emoji: "⭐" },
+];
 
 interface Goal {
   id: string;
@@ -86,6 +95,8 @@ interface Goal {
   updated_at: string;
   progress_percentage?: number;
   goal_template_id?: string; // FK to goal_templates table
+  pillar: "training" | "nutrition" | "lifestyle" | "checkins" | "general";
+  goal_type?: string | null;
 }
 
 interface GoalCategory {
@@ -247,6 +258,7 @@ export default function ClientGoals() {
   const { performanceSettings, isDark, getSemanticColor } = useTheme();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const loadingRef = useRef(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [presetGoalTemplates, setPresetGoalTemplates] = useState<PresetGoal[]>(
     []
@@ -286,7 +298,10 @@ export default function ClientGoals() {
     target_unit: "",
     target_date: "",
     priority: "medium" as Goal["priority"],
+    pillar: "training" as Goal["pillar"],
   });
+  const [addGoalPillar, setAddGoalPillar] = useState<Goal["pillar"]>("general");
+  const [addGoalModalPillar, setAddGoalModalPillar] = useState<Goal["pillar"] | null>(null);
   const [completedSectionOpen, setCompletedSectionOpen] = useState(false);
 
   const goalCategories: GoalCategory[] = [
@@ -350,7 +365,8 @@ export default function ClientGoals() {
 
   const loadGoals = useCallback(async () => {
     if (!user) return;
-
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     try {
       await withTimeout(
@@ -359,6 +375,7 @@ export default function ClientGoals() {
         .from("goals")
         .select("*")
         .eq("client_id", user.id)
+        .order("pillar", { ascending: true })
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -434,6 +451,7 @@ export default function ClientGoals() {
       setLoadError(error?.message === "timeout" ? "Loading took too long. Please try again." : (error?.message || "Failed to load goals"));
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, [user]);
 
@@ -471,7 +489,6 @@ export default function ClientGoals() {
         setPresetGoalTemplates(mappedTemplates);
       } else {
         // Fallback to hardcoded if no templates in DB yet
-        console.log('No goal templates in DB, using hardcoded fallback');
         setPresetGoalTemplates(PRESET_GOALS);
       }
     } catch (error) {
@@ -532,6 +549,7 @@ export default function ClientGoals() {
         title: presetTitle,
         description: preset?.description || `Target: ${targetValue}`,
         category: category,
+        pillar: addGoalPillar,
         target_value: targetValue,
         target_unit: preset?.unit || null,
         target_date: targetDate || null,
@@ -612,6 +630,7 @@ export default function ClientGoals() {
         title: preset.title,
         description: description,
         category: validCategory,
+        pillar: addGoalPillar,
         target_value: parsedValue,
         target_date: customForm.targetDate || null,
         current_value: 0,
@@ -627,15 +646,6 @@ export default function ClientGoals() {
       if (targetUnit && targetUnit.trim() !== "") {
         insertData.target_unit = targetUnit;
       }
-
-      console.log(
-        "Creating goal with category:",
-        validCategory,
-        "from preset category:",
-        preset.category
-      );
-      console.log("Status being sent:", insertData.status);
-      console.log("Insert data:", insertData);
 
       const { error } = await supabase.from("goals").insert(insertData);
 
@@ -787,6 +797,7 @@ export default function ClientGoals() {
         title: formData.title,
         description: formData.description,
         category: formData.category,
+        pillar: formData.pillar,
         type: formData.type,
         target_value: formData.target_value
           ? parseFloat(formData.target_value)
@@ -866,6 +877,7 @@ export default function ClientGoals() {
       target_unit: "",
       target_date: "",
       priority: "medium",
+      pillar: "training",
     });
   };
 
@@ -880,6 +892,7 @@ export default function ClientGoals() {
       target_unit: goal.target_unit || "",
       target_date: goal.target_date ? goal.target_date.split("T")[0] : "",
       priority: goal.priority,
+      pillar: goal.pillar ?? "general",
     });
     setShowCreateForm(true);
   };
@@ -891,7 +904,7 @@ export default function ClientGoals() {
 
   const getCategoryColor = (categoryId: string) => {
     const category = goalCategories.find((c) => c.id === categoryId);
-    return category?.color || "text-slate-600";
+    return category?.color || "fc-text-dim";
   };
 
   const getPriorityColor = (priority: string) => {
@@ -903,7 +916,7 @@ export default function ClientGoals() {
       case "low":
         return "text-green-600 bg-green-50 border-green-200";
       default:
-        return "text-slate-600 bg-slate-50 border-slate-200";
+        return "fc-text-dim bg-[color:var(--fc-glass-highlight)] border-[color:var(--fc-glass-border)]";
     }
   };
 
@@ -919,7 +932,7 @@ export default function ClientGoals() {
       case "cancelled":
         return "text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-900/20 dark:border-red-800";
       default:
-        return "text-slate-600 bg-slate-50 border-slate-200 dark:text-slate-400 dark:bg-slate-900/20 dark:border-slate-800";
+        return "fc-text-dim bg-[color:var(--fc-glass-highlight)] border-[color:var(--fc-glass-border)]";
     }
   };
 
@@ -967,7 +980,7 @@ export default function ClientGoals() {
     } else if (status === "cancelled") {
       return "from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20";
     } else {
-      return "from-slate-50 to-gray-50 dark:from-slate-800/20 dark:to-gray-800/20";
+      return "from-[color:var(--fc-glass-highlight)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-glass-highlight)] dark:to-[color:var(--fc-surface)]";
     }
   };
 
@@ -1040,12 +1053,7 @@ export default function ClientGoals() {
   const filteredAndSortedGoals = (goalList: Goal[]) => {
     let filtered = goalList;
 
-    // Apply category filter
-    if (activeTab !== "all") {
-      filtered = filtered.filter((goal) => goal.category === activeTab);
-    }
-
-    // Apply status filter
+    // Apply status filter (category filter removed — grouping is by pillar now)
     if (filterStatus !== "all") {
       filtered = filtered.filter((goal) => {
         // Treat "in_progress" as "active" for filtering
@@ -1103,14 +1111,14 @@ export default function ClientGoals() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
+        <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)]">
           <div className="p-4">
             <div className="max-w-4xl mx-auto space-y-6">
               {/* Header Skeleton */}
               <div className="text-center space-y-4 py-8">
                 <div className="animate-pulse">
-                  <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded-2xl w-64 mx-auto mb-4"></div>
-                  <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-96 mx-auto mb-6"></div>
+                  <div className="h-12 bg-[color:var(--fc-glass-highlight)] rounded-2xl w-64 mx-auto mb-4"></div>
+                  <div className="h-6 bg-[color:var(--fc-glass-highlight)] rounded-lg w-96 mx-auto mb-6"></div>
                 </div>
               </div>
 
@@ -1118,12 +1126,12 @@ export default function ClientGoals() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="animate-pulse">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
+                    <div className="fc-surface rounded-2xl p-6 shadow-lg">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                        <div className="w-12 h-12 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
                         <div>
-                          <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg mb-2"></div>
-                          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div>
+                          <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded-lg mb-2"></div>
+                          <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-3/4"></div>
                         </div>
                       </div>
                     </div>
@@ -1133,10 +1141,10 @@ export default function ClientGoals() {
 
               {/* Filter Skeleton */}
               <div className="animate-pulse">
-                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg">
+                <div className="fc-surface rounded-2xl p-4 shadow-lg">
                   <div className="flex gap-4">
-                    <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg w-32"></div>
-                    <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg w-32"></div>
+                    <div className="h-10 bg-[color:var(--fc-glass-highlight)] rounded-lg w-32"></div>
+                    <div className="h-10 bg-[color:var(--fc-glass-highlight)] rounded-lg w-32"></div>
                   </div>
                 </div>
               </div>
@@ -1145,19 +1153,19 @@ export default function ClientGoals() {
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="animate-pulse">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg">
+                    <div className="fc-surface rounded-2xl p-6 shadow-lg">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+                          <div className="w-12 h-12 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
                           <div>
-                            <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-48 mb-2"></div>
-                            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32"></div>
+                            <div className="h-6 bg-[color:var(--fc-glass-highlight)] rounded-lg w-48 mb-2"></div>
+                            <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-32"></div>
                           </div>
                         </div>
-                        <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+                        <div className="w-16 h-16 bg-[color:var(--fc-glass-highlight)] rounded-full"></div>
                       </div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full mb-2"></div>
-                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/3"></div>
+                      <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-full mb-2"></div>
+                      <div className="h-4 bg-[color:var(--fc-glass-highlight)] rounded w-2/3"></div>
                     </div>
                   </div>
                 ))}
@@ -1172,7 +1180,7 @@ export default function ClientGoals() {
   if (loadError) {
     return (
       <ProtectedRoute requiredRole="client">
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-gradient-to-br from-[color:var(--fc-bg-page)] to-[color:var(--fc-surface)] dark:from-[color:var(--fc-bg-page)] dark:to-[color:var(--fc-surface)] flex items-center justify-center p-4">
           <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center max-w-md">
             <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
             <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadGoals(); }} className="fc-btn fc-btn-primary">
@@ -1185,177 +1193,158 @@ export default function ClientGoals() {
   }
 
   const stats = getGoalStats();
+  const goalStatsFromService = getGoalStatsFromService(goals);
   const completedGoalsList = goals.filter((g) => g.status === "completed");
-  const nonCompletedGoals = goals.filter((g) => g.status !== "completed");
-  const activeFiltered = filteredAndSortedGoals(
-    nonCompletedGoals.filter((g) => {
-      if (activeTab !== "all" && g.category !== activeTab) return false;
-      if (filterStatus !== "all") {
-        const norm = g.status === "in_progress" ? "active" : g.status;
-        return norm === filterStatus;
-      }
-      return true;
-    })
-  );
+  const activeGoalsList = goals.filter((g) => g.status === "active" || g.status === "in_progress");
+
+  const getActiveGoalsForPillar = (pillar: Goal["pillar"]) => {
+    let list = activeGoalsList.filter((g) => (g.pillar ?? "general") === pillar);
+    return filteredAndSortedGoals(list);
+  };
+  const getPillarStats = (pillar: Goal["pillar"]) =>
+    goalStatsFromService.byPillar.find((p) => p.pillar === pillar);
 
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen fc-page">
-          <div className="max-w-6xl mx-auto flex flex-col" style={{ gap: "var(--fc-gap-sections)" }}>
-            {/* Header: eyebrow + Your Goals + active/total (mockup) */}
+        <div className="relative z-10 min-h-screen fc-page min-w-0 overflow-x-hidden px-4 sm:px-6">
+          <div className="max-w-6xl mx-auto flex flex-col min-w-0" style={{ gap: "var(--fc-gap-sections)" }}>
+            {/* Header */}
             <header className="flex justify-between items-end flex-wrap gap-4">
               <div>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="w-12 h-0.5 bg-[color:var(--fc-status-error)]" aria-hidden />
                   <span className="fc-micro fc-text-error font-mono">GOAL CENTER</span>
                 </div>
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tight fc-text-primary">
-                  Your Goals
+                <h1 className="text-2xl font-bold tracking-tight fc-text-primary">
+                  My Goals
                 </h1>
-              </div>
-              <div className="hidden md:block text-right">
-                <div className="font-mono text-2xl font-bold fc-text-primary">
-                  {String(stats.active).padStart(2, "0")} / {String(stats.total).padStart(2, "0")}
-                </div>
-                <div className="fc-micro fc-text-subtle uppercase tracking-widest">Active / Total</div>
               </div>
             </header>
 
-            {/* Hero stats: one monolith card — circular progress + 3 stats (mockup) */}
-            <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl p-8 flex flex-col md:flex-row items-center gap-8 md:gap-12">
-              <div className="relative w-32 h-32 flex-shrink-0">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                  <circle cx="50" cy="50" r="44" fill="none" stroke="var(--fc-glass-border-strong)" strokeWidth="8" />
-                  <circle
-                    cx="50" cy="50" r="44"
-                    fill="none"
-                    stroke="url(#goalsHeroGradient)"
-                    strokeWidth="12"
-                    strokeDasharray={276}
-                    strokeDashoffset={276 - (276 * stats.avgProgress) / 100}
-                    strokeLinecap="round"
-                  />
-                  <defs>
-                    <linearGradient id="goalsHeroGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="var(--fc-status-error)" />
-                      <stop offset="100%" stopColor="var(--fc-domain-workouts)" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold font-mono fc-text-primary">{stats.avgProgress}%</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 flex-1 w-full">
-                <div>
-                  <div className="fc-micro fc-text-subtle mb-1">Avg progress</div>
-                  <div className="text-2xl md:text-3xl font-bold font-mono fc-text-success">{stats.avgProgress}%</div>
-                </div>
-                <div>
-                  <div className="fc-micro fc-text-subtle mb-1">Active / total</div>
-                  <div className="text-2xl md:text-3xl font-bold font-mono fc-text-primary">
-                    {stats.active}<span className="text-lg opacity-50">/{stats.total}</span>
-                  </div>
-                </div>
-                <div className="col-span-2 md:col-span-1">
-                  <div className="fc-micro fc-text-subtle mb-1">Next goal</div>
-                  <div className="text-base md:text-lg font-semibold leading-tight fc-text-primary truncate">
-                    {activeFiltered[0]?.title ?? "—"}
-                  </div>
-                </div>
+            {/* Overall stats */}
+            <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl p-6">
+              <p className="fc-text-subtle text-sm mb-2">
+                Overall: {goalStatsFromService.active} active goals · {goalStatsFromService.overallAdherence}% adherence
+              </p>
+              <div className="w-full h-2 rounded-full overflow-hidden bg-[color:var(--fc-glass-border)]">
+                <div
+                  className="h-full rounded-full bg-[color:var(--fc-accent-cyan)] transition-all"
+                  style={{ width: `${goalStatsFromService.overallAdherence}%` }}
+                />
               </div>
             </GlassCard>
 
-            {/* Filter bar: compact, token-styled */}
+            {/* Status and Sort (no category tabs) */}
             <GlassCard elevation={1} className="fc-glass fc-card p-4 rounded-xl">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-                <div className="flex-1 min-w-0">
-                  <label className="fc-micro fc-text-subtle mb-2 block">Category</label>
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="fc-glass-soft border border-[color:var(--fc-glass-border)] grid w-full grid-cols-4 lg:grid-cols-7 h-9">
-                      <TabsTrigger value="all" className="text-xs fc-text-dim data-[state=active]:fc-text-primary">All</TabsTrigger>
-                      {goalCategories.map((cat) => (
-                        <TabsTrigger key={cat.id} value={cat.id} className="text-xs fc-text-dim data-[state=active]:fc-text-primary">
-                          <cat.icon className="w-3 h-3 mr-1" />
-                          {cat.name}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                  </Tabs>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="min-w-0">
+                  <label className="fc-micro fc-text-subtle mb-2 block">Status</label>
+                  <Select value={filterStatus} onValueChange={(v: typeof filterStatus) => setFilterStatus(v)}>
+                    <SelectTrigger className="fc-glass-soft border border-[color:var(--fc-glass-border)] w-full sm:w-36">
+                      <Filter className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="paused">Paused</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-4 lg:w-auto">
-                  <div className="min-w-0">
-                    <label className="fc-micro fc-text-subtle mb-2 block">Status</label>
-                    <Select value={filterStatus} onValueChange={(v: typeof filterStatus) => setFilterStatus(v)}>
-                      <SelectTrigger className="fc-glass-soft border border-[color:var(--fc-glass-border)] w-full sm:w-36">
-                        <Filter className="w-4 h-4 mr-2" />
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="paused">Paused</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="min-w-0">
-                    <label className="fc-micro fc-text-subtle mb-2 block">Sort</label>
-                    <Select value={sortBy} onValueChange={(v: typeof sortBy) => setSortBy(v)}>
-                      <SelectTrigger className="fc-glass-soft border border-[color:var(--fc-glass-border)] w-full sm:w-36">
-                        <SortAsc className="w-4 h-4 mr-2" />
-                        <SelectValue placeholder="Sort" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="newest">Newest</SelectItem>
-                        <SelectItem value="oldest">Oldest</SelectItem>
-                        <SelectItem value="priority">Priority</SelectItem>
-                        <SelectItem value="progress">Progress</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="min-w-0">
+                  <label className="fc-micro fc-text-subtle mb-2 block">Sort</label>
+                  <Select value={sortBy} onValueChange={(v: typeof sortBy) => setSortBy(v)}>
+                    <SelectTrigger className="fc-glass-soft border border-[color:var(--fc-glass-border)] w-full sm:w-36">
+                      <SortAsc className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Sort" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">Newest</SelectItem>
+                      <SelectItem value="oldest">Oldest</SelectItem>
+                      <SelectItem value="priority">Priority</SelectItem>
+                      <SelectItem value="progress">Progress</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </GlassCard>
 
-            {/* Active goals section */}
-            <section>
-              <div className="fc-section-heading">
-                <h2>Active goals</h2>
-                <div className="fc-line" aria-hidden />
-              </div>
-              {activeFiltered.length === 0 ? (
-                <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center rounded-2xl">
-                  <Target className="w-12 h-12 mx-auto mb-4 fc-text-subtle" />
-                  <p className="fc-text-primary font-medium mb-2">No active goals</p>
-                  <p className="text-sm fc-text-dim mb-4">Use the button below to add a preset goal, or create a custom goal.</p>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <Button onClick={() => setShowPresetSelection(true)} className="fc-btn fc-btn-primary">
-                      <Target className="w-4 h-4 mr-2" /> Preset goal
-                    </Button>
-                    <Button onClick={() => setShowCustomGoalForm(true)} variant="outline" className="fc-btn fc-btn-secondary">
-                      <Plus className="w-4 h-4 mr-2" /> Custom goal
-                    </Button>
-                  </div>
-                </GlassCard>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" style={{ gap: "var(--fc-gap-cards)" }}>
-                  {activeFiltered.map((goal) => (
-                    <GoalCard
-                      key={goal.id}
-                      goal={goal as Goal}
-                      isAutoTracked={isPresetGoal(goal)}
-                      onDelete={handleDeleteGoal}
-                      onUpdate={updateGoalProgress}
-                      onEdit={startEditing}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+            {/* Pillar sections */}
+            {PILLAR_SECTIONS.map(({ id: pillarId, label, emoji }) => {
+              const pillarGoalsList = getActiveGoalsForPillar(pillarId);
+              const pillarStat = getPillarStats(pillarId);
+              const count = pillarStat?.count ?? 0;
+              const adherence = pillarStat?.adherence ?? 0;
+              return (
+                <section key={pillarId}>
+                  <GlassCard elevation={2} className="fc-glass fc-card rounded-2xl p-6">
+                    <div className="flex items-center justify-between gap-4 mb-4">
+                      <h2 className="text-lg font-bold fc-text-primary">
+                        {emoji} {label}
+                        {count > 0 && (
+                          <span className="fc-text-dim font-normal ml-2">
+                            {count} goal{count !== 1 ? "s" : ""} · {adherence}%
+                          </span>
+                        )}
+                      </h2>
+                    </div>
+                    {pillarGoalsList.length === 0 ? (
+                      <div className="py-4 text-center">
+                        <p className="fc-text-dim text-sm mb-3">No goals yet</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAddGoalModalPillar(pillarId)}
+                          className="fc-btn fc-btn-secondary"
+                        >
+                          + Add {label} Goal
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4" style={{ gap: "var(--fc-gap-cards)" }}>
+                          {pillarGoalsList.map((goal) => (
+                            <GoalCard
+                              key={goal.id}
+                              goal={goal as Goal}
+                              isAutoTracked={isPresetGoal(goal)}
+                              onDelete={handleDeleteGoal}
+                              onUpdate={updateGoalProgress}
+                              onEdit={startEditing}
+                            />
+                          ))}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAddGoalModalPillar(pillarId)}
+                          className="fc-btn fc-btn-secondary"
+                        >
+                          + Add {label} Goal
+                        </Button>
+                      </>
+                    )}
+                  </GlassCard>
+                </section>
+              );
+            })}
+
+            {/* Add goal from pillar section (modal) */}
+            {addGoalModalPillar && (
+              <AddGoalModal
+                open={true}
+                onClose={() => setAddGoalModalPillar(null)}
+                pillar={addGoalModalPillar}
+                onSuccess={() => {
+                  loadGoals();
+                  setAddGoalModalPillar(null);
+                }}
+              />
+            )}
 
             {/* Completed goals: collapsible */}
             <section className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] overflow-hidden">
@@ -1415,9 +1404,11 @@ export default function ClientGoals() {
                 onSubmit={async (goalData) => {
                   if (!user) return;
                   try {
+                    const { pillar: _pillar, ...restGoal } = goalData;
                     const { error } = await supabase.from("goals").insert({
+                      ...restGoal,
                       client_id: user.id,
-                      ...goalData,
+                      pillar: _pillar ?? "general",
                       start_date: new Date().toISOString().split("T")[0],
                     });
                     if (error) throw error;
@@ -1443,7 +1434,7 @@ export default function ClientGoals() {
                       Select Your Goal
                     </h2>
                     <p
-                      className="text-center mb-8"
+                      className="text-center mb-4"
                       style={{
                         color: isDark
                           ? "rgba(255,255,255,0.7)"
@@ -1452,6 +1443,26 @@ export default function ClientGoals() {
                     >
                       Choose what you want to achieve
                     </p>
+                    <div className="flex justify-center mb-6">
+                      <div className="space-y-2 w-full max-w-xs">
+                        <Label className="text-sm font-medium fc-text-subtle">Pillar</Label>
+                        <Select
+                          value={addGoalPillar}
+                          onValueChange={(v) => setAddGoalPillar(v as Goal["pillar"])}
+                        >
+                          <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="training">Training</SelectItem>
+                            <SelectItem value="nutrition">Nutrition</SelectItem>
+                            <SelectItem value="checkins">Check-ins (Body Metrics)</SelectItem>
+                            <SelectItem value="lifestyle">Lifestyle (Sleep, Wellness)</SelectItem>
+                            <SelectItem value="general">General</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
 
                     {/* Group goals by category */}
                     {[
@@ -1583,7 +1594,7 @@ export default function ClientGoals() {
                                           targetValue: e.target.value,
                                         })
                                       }
-                                      className="flex-1 rounded-xl border-slate-200 dark:border-slate-700"
+                                      className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
                                       required
                                     />
                                     <Select
@@ -1595,7 +1606,7 @@ export default function ClientGoals() {
                                         })
                                       }
                                     >
-                                      <SelectTrigger className="w-32 rounded-xl border-slate-200 dark:border-slate-700">
+                                      <SelectTrigger className="w-32 rounded-xl border-[color:var(--fc-glass-border)]">
                                         <SelectValue
                                           placeholder={preset.suggestedUnit}
                                         />
@@ -1656,7 +1667,7 @@ export default function ClientGoals() {
                                           targetValue: `${muscle}/${fat}`,
                                         });
                                       }}
-                                      className="flex-1 rounded-xl border-slate-200 dark:border-slate-700"
+                                      className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
                                     />
                                     <span
                                       className="flex items-center"
@@ -1686,7 +1697,7 @@ export default function ClientGoals() {
                                           targetValue: `${muscle}/${fat}`,
                                         });
                                       }}
-                                      className="flex-1 rounded-xl border-slate-200 dark:border-slate-700"
+                                      className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
                                     />
                                   </>
                                 ) : (
@@ -1701,7 +1712,7 @@ export default function ClientGoals() {
                                           targetValue: e.target.value,
                                         })
                                       }
-                                      className="flex-1 rounded-xl border-slate-200 dark:border-slate-700"
+                                      className="flex-1 rounded-xl border-[color:var(--fc-glass-border)]"
                                       required
                                     />
                                     <Select
@@ -1713,7 +1724,7 @@ export default function ClientGoals() {
                                         })
                                       }
                                     >
-                                      <SelectTrigger className="w-32 rounded-xl border-slate-200 dark:border-slate-700">
+                                      <SelectTrigger className="w-32 rounded-xl border-[color:var(--fc-glass-border)]">
                                         <SelectValue
                                           placeholder={preset.suggestedUnit}
                                         />
@@ -1786,7 +1797,7 @@ export default function ClientGoals() {
                                     targetDate: e.target.value,
                                   })
                                 }
-                                className="w-full rounded-xl border-slate-200 dark:border-slate-700"
+                                className="w-full rounded-xl border-[color:var(--fc-glass-border)]"
                               />
                             </div>
 
@@ -1873,14 +1884,14 @@ export default function ClientGoals() {
               {/* Create/Edit Goal Form Modal */}
               {showCreateForm && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <Card className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border-0 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                    <CardHeader className="border-b border-slate-200 dark:border-slate-700">
+                  <Card className="fc-surface rounded-2xl shadow-2xl border-0 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <CardHeader className="border-b border-[color:var(--fc-glass-border)]">
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+                          <CardTitle className="text-2xl font-bold fc-text-primary">
                             {editingGoal ? "Edit Goal" : "Create New Goal"}
                           </CardTitle>
-                          <CardDescription className="text-slate-600 dark:text-slate-300">
+                          <CardDescription className="fc-text-dim">
                             {editingGoal
                               ? "Update your goal details"
                               : "Set a new goal to track your progress"}
@@ -1894,7 +1905,7 @@ export default function ClientGoals() {
                             setEditingGoal(null);
                             resetForm();
                           }}
-                          className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                          className="fc-text-dim hover:fc-text-primary"
                         >
                           <XCircle className="w-5 h-5" />
                         </Button>
@@ -1907,11 +1918,41 @@ export default function ClientGoals() {
                         }
                         className="space-y-6"
                       >
+                        {!editingGoal && (
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="pillar"
+                              className="text-sm font-medium fc-text-primary"
+                            >
+                              Pillar
+                            </Label>
+                            <Select
+                              value={formData.pillar}
+                              onValueChange={(value) =>
+                                setFormData({
+                                  ...formData,
+                                  pillar: value as Goal["pillar"],
+                                })
+                              }
+                            >
+                              <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="training">Training</SelectItem>
+                                <SelectItem value="nutrition">Nutrition</SelectItem>
+                                <SelectItem value="checkins">Check-ins (Body Metrics)</SelectItem>
+                                <SelectItem value="lifestyle">Lifestyle (Sleep, Wellness)</SelectItem>
+                                <SelectItem value="general">General</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label
                               htmlFor="title"
-                              className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                              className="text-sm font-medium fc-text-primary"
                             >
                               Goal Title
                             </Label>
@@ -1925,7 +1966,7 @@ export default function ClientGoals() {
                                 })
                               }
                               placeholder="e.g., Complete 30 workouts this month"
-                              className="rounded-xl border-slate-200 dark:border-slate-700"
+                              className="rounded-xl border-[color:var(--fc-glass-border)]"
                               required
                             />
                           </div>
@@ -1933,7 +1974,7 @@ export default function ClientGoals() {
                           <div className="space-y-2">
                             <Label
                               htmlFor="category"
-                              className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                              className="text-sm font-medium fc-text-primary"
                             >
                               Category
                             </Label>
@@ -1946,7 +1987,7 @@ export default function ClientGoals() {
                                 })
                               }
                             >
-                              <SelectTrigger className="rounded-xl border-slate-200 dark:border-slate-700">
+                              <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -1971,7 +2012,7 @@ export default function ClientGoals() {
                         <div className="space-y-2">
                           <Label
                             htmlFor="description"
-                            className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                            className="text-sm font-medium fc-text-primary"
                           >
                             Description
                           </Label>
@@ -1986,7 +2027,7 @@ export default function ClientGoals() {
                             }
                             placeholder="Describe your goal and why it's important to you..."
                             rows={3}
-                            className="rounded-xl border-slate-200 dark:border-slate-700"
+                            className="rounded-xl border-[color:var(--fc-glass-border)]"
                           />
                         </div>
 
@@ -1994,7 +2035,7 @@ export default function ClientGoals() {
                           <div className="space-y-2">
                             <Label
                               htmlFor="type"
-                              className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                              className="text-sm font-medium fc-text-primary"
                             >
                               Goal Type
                             </Label>
@@ -2007,7 +2048,7 @@ export default function ClientGoals() {
                                 })
                               }
                             >
-                              <SelectTrigger className="rounded-xl border-slate-200 dark:border-slate-700">
+                              <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -2027,7 +2068,7 @@ export default function ClientGoals() {
                               <div className="space-y-2">
                                 <Label
                                   htmlFor="target_value"
-                                  className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                                  className="text-sm font-medium fc-text-primary"
                                 >
                                   Target Value
                                 </Label>
@@ -2042,14 +2083,14 @@ export default function ClientGoals() {
                                     })
                                   }
                                   placeholder="e.g., 30"
-                                  className="rounded-xl border-slate-200 dark:border-slate-700"
+                                  className="rounded-xl border-[color:var(--fc-glass-border)]"
                                 />
                               </div>
 
                               <div className="space-y-2">
                                 <Label
                                   htmlFor="target_unit"
-                                  className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                                  className="text-sm font-medium fc-text-primary"
                                 >
                                   Unit
                                 </Label>
@@ -2063,7 +2104,7 @@ export default function ClientGoals() {
                                     })
                                   }
                                   placeholder="e.g., workouts, kg, days"
-                                  className="rounded-xl border-slate-200 dark:border-slate-700"
+                                  className="rounded-xl border-[color:var(--fc-glass-border)]"
                                 />
                               </div>
                             </>
@@ -2074,7 +2115,7 @@ export default function ClientGoals() {
                           <div className="space-y-2">
                             <Label
                               htmlFor="target_date"
-                              className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                              className="text-sm font-medium fc-text-primary"
                             >
                               Target Date (Optional)
                             </Label>
@@ -2088,14 +2129,14 @@ export default function ClientGoals() {
                                   target_date: e.target.value,
                                 })
                               }
-                              className="rounded-xl border-slate-200 dark:border-slate-700"
+                              className="rounded-xl border-[color:var(--fc-glass-border)]"
                             />
                           </div>
 
                           <div className="space-y-2">
                             <Label
                               htmlFor="priority"
-                              className="text-sm font-medium text-slate-700 dark:text-slate-300"
+                              className="text-sm font-medium fc-text-primary"
                             >
                               Priority
                             </Label>
@@ -2108,7 +2149,7 @@ export default function ClientGoals() {
                                 })
                               }
                             >
-                              <SelectTrigger className="rounded-xl border-slate-200 dark:border-slate-700">
+                              <SelectTrigger className="rounded-xl border-[color:var(--fc-glass-border)]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -2136,7 +2177,7 @@ export default function ClientGoals() {
                               setEditingGoal(null);
                               resetForm();
                             }}
-                            className="px-6 py-3 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300"
+                            className="px-6 py-3 border-[color:var(--fc-glass-border)] fc-text-primary rounded-xl font-semibold hover:bg-[color:var(--fc-glass-highlight)] transition-all duration-300"
                           >
                             Cancel
                           </Button>

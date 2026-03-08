@@ -45,12 +45,8 @@ export class ProgressPhotoStorage {
         throw error
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from(STORAGE_BUCKET)
-        .getPublicUrl(storagePath)
-
-      return publicUrl
+      // Return storage path (not URL) for storing in DB; use getSignedUrl for display (private bucket)
+      return storagePath
     } catch (error) {
       console.error('Error uploading progress photo:', error)
       throw error
@@ -58,23 +54,25 @@ export class ProgressPhotoStorage {
   }
 
   /**
-   * Delete a photo from storage
+   * Delete a photo from storage.
+   * Accepts either a storage path (as stored in DB) or a full URL (legacy).
    */
   static async deletePhoto(
-    photoUrl: string,
+    photoUrlOrPath: string,
     clientId: string,
     recordType: 'body-metrics' | 'mobility' | 'fms',
     recordId: string
   ): Promise<boolean> {
     try {
-      // Extract file path from URL
-      const urlParts = photoUrl.split(`/${recordType}/${clientId}/${recordId}/`)
-      if (urlParts.length < 2) {
-        throw new Error('Invalid photo URL format')
+      let storagePath: string
+      if (photoUrlOrPath.startsWith('http')) {
+        const urlParts = photoUrlOrPath.split(`/${recordType}/${clientId}/${recordId}/`)
+        if (urlParts.length < 2) throw new Error('Invalid photo URL format')
+        const fileName = urlParts[1].split('?')[0]
+        storagePath = `${recordType}/${clientId}/${recordId}/${fileName}`
+      } else {
+        storagePath = photoUrlOrPath
       }
-
-      const fileName = urlParts[1].split('?')[0] // Remove query params
-      const storagePath = `${recordType}/${clientId}/${recordId}/${fileName}`
 
       // Delete from storage
       const { error } = await supabase.storage
@@ -116,16 +114,33 @@ export class ProgressPhotoStorage {
   }
 
   /**
-   * Get public URL for a photo (if already uploaded)
+   * Get public URL for a photo (deprecated for private bucket; use getSignedUrl)
    */
-  static getPhotoUrl(
-    storagePath: string
-  ): string {
+  static getPhotoUrl(storagePath: string): string {
     const { data: { publicUrl } } = supabase.storage
       .from(STORAGE_BUCKET)
       .getPublicUrl(storagePath)
-
     return publicUrl
+  }
+
+  /**
+   * Get a signed URL for a photo (use for private bucket display).
+   * Returns null on error.
+   */
+  static async getSignedUrl(
+    storagePath: string,
+    expirySeconds: number = 3600
+  ): Promise<string | null> {
+    try {
+      const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(storagePath, expirySeconds)
+      if (error || !data?.signedUrl) return null
+      return data.signedUrl
+    } catch (error) {
+      console.error('Error creating signed URL for progress photo:', error)
+      return null
+    }
   }
 }
 

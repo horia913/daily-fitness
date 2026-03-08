@@ -19,8 +19,11 @@ import {
   Hash,
   Flame,
   Repeat,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import ExerciseItem from "./ExerciseItem";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface ExerciseBlockCardProps {
   exercise: any; // WorkoutTemplateExercise with all its data
@@ -33,6 +36,8 @@ interface ExerciseBlockCardProps {
   onDragStart?: (e: React.DragEvent, exerciseId: string) => void;
   onDragEnd?: (e: React.DragEvent) => void;
   renderMode?: "form" | "view"; // 'form' for edit mode, 'view' for display only
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
   children?: React.ReactNode;
 }
 
@@ -65,10 +70,6 @@ const blockTypeStyles: Record<
     icon: PauseCircle,
     label: "Rest-Pause",
   },
-  pyramid_set: {
-    icon: BarChart3,
-    label: "Pyramid Set",
-  },
   pre_exhaustion: {
     icon: Activity,
     label: "Pre-Exhaustion",
@@ -89,23 +90,14 @@ const blockTypeStyles: Record<
     icon: Flame,
     label: "Tabata",
   },
-  circuit: {
-    icon: Repeat,
-    label: "Circuit",
-  },
   for_time: {
     icon: Zap,
     label: "For Time",
-  },
-  ladder: {
-    icon: BarChart3,
-    label: "Ladder",
   },
 };
 
 // Complex block types that show nested exercises
 const COMPLEX_BLOCK_TYPES = [
-  "circuit",
   "tabata",
   "giant_set",
   "superset",
@@ -114,7 +106,6 @@ const COMPLEX_BLOCK_TYPES = [
   "emom",
   "emom_reps",
   "for_time",
-  "ladder",
 ];
 
 export default function ExerciseBlockCard({
@@ -128,10 +119,15 @@ export default function ExerciseBlockCard({
   onDragStart,
   onDragEnd,
   renderMode = "form",
+  isExpanded = true,
+  onToggleExpand,
   children,
 }: ExerciseBlockCardProps) {
+  const isCollapsible =
+    renderMode === "form" && onToggleExpand != null;
+  const showExpanded = !isCollapsible || isExpanded;
   const exerciseType =
-    exercise.exercise_type || exercise.block_type || "straight_set";
+    exercise.exercise_type || exercise.set_type || "straight_set";
   const isComplex = COMPLEX_BLOCK_TYPES.includes(exerciseType);
 
   const styleConfig =
@@ -170,28 +166,6 @@ export default function ExerciseBlockCard({
           <>
             {tabataRounds} rounds • {tabataSets} sets • {totalTabataExercises}{" "}
             exercises
-            {exercise.load_percentage &&
-              ` • Load: ${exercise.load_percentage}%`}
-          </>
-        );
-      case "circuit":
-        // Count rounds, sets, and exercises
-        const circuitRounds =
-          exercise.sets || exercise.circuit_sets?.length || 1;
-        const circuitSets = exercise.circuit_sets?.length || 0;
-        const totalCircuitExercises =
-          exercise.circuit_sets && Array.isArray(exercise.circuit_sets)
-            ? exercise.circuit_sets.reduce((total: number, set: any) => {
-                return (
-                  total +
-                  (Array.isArray(set.exercises) ? set.exercises.length : 0)
-                );
-              }, 0)
-            : 0;
-        return (
-          <>
-            {circuitRounds} rounds • {circuitSets} sets •{" "}
-            {totalCircuitExercises} exercises
             {exercise.load_percentage &&
               ` • Load: ${exercise.load_percentage}%`}
           </>
@@ -321,28 +295,6 @@ export default function ExerciseBlockCard({
               ` • Load: ${exercise.load_percentage}%`}
           </>
         );
-      case "pyramid_set":
-        return (
-          <>
-            {exercise.sets} sets • Pyramid structure
-            {exercise.start_reps && ` • Start: ${exercise.start_reps} reps`}
-            {exercise.end_reps && ` • End: ${exercise.end_reps} reps`}
-            {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
-            {exercise.load_percentage &&
-              ` • Load: ${exercise.load_percentage}%`}
-          </>
-        );
-      case "ladder":
-        return (
-          <>
-            {exercise.rounds} rounds • Ladder style
-            {exercise.start_reps && ` • Start: ${exercise.start_reps} reps`}
-            {exercise.increment && ` • +${exercise.increment} per round`}
-            {exercise.rest_seconds && ` • ${exercise.rest_seconds}s rest`}
-            {exercise.load_percentage &&
-              ` • Load: ${exercise.load_percentage}%`}
-          </>
-        );
       default:
         // Straight sets and any other type - show ALL available data
         const details: string[] = [];
@@ -365,7 +317,7 @@ export default function ExerciseBlockCard({
 
   // Extract nested exercises for complex blocks
   const getNestedExercises = (): any[] => {
-    // First check if exercises are directly available (from workout_blocks schema)
+    // First check if exercises are directly available (from workout_set_entries schema)
     if (
       exercise.exercises &&
       Array.isArray(exercise.exercises) &&
@@ -390,34 +342,6 @@ export default function ExerciseBlockCard({
 
     // Fallback to legacy format
     switch (exerciseType) {
-      case "circuit":
-        // Circuit: circuit_sets is an array of sets, each set has exercises array
-        if (exercise.circuit_sets && Array.isArray(exercise.circuit_sets)) {
-          const allExercises: any[] = [];
-          exercise.circuit_sets.forEach((set: any, setIndex: number) => {
-            if (set.exercises && Array.isArray(set.exercises)) {
-              set.exercises.forEach((ex: any, exIndex: number) => {
-                allExercises.push({
-                  exercise_id: ex.exercise_id,
-                  name: ex.exercise?.name || getExerciseName(ex.exercise_id),
-                  sets: ex.sets || exercise.sets,
-                  reps: ex.reps || exercise.reps,
-                  rest_seconds:
-                    ex.rest_seconds ||
-                    set.rest_between_sets ||
-                    exercise.rest_seconds,
-                  exercise: ex.exercise,
-                  work_seconds: ex.work_seconds,
-                  rest_after: ex.rest_after || set.rest_between_sets,
-                  load_percentage: ex.load_percentage?.toString() || "",
-                  exercise_letter: String.fromCharCode(65 + exIndex), // A, B, C, etc.
-                });
-              });
-            }
-          });
-          return allExercises;
-        }
-        return [];
       case "tabata":
         // Tabata: tabata_sets is an array of sets, each set has exercises array
         if (exercise.tabata_sets && Array.isArray(exercise.tabata_sets)) {
@@ -548,8 +472,8 @@ export default function ExerciseBlockCard({
   };
 
   const nestedExercises = getNestedExercises();
-  // Always show nested exercises for complex blocks
-  const showNestedExercises = isComplex && nestedExercises.length > 0;
+  const showNestedExercises =
+    isComplex && nestedExercises.length > 0 && showExpanded;
 
   return (
     <div
@@ -558,16 +482,23 @@ export default function ExerciseBlockCard({
       onDragEnd={draggable ? onDragEnd : undefined}
       className={`fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] p-3 sm:p-5 transition-all duration-200 fc-hover-rise w-full ${
         draggable ? "cursor-move" : ""
-      }`}
+      } ${isCollapsible && isExpanded ? "ring-2 ring-[color:var(--fc-accent-cyan)]/30" : ""}`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div
+        className={`flex items-start justify-between gap-3 ${isCollapsible ? "cursor-pointer min-h-11" : ""}`}
+        onClick={isCollapsible ? onToggleExpand : undefined}
+        role={isCollapsible ? "button" : undefined}
+        tabIndex={isCollapsible ? 0 : undefined}
+        onKeyDown={isCollapsible ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggleExpand?.(); } } : undefined}
+        aria-expanded={isCollapsible ? isExpanded : undefined}
+      >
         {/* Left side: Number, drag handle, content */}
         <div className="flex items-start gap-3 flex-1 min-w-0">
           {/* Number and drag handle */}
           <div className="flex items-center gap-2 flex-shrink-0">
             {draggable && (
-              <div className="hidden sm:block cursor-grab active:cursor-grabbing">
-                <GripVertical className="w-4 h-4 fc-text-subtle" />
+              <div className="flex cursor-grab active:cursor-grabbing">
+                <GripVertical className="w-3 h-3 sm:w-4 sm:h-4 fc-text-subtle" />
               </div>
             )}
             <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold fc-glass-soft border border-[color:var(--fc-glass-border)] fc-text-primary">
@@ -604,13 +535,35 @@ export default function ExerciseBlockCard({
         {/* Right side: Actions */}
         {renderMode === "form" && (
           <div className="flex gap-2 flex-shrink-0">
+            {isCollapsible && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand?.();
+                }}
+                className="fc-btn fc-btn-ghost fc-press min-w-11 min-h-11"
+                aria-label={isExpanded ? "Collapse" : "Expand"}
+              >
+                {isExpanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </Button>
+            )}
             {onEdit && (
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                onClick={() => onEdit(exercise)}
-                className="fc-btn fc-btn-ghost fc-press"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(exercise);
+                }}
+                className="fc-btn fc-btn-ghost fc-press min-w-11 min-h-11"
               >
                 <Edit className="w-4 h-4" />
               </Button>
@@ -619,9 +572,12 @@ export default function ExerciseBlockCard({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                onClick={() => onDelete(exercise.id)}
-                className="fc-btn fc-btn-ghost fc-press fc-text-error"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(exercise.id);
+                }}
+                className="fc-btn fc-btn-ghost fc-press fc-text-error min-w-11 min-h-11"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -630,17 +586,12 @@ export default function ExerciseBlockCard({
         )}
       </div>
 
-      {/* Nested exercises for complex blocks */}
+      {/* Nested exercises for complex set entries */}
       {showNestedExercises && (
         <div className="mt-4 pt-4 border-t border-[color:var(--fc-glass-border)] space-y-3">
-          {/* Group exercises by sets for tabata/circuit */}
-          {(exerciseType === "tabata" || exerciseType === "circuit") &&
-          (exercise.tabata_sets || exercise.circuit_sets)
-            ? // Display sets with their exercises
-              (exerciseType === "tabata"
-                ? exercise.tabata_sets
-                : exercise.circuit_sets
-              ).map((set: any, setIndex: number) => (
+          {/* Group exercises by sets for tabata */}
+          {exerciseType === "tabata" && exercise.tabata_sets
+            ? exercise.tabata_sets.map((set: any, setIndex: number) => (
                 <div key={setIndex} className="space-y-2">
                   {/* Set header with rest after set time */}
                   {((exercise as any).rest_after_set ||
@@ -718,9 +669,7 @@ export default function ExerciseBlockCard({
                       })}
                     </div>
                   ) : (
-                    <div className="text-xs fc-text-subtle pl-2 italic">
-                      No exercises in this set
-                    </div>
+                    <EmptyState variant="inline" title="No exercises in this set" />
                   )}
                 </div>
               ))
@@ -739,7 +688,11 @@ export default function ExerciseBlockCard({
         </div>
       )}
 
-      {children && <div className="mt-5 pt-5 border-t border-[color:var(--fc-glass-border)]">{children}</div>}
+      {showExpanded && children && (
+        <div className="mt-5 pt-5 border-t border-[color:var(--fc-glass-border)]">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

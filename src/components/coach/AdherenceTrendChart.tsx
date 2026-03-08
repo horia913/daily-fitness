@@ -14,11 +14,11 @@ import {
   Zap,
   Calendar,
   BarChart3,
-  LineChart,
-  PieChart
+  LineChart
 } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 
-interface TrendData {
+export interface TrendData {
   date: string
   workout: number
   nutrition: number
@@ -43,16 +43,7 @@ export default function AdherenceTrendChart({
   const theme = getThemeStyles()
   const [chartType, setChartType] = useState<'line' | 'bar'>('line')
 
-  // Mock trend data - replace with actual data
-  const mockTrendData: TrendData[] = [
-    { date: '2024-01-08', workout: 95, nutrition: 90, habit: 85, overall: 90 },
-    { date: '2024-01-09', workout: 98, nutrition: 92, habit: 88, overall: 93 },
-    { date: '2024-01-10', workout: 85, nutrition: 88, habit: 90, overall: 88 },
-    { date: '2024-01-11', workout: 92, nutrition: 95, habit: 87, overall: 91 },
-    { date: '2024-01-12', workout: 88, nutrition: 90, habit: 92, overall: 90 },
-    { date: '2024-01-13', workout: 95, nutrition: 93, habit: 89, overall: 92 },
-    { date: '2024-01-14', workout: 90, nutrition: 88, habit: 91, overall: 90 }
-  ]
+  const data = trendData ?? []
 
   const getMetricColor = (metric: string) => {
     switch (metric) {
@@ -82,13 +73,15 @@ export default function AdherenceTrendChart({
   }
 
   const getCurrentValue = () => {
-    const latest = mockTrendData[mockTrendData.length - 1]
-    return latest[selectedMetric]
+    if (data.length === 0) return 0
+    const latest = data[data.length - 1]
+    return latest[selectedMetric] ?? 0
   }
 
   const getPreviousValue = () => {
-    const previous = mockTrendData[mockTrendData.length - 2]
-    return previous[selectedMetric]
+    if (data.length < 2) return 0
+    const previous = data[data.length - 2]
+    return previous[selectedMetric] ?? 0
   }
 
   const getTrend = () => {
@@ -103,16 +96,41 @@ export default function AdherenceTrendChart({
   const getTrendPercentage = () => {
     const current = getCurrentValue()
     const previous = getPreviousValue()
+    if (previous == null || previous === 0) return '0.0'
     return Math.abs(((current - previous) / previous) * 100).toFixed(1)
   }
 
+  const sevenDayAvg =
+    data.length > 0
+      ? (data.reduce((sum, day) => sum + (day[selectedMetric] ?? 0), 0) / data.length).toFixed(1)
+      : '0.0'
+
   const MetricIcon = getMetricIcon(selectedMetric)
+
+  if (data.length === 0) {
+    return (
+      <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className={`${theme.text} text-base sm:text-lg`}>
+            {clientName} — {selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)} Trends
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-6">
+          <EmptyState
+            variant="compact"
+            title="No trend data yet"
+            description="Complete workouts and check-ins to see adherence trends."
+          />
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className={`${theme.card} ${theme.shadow} rounded-2xl border-2`}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className={`flex items-center gap-3 ${theme.text}`}>
+      <CardHeader className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <CardTitle className={`flex items-center gap-2 sm:gap-3 ${theme.text} text-base sm:text-lg min-w-0 truncate`}>
             <div className={`p-2 ${getMetricBgColor(selectedMetric)} rounded-lg`}>
               <MetricIcon className={`w-5 h-5 ${getMetricColor(selectedMetric)}`} />
             </div>
@@ -138,31 +156,31 @@ export default function AdherenceTrendChart({
         </div>
       </CardHeader>
       
-      <CardContent>
+      <CardContent className="p-4 sm:p-6">
         {/* Trend Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className={`${theme.card} rounded-xl p-4 border-2`}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2`}>
             <div className="flex items-center gap-2 mb-2">
-              <Activity className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-              <span className={`text-sm font-medium ${theme.text}`}>Current</span>
+              <Activity className="w-4 h-4 fc-text-subtle flex-shrink-0" />
+              <span className={`text-xs sm:text-sm font-medium ${theme.text}`}>Current</span>
             </div>
-            <p className={`text-2xl font-bold ${getMetricColor(selectedMetric)}`}>
+            <p className={`text-xl sm:text-2xl font-bold ${getMetricColor(selectedMetric)}`}>
               {getCurrentValue()}%
             </p>
           </div>
           
-          <div className={`${theme.card} rounded-xl p-4 border-2`}>
+          <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2`}>
             <div className="flex items-center gap-2 mb-2">
               {getTrend() === 'up' ? (
-                <TrendingUp className="w-4 h-4 text-green-600" />
+                <TrendingUp className="w-4 h-4 text-green-600 flex-shrink-0" />
               ) : getTrend() === 'down' ? (
-                <TrendingDown className="w-4 h-4 text-red-600" />
+                <TrendingDown className="w-4 h-4 text-red-600 flex-shrink-0" />
               ) : (
-                <Activity className="w-4 h-4 text-slate-400" />
+                <Activity className="w-4 h-4 fc-text-subtle flex-shrink-0" />
               )}
-              <span className={`text-sm font-medium ${theme.text}`}>Trend</span>
+              <span className={`text-xs sm:text-sm font-medium ${theme.text}`}>Trend</span>
             </div>
-            <p className={`text-2xl font-bold ${
+            <p className={`text-xl sm:text-2xl font-bold ${
               getTrend() === 'up' ? 'text-green-600 dark:text-green-400' :
               getTrend() === 'down' ? 'text-red-600 dark:text-red-400' :
               'text-slate-600 dark:text-slate-400'
@@ -171,37 +189,37 @@ export default function AdherenceTrendChart({
             </p>
           </div>
           
-          <div className={`${theme.card} rounded-xl p-4 border-2`}>
+          <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2`}>
             <div className="flex items-center gap-2 mb-2">
-              <Calendar className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-              <span className={`text-sm font-medium ${theme.text}`}>7-Day Avg</span>
+              <Calendar className="w-4 h-4 fc-text-subtle flex-shrink-0" />
+              <span className={`text-xs sm:text-sm font-medium ${theme.text}`}>7-Day Avg</span>
             </div>
-            <p className={`text-2xl font-bold ${getMetricColor(selectedMetric)}`}>
-              {(mockTrendData.reduce((sum, day) => sum + day[selectedMetric], 0) / mockTrendData.length).toFixed(1)}%
+            <p className={`text-xl sm:text-2xl font-bold ${getMetricColor(selectedMetric)}`}>
+              {sevenDayAvg}%
             </p>
           </div>
         </div>
 
         {/* Chart Visualization */}
-        <div className={`${theme.card} rounded-xl p-6 border-2`}>
-          <div className="space-y-4">
+        <div className={`${theme.card} rounded-xl p-4 sm:p-6 border-2 overflow-x-auto`}>
+          <div className="space-y-3 sm:space-y-4 min-w-0">
             {/* Chart Header */}
-            <div className="flex items-center justify-between">
-              <h4 className={`font-semibold ${theme.text}`}>Weekly Trend</h4>
+            <div className="flex items-center justify-between gap-2">
+              <h4 className={`font-semibold text-sm sm:text-base ${theme.text}`}>Weekly Trend</h4>
               <Badge className={`${getMetricBgColor(selectedMetric)} ${getMetricColor(selectedMetric)} border-0`}>
                 {chartType === 'line' ? 'Line Chart' : 'Bar Chart'}
               </Badge>
             </div>
 
             {/* Simple Chart Visualization */}
-            <div className="h-64 flex items-end justify-between gap-2">
-              {mockTrendData.map((day, index) => {
+            <div className="h-64 flex items-end justify-between gap-1 sm:gap-2">
+              {data.map((day, index) => {
                 const value = day[selectedMetric]
                 const height = (value / 100) * 200 // Scale to chart height
                 
                 return (
                   <div key={index} className="flex flex-col items-center gap-2 flex-1">
-                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                    <div className="text-xs fc-text-subtle">
                       {new Date(day.date).toLocaleDateString('en', { weekday: 'short' })}
                     </div>
                     
@@ -244,7 +262,7 @@ export default function AdherenceTrendChart({
         </div>
 
         {/* Insights */}
-        <div className={`${theme.card} rounded-xl p-4 border-2 mt-4`}>
+        <div className={`${theme.card} rounded-xl p-3 sm:p-4 border-2 mt-3 sm:mt-4`}>
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
             <span className={`font-medium ${theme.text}`}>Insights</span>

@@ -20,6 +20,7 @@ import {
 import { LargeInput } from "../ui/LargeInput";
 import { BlockDetail, BaseBlockExecutorProps } from "../types";
 import { LoggedSet } from "@/types/workoutBlocks";
+import { InlineRPERow } from "../ui/InlineRPERow";
 import { useLoggingReset } from "../hooks/useLoggingReset";
 import { getWeightDefaultAndSuggestion } from "@/lib/weightDefaultService";
 import { fetchApi } from "@/lib/apiClient";
@@ -45,7 +46,9 @@ export function AmrapExecutor({
   calculateSuggestedWeight,
   onVideoClick,
   onAlternativesClick,
+  onPlateCalculatorClick,
   onRestTimerClick,
+  previousPerformanceMap,
   allowSetEditDelete = false,
   registerSetLogIdResolved,
   onSetLogUpsert,
@@ -61,6 +64,8 @@ export function AmrapExecutor({
   const loggedSetsList = loggedSets ?? [];
 
   const [viewingSetIndex, setViewingSetIndex] = useState(0);
+  /** Collapsible set history: show all sets or only last 2 */
+  const [showAllSets, setShowAllSets] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [menuOpenSetId, setMenuOpenSetId] = useState<string | null>(null);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
@@ -220,7 +225,7 @@ export function AmrapExecutor({
   }
 
   const instructions =
-    currentExercise?.notes || block.block.block_notes || undefined;
+    currentExercise?.notes || block.block.set_notes || undefined;
 
   const handleStartTimer = () => {
     setIsActive(true);
@@ -261,7 +266,7 @@ export function AmrapExecutor({
       if (process.env.NODE_ENV !== "production") {
         console.log("[SAVE EDITS guard]", {
           executor: "AmrapExecutor",
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           editingSetId,
           isSavingEdit,
           timestamp: Date.now(),
@@ -279,7 +284,7 @@ export function AmrapExecutor({
     if (isNaN(repsNum) || repsNum <= 0) return;
     setIsSavingEdit(true);
     try {
-      const payload = buildSetEditPatchPayload(block.block.block_type, {
+      const payload = buildSetEditPatchPayload(block.block.set_type, {
         exercise_id: currentExercise?.exercise_id ?? undefined,
         weight: !isNaN(weightNum) && weightNum >= 0 ? weightNum : undefined,
         amrap_total_reps: repsNum,
@@ -288,7 +293,7 @@ export function AmrapExecutor({
         console.log("[SAVE EDITS]", {
           executor: "AmrapExecutor",
           setId: editingSetId,
-          blockTypeFromUI: block.block.block_type,
+          blockTypeFromUI: block.block.set_type,
           payloadKeys: Object.keys(payload),
         });
       }
@@ -303,7 +308,7 @@ export function AmrapExecutor({
           id: editingSetId,
           exercise_id:
             current?.exercise_id ?? currentExercise?.exercise_id ?? "",
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: current?.set_number ?? 1,
           weight_kg: weightNum,
           reps_completed: repsNum,
@@ -393,7 +398,7 @@ export function AmrapExecutor({
       console.log(
         "AmrapExecutor handleLogSet: Calling logSetToDatabase with:",
         {
-          block_type: "amrap",
+          set_type: "amrap",
           exercise_id: exerciseIdToLog,
           amrap_total_reps: repsNum,
           amrap_duration_seconds: actualDurationSeconds,
@@ -402,7 +407,7 @@ export function AmrapExecutor({
       );
 
       const logData: any = {
-        block_type: "amrap",
+        set_type: "amrap",
       };
 
       // Only add fields if they're defined
@@ -424,7 +429,7 @@ export function AmrapExecutor({
         const newEntry: LoggedSet = {
           id: setLogId,
           exercise_id: currentExercise.exercise_id,
-          block_id: block.block.id,
+          set_entry_id: block.block.id,
           set_number: 1,
           weight_kg: weightNum,
           reps_completed: repsNum,
@@ -467,31 +472,99 @@ export function AmrapExecutor({
             background: "var(--fc-surface-sunken)",
           }}
         >
-          <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider mb-2">
-            Logged
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold fc-text-dim uppercase tracking-wider">
+              Logged
+            </div>
+            {loggedSetsList.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSets(!showAllSets)}
+                className="text-xs font-medium fc-text-dim hover:fc-text-primary transition-colors"
+              >
+                {showAllSets ? (
+                  <>Show less ▲</>
+                ) : (
+                  <>Show all {loggedSetsList.length} sets ▼</>
+                )}
+              </button>
+            )}
           </div>
           <ul className="space-y-1.5">
-            {loggedSetsList.map((setEntry) => (
+            {(showAllSets ? loggedSetsList : loggedSetsList.slice(-2)).map((setEntry, index) => {
+              // Calculate the actual index in the full list for isLatestSet
+              const actualIndex = showAllSets ? index : loggedSetsList.length - 2 + index;
+              const isLatestSet = actualIndex === loggedSetsList.length - 1;
+              return (
               <li
                 key={setEntry.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleEditSet(setEntry)}
-                onKeyDown={(e) => e.key === "Enter" && handleEditSet(setEntry)}
-                className={`flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg cursor-pointer ${editingSetId === setEntry.id ? "ring-2 ring-offset-1 ring-fc-accent" : ""}`}
+                className={`flex flex-col gap-1.5 py-1.5 px-2 rounded-lg ${editingSetId === setEntry.id ? "ring-2 ring-offset-1 ring-fc-accent" : ""}`}
                 style={{ background: "var(--fc-surface-elevated)" }}
               >
-                <span className="text-sm fc-text-primary">
-                  {setEntry.weight_kg != null && setEntry.weight_kg > 0
-                    ? `${setEntry.weight_kg} kg × `
-                    : ""}
-                  {setEntry.reps_completed ?? "—"} reps
-                  {setEntry.set_number > 0
-                    ? ` (Set ${setEntry.set_number})`
-                    : ""}
-                </span>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleEditSet(setEntry)}
+                  onKeyDown={(e) => e.key === "Enter" && handleEditSet(setEntry)}
+                  className="flex items-center justify-between gap-2 cursor-pointer"
+                >
+                  <span className="text-sm fc-text-primary">
+                    {setEntry.weight_kg != null && setEntry.weight_kg > 0
+                      ? `${setEntry.weight_kg} kg × `
+                      : ""}
+                    {setEntry.reps_completed ?? "—"} reps
+                    {setEntry.set_number > 0
+                      ? ` (Set ${setEntry.set_number})`
+                      : ""}
+                  </span>
+                </div>
+                <InlineRPERow
+                  setLogId={setEntry.id.startsWith("temp-") ? null : setEntry.id}
+                  currentRPE={setEntry.rpe ?? null}
+                  onRPESelect={async (rpe) => {
+                    const updatedEntry: LoggedSet = {
+                      ...setEntry,
+                      rpe,
+                    };
+                    onSetLogUpsert?.(block.block.id, updatedEntry, {
+                      replaceId: setEntry.id,
+                    });
+
+                    if (!setEntry.id.startsWith("temp-")) {
+                      try {
+                        const res = await fetch(`/api/sets/${setEntry.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ rpe }),
+                          credentials: "include",
+                        });
+                        if (!res.ok) {
+                          console.error("Failed to update RPE:", await res.text());
+                          const revertedEntry: LoggedSet = {
+                            ...setEntry,
+                            rpe: setEntry.rpe ?? undefined,
+                          };
+                          onSetLogUpsert?.(block.block.id, revertedEntry, {
+                            replaceId: setEntry.id,
+                          });
+                        }
+                      } catch (err) {
+                        console.error("Error updating RPE:", err);
+                        const revertedEntry: LoggedSet = {
+                          ...setEntry,
+                          rpe: setEntry.rpe ?? undefined,
+                        };
+                        onSetLogUpsert?.(block.block.id, revertedEntry, {
+                          replaceId: setEntry.id,
+                        });
+                      }
+                    }
+                  }}
+                  isLatestSet={isLatestSet}
+                />
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}
@@ -705,7 +778,9 @@ export function AmrapExecutor({
         calculateSuggestedWeight,
         onVideoClick,
         onAlternativesClick,
+        onPlateCalculatorClick,
         onRestTimerClick,
+        previousPerformanceMap,
       }}
       exerciseName={currentExercise?.exercise?.name || "Exercise"}
       blockDetails={blockDetails}

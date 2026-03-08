@@ -22,9 +22,9 @@ function parseIntNum(value: unknown): number | null {
   return isNaN(n) ? null : n
 }
 
-/** Extract (weight, reps) for a given exercise from a set log row by block_type */
+/** Extract (weight, reps) for a given exercise from a set log row by set_type */
 function getWeightRepsForExercise(row: Row, exerciseId: string): { weight: number; reps: number } | null {
-  const blockType = row.block_type as string
+  const blockType = row.set_type as string
   const w = parseNum(row.weight)
   const r = parseIntNum(row.reps)
 
@@ -114,7 +114,7 @@ function rowContributesToExercise(row: Row, exerciseId: string): boolean {
   if (row.superset_exercise_a_id === exerciseId || row.superset_exercise_b_id === exerciseId) return true
   if (row.preexhaust_isolation_exercise_id === exerciseId || row.preexhaust_compound_exercise_id === exerciseId)
     return true
-  if (row.block_type === 'giant_set' && Array.isArray(row.giant_set_exercises)) {
+  if (row.set_type === 'giant_set' && Array.isArray(row.giant_set_exercises)) {
     const arr = row.giant_set_exercises as Array<{ exercise_id?: string }>
     return arr.some((e) => e?.exercise_id === exerciseId)
   }
@@ -155,7 +155,7 @@ export async function recomputeUserExerciseMetrics(
       .from('workout_set_logs')
       .select('*')
       .eq('client_id', userId)
-      .eq('block_type', 'giant_set')
+      .eq('set_type', 'giant_set')
       .not('giant_set_exercises', 'is', null)
 
     if (giantErr) {

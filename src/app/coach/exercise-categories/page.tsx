@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
@@ -22,6 +22,7 @@ import {
   Star,
   ArrowLeft
 } from 'lucide-react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import ExerciseCategoryForm from '@/components/ExerciseCategoryForm'
@@ -53,44 +54,47 @@ export default function ExerciseCategories() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingCategory, setEditingCategory] = useState<ExerciseCategory | null>(null)
 
-  useEffect(() => {
-    loadCategories()
-  }, [])
+  const loadingRef = useRef(false)
+  const didLoadRef = useRef(false)
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async (signal?: AbortSignal) => {
+    if (signal) {
+      if (didLoadRef.current) return
+      if (loadingRef.current) return
+      didLoadRef.current = true
+    }
+    loadingRef.current = true
     try {
-      const { data, error } = await supabase
-        .from('exercise_categories')
-        .select('*')
-        .order('name')
-
-      if (error) {
-        console.error('Error loading categories:', error)
+      setLoading(true)
+      const res = await fetch('/api/coach/exercise-categories', { signal: signal ?? null })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error ?? `HTTP ${res.status}`)
+      }
+      const { categories: list } = await res.json()
+      setCategories(Array.isArray(list) ? list : [])
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        if (signal) didLoadRef.current = false
         return
       }
-
-      // Get exercise count for each category
-      const categoriesWithCount = await Promise.all(
-        (data || []).map(async (category) => {
-          const { count } = await supabase
-            .from('exercises')
-            .select('*', { count: 'exact', head: true })
-            .eq('category', category.name)
-          
-          return {
-            ...category,
-            exercise_count: count || 0
-          }
-        })
-      )
-
-      setCategories(categoriesWithCount)
-    } catch (error) {
-      console.error('Error loading categories:', error)
+      console.error('Error loading categories:', err)
+      if (signal) didLoadRef.current = false
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    const ac = new AbortController()
+    loadCategories(ac.signal)
+    return () => {
+      didLoadRef.current = false
+      loadingRef.current = false
+      ac.abort()
+    }
+  }, [loadCategories])
 
   const filteredCategories = categories.filter(category =>
     category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -118,30 +122,15 @@ export default function ExerciseCategories() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="coach">
-        <div style={{ 
-          backgroundColor: isDark ? '#0A0A0A' : '#E8E9F3',
-          backgroundImage: isDark 
-            ? 'linear-gradient(to bottom right, #0A0A0A, #1A1A1A)' 
-            : 'linear-gradient(to bottom right, #E8E9F3, #F5F5FF)',
-          minHeight: '100vh'
-        }}>
-          <div style={{ padding: '24px 20px' }}>
-            <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ 
-                backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
-                borderRadius: '24px',
-                padding: '32px',
-                boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(0, 0, 0, 0.08)'
-              }}>
-                <div className="animate-pulse">
-                  <div className="h-8 rounded-xl mb-4" style={{ background: "var(--fc-surface-sunken)" }}></div>
-                  <div className="h-4 rounded-lg w-3/4 mb-2" style={{ background: "var(--fc-surface-sunken)" }}></div>
-                  <div className="h-4 rounded-lg w-1/2" style={{ background: "var(--fc-surface-sunken)" }}></div>
-                </div>
-              </div>
+        <AnimatedBackground>
+          <div className="min-h-screen p-6 max-w-7xl mx-auto">
+            <div className="rounded-2xl p-8 fc-surface animate-pulse">
+              <div className="h-8 rounded-xl mb-4 bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-4 rounded-lg w-3/4 mb-2 bg-[color:var(--fc-glass-highlight)]" />
+              <div className="h-4 rounded-lg w-1/2 bg-[color:var(--fc-glass-highlight)]" />
             </div>
           </div>
-        </div>
+        </AnimatedBackground>
       </ProtectedRoute>
     )
   }
@@ -152,13 +141,17 @@ export default function ExerciseCategories() {
         {performanceSettings.floatingParticles && <FloatingParticles />}
         <div className="min-h-screen relative z-10 p-6 md:p-12 pb-32">
           <div className="max-w-7xl mx-auto">
+            <Link href="/coach/programs" className="fc-surface inline-flex items-center gap-2 rounded-xl border border-[color:var(--fc-surface-card-border)] px-3 py-2.5 w-fit text-[color:var(--fc-text-primary)] text-sm font-medium mb-4">
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              Back to Training
+            </Link>
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-[color:var(--fc-accent)] mb-1">
                   <Layers className="w-5 h-5" />
                   <span className="text-sm font-bold tracking-widest uppercase font-mono fc-text-primary">Library Management</span>
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight fc-text-primary">Exercise Categories</h1>
+                <h1 className="text-2xl font-bold tracking-tight fc-text-primary">Exercise Categories</h1>
                 <p className="text-base fc-text-dim">Organize your protocols with kinetic visual hierarchy.</p>
               </div>
               <button
@@ -176,15 +169,7 @@ export default function ExerciseCategories() {
                 const IconComponent = categoryIcons[category.icon as keyof typeof categoryIcons] || Dumbbell
                 return (
                   <div key={category.id} 
-                    style={{ 
-                      backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
-                      borderRadius: '24px',
-                      padding: '24px',
-                      boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(0, 0, 0, 0.08)',
-                      transition: 'all 0.3s ease',
-                      overflow: 'hidden'
-                    }}
-                    className="group"
+                    className="group fc-surface rounded-2xl p-6 overflow-hidden transition-all duration-300"
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'scale(1.02)'
                       e.currentTarget.style.boxShadow = isDark ? '0 8px 24px rgba(0, 0, 0, 0.6)' : '0 4px 16px rgba(0, 0, 0, 0.12)'
@@ -213,44 +198,22 @@ export default function ExerciseCategories() {
                               />
                             </div>
                             <div style={{ flex: 1 }}>
-                              <h3 style={{
-                                fontSize: '18px',
-                                fontWeight: '600',
-                                color: isDark ? '#FFFFFF' : '#1A1A1A',
-                                margin: 0,
-                                marginBottom: '4px',
-                                lineHeight: '1.4'
-                              }} className="group-hover:text-purple-600 transition-colors">
+                              <h3 className="text-lg font-semibold fc-text-primary mb-1 leading-snug m-0 group-hover:text-purple-600 transition-colors">
                                 {category.name}
                               </h3>
-                              <p style={{
-                                fontSize: '14px',
-                                fontWeight: '400',
-                                color: isDark ? '#9CA3AF' : '#6B7280',
-                                margin: 0,
-                                lineHeight: '1.5'
-                              }}>
+                              <p className="text-sm font-normal fc-text-dim m-0 leading-normal">
                                 {category.description}
                               </p>
                             </div>
                           </div>
                           
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isDark ? '#9CA3AF' : '#6B7280' }}>
-                              <Activity style={{ width: '16px', height: '16px', color: '#10B981' }} />
-                              <span style={{ fontSize: '14px', fontWeight: '500' }}>{category.exercise_count || 0} exercises</span>
+                            <div className="flex items-center gap-2 fc-text-dim">
+                              <Activity className="w-4 h-4 text-[color:var(--fc-status-success)]" />
+                              <span className="text-sm font-medium">{category.exercise_count || 0} exercises</span>
                             </div>
-                            <div style={{
-                              border: `2px solid ${isDark ? '#2A2A2A' : '#E5E7EB'}`,
-                              borderRadius: '16px',
-                              padding: '4px 12px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '12px',
-                              color: isDark ? '#9CA3AF' : '#6B7280'
-                            }}>
-                              <Star style={{ width: '12px', height: '12px' }} />
+                            <div className="flex items-center gap-1 rounded-2xl py-1 px-3 text-xs border-2 border-[color:var(--fc-glass-border)] fc-text-dim">
+                              <Star className="w-3 h-3" />
                               Active
                             </div>
                           </div>
@@ -258,38 +221,23 @@ export default function ExerciseCategories() {
                       </div>
                     </div>
                     
-                    <div style={{ paddingTop: '16px', borderTop: `1px solid ${isDark ? '#2A2A2A' : '#E5E7EB'}` }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="pt-4 border-t border-[color:var(--fc-glass-border)]">
+                      <div className="flex gap-2">
                         <button
                           onClick={() => {
                             setEditingCategory(category)
                             setShowCreateForm(true)
                           }}
-                          style={{
-                            flex: 1,
-                            backgroundColor: 'transparent',
-                            border: `2px solid ${isDark ? '#2A2A2A' : '#E5E7EB'}`,
-                            borderRadius: '16px',
-                            padding: '8px 16px',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            color: isDark ? '#FFFFFF' : '#1A1A1A',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            transition: 'all 0.2s ease'
-                          }}
+                          className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-2xl text-sm font-semibold border-2 border-[color:var(--fc-glass-border)] bg-transparent fc-text-primary cursor-pointer transition-all duration-200"
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = isDark ? '#8B5CF6' : '#F3E8FF'
-                            e.currentTarget.style.borderColor = '#8B5CF6'
-                            e.currentTarget.style.color = isDark ? '#FFFFFF' : '#7C3AED'
+                            e.currentTarget.style.backgroundColor = 'var(--fc-accent-primary)'
+                            e.currentTarget.style.borderColor = 'var(--fc-accent-primary)'
+                            e.currentTarget.style.color = 'white'
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.backgroundColor = 'transparent'
-                            e.currentTarget.style.borderColor = isDark ? '#2A2A2A' : '#E5E7EB'
-                            e.currentTarget.style.color = isDark ? '#FFFFFF' : '#1A1A1A'
+                            e.currentTarget.style.borderColor = ''
+                            e.currentTarget.style.color = ''
                           }}
                         >
                           <Edit style={{ width: '16px', height: '16px' }} />
@@ -297,27 +245,14 @@ export default function ExerciseCategories() {
                         </button>
                         <button
                           onClick={() => deleteCategory(category.id)}
-                          style={{
-                            backgroundColor: 'transparent',
-                            border: `2px solid ${isDark ? '#2A2A2A' : '#E5E7EB'}`,
-                            borderRadius: '16px',
-                            padding: '8px 16px',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            color: '#EF4444',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s ease'
-                          }}
+                          className="flex items-center justify-center py-2 px-4 rounded-2xl text-sm font-semibold border-2 border-[color:var(--fc-glass-border)] bg-transparent text-[color:var(--fc-status-error)] cursor-pointer transition-all duration-200"
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = isDark ? '#7F1D1D' : '#FEE2E2'
-                            e.currentTarget.style.borderColor = '#EF4444'
+                            e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--fc-status-error) 20%, transparent)'
+                            e.currentTarget.style.borderColor = 'var(--fc-status-error)'
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.backgroundColor = 'transparent'
-                            e.currentTarget.style.borderColor = isDark ? '#2A2A2A' : '#E5E7EB'
+                            e.currentTarget.style.borderColor = ''
                           }}
                         >
                           <Trash2 style={{ width: '16px', height: '16px' }} />
@@ -331,78 +266,31 @@ export default function ExerciseCategories() {
 
             {/* Enhanced Empty State */}
             {filteredCategories.length === 0 && (
-              <div style={{
-                backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
-                borderRadius: '24px',
-                padding: '48px',
-                boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(0, 0, 0, 0.08)',
-                textAlign: 'center'
-              }}>
-                <div style={{ 
-                  padding: '24px', 
-                  borderRadius: '18px', 
-                  background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)', 
-                  width: '96px', 
-                  height: '96px', 
-                  margin: '0 auto 24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: isDark ? '0 4px 12px rgba(139, 92, 246, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.08)'
-                }}>
-                  <Layers style={{ width: '48px', height: '48px', color: '#FFFFFF' }} />
+              <div className="fc-surface rounded-2xl p-12 text-center">
+                <div
+                  className="w-24 h-24 mx-auto mb-6 flex items-center justify-center rounded-[18px] shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                  style={{ background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)' }}
+                >
+                  <Layers className="w-12 h-12 text-white" />
                 </div>
-                <h3 style={{
-                  fontSize: '28px',
-                  fontWeight: '700',
-                  color: isDark ? '#FFFFFF' : '#1A1A1A',
-                  margin: '0 0 16px 0',
-                  lineHeight: '1.3'
-                }}>
+                <h3 className="text-3xl font-bold fc-text-primary m-0 mb-4 leading-tight">
                   {categories.length === 0 ? 'No exercise categories yet' : 'No categories found'}
                 </h3>
-                <p style={{
-                  fontSize: '16px',
-                  fontWeight: '400',
-                  color: isDark ? '#9CA3AF' : '#6B7280',
-                  margin: '0 auto 32px',
-                  maxWidth: '448px',
-                  lineHeight: '1.5'
-                }}>
+                <p className="text-base font-normal fc-text-dim mx-auto mb-8 max-w-[448px] leading-normal m-0">
                   {categories.length === 0 
                     ? 'Start organizing your exercise library by creating your first category.'
                     : 'Try adjusting your search criteria.'
                   }
                 </p>
-                <button 
+                <button
                   onClick={() => setShowCreateForm(true)}
-                  style={{
-                    backgroundColor: '#8B5CF6',
-                    color: '#FFFFFF',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    padding: '16px 32px',
-                    borderRadius: '20px',
-                    border: 'none',
-                    boxShadow: isDark ? '0 4px 12px rgba(139, 92, 246, 0.3)' : '0 2px 4px rgba(0, 0, 0, 0.1)',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.05)'
-                    e.currentTarget.style.backgroundColor = '#7C3AED'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)'
-                    e.currentTarget.style.backgroundColor = '#8B5CF6'
-                  }}
+                  className="inline-flex items-center gap-3 py-4 px-8 rounded-[20px] border-none text-base font-semibold text-white bg-[color:var(--fc-accent-primary)] cursor-pointer transition-all duration-200 shadow-[0_2px_4px_rgba(0,0,0,0.1)]"
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
                 >
-                  <Plus style={{ width: '20px', height: '20px' }} />
+                  <Plus className="w-5 h-5" />
                   Create Category
-                  <ArrowRight style={{ width: '20px', height: '20px' }} />
+                  <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
             )}

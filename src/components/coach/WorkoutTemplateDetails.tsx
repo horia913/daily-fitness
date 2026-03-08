@@ -20,6 +20,7 @@ import {
   Activity,
   Settings,
 } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface WorkoutTemplateDetailsProps {
   isOpen: boolean;
@@ -108,14 +109,14 @@ export default function WorkoutTemplateDetails({
           // Create exercise object from block (same logic as edit page)
           const exercise: any = {
             id: block.id || `block-${blockIndex}-${Date.now()}`,
-            exercise_type: block.block_type,
+            exercise_type: block.set_type,
             exercise_id: block.exercises?.[0]?.exercise_id,
             order_index: blockIndex + 1,
             sets: block.total_sets?.toString() || "",
             reps: block.reps_per_set || "",
             rest_seconds: block.rest_seconds?.toString() || "",
-            notes: block.block_notes || "",
-            block_name: block.block_name,
+            notes: block.set_notes || "",
+            set_name: block.set_name,
           };
 
           // Get first exercise and its special table data
@@ -132,9 +133,6 @@ export default function WorkoutTemplateDetails({
           const dropSet = firstExercise?.drop_sets?.[0];
           const clusterSet = firstExercise?.cluster_sets?.[0];
           const restPauseSet = firstExercise?.rest_pause_sets?.[0];
-          const pyramidSets = firstExercise?.pyramid_sets || [];
-          const ladderSets = firstExercise?.ladder_sets || [];
-
           // Load data from special tables
           exercise.rounds = timeProtocol?.rounds?.toString() || undefined;
           exercise.work_seconds = timeProtocol?.work_seconds?.toString() || undefined;
@@ -162,8 +160,8 @@ export default function WorkoutTemplateDetails({
           }
 
           // Handle complex block types with nested exercises
-          const blockType = block.block_type as string;
-          if (blockType === "circuit" || blockType === "tabata") {
+          const blockType = block.set_type as string;
+          if (blockType === "tabata") {
             const exercisesArray =
               block.exercises?.map((ex, idx) => ({
                 exercise_id: ex.exercise_id,
@@ -219,78 +217,22 @@ export default function WorkoutTemplateDetails({
                   };
                 }
               );
-              
-              exercise.circuit_sets = exercise.tabata_sets;
-            } else {
-              // Circuit uses circuit_sets
-              // Get time protocol data for circuit
-              const circuitProtocol = block.time_protocols?.find(
-                (tp: any) => tp.protocol_type === 'circuit'
-              ) || timeProtocol;
-              
-              // Build circuit_sets from exercises and their time protocols
-              const numSets = block.total_sets || 1;
-              exercise.circuit_sets = Array.from(
-                { length: numSets },
-                (_, setIdx) => {
-                  // Get time protocol for each exercise if available
-                  const exerciseProtocols = block.time_protocols?.filter(
-                    (tp: any) => tp.protocol_type === 'circuit'
-                  ) || [];
-                  
-                  return {
-                    exercises: exercisesArray.map((ex: any, exIdx: number) => {
-                      const exProtocol = exerciseProtocols.find(
-                        (tp: any) => tp.exercise_id === ex.exercise_id && tp.exercise_order === (exIdx + 1)
-                      );
-                      return {
-                        ...ex,
-                        exercise: ex.exercise || availableExercisesList.find((e: any) => e.id === ex.exercise_id),
-                        rest_seconds: exProtocol?.rest_seconds?.toString() || 
-                          block.rest_seconds?.toString() || 
-                          "60",
-                      };
-                    }),
-                    rest_between_sets: circuitProtocol?.rest_seconds?.toString() ||
-                      block.rest_seconds?.toString() ||
-                      "60",
-                  };
-                }
-              );
-              
-              // circuit_sets should come from relational tables (block_parameters removed)
-              // TODO: Check if circuit_sets data exists in relational tables
-            }
-          } else if (block.block_type === "drop_set") {
+          } else if (block.set_type === "drop_set") {
             // Already handled above in the special table loading section
-          } else if (block.block_type === "cluster_set") {
+          } else if (block.set_type === "cluster_set") {
             // Load cluster set data from special table
             if (clusterSet) {
               exercise.cluster_reps = clusterSet.reps_per_cluster?.toString() || exercise.reps || "";
               exercise.clusters_per_set = clusterSet.clusters_per_set?.toString() || "";
               exercise.intra_cluster_rest = clusterSet.intra_cluster_rest?.toString() || "15";
             }
-          } else if (block.block_type === "rest_pause") {
+          } else if (block.set_type === "rest_pause") {
             // Load rest pause data from special table
             if (restPauseSet) {
               exercise.rest_pause_duration = restPauseSet.rest_pause_duration?.toString() || "15";
               exercise.max_rest_pauses = restPauseSet.max_rest_pauses?.toString() || "3";
             }
-          } else if (block.block_type === "pyramid_set") {
-            // Load pyramid set data from special table
-            if (pyramidSets.length > 0) {
-              // Use first pyramid step as base
-              exercise.weight_kg = pyramidSets[0]?.weight_kg?.toString() || "";
-              exercise.reps = pyramidSets[0]?.reps || "";
-            }
-          } else if (block.block_type === "ladder") {
-            // Load ladder set data from special table
-            if (ladderSets.length > 0) {
-              // Use first ladder step as base
-              exercise.weight_kg = ladderSets[0]?.weight_kg?.toString() || "";
-              exercise.reps = ladderSets[0]?.reps?.toString() || "";
-            }
-          } else if (block.block_type === "giant_set") {
+          } else if (block.set_type === "giant_set") {
             exercise.giant_set_exercises =
               block.exercises?.map((ex) => ({
                 exercise_id: ex.exercise_id,
@@ -298,19 +240,20 @@ export default function WorkoutTemplateDetails({
                 reps: ex.reps || block.reps_per_set || "",
                 exercise: ex.exercise,
               })) || [];
-          } else if (block.block_type === "superset") {
+          } else if (block.set_type === "superset") {
             if (block.exercises && block.exercises.length >= 2) {
               exercise.superset_exercise_id = block.exercises[1].exercise_id;
               exercise.superset_reps =
                 block.exercises[1].reps || block.reps_per_set || "";
             }
-          } else if (block.block_type === "pre_exhaustion") {
+          } else if (block.set_type === "pre_exhaustion") {
             if (block.exercises && block.exercises.length >= 2) {
               exercise.compound_exercise_id = block.exercises[1].exercise_id;
               exercise.isolation_reps = block.exercises[0].reps || "";
               exercise.compound_reps = block.exercises[1].reps || "";
             }
           }
+        }
 
           // Add exercise object from block
           if (block.exercises && block.exercises.length > 0) {
@@ -490,7 +433,7 @@ export default function WorkoutTemplateDetails({
                     ))}
                   </div>
                 ) : exercises.length > 0 ? (
-                  <div className="space-y-3 max-h-[600px] sm:max-h-[700px] overflow-y-auto">
+                  <div className="space-y-3 sm:max-h-[700px] sm:overflow-y-auto">
                     {exercises.map((exercise, index) => {
                       // Create unique key combining multiple properties to avoid duplicates
                       const order = exercise.order_index || index + 1;
@@ -514,17 +457,10 @@ export default function WorkoutTemplateDetails({
                     })}
                   </div>
                 ) : (
-                  <div className="p-6 text-center rounded-2xl border-2 border-dashed border-[color:var(--fc-glass-border)] fc-text-dim">
-                    <div className="mx-auto w-12 h-12 mb-3 fc-icon-tile fc-icon-workouts">
-                      <Dumbbell className="w-5 h-5" />
-                    </div>
-                    <h4 className="font-semibold text-lg fc-text-primary">
-                      No Exercises
-                    </h4>
-                    <p className="text-sm">
-                      This workout template doesn't have any exercises yet.
-                    </p>
-                  </div>
+                  <EmptyState
+                    variant="inline"
+                    title="No exercises added yet"
+                  />
                 )}
               </div>
             </div>

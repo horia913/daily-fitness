@@ -1,0 +1,2509 @@
+[
+  {
+    "id": "TC001",
+    "title": "Create workout template shell with Volume Calculator ON",
+    "description": "Verifies a coach can log in from /, navigate to Workout Templates, start a new template, and save basic details with Volume Calculator enabled.",
+    "category": "Flow 1: Create Workout Template with All Block Types",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button to open navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the side menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Start Create New template and fill required metadata",
+    "description": "Verifies the Create New template screen accepts name/description, Volume Calculator can be turned on, and optional fields can be selected if present.",
+    "category": "Flow 1: Create Workout Template with All Block Types",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button to open navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the side menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" button"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Save template with name, description, and Volume Calculator enabled",
+    "description": "Verifies saving a template succeeds and the detail page shows the new template name.",
+    "category": "Flow 1: Create Workout Template with All Block Types",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button to open navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the side menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"TS Full Blocks Test\" into the template name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"All block types\" into the description field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Volume Calculator\" toggle to turn it ON"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"TS Full Blocks Test\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Add Straight Set block with 2 sets and filled fields",
+    "description": "Verifies a Straight Set block can be added and configured with an exercise and two sets (reps/weight/rest if present).",
+    "category": "Flow 1: Create Workout Template with All Block Types",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button to open navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the side menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"TS Full Blocks Test\" into the template name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add Block\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Straight Set\" in the block type picker"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Straight Set\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Add Superset block with 2 exercises and 2 sets",
+    "description": "Verifies a Superset block can be added and shows two exercise slots and set fields for configuration.",
+    "category": "Flow 1: Create Workout Template with All Block Types",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button to open navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the side menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"TS Full Blocks Test\" into the template name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add Block\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Superset\" in the block type picker"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Superset\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Add Giant Set block with 3 exercises and 2 sets",
+    "description": "Verifies a Giant Set block can be added and shows three exercise slots and set fields for configuration.",
+    "category": "Flow 1: Create Workout Template with All Block Types",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button to open navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the side menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"TS Full Blocks Test\" into the template name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add Block\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Giant Set\" in the block type picker"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Giant Set\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Add advanced intensity blocks (Drop, Cluster, Rest-Pause, Pre-Exhaustion) if available",
+    "description": "Verifies the UI offers advanced block types and each selected block renders its configuration section; missing types are treated as absence in UI.",
+    "category": "Flow 1: Create Workout Template with All Block Types",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button to open navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the side menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"TS Full Blocks Test\" into the template name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add Block\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Drop Set\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Add time-based blocks (AMRAP, EMOM, For Time, Tabata) from Time-Based section if available",
+    "description": "Verifies time-based block options are accessible and selecting one displays time/interval inputs where present.",
+    "category": "Flow 1: Create Workout Template with All Block Types",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button to open navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the side menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"TS Full Blocks Test\" into the template name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add Block\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Time-Based\" in the block type picker"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"AMRAP\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Add HR Sets block and select a heart rate zone if available",
+    "description": "Verifies an HR Sets block can be added and displays a selectable heart rate zone field when present.",
+    "category": "Flow 1: Create Workout Template with All Block Types",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button to open navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the side menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"TS Full Blocks Test\" into the template name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add Block\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"HR Sets\" in the block type picker"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"HR Sets\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Validation: cannot save template without a name",
+    "description": "Verifies the template cannot be saved when the name is missing and a visible validation message or disabled save state is shown.",
+    "category": "Flow 1: Create Workout Template with All Block Types",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button to open navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the side menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Name\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Cancel edit after changing reps and verify value does not persist",
+    "description": "Changes reps but exits without saving and confirms the original reps value is retained when reopening.",
+    "category": "Flow 2: Edit Existing Template — Change Values and Verify Persistence",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the first template in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Edit Template\""
+      },
+      {
+        "type": "action",
+        "description": "Scroll to a block section that contains a reps input"
+      },
+      {
+        "type": "action",
+        "description": "Click into the reps input field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"88\" into the reps input field"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Cancel\" or \"Back\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Edit Template\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"88\" is not visible in the reps input field"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Save with high numeric reps value and confirm it persists (stress within UI limits)",
+    "description": "Updates reps to a large value and verifies the app accepts it and persists it after reopening.",
+    "category": "Flow 2: Edit Existing Template — Change Values and Verify Persistence",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the first template in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Edit Template\""
+      },
+      {
+        "type": "action",
+        "description": "Scroll to a block section that contains a reps input"
+      },
+      {
+        "type": "action",
+        "description": "Click into the reps input field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"999\" into the reps input field"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Update\" or \"Save Template\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Saved\" or \"Updated\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Edit Template\" again for the same template"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"999\" is visible in the reps input field"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Verify template editor loads with non-empty template name before editing reps",
+    "description": "Confirms the edit screen is correctly populated (template name present) to avoid editing a blank/failed-load state.",
+    "category": "Flow 2: Edit Existing Template — Change Values and Verify Persistence",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the first template in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Edit Template\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the template name field is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text is visible in the template name field"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Edit reps to 99, refresh by returning to templates list, then reopen and verify persistence",
+    "description": "Saves reps=99 and verifies persistence after leaving the editor and returning via the templates list navigation path.",
+    "category": "Flow 2: Edit Existing Template — Change Values and Verify Persistence",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click the side menu button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\""
+      },
+      {
+        "type": "action",
+        "description": "Click the first template in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Edit Template\""
+      },
+      {
+        "type": "action",
+        "description": "Scroll to a block section that contains a reps input"
+      },
+      {
+        "type": "action",
+        "description": "Click into the reps input field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"99\" into the reps input field"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Update\" or \"Save Template\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Saved\" or \"Updated\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Workout Templates\" breadcrumb or \"Back to Templates\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Workout Templates\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the same first template in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Edit Template\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"99\" is visible in the reps input field"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Create a new 4-week program from coach dashboard entry point",
+    "description": "Verifies a coach can start program creation from Training and reach the program creation screen.",
+    "category": "Flow 3: Create 4-Week Program with Weekly Schedule",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" program button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Basic Info\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Fill Basic Info for TS 4-Week Program with 4-week duration",
+    "description": "Verifies a coach can enter program name/description and set duration to 4 weeks on the Basic Info tab.",
+    "category": "Flow 3: Create 4-Week Program with Weekly Schedule",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" program button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"TS 4-Week Program\" into the program name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Schedule and progression test\" into the program description field"
+      },
+      {
+        "type": "action",
+        "description": "Select \"4\" from the duration (weeks) dropdown"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"4\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Schedule Week 1: assign templates to Monday, Wednesday, Friday and leave other days as Rest Day",
+    "description": "Verifies Week 1 scheduling supports assigning templates on specific weekdays and leaving remaining days as Rest Day.",
+    "category": "Flow 3: Create 4-Week Program with Weekly Schedule",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" program button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Week 1\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Monday\" in the schedule grid/list"
+      },
+      {
+        "type": "action",
+        "description": "Select a workout template from the template picker for Monday"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Wednesday\" in the schedule grid/list"
+      },
+      {
+        "type": "action",
+        "description": "Select a workout template from the template picker for Wednesday"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Friday\" in the schedule grid/list"
+      },
+      {
+        "type": "action",
+        "description": "Select a workout template from the template picker for Friday"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Rest Day\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Schedule Week 2 (if supported): assign templates to Mon/Tue/Wed/Fri and leave other days Rest Day",
+    "description": "Verifies Week 2 scheduling is accessible via a week selector and supports assigning templates for multiple days.",
+    "category": "Flow 3: Create 4-Week Program with Weekly Schedule",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" program button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Click the week selector control"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Week 2\" in the week selector list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Week 2\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Monday\" in the schedule grid/list"
+      },
+      {
+        "type": "action",
+        "description": "Select a workout template from the template picker for Monday"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Tuesday\" in the schedule grid/list"
+      },
+      {
+        "type": "action",
+        "description": "Select a workout template from the template picker for Tuesday"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Wednesday\" in the schedule grid/list"
+      },
+      {
+        "type": "action",
+        "description": "Select a workout template from the template picker for Wednesday"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Friday\" in the schedule grid/list"
+      },
+      {
+        "type": "action",
+        "description": "Select a workout template from the template picker for Friday"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Rest Day\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Week 2 selector missing: verify schedule UI does not allow switching weeks (record limitation)",
+    "description": "Verifies behavior when no week selector exists by confirming only Week 1 is available/visible in the Schedule tab.",
+    "category": "Flow 3: Create 4-Week Program with Weekly Schedule",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" program button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Week 1\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Week 2\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Progression Rules tab present: set basic weight and/or reps progression",
+    "description": "Verifies the Progression Rules tab supports setting progression values when the tab is available and populated.",
+    "category": "Flow 3: Create 4-Week Program with Weekly Schedule",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" program button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Progression Rules\" tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Progression\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"5\" into the weight progression field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"1\" into the reps progression field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"5\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Progression Rules tab missing/empty: verify no configurable progression is shown (record limitation)",
+    "description": "Verifies behavior when progression rules are not configurable by confirming the tab or expected controls are not visible.",
+    "category": "Flow 3: Create 4-Week Program with Weekly Schedule",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" program button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Progression Rules\" is not visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Weight progression\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "Save program and verify program detail shows TS 4-Week Program",
+    "description": "Verifies a coach can save the configured program and see the correct program name on the resulting detail page.",
+    "category": "Flow 3: Create 4-Week Program with Weekly Schedule",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create New\" or \"+\" program button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"TS 4-Week Program\" into the program name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Schedule and progression test\" into the program description field"
+      },
+      {
+        "type": "action",
+        "description": "Select \"4\" from the duration (weeks) dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"TS 4-Week Program\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach/programs\""
+      }
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "Edit an existing program schedule and verify the change persists after reopening",
+    "description": "Opens an existing program, edits one schedule day, saves, and verifies the updated day persists when reopening the edit screen.",
+    "category": "Flow 4: Edit Program — Verify Schedule Persisted and Modify",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach/programs\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible program in the programs list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit Program\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Schedule\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify at least one day shows an assigned workout template name (not all days show \"Rest Day\")"
+      },
+      {
+        "type": "action",
+        "description": "Click on one day in the schedule that currently shows a workout template name"
+      },
+      {
+        "type": "action",
+        "description": "Select \"Rest Day\" for that day"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Saved\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Back\" or \"Programs\" navigation to return to the programs list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach/programs\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the same program opened earlier in this test"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit Program\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the previously changed day now shows \"Rest Day\""
+      }
+    ]
+  },
+  {
+    "id": "TC024",
+    "title": "Schedule tab shows persisted assigned templates (not all Rest Day) for an existing program",
+    "description": "Verifies that an existing program has at least one scheduled day with an assigned template visible on the Schedule tab.",
+    "category": "Flow 4: Edit Program — Verify Schedule Persisted and Modify",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach/programs\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible program in the programs list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit Program\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify at least one day shows an assigned workout template name (not all days show \"Rest Day\")"
+      }
+    ]
+  },
+  {
+    "id": "TC025",
+    "title": "Change a scheduled day from Rest Day to a workout template and verify persistence",
+    "description": "Updates a schedule day from Rest Day to a template and verifies the selected template remains after reopening the program edit screen.",
+    "category": "Flow 4: Edit Program — Verify Schedule Persisted and Modify",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible program in the programs list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit Program\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Click on one day in the schedule that currently shows \"Rest Day\""
+      },
+      {
+        "type": "action",
+        "description": "Select the first available workout template option (a non-\"Rest Day\" option) for that day"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Saved\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Back\" or \"Programs\" navigation to return to the programs list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the same program opened earlier in this test"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit Program\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the previously changed day now shows the selected workout template name (not \"Rest Day\")"
+      }
+    ]
+  },
+  {
+    "id": "TC026",
+    "title": "Attempt to save schedule without changes and confirm no error state is shown",
+    "description": "Ensures saving an unchanged schedule does not show visible errors and the user remains on the edit experience.",
+    "category": "Flow 4: Edit Program — Verify Schedule Persisted and Modify",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible program in the programs list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit Program\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Saved\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Schedule\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC027",
+    "title": "Cancel/leave edit program without saving and confirm the schedule did not change after reopening",
+    "description": "Edits a schedule day but leaves the edit screen without saving, then reopens to confirm the original value remains.",
+    "category": "Flow 4: Edit Program — Verify Schedule Persisted and Modify",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible program in the programs list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit Program\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Click on one day in the schedule that currently shows a workout template name"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the day shows a workout template name (not \"Rest Day\")"
+      },
+      {
+        "type": "action",
+        "description": "Select \"Rest Day\" for that day"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Back\" button to leave the edit screen"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach/programs\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the same program opened earlier in this test"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit Program\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the previously edited day still shows a workout template name (not \"Rest Day\")"
+      }
+    ]
+  },
+  {
+    "id": "TC028",
+    "title": "Save a schedule change and verify it is reflected after a full page reload of the programs page",
+    "description": "Confirms that a saved schedule change is persisted beyond client-side navigation by reloading and reopening the program edit screen.",
+    "category": "Flow 4: Edit Program — Verify Schedule Persisted and Modify",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach/programs\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible program in the programs list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit Program\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Click on one day in the schedule that currently shows a workout template name"
+      },
+      {
+        "type": "action",
+        "description": "Select \"Rest Day\" for that day"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Saved\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Back\" or \"Programs\" navigation to return to the programs list"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to \"/coach/programs\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the same program opened earlier in this test"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit Program\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Schedule\" tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the previously changed day now shows \"Rest Day\""
+      }
+    ]
+  },
+  {
+    "id": "TC029",
+    "title": "Assign a workout template to a client (basic happy path)",
+    "description": "Verifies a coach can assign any available workout template to a client and sees confirmation plus the assignment in the client hub.",
+    "category": "Flow 5: Assign Workout to Client",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on any client in the clients list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Assign Workout\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on any available workout template in the template chooser"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" or \"Assign\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Assigned\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the newly assigned workout is visible in the upcoming/assignments area"
+      }
+    ]
+  },
+  {
+    "id": "TC030",
+    "title": "Assign a workout with a specific scheduled date",
+    "description": "Verifies the optional date field can be set during assignment and the scheduled assignment appears for the client.",
+    "category": "Flow 5: Assign Workout to Client",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on any client in the clients list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Assign Workout\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on any available workout template in the template chooser"
+      },
+      {
+        "type": "action",
+        "description": "Type \"2030-01-15\" into the date field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" or \"Assign\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Assigned\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"2030-01-15\" is visible in the upcoming/assignments area"
+      }
+    ]
+  },
+  {
+    "id": "TC031",
+    "title": "Cancel out of the assign workout flow without creating an assignment",
+    "description": "Verifies that backing out/canceling does not create an assignment for the client.",
+    "category": "Flow 5: Assign Workout to Client",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on any client in the clients list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Assign Workout\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Choose\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Cancel\" or \"Close\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the \"Assign Workout\" button is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC032",
+    "title": "Attempt to confirm assignment without selecting a template",
+    "description": "Verifies the UI prevents confirming an assignment when no template is chosen and shows a validation message or disabled confirm state.",
+    "category": "Flow 5: Assign Workout to Client",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on any client in the clients list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Assign Workout\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" or \"Assign\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Select a template\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC033",
+    "title": "Verify assigned workout appears in the client hub assignments area after refresh navigation",
+    "description": "Verifies that once assigned, the workout remains visible when returning to the client hub within the same session.",
+    "category": "Flow 5: Assign Workout to Client",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on any client in the clients list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Assign Workout\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on any available workout template in the template chooser"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" or \"Assign\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Assigned\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on the same client in the clients list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the assigned workout is visible in the upcoming/assignments area"
+      }
+    ]
+  },
+  {
+    "id": "TC034",
+    "title": "Assign two different templates to the same client in one session",
+    "description": "Verifies multiple assignments can be created sequentially and both appear in the assignments area.",
+    "category": "Flow 5: Assign Workout to Client",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on any client in the clients list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Assign Workout\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on any available workout template in the template chooser"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" or \"Assign\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Assigned\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Assign Workout\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on a different available workout template in the template chooser"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" or \"Assign\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Assigned\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify at least two assigned workouts are visible in the upcoming/assignments area"
+      }
+    ]
+  },
+  {
+    "id": "TC035",
+    "title": "Invalid login prevents reaching coach clients and assignment flow",
+    "description": "Verifies that incorrect credentials do not allow access to coach dashboard and therefore block assignment actions.",
+    "category": "Flow 5: Assign Workout to Client",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Type \"fake_user@example.com\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"wrong-password\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Invalid\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      }
+    ]
+  },
+  {
+    "id": "TC036",
+    "title": "Coach can log in from / and reach coach dashboard",
+    "description": "Verifies that a coach can authenticate starting at / and land on the coach home area.",
+    "category": "Flow 6: Locate Program Assignment Feature",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Sign In\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Coach\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC037",
+    "title": "Navigate from coach dashboard to Training area (programs list entry point)",
+    "description": "Verifies the Training bottom navigation can be used to reach the coach programs area.",
+    "category": "Flow 6: Locate Program Assignment Feature",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Sign In\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach/programs\""
+      }
+    ]
+  },
+  {
+    "id": "TC038",
+    "title": "Open a program detail page from the programs list",
+    "description": "Verifies a coach can reach some program detail view by selecting a program from the programs list.",
+    "category": "Flow 6: Locate Program Assignment Feature",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Sign In\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible program in the programs list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify page title contains \"Program\""
+      }
+    ]
+  },
+  {
+    "id": "TC039",
+    "title": "Program detail: Assign/Assign Program control is discoverable (or explicitly absent)",
+    "description": "Searches program detail tabs and sections for visible assignment controls such as Assign or Assign Program.",
+    "category": "Flow 6: Locate Program Assignment Feature",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Sign In\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible program in the programs list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Assign\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC040",
+    "title": "Program detail: Clients tab shows assignment-related controls (or explicitly absent)",
+    "description": "Checks whether a program has a Clients tab/section that exposes assignment actions.",
+    "category": "Flow 6: Locate Program Assignment Feature",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Sign In\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible program in the programs list"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Clients\" tab (if visible)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Assign\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC041",
+    "title": "From client hub: Locate Assign Program controls across client tabs",
+    "description": "Verifies that assignment controls can be found from the Clients area by opening a client hub and checking tabs/sections.",
+    "category": "Flow 6: Locate Program Assignment Feature",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Sign In\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Clients\" in the bottom navigation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach/clients\""
+      },
+      {
+        "type": "action",
+        "description": "Click on the first visible client in the clients list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Assign\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC042",
+    "title": "Record missing: No program assignment controls found from Programs or Clients areas",
+    "description": "If assignment controls are not present, verify the UI does not expose any Assign/Assign Program action in the searched areas.",
+    "category": "Flow 6: Locate Program Assignment Feature",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Sign In\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Training\" in the bottom navigation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach/programs\""
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Clients\" in the bottom navigation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/coach/clients\""
+      }
+    ]
+  },
+  {
+    "id": "TC043",
+    "title": "Negative login: Invalid password prevents access to coach area",
+    "description": "Verifies incorrect credentials do not allow entry into coach routes and an error is visible.",
+    "category": "Flow 6: Locate Program Assignment Feature",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Sign In\" tab"
+      },
+      {
+        "type": "action",
+        "description": "Type \"fake.user@example.com\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"wrong-password\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign In\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Invalid\" is visible"
+      }
+    ]
+  }
+]

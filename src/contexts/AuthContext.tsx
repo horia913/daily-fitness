@@ -17,6 +17,7 @@ export interface UserProfile {
   first_name?: string;
   last_name?: string;
   timezone?: string | null;
+  avatar_url?: string | null;
 }
 
 interface AuthContextType {
@@ -37,13 +38,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const refreshPromiseRef = useRef<Promise<Session | null> | null>(null)
+  const lastUserIdRef = useRef<string | null>(null)
 
   // Fetch user profile including client_type and timezone
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, role, client_type, first_name, last_name, timezone')
+        .select('id, email, role, client_type, first_name, last_name, timezone, avatar_url')
         .eq('id', userId)
         .single();
 
@@ -123,22 +125,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session and profile
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session ?? null)
-      setUser(session?.user ?? null);
+    const getSessionWithTimeout = async () => {
+      try {
+        const result = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('getSession timeout')), 5000)
+          )
+        ]);
+        const session = result.data.session;
+        lastUserIdRef.current = session?.user?.id ?? null;
+        setSession(session ?? null);
+        setUser(session?.user ?? null);
 
-      if (session?.user) {
-        const profileData = await fetchProfile(session.user.id);
-        setProfile(profileData);
-        const didUpdate = await syncProfileTimezoneOnce(session.user.id, profileData?.timezone);
-        if (didUpdate) {
-          const updated = await fetchProfile(session.user.id);
-          if (updated) setProfile(updated);
+        if (session?.user) {
+          const profileData = await fetchProfile(session.user.id);
+          setProfile(profileData);
+          const didUpdate = await syncProfileTimezoneOnce(session.user.id, profileData?.timezone);
+          if (didUpdate) {
+            const updated = await fetchProfile(session.user.id);
+            if (updated) setProfile(updated);
+          }
         }
+      } catch (error) {
+        console.warn('[AuthContext] getSession failed or timed out:', error);
+        lastUserIdRef.current = null;
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
-    });
+    };
+    getSessionWithTimeout();
 
     // Listen for auth changes
     const {
@@ -149,8 +168,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasSession: !!session,
         userId: session?.user?.id ?? null,
       })
-      setSession(session ?? null)
-      setUser(session?.user ?? null);
+      const newUserId = session?.user?.id ?? null
+      const sameUser = newUserId !== null && newUserId === lastUserIdRef.current
+      const isTokenRefresh = event === 'TOKEN_REFRESHED'
+
+      // Skip setUser/setSession when only the token refreshed and user ID unchanged
+      // to avoid new object references and downstream re-renders (tab-return data loss)
+      if (!(isTokenRefresh && sameUser)) {
+        lastUserIdRef.current = newUserId
+        setSession(session ?? null)
+        setUser(session?.user ?? null)
+      }
 
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id);
@@ -161,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (updated) setProfile(updated);
         }
       } else {
+        lastUserIdRef.current = null
         setProfile(null);
       }
 
@@ -169,27 +198,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  useEffect(() => {
-    const handleFocus = () => {
-      ensureFreshSession().catch(() => {})
-    }
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        ensureFreshSession().catch(() => {})
-      }
-    }
-
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', handleVisibility)
-
-    return () => {
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibility)
-    }
-  }, [])
-
 
   const signOut = async () => {
     await unsubscribeUser()

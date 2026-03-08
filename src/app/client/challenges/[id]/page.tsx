@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,10 +26,28 @@ function ChallengeDetailContent() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (user && !authLoading && challengeId) {
-      loadChallenge();
-    }
+    if (!user || authLoading || !challengeId) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setLoading(false);
+      setLoadError("Loading took too long. Tap Retry to try again.");
+    }, 20_000);
+    loadChallenge().finally(() => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
   }, [user, authLoading, challengeId]);
 
   const loadChallenge = async () => {
@@ -56,7 +74,7 @@ function ChallengeDetailContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <div className="fc-glass fc-card p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -74,7 +92,7 @@ function ChallengeDetailContent() {
       <ProtectedRoute>
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <GlassCard elevation={2} className="fc-glass fc-card p-12 text-center">
               <p className="text-lg font-semibold text-[color:var(--fc-text-primary)] mb-4">
                 {loadError || "Challenge not found"}
@@ -111,7 +129,7 @@ function ChallengeDetailContent() {
           </Link>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight fc-text-primary mb-2">
+              <h1 className="text-2xl font-bold tracking-tight fc-text-primary mb-2">
                 {challenge.name}
               </h1>
               <div className="flex flex-wrap items-center gap-4">

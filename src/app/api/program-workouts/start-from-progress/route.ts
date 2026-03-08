@@ -46,15 +46,28 @@ export async function POST(request: NextRequest) {
     
     // Security: Client can only start their own workout
     validateOwnership(user.id, clientId)
-    
-    console.log('[start-from-progress] Starting for client:', clientId)
-    
+
     // ========================================================================
     // STEP 1: Get program state from canonical resolver
     // ========================================================================
     const state = await getProgramState(supabaseAuth, clientId)
+
+    console.log('[start-from-progress] STEP 1 — program state:', {
+      requested_schedule_id: body.program_schedule_id ?? '(none — will use nextSlot)',
+      has_assignment: !!state.assignment,
+      assignment_id: state.assignment?.id ?? null,
+      assignment_status: (state.assignment as any)?.status ?? null,
+      total_slots: state.slots.length,
+      completed_slots: state.completedSlots.length,
+      is_completed: state.isCompleted,
+      next_slot_id: state.nextSlot?.id ?? null,
+      next_slot_week: state.nextSlot?.week_number ?? null,
+      next_slot_day: state.nextSlot?.day_number ?? null,
+      completed_schedule_ids: state.completedSlots.map(c => c.program_schedule_id),
+    })
     
     if (!state.assignment) {
+      console.warn('[start-from-progress] REJECTED — no active assignment')
       return NextResponse.json({
         error: 'No active program',
         message: 'No active program assignment found',
@@ -63,6 +76,7 @@ export async function POST(request: NextRequest) {
     }
     
     if (state.isCompleted) {
+      console.warn('[start-from-progress] REJECTED — program isCompleted=true (all slots in ledger)')
       return NextResponse.json({
         error: 'Program completed',
         message: 'All program workouts have been completed',
@@ -71,6 +85,7 @@ export async function POST(request: NextRequest) {
     }
     
     if (state.slots.length === 0) {
+      console.warn('[start-from-progress] REJECTED — program has no schedule slots')
       return NextResponse.json({
         error: 'No schedule',
         message: 'No training days configured in program schedule',
@@ -88,8 +103,16 @@ export async function POST(request: NextRequest) {
     if (body.program_schedule_id) {
       // User selected a specific slot — validate it
       const requestedSlot = state.slots.find(s => s.id === body.program_schedule_id)
+
+      console.log('[start-from-progress] STEP 2 — slot lookup:', {
+        requested_id: body.program_schedule_id,
+        found_in_slots: !!requestedSlot,
+        slot_week: requestedSlot?.week_number ?? null,
+        slot_day: requestedSlot?.day_number ?? null,
+      })
       
       if (!requestedSlot) {
+        console.warn('[start-from-progress] REJECTED — requested slot not found in program schedule')
         return NextResponse.json({
           error: 'Invalid slot',
           message: 'The selected schedule slot does not belong to this program',
@@ -98,7 +121,18 @@ export async function POST(request: NextRequest) {
       
       // Check if already completed
       const completedScheduleIds = new Set(state.completedSlots.map(c => c.program_schedule_id))
-      if (completedScheduleIds.has(requestedSlot.id)) {
+      const alreadyCompleted = completedScheduleIds.has(requestedSlot.id)
+
+      console.log('[start-from-progress] STEP 2 — completion ledger check:', {
+        slot_id: requestedSlot.id,
+        slot_week: requestedSlot.week_number,
+        slot_day: requestedSlot.day_number,
+        already_in_ledger: alreadyCompleted,
+        ledger_ids: [...completedScheduleIds],
+      })
+
+      if (alreadyCompleted) {
+        console.warn('[start-from-progress] REJECTED — slot is in program_day_completions ledger')
         return NextResponse.json({
           error: 'Slot already completed',
           message: 'This program day has already been completed',
@@ -106,38 +140,35 @@ export async function POST(request: NextRequest) {
       }
       
       chosenSlot = requestedSlot
-      console.log('[start-from-progress] User selected specific slot:', {
-        schedule_id: chosenSlot.id,
-        week: chosenSlot.week_number,
-        day: chosenSlot.day_number,
-      })
     } else {
       // Use next uncompleted slot (default)
       chosenSlot = state.nextSlot
+
+      console.log('[start-from-progress] STEP 2 — using nextSlot (no schedule_id in body):', {
+        next_slot_id: chosenSlot?.id ?? null,
+        next_slot_week: chosenSlot?.week_number ?? null,
+        next_slot_day: chosenSlot?.day_number ?? null,
+      })
       
       if (!chosenSlot) {
+        console.warn('[start-from-progress] REJECTED — nextSlot is null (all slots completed)')
         return NextResponse.json({
           error: 'Program completed',
           message: 'All program workouts have been completed',
           status: 'completed',
         }, { status: 409 })
       }
-      
-      console.log('[start-from-progress] Using next slot:', {
-        schedule_id: chosenSlot.id,
-        week: chosenSlot.week_number,
-        day: chosenSlot.day_number,
-      })
     }
-    
+
     // ========================================================================
     // STEP 2b: WEEK LOCK — reject if the chosen slot is in a locked week
     // ========================================================================
     try {
       assertWeekUnlocked(chosenSlot.week_number, state.slots, state.completedSlots)
+      console.log('[start-from-progress] STEP 2b — week lock OK, week', chosenSlot.week_number, 'is unlocked')
     } catch (lockErr: any) {
       if (lockErr.code === 'WEEK_LOCKED') {
-        console.warn('[start-from-progress] Week lock rejected:', lockErr.message)
+        console.warn('[start-from-progress] REJECTED — WEEK_LOCKED:', lockErr.message)
         return NextResponse.json({
           error: 'WEEK_LOCKED',
           message: lockErr.message,
@@ -161,7 +192,6 @@ export async function POST(request: NextRequest) {
     // ========================================================================
     
     // 3a. Check workout_sessions for in-progress session
-    console.log('[start-from-progress] Checking for in-progress sessions by program day...')
     const { data: inProgressSession, error: sessionError } = await supabaseAuth
       .from('workout_sessions')
       .select('id, assignment_id, status, started_at, program_assignment_id, program_schedule_id')
@@ -172,31 +202,73 @@ export async function POST(request: NextRequest) {
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    console.log('[start-from-progress] STEP 3a — in-progress session check:', {
+      program_schedule_id: programScheduleId,
+      program_assignment_id: programAssignmentId,
+      session_error: sessionError ?? null,
+      found_session: !!inProgressSession,
+      session_id: inProgressSession?.id ?? null,
+      session_assignment_id: inProgressSession?.assignment_id ?? null,
+      session_status: inProgressSession?.status ?? null,
+      session_started_at: inProgressSession?.started_at ?? null,
+    })
     
     if (sessionError) {
       console.error('[start-from-progress] Error checking sessions:', sessionError)
     } else if (inProgressSession) {
-      console.log('[start-from-progress] REUSED existing in-progress session:', inProgressSession.id)
-      
-      return NextResponse.json({
-        workout_assignment_id: inProgressSession.assignment_id,
-        template_id: templateId,
-        week_number: chosenSlot.week_number,
-        day_position: dayPosition,
-        position_label: positionLabel,
-        program_assignment_id: programAssignmentId,
-        program_schedule_id: programScheduleId,
-        reused_existing: true,
-        reuse_reason: 'in_progress_session_by_program_day',
-        session_id: inProgressSession.id,
-      })
+      // ── Stale session guard (Fix 4) ─────────────────────────────────────────
+      // If the session is older than 24 hours it was abandoned. Close it and
+      // let a fresh session be created. Do NOT write to program_day_completions
+      // — an abandoned workout does not count as a real completion.
+      const SESSION_STALE_MS = 24 * 60 * 60 * 1000 // 24 hours
+      const sessionAge = Date.now() - new Date(inProgressSession.started_at).getTime()
+      const isStale = sessionAge > SESSION_STALE_MS
+
+      if (isStale) {
+        const ageHours = (sessionAge / 1000 / 60 / 60).toFixed(1)
+        console.log(
+          `[start-from-progress] Auto-closing stale session ${inProgressSession.id}` +
+          ` (started ${inProgressSession.started_at}, age: ${ageHours}h)`
+        )
+
+        // Close the session row
+        await supabaseAdmin
+          .from('workout_sessions')
+          .update({ status: 'completed', completed_at: inProgressSession.started_at })
+          .eq('id', inProgressSession.id)
+
+        // Close the matching incomplete workout_log (mark as abandoned at start time)
+        if (inProgressSession.assignment_id) {
+          await supabaseAdmin
+            .from('workout_logs')
+            .update({ completed_at: inProgressSession.started_at })
+            .eq('workout_assignment_id', inProgressSession.assignment_id)
+            .eq('client_id', clientId)
+            .is('completed_at', null)
+        }
+        // Fall through — create a fresh session below
+      } else {
+        console.log('[start-from-progress] REUSING in-progress session →', inProgressSession.assignment_id)
+        return NextResponse.json({
+          workout_assignment_id: inProgressSession.assignment_id,
+          template_id: templateId,
+          week_number: chosenSlot.week_number,
+          day_position: dayPosition,
+          position_label: positionLabel,
+          program_assignment_id: programAssignmentId,
+          program_schedule_id: programScheduleId,
+          reused_existing: true,
+          reuse_reason: 'in_progress_session_by_program_day',
+          session_id: inProgressSession.id,
+        })
+      }
     }
     
     // 3b. Check workout_logs for incomplete log
-    console.log('[start-from-progress] Checking for incomplete workout_logs by program day...')
     const { data: incompleteLog, error: logError } = await supabaseAuth
       .from('workout_logs')
-      .select('id, workout_assignment_id, started_at, program_assignment_id, program_schedule_id')
+      .select('id, workout_assignment_id, started_at, program_assignment_id, program_schedule_id, completed_at')
       .eq('client_id', clientId)
       .eq('program_assignment_id', programAssignmentId)
       .eq('program_schedule_id', programScheduleId)
@@ -204,30 +276,60 @@ export async function POST(request: NextRequest) {
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    console.log('[start-from-progress] STEP 3b — incomplete log check:', {
+      program_schedule_id: programScheduleId,
+      program_assignment_id: programAssignmentId,
+      log_error: logError ?? null,
+      found_log: !!incompleteLog,
+      log_id: incompleteLog?.id ?? null,
+      log_workout_assignment_id: incompleteLog?.workout_assignment_id ?? null,
+      log_started_at: incompleteLog?.started_at ?? null,
+      log_completed_at: incompleteLog?.completed_at ?? null,
+      log_program_assignment_id: incompleteLog?.program_assignment_id ?? null,
+      log_program_schedule_id: incompleteLog?.program_schedule_id ?? null,
+    })
     
     if (logError) {
       console.error('[start-from-progress] Error checking logs:', logError)
     } else if (incompleteLog) {
-      console.log('[start-from-progress] REUSED existing incomplete log:', incompleteLog.id)
-      
-      return NextResponse.json({
-        workout_assignment_id: incompleteLog.workout_assignment_id,
-        template_id: templateId,
-        week_number: chosenSlot.week_number,
-        day_position: dayPosition,
-        position_label: positionLabel,
-        program_assignment_id: programAssignmentId,
-        program_schedule_id: programScheduleId,
-        reused_existing: true,
-        reuse_reason: 'incomplete_log_by_program_day',
-      })
+      // ── Stale log guard (Fix 4) ──────────────────────────────────────────────
+      // Same 24-hour threshold applied to orphaned workout_logs that have no
+      // matching in-progress session (session was already closed or never created).
+      const LOG_STALE_MS = 24 * 60 * 60 * 1000
+      const logAge = Date.now() - new Date(incompleteLog.started_at).getTime()
+      const isLogStale = logAge > LOG_STALE_MS
+
+      if (isLogStale) {
+        const ageHours = (logAge / 1000 / 60 / 60).toFixed(1)
+        console.log(
+          `[start-from-progress] Auto-closing stale log ${incompleteLog.id}` +
+          ` (started ${incompleteLog.started_at}, age: ${ageHours}h)`
+        )
+        await supabaseAdmin
+          .from('workout_logs')
+          .update({ completed_at: incompleteLog.started_at })
+          .eq('id', incompleteLog.id)
+        // Fall through — create fresh session/log below
+      } else {
+        console.log('[start-from-progress] REUSING incomplete log →', incompleteLog.workout_assignment_id)
+        return NextResponse.json({
+          workout_assignment_id: incompleteLog.workout_assignment_id,
+          template_id: templateId,
+          week_number: chosenSlot.week_number,
+          day_position: dayPosition,
+          position_label: positionLabel,
+          program_assignment_id: programAssignmentId,
+          program_schedule_id: programScheduleId,
+          reused_existing: true,
+          reuse_reason: 'incomplete_log_by_program_day',
+        })
+      }
     }
     
     // ========================================================================
     // STEP 4: No existing workout for this program day — create new
     // ========================================================================
-    console.log('[start-from-progress] No existing workout for this program day, creating new...')
-    
     // Get template info for naming
     const { data: template, error: templateError } = await supabaseAuth
       .from('workout_templates')
@@ -314,17 +416,7 @@ export async function POST(request: NextRequest) {
     } else {
       newLog = logData
     }
-    
-    console.log('[start-from-progress] CREATED new workout for program day:', {
-      workout_assignment_id: newAssignment.id,
-      workout_session_id: newSession?.id,
-      workout_log_id: newLog?.id,
-      template_id: templateId,
-      program_assignment_id: programAssignmentId,
-      program_schedule_id: programScheduleId,
-      name: workoutName,
-    })
-    
+
     // ========================================================================
     // STEP 5: Return the new assignment info
     // ========================================================================

@@ -267,51 +267,13 @@ export function useGreetingContext(userId: string) {
   }
 }
 
-// Hook for managing greeting auto-refresh
+// Hook for managing greeting auto-refresh (load-once: no polling)
 export function useGreetingAutoRefresh(
-  userContext: UserContext | null,
-  refreshCallback: () => void
+  _userContext: UserContext | null,
+  _refreshCallback: () => void
 ) {
-  const [isActive, setIsActive] = useState(false)
-  const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null)
-
-  useEffect(() => {
-    if (!userContext?.preferences?.autoRefresh) {
-      setIsActive(false)
-      if (intervalId) {
-        clearInterval(intervalId)
-        setIntervalId(null)
-      }
-      return
-    }
-
-    const interval = userContext.preferences.refreshInterval * 60 * 1000 // Convert minutes to milliseconds
-    
-    setIsActive(true)
-    const id = setInterval(() => {
-      refreshCallback()
-    }, interval)
-    
-    setIntervalId(id)
-
-    return () => {
-      if (id) {
-        clearInterval(id)
-        setIntervalId(null)
-      }
-    }
-  }, [userContext?.preferences?.autoRefresh, userContext?.preferences?.refreshInterval, refreshCallback])
-
-  const toggleAutoRefresh = useCallback(() => {
-    if (userContext?.preferences) {
-      // This would need to be connected to the preferences hook
-      // For now, we'll just toggle the local state
-      setIsActive(!isActive)
-    }
-  }, [userContext, isActive])
-
   return {
-    isActive,
-    toggleAutoRefresh
+    isActive: false,
+    toggleAutoRefresh: () => {}
   }
 }

@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { withTimeout } from '@/lib/withTimeout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -78,6 +79,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
 
   const [foods, setFoods] = useState<Food[]>([])
   const [loading, setLoading] = useState(true)
+  const loadingRef = useRef(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedSource, setSelectedSource] = useState('all')
@@ -143,13 +145,18 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
   }, [])
 
   const loadFoods = async () => {
+    if (loadingRef.current) return
+    loadingRef.current = true
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      setLoading(true)
+      await withTimeout(
+        (async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
 
-      try {
-        const { data, error } = await supabase
-          .from('foods')
+          try {
+            const { data, error } = await supabase
+              .from('foods')
           .select('*')
           .eq('is_active', true)
           .order('name')
@@ -158,7 +165,6 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
 
         setFoods(data || [])
       } catch (dbError) {
-        console.log('Database not ready, using localStorage fallback')
         const savedFoods = localStorage.getItem(`foods_${user.id}`)
         if (savedFoods) {
           setFoods(JSON.parse(savedFoods))
@@ -249,10 +255,15 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
           localStorage.setItem(`foods_${user.id}`, JSON.stringify(sampleFoods))
         }
       }
+        })(),
+        45000,
+        'loadFoods'
+      )
     } catch (error) {
       console.error('Error loading foods:', error)
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
   }
 
@@ -340,7 +351,7 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
                 <div className="flex items-center gap-3 sm:gap-4">
                   <Button
                     variant="ghost"
-                    onClick={() => router.push('/coach')}
+                    onClick={() => router.push('/coach/nutrition')}
                     className="fc-btn fc-btn-ghost h-10 w-10"
                   >
                     <ArrowLeft className="w-5 h-5" />
@@ -384,26 +395,6 @@ export default function OptimizedFoodDatabase({ }: OptimizedFoodDatabaseProps) {
       </div>
 
       <div className="p-4 sm:p-6">
-        {/* Action Buttons */}
-        <div className="flex flex-col gap-3 mb-5">
-          <div className="flex gap-3">
-            <Button
-              onClick={loadFoods}
-              className="fc-btn fc-btn-ghost flex-1 flex items-center justify-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </Button>
-            <Button
-              onClick={() => setShowAddForm(true)}
-              className="fc-btn fc-btn-primary flex-1 flex items-center justify-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Food
-            </Button>
-          </div>
-        </div>
-
         {/* Stats Overview */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
           <div className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)] text-center p-5">

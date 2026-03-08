@@ -407,7 +407,6 @@ export default function ExerciseCard({
         }`}>
           <Button
             variant="outline"
-            size="sm"
             onClick={(e) => {
               e.stopPropagation()
               onEdit(exercise)
@@ -419,12 +418,11 @@ export default function ExerciseCard({
           </Button>
           <Button
             variant="outline"
-            size="sm"
             onClick={(e) => {
               e.stopPropagation()
               onDelete(exercise.id)
             }}
-            className="text-red-600 hover:text-red-700"
+            className="min-w-11 min-h-11 text-red-600 hover:text-red-700"
           >
             <Trash2 className="w-3 h-3" />
           </Button>

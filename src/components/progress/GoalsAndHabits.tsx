@@ -256,7 +256,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
     setLoadingGoals(true);
     try {
       const dbGoalData = uiGoalToDB(newGoal, user.id);
-      const created = await GoalsService.createGoal(user.id, dbGoalData);
+      const created = await GoalsService.createGoal(user.id, { ...dbGoalData, pillar: "training" });
 
       if (created) {
         setGoals([...goals, dbGoalToUI(created)]);
@@ -767,7 +767,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
       {/* ========== CREATE GOAL MODAL ========== */}
       {showCreateGoal && (
         <div
-          className="fixed inset-0 z-[9999] flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
           onClick={() => setShowCreateGoal(false)}
         >
           <div
@@ -1294,7 +1294,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
       {/* ========== LOG HABIT MODAL ========== */}
       {showLogHabit && (
         <div
-          className="fixed inset-0 z-[9999] flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
           onClick={() => setShowLogHabit(false)}
         >
           <div
@@ -1616,7 +1616,7 @@ export function GoalsAndHabits({ loading = false }: GoalsAndHabitsProps) {
       {/* Goal Details Modal - Simplified, no manual updates since it's auto-tracked */}
       {selectedGoal && (
         <div
-          className="fixed inset-0 z-[9999] flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
           onClick={() => setSelectedGoal(null)}
         >
           <div

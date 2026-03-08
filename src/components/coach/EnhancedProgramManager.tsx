@@ -53,6 +53,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProgramProgressionService } from "@/lib/programProgressionService";
 import ProgramProgressionRulesEditor from "@/components/coach/ProgramProgressionRulesEditor";
+import { useToast } from "@/components/ui/toast-provider";
 
 interface Program {
   id: string;
@@ -95,6 +96,7 @@ export default function EnhancedProgramManager({
   coachId,
 }: EnhancedProgramManagerProps) {
   const { getThemeStyles } = useTheme();
+  const { addToast } = useToast();
   const theme = getThemeStyles();
   const { user } = useAuth();
 
@@ -121,6 +123,11 @@ export default function EnhancedProgramManager({
     useState<Program | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  // Replace active program confirmation (clients with existing active program)
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
+  const [replaceConfirmList, setReplaceConfirmList] = useState<
+    { client_id: string; program_name: string }[]
+  >([]);
 
   // Load assignment counts for all programs
   const loadProgramAssignmentCounts = useCallback(async () => {
@@ -218,11 +225,11 @@ export default function EnhancedProgramManager({
           console.log("🔧 Program deleted successfully");
           loadData(); // Reload the data to refresh the list
         } else {
-          alert("Failed to delete program. Please try again.");
+          addToast({ title: "Failed to delete program. Please try again.", variant: "destructive" });
         }
       } catch (error) {
         console.error("Error deleting program:", error);
-        alert("Error deleting program. Please try again.");
+        addToast({ title: "Error deleting program. Please try again.", variant: "destructive" });
       }
     }
   };
@@ -285,7 +292,7 @@ export default function EnhancedProgramManager({
           );
 
           if (availableClients.length === 0) {
-            alert("All clients already have this program assigned!");
+            addToast({ title: "All clients already have this program assigned!", variant: "destructive" });
             setShowAssignmentModal(false);
             return;
           }
@@ -302,7 +309,7 @@ export default function EnhancedProgramManager({
         }
       } catch (error) {
         console.error("Error loading clients:", error);
-        alert("Error loading clients. Please try again.");
+        addToast({ title: "Error loading clients. Please try again.", variant: "destructive" });
         // Don't return here, let the modal show even if clients fail to load
       }
     }
@@ -346,6 +353,30 @@ export default function EnhancedProgramManager({
     });
 
     return count;
+  };
+
+  const doAssignAndClose = async () => {
+    if (!selectedProgramForAssignment || selectedClients.length === 0) return;
+    try {
+      const assigned = await assignProgramToClients(
+        selectedProgramForAssignment.id,
+        selectedClients,
+        user?.id || ""
+      );
+      addToast({
+        title: `Program assigned to ${assigned} client(s) successfully!`,
+        variant: "success",
+      });
+      setShowAssignmentModal(false);
+      setShowReplaceConfirm(false);
+      setReplaceConfirmList([]);
+      setSelectedProgramForAssignment(null);
+      setSelectedClients([]);
+      setAssignNotes("");
+    } catch (error) {
+      console.error("Error assigning program:", error);
+      addToast({ title: "Error assigning program. Please try again.", variant: "destructive" });
+    }
   };
 
   if (loading) {
@@ -622,26 +653,21 @@ export default function EnhancedProgramManager({
                       <Button
                         onClick={async () => {
                           if (selectedClients.length === 0) {
-                            alert("Please select at least one client.");
+                            addToast({ title: "Please select at least one client.", variant: "destructive" });
                             return;
                           }
 
                           try {
-                            const assigned = await assignProgramToClients(
-                              selectedProgramForAssignment.id,
-                              selectedClients,
-                              user?.id || ""
-                            );
-                            alert(
-                              `Program assigned to ${assigned} client(s) successfully!`
-                            );
-                            setShowAssignmentModal(false);
-                            setSelectedProgramForAssignment(null);
-                            setSelectedClients([]);
-                            setAssignNotes("");
+                            const withActive = await WorkoutTemplateService.getClientsWithActiveProgram(selectedClients);
+                            if (withActive.length > 0) {
+                              setReplaceConfirmList(withActive);
+                              setShowReplaceConfirm(true);
+                              return;
+                            }
+                            await doAssignAndClose();
                           } catch (error) {
                             console.error("Error assigning program:", error);
-                            alert("Error assigning program. Please try again.");
+                            addToast({ title: "Error assigning program. Please try again.", variant: "destructive" });
                           }
                         }}
                         disabled={selectedClients.length === 0}
@@ -660,6 +686,61 @@ export default function EnhancedProgramManager({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Replace active program confirmation */}
+      {showReplaceConfirm && replaceConfirmList.length > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            inset: "0",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            padding: "16px",
+          }}
+        >
+          <div
+            className="fc-surface"
+            style={{
+              maxWidth: "28rem",
+              width: "100%",
+              padding: "24px",
+              borderRadius: "12px",
+            }}
+          >
+            <h3 className="text-lg font-semibold text-[color:var(--fc-text-primary)] mb-2">
+              Replace active program?
+            </h3>
+            <p className="text-sm text-[color:var(--fc-text-dim)] mb-4">
+              {replaceConfirmList.length === 1 && selectedClients.length === 1
+                ? `This client currently has an active program: "${replaceConfirmList[0].program_name}". Assigning a new program will deactivate it. Continue?`
+                : `${replaceConfirmList.length} of ${selectedClients.length} selected client(s) have an active program. Assigning will deactivate those programs. Continue?`}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowReplaceConfirm(false);
+                  setReplaceConfirmList([]);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => doAssignAndClose()}
+                style={{
+                  backgroundColor: "#6C5CE7",
+                  color: "#FFFFFF",
+                }}
+              >
+                Replace Program
+              </Button>
             </div>
           </div>
         </div>
@@ -1124,6 +1205,21 @@ export default function EnhancedProgramManager({
                   console.log("🔧 Create result:", newProgram);
                   if (!newProgram) throw new Error("Failed to create program");
                   programId = newProgram.id;
+
+                  // Auto-create implicit training block for new programs
+                  try {
+                    const { TrainingBlockService } = await import("@/lib/trainingBlockService");
+                    await TrainingBlockService.createTrainingBlock({
+                      program_id: newProgram.id,
+                      name: `${finalProgramData.name} - Phase 1`,
+                      goal: "custom",
+                      duration_weeks: finalProgramData.duration_weeks ?? 4,
+                      block_order: 1,
+                      progression_profile: "none",
+                    });
+                  } catch (blockErr) {
+                    console.warn("Could not create implicit training block:", blockErr);
+                  }
                 }
 
                 // Save schedule using only columns that exist in DB (program_id, day_of_week, week_number, template_id)
@@ -1447,7 +1543,7 @@ export default function EnhancedProgramManager({
                 setEditingProgram(null);
               } catch (error) {
                 console.error("❌ Error saving program:", error);
-                alert("Error saving program. Please try again.");
+                addToast({ title: "Error saving program. Please try again.", variant: "destructive" });
               }
             }}
             onClose={() => {
@@ -2114,6 +2210,7 @@ function ProgramCreateForm({
   onClose,
   onTemplatesUpdate,
 }: ProgramCreateFormProps) {
+  const { addToast } = useToast();
   const [formData, setFormData] = useState({
     name: program?.name || "",
     description: program?.description || "",
@@ -2160,7 +2257,6 @@ function ProgramCreateForm({
     exercise_type: string;
     superset_exercise_id: string;
     superset_reps: string;
-    circuit_exercises: any[];
     giant_set_exercises: any[];
     tabata_exercises: any[];
     rounds: number;
@@ -2185,7 +2281,6 @@ function ProgramCreateForm({
     exercise_type: "straight_set",
     superset_exercise_id: "",
     superset_reps: "",
-    circuit_exercises: [],
     giant_set_exercises: [],
     tabata_exercises: [],
     rounds: 8,
@@ -2333,7 +2428,7 @@ function ProgramCreateForm({
 
       if (templateError || !newTemplate) {
         console.error("Failed to create new template:", templateError);
-        alert("Failed to create replacement template. Please try again.");
+        addToast({ title: "Failed to create replacement template. Please try again.", variant: "destructive" });
         return;
       }
 
@@ -2385,13 +2480,6 @@ function ProgramCreateForm({
               config?.giant_set_exercises?.length > 0
             ) {
               exerciseData.giant_set_exercises = config.giant_set_exercises;
-            }
-
-            if (
-              config?.exercise_type === "circuit" &&
-              config?.circuit_exercises?.length > 0
-            ) {
-              exerciseData.circuit_exercises = config.circuit_exercises;
             }
 
             if (
@@ -2462,7 +2550,6 @@ function ProgramCreateForm({
               superset_exercise_id: exercise.superset_exercise_id,
               superset_reps: exercise.superset_reps,
               giant_set_exercises: exercise.giant_set_exercises,
-              circuit_exercises: exercise.circuit_exercises,
               tabata_exercises: exercise.tabata_exercises,
               drop_percentage: exercise.drop_percentage,
               drop_set_reps: exercise.drop_set_reps,
@@ -2551,7 +2638,7 @@ function ProgramCreateForm({
 
       if (error) {
         console.error("Failed to update program schedule:", error);
-        alert("Failed to save exercise replacement. Please try again.");
+        addToast({ title: "Failed to save exercise replacement. Please try again.", variant: "destructive" });
         return;
       }
 
@@ -2603,9 +2690,10 @@ function ProgramCreateForm({
       );
     } catch (error) {
       console.error("Error in handleReplaceExercise:", error);
-      alert(
-        "An error occurred while replacing the exercise. Please try again."
-      );
+      addToast({
+        title: "An error occurred while replacing the exercise. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -3020,7 +3108,7 @@ function ProgramCreateForm({
   }, [program?.id]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-[9999]">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[9999]">
       <Card className="fc-surface max-w-2xl w-full h-[88vh] max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
         <div
           className="flex-shrink-0 p-6 border-b border-[color:var(--fc-glass-border)]"
@@ -3496,7 +3584,6 @@ function ProgramCreateForm({
                                       exercise_type: "straight_set",
             superset_exercise_id: "",
             superset_reps: "",
-            circuit_exercises: [],
             giant_set_exercises: [],
             tabata_exercises: [],
             rounds: 8,
@@ -3540,7 +3627,6 @@ function ProgramCreateForm({
                   exercise_type: "straight_set",
                   superset_exercise_id: "",
                   superset_reps: "",
-                  circuit_exercises: [],
                   giant_set_exercises: [],
                   tabata_exercises: [],
                   rounds: 8,
@@ -3585,7 +3671,6 @@ function ProgramCreateForm({
                     exercise_type: "straight_set",
                     superset_exercise_id: "",
                     superset_reps: "",
-                    circuit_exercises: [],
                     giant_set_exercises: [],
                     tabata_exercises: [],
                     rounds: 8,
@@ -3643,7 +3728,7 @@ function ProgramCreateForm({
                 >
                   <div className="font-medium">{ex.name}</div>
                   {ex.description && (
-                    <div className="text-sm text-gray-600">{ex.description}</div>
+                    <div className="text-sm fc-text-dim">{ex.description}</div>
                   )}
                 </div>
               ))}

@@ -84,19 +84,6 @@ export interface Achievement {
   created_at: string
 }
 
-export interface Session {
-  id: string
-  coach_id: string
-  client_id: string
-  title: string
-  description?: string
-  scheduled_at: string
-  duration_minutes: number
-  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
-  created_at: string
-  client_profile?: Profile
-}
-
 // Database functions
 export class DatabaseService {
   // Profile functions
@@ -114,11 +101,9 @@ export class DatabaseService {
       if (error) {
         // Handle specific error cases
         if (error.code === 'PGRST116') {
-          console.log('Profile not found for user:', userId)
           // Only try to create profile if this is the current user
           const { data: authUser } = await supabase.auth.getUser()
           if (authUser?.user?.id === userId && authUser?.user?.email) {
-            console.log('Creating profile for current user:', userId)
             return await this.createProfile(userId, authUser.user.email, 'client')
           }
           // Don't try to create profile for other users due to RLS restrictions
@@ -374,34 +359,6 @@ export class DatabaseService {
       return data || []
     } catch (error) {
       console.error('Unexpected error fetching achievements:', error)
-      return []
-    }
-  }
-
-  // Session functions (for coaches)
-  static async getTodaysSessions(coachId: string): Promise<Session[]> {
-    try {
-      // Ensure user is authenticated before querying
-      await ensureAuthenticated()
-      
-      const today = new Date().toISOString().split('T')[0]
-      
-      const { data, error } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('coach_id', coachId)
-        .gte('scheduled_at', `${today}T00:00:00`)
-        .lt('scheduled_at', `${today}T23:59:59`)
-        .order('scheduled_at', { ascending: true })
-
-      if (error) {
-        console.error('Error fetching today\'s sessions:', error)
-        return []
-      }
-
-      return data || []
-    } catch (error) {
-      console.error('Unexpected error fetching today\'s sessions:', error)
       return []
     }
   }

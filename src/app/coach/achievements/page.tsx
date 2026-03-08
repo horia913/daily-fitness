@@ -449,7 +449,6 @@ export default function CoachAchievements() {
         .eq('status', 'active')
 
       if (clientsError) {
-        console.log('Clients error:', clientsError)
         setClients([])
       } else if (clientsData && clientsData.length > 0) {
         const clientIds = clientsData.map(c => c.client_id)
@@ -476,7 +475,6 @@ export default function CoachAchievements() {
             .order('achieved_at', { ascending: false })
 
           if (achievementsError) {
-            console.log('Achievements table error:', achievementsError)
             setClientAchievements([])
           } else if (achievementsData) {
             const achievementsWithClients = achievementsData.map(achievement => ({
@@ -486,8 +484,7 @@ export default function CoachAchievements() {
 
             setClientAchievements(achievementsWithClients)
           }
-        } catch (error) {
-          console.log('Achievements table error:', error)
+        } catch {
           setClientAchievements([])
         }
       } else {
@@ -863,13 +860,7 @@ export default function CoachAchievements() {
               setShowCreateTemplate(open && showCreateTemplate)
               setShowEditTemplate(open && showEditTemplate)
             }}>
-              <DialogContent className={`${theme.card} ${theme.shadow} rounded-2xl border-0 shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[85vh] !w-[min(650px,95vw)] !m-0 !p-0 overflow-hidden`} style={{
-                backgroundColor: theme.card.includes('dark') ? '#1E1E1E' : '#FFFFFF',
-                border: theme.card.includes('dark') ? '1px solid #374151' : '1px solid #E5E7EB',
-                boxShadow: theme.card.includes('dark') 
-                  ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05)' 
-                  : '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-              }}>
+              <DialogContent className="fc-surface rounded-2xl border border-[color:var(--fc-glass-border)] shadow-2xl !fixed !top-1/2 !left-1/2 !transform !-translate-x-1/2 !-translate-y-1/2 !z-[9999] !max-w-[95vw] !max-h-[85vh] !w-[min(650px,95vw)] !m-0 !p-0 overflow-hidden">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                   <DialogHeader className="space-y-3">
                     <DialogTitle className={`text-2xl font-bold ${theme.text} leading-tight`}>

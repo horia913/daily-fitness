@@ -126,29 +126,6 @@ export class WorkoutGroupService {
         }
         break
 
-      case 'circuit':
-        // Insert ALL exercises from circuit_sets
-        if (exerciseData.circuit_sets && Array.isArray(exerciseData.circuit_sets)) {
-          exerciseData.circuit_sets.forEach((set: any) => {
-            if (set.exercises && Array.isArray(set.exercises)) {
-              set.exercises.forEach((ex: any, index: number) => {
-                exerciseRows.push({
-                  template_id: templateId,
-                  exercise_id: ex.exercise_id,
-                  group_id: groupId,
-                  group_letter: String.fromCharCode(65 + index),
-                  work_seconds: ex.work_seconds ? parseInt(ex.work_seconds) : undefined,
-                  rest_seconds: ex.rest_seconds ? parseInt(ex.rest_seconds) : undefined,
-                  sets: ex.sets ? parseInt(ex.sets) : undefined,
-                  reps: ex.reps || null,
-                  notes: ex.notes || null
-                })
-              })
-            }
-          })
-        }
-        break
-
       case 'tabata':
         // Insert exercises from tabata_sets
         if (exerciseData.tabata_sets && Array.isArray(exerciseData.tabata_sets)) {
@@ -189,25 +166,6 @@ export class WorkoutGroupService {
         }
         break
 
-      case 'pyramid_set':
-        // Insert same exercise multiple times with progressive weights/reps
-        if (exerciseData.exercise_id) {
-          const pyramids = exerciseData.pyramid_sets || []
-          pyramids.forEach((pyramid: any, index: number) => {
-            exerciseRows.push({
-              template_id: templateId,
-              exercise_id: exerciseData.exercise_id,
-              group_id: groupId,
-              group_letter: undefined,
-              weight_kg: pyramid.weight_kg || null,
-              reps: pyramid.reps || null,
-              rest_seconds: pyramid.rest_seconds ? parseInt(pyramid.rest_seconds) : undefined,
-              notes: pyramid.notes || exerciseData.notes || null
-            })
-          })
-        }
-        break
-
       case 'pre_exhaustion':
         // Insert 2 exercises (isolation then compound)
         if (exerciseData.exercise_id && exerciseData.compound_exercise_id) {
@@ -240,7 +198,6 @@ export class WorkoutGroupService {
       case 'amrap':
       case 'emom':
       case 'for_time':
-      case 'ladder':
         // Insert exercises (can be multiple for AMRAP/EMOM)
         const exerciseList = exerciseData.amrap_exercises || exerciseData.emom_exercises || []
         

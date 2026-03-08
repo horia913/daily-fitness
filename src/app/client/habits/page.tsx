@@ -10,7 +10,8 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Flame, Target, CheckCircle, Plus, BarChart3, ChevronDown, LayoutGrid } from 'lucide-react'
+import { Flame, Target, CheckCircle, Plus, BarChart3, ChevronDown, LayoutGrid, Repeat } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { supabase } from '@/lib/supabase'
 import { withTimeout } from '@/lib/withTimeout'
 
@@ -280,7 +281,7 @@ export default function ClientHabitsPage() {
     if (streak >= 21) return 'text-yellow-600 bg-yellow-50 border-yellow-200'
     if (streak >= 7) return 'text-orange-600 bg-orange-50 border-orange-200'
     if (streak >= 3) return 'text-green-600 bg-green-50 border-green-200'
-    return 'text-slate-600 bg-slate-50 border-slate-200'
+    return 'text-[color:var(--fc-text-dim)] bg-[color:var(--fc-glass-highlight)] border-[color:var(--fc-glass-border)]'
   }
 
   if (loading) {
@@ -288,7 +289,7 @@ export default function ClientHabitsPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <GlassCard elevation={2} className="fc-glass fc-card p-8">
               <div className="animate-pulse space-y-6">
                 <div className="h-20 rounded-2xl bg-[color:var(--fc-glass-highlight)]"></div>
@@ -311,7 +312,7 @@ export default function ClientHabitsPage() {
       <ProtectedRoute requiredRole="client">
         <AnimatedBackground>
           {performanceSettings.floatingParticles && <FloatingParticles />}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 lg:px-10">
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-32 pt-10 sm:px-6 lg:px-10">
             <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center">
               <p className="text-[color:var(--fc-text-dim)] mb-4">{loadError}</p>
               <Button type="button" onClick={() => { setLoadError(null); setLoading(true); loadHabits(); }} className="fc-btn fc-btn-primary">
@@ -346,7 +347,7 @@ export default function ClientHabitsPage() {
           <header>
             <div className="flex justify-between items-start gap-4 mb-6">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight fc-text-primary">
+                <h1 className="text-2xl font-bold tracking-tight fc-text-primary">
                   Daily Habits
                 </h1>
                 <p className="text-sm fc-text-dim mt-1">
@@ -442,14 +443,12 @@ export default function ClientHabitsPage() {
                 ))}
               </div>
             ) : (
-              <GlassCard elevation={2} className="fc-glass fc-card p-8 text-center rounded-2xl">
-                <Target className="w-12 h-12 mx-auto mb-4 fc-text-subtle" />
-                <h3 className="text-lg font-bold fc-text-primary mb-2">No habits yet</h3>
-                <p className="text-sm fc-text-dim mb-6">Get started by adding a habit to track.</p>
-                <Button className="fc-btn fc-btn-primary">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add habit
-                </Button>
+              <GlassCard elevation={2} className="fc-glass fc-card p-8 rounded-2xl">
+                <EmptyState
+                  icon={Repeat}
+                  title="No habits yet"
+                  description="Assign habits to start tracking."
+                />
               </GlassCard>
             )}
           </section>

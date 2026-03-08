@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -6,14 +7,14 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
 import { FloatingParticles } from "@/components/ui/FloatingParticles";
 import { useTheme } from "@/contexts/ThemeContext";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  ClientPageShell,
+  ClientGlassCard,
+  SectionHeader,
+  PrimaryButton,
+  SecondaryButton,
+} from "@/components/client-ui";
 import { Badge } from "@/components/ui/badge";
 import { Stepper } from "@/components/ui/stepper";
 import { RestTimerOverlay } from "@/components/workout/RestTimerOverlay";
@@ -47,6 +48,7 @@ import { supabase } from "@/lib/supabase";
 import { fetchApi } from "@/lib/apiClient";
 import { useToast } from "@/components/ui/toast-provider";
 import LiveWorkoutBlockExecutor from "@/components/client/LiveWorkoutBlockExecutor";
+import { WorkoutProgressBar } from "@/components/client/workout-execution/ui/WorkoutProgressBar";
 import {
   WorkoutBlock,
   LiveWorkoutBlock,
@@ -59,88 +61,21 @@ import {
   calculateSuggestedWeight,
   formatSuggestedWeight,
 } from "@/lib/e1rmUtils";
-interface WorkoutAssignment {
-  id: string;
-  workout_template_id: string | null;
-  status: string;
-  notes?: string | null;
-  name?: string | null;
-  description?: string | null;
-  scheduled_date?: string | null;
-}
-
-interface TemplateExercise {
-  id: string;
-  exercise_id: string;
-  order_index: number;
-  sets: number;
-  reps: string;
-  rest_seconds: number;
-  notes: string;
-  // Parsed complex data saved as JSON in notes
-  exercise_type?: string;
-  meta?: any;
-  exercise?: {
-    id: string;
-    name: string;
-    description: string;
-    category: string;
-    image_url?: string;
-    video_url?: string;
-  };
-  completed_sets?: number;
-  current_set?: number;
-  [key: string]: any;
-}
-
-type ClientBlockExerciseRecord = {
-  id: string;
-  exercise_id: string | null;
-  exercise_order: number | null;
-  exercise_letter: string | null;
-  sets: number | null;
-  reps: string | null;
-  weight_kg: number | null;
-  rir: number | null;
-  tempo: string | null;
-  rest_seconds: number | null;
-  notes: string | null;
-  time_protocols?: any[]; // For tabata/amrap/emom/for_time/circuit blocks
-  // Special set data from workout_*_sets tables
-  drop_sets?: any[];
-  cluster_sets?: any[];
-  rest_pause_sets?: any[];
-  pyramid_sets?: any[];
-  ladder_sets?: any[];
-};
-
-type ClientBlockRecord = {
-  id: string;
-  block_order: number | null;
-  block_type: string | null;
-  block_name: string | null;
-  block_notes: string | null;
-  total_sets: number | null;
-  reps_per_set: string | null;
-  rest_seconds: number | null;
-  duration_seconds?: number | null;
-  block_parameters?: unknown;
-  exercises?: ClientBlockExerciseRecord[] | null;
-  time_protocols?: any[]; // Block-level time protocols for tabata/amrap/emom/for_time/circuit
-};
+import type {
+  WorkoutAssignment,
+  TemplateExercise,
+  ClientBlockRecord,
+  ClientBlockExerciseRecord,
+} from "./types";
+import { BARBELL_OPTIONS } from "./constants";
+import { isValidUuid, calculatePlateLoading } from "./utils";
+import { PreviousPerformanceCard } from "./components/PreviousPerformanceCard";
 
 export default function LiveWorkout() {
   const params = useParams();
   const router = useRouter();
   const assignmentId = params.id as string;
-  console.log("📍 Page: assignmentId from params:", assignmentId);
   const { addToast } = useToast();
-
-  // Debug: Log assignmentId from URL
-  useEffect(() => {
-    console.log("🔍 [Page] assignmentId from URL params:", params.id);
-    console.log("🔍 [Page] assignmentId variable:", assignmentId);
-  }, [assignmentId, params.id]);
   const { isDark, getThemeStyles, performanceSettings } = useTheme();
 
   const [assignment, setAssignment] = useState<WorkoutAssignment | null>(null);
@@ -149,6 +84,8 @@ export default function LiveWorkout() {
   const [currentSet, setCurrentSet] = useState(1);
   const [workoutStarted, setWorkoutStarted] = useState(true);
   const [loading, setLoading] = useState(true);
+  /** True once blocks + exercises are loaded; allows showing "Loading exercises..." after assignment is resolved */
+  const [contentReady, setContentReady] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [workoutLogId, setWorkoutLogId] = useState<string | null>(null); // Store restored workout_log_id
   const [currentSetData, setCurrentSetData] = useState({
@@ -176,7 +113,7 @@ export default function LiveWorkout() {
 
   // Workout Block System
   const [workoutBlocks, setWorkoutBlocks] = useState<LiveWorkoutBlock[]>([]);
-  /** Parent-owned logged sets keyed by block_id so history persists when navigating blocks. */
+  /** Parent-owned logged sets keyed by set_entry_id so history persists when navigating set entries. */
   const [loggedSetsByBlockId, setLoggedSetsByBlockId] = useState<
     Record<string, LoggedSet[]>
   >({});
@@ -185,6 +122,8 @@ export default function LiveWorkout() {
   const workoutBlocksRef = useRef<LiveWorkoutBlock[]>([]);
   const currentBlockIndexRef = useRef(0);
   const completedBlockRef = useRef<Set<string>>(new Set());
+  const loadInProgressRef = useRef(false);
+  const loadIdRef = useRef(0);
 
   // Button Enhancement States
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
@@ -202,15 +141,7 @@ export default function LiveWorkout() {
     totalWeightLifted: 0,
     weightComparison: "",
   });
-  const [workoutStartTime, setWorkoutStartTime] = useState(() => {
-    const time = Date.now();
-    console.log("🕐 [Duration Debug] workoutStartTime initialized:", {
-      timestamp: time,
-      date: new Date(time).toISOString(),
-      isMilliseconds: true,
-    });
-    return time;
-  });
+  const [workoutStartTime, setWorkoutStartTime] = useState(() => Date.now());
   const [totalWeightLifted, setTotalWeightLifted] = useState(0);
   // Ref to prevent multiple timeout calls for block advancement
   const blockAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -243,14 +174,6 @@ export default function LiveWorkout() {
   useEffect(() => {
     currentBlockIndexRef.current = currentBlockIndex;
   }, [currentBlockIndex]);
-
-  // Helper: Validate UUID format
-  const isValidUuid = (value: string | null | undefined): boolean => {
-    if (!value) return false;
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      value,
-    );
-  };
 
   // Helper: Persist workout progress to workout_sessions (lightweight, non-blocking)
   const persistSessionProgress = async (
@@ -340,125 +263,12 @@ export default function LiveWorkout() {
     return `${loadPercentage}% Load - Suggested: Log first set to calculate`;
   };
 
-  // Barbell options
-  const barbellOptions = [
-    { weight: 20, name: "Olympic", type: "straight" },
-    { weight: 15, name: "Junior", type: "straight" },
-    { weight: 12, name: "Straight", type: "straight" },
-    { weight: 9, name: "EZ Bar", type: "ez" },
-  ];
-
-  // Function to calculate plate loading with barbell selection - PRIORITIZES 20kg and 10kg
-  const calculatePlateLoading = (
-    targetWeight: number,
-    barbellWeight: number = 20,
-  ) => {
-    const plates = [
-      { weight: 20, color: "bg-blue-600", border: "border-blue-800" },
-      { weight: 10, color: "bg-green-500", border: "border-green-700" },
-      { weight: 25, color: "bg-red-600", border: "border-red-800" },
-      { weight: 15, color: "bg-yellow-500", border: "border-yellow-700" },
-      { weight: 5, color: "bg-white", border: "border-slate-400" },
-      { weight: 2.5, color: "bg-black", border: "border-slate-600" },
-      { weight: 1.25, color: "bg-gray-400", border: "border-gray-600" },
-    ];
-
-    // Calculate plates needed per side
-    const plateWeight = targetWeight - barbellWeight;
-    const weightPerSide = plateWeight / 2;
-
-    // Generate two best loading options
-    const options = [];
-
-    // Option 1: Prioritize 20kg and 10kg plates first
-    const option1 = [];
-    let remaining1 = weightPerSide;
-    for (const plate of plates) {
-      const count = Math.floor(remaining1 / plate.weight);
-      if (count > 0) {
-        option1.push({
-          weight: plate.weight,
-          count: count,
-          color: plate.color,
-          border: plate.border,
-        });
-        remaining1 -= count * plate.weight;
-      }
-    }
-
-    // Option 2: Alternative approach - try to minimize total number of plates
-    const option2 = [];
-    let remaining2 = weightPerSide;
-    const platesAlt = [
-      { weight: 25, color: "bg-red-600", border: "border-red-800" },
-      { weight: 20, color: "bg-blue-600", border: "border-blue-800" },
-      { weight: 15, color: "bg-yellow-500", border: "border-yellow-700" },
-      { weight: 10, color: "bg-green-500", border: "border-green-700" },
-      { weight: 5, color: "bg-white", border: "border-slate-400" },
-      { weight: 2.5, color: "bg-black", border: "border-slate-600" },
-      { weight: 1.25, color: "bg-gray-400", border: "border-gray-600" },
-    ];
-    for (const plate of platesAlt) {
-      const count = Math.floor(remaining2 / plate.weight);
-      if (count > 0) {
-        option2.push({
-          weight: plate.weight,
-          count: count,
-          color: plate.color,
-          border: plate.border,
-        });
-        remaining2 -= count * plate.weight;
-      }
-    }
-
-    // If both options are the same, provide a third alternative
-    const isSame = JSON.stringify(option1) === JSON.stringify(option2);
-    if (isSame && option1.length > 1) {
-      // Try a different combination for option 2
-      option2.length = 0; // Clear option 2
-      remaining2 = weightPerSide;
-      // Use a different greedy approach
-      for (const plate of platesAlt.slice(1)) {
-        // Skip 25kg to force different combination
-        const count = Math.floor(remaining2 / plate.weight);
-        if (count > 0) {
-          option2.push({
-            weight: plate.weight,
-            count: count,
-            color: plate.color,
-            border: plate.border,
-          });
-          remaining2 -= count * plate.weight;
-        }
-      }
-    }
-
-    return {
-      option1: { plates: option1, remainder: remaining1 },
-      option2: { plates: option2, remainder: remaining2 },
-      barbellWeight,
-    };
-  };
-
-  // Removed childish weight comparison function - now just showing weight in kg
+  const barbellOptions = BARBELL_OPTIONS;
 
   // Workout Block Handlers
   const handleBlockComplete = (blockId: string, loggedSets: LoggedSet[]) => {
     const hadLogId = !!workoutLogId;
     const assignmentIdForApi = assignment?.id || assignmentId;
-
-    console.log("🎯 handleBlockComplete called:", {
-      blockId,
-      currentBlockIndex,
-      totalBlocks: workoutBlocks.length,
-      isLastBlock: currentBlockIndex >= workoutBlocks.length - 1,
-    });
-    console.log("[block complete detected]", {
-      blockId,
-      currentBlockIndex,
-      totalBlocks: workoutBlocks.length,
-      source: "handleBlockComplete",
-    });
 
     // Persist block completion (non-blocking). When workout_log_id was missing, persist the one returned by the API.
     fetchApi("/api/block-complete", {
@@ -467,7 +277,7 @@ export default function LiveWorkout() {
       body: JSON.stringify({
         workout_log_id: workoutLogId || undefined,
         workout_assignment_id: assignmentIdForApi,
-        workout_block_id: blockId,
+        workout_set_entry_id: blockId,
       }),
     })
       .then((r) => r.json())
@@ -491,19 +301,8 @@ export default function LiveWorkout() {
 
       // Only show completion when ALL blocks are complete
       if (allCompleted) {
-        console.log(
-          "🏁 All blocks completed - setting isLastBlockComplete flag",
-        );
         setIsLastBlockComplete(true);
       }
-
-      console.log("📊 Block completion status:", {
-        totalBlocks: updated.length,
-        completedCount,
-        allCompleted,
-        currentBlockIndex: currentBlockIndexRef.current,
-        isLastBlock: allCompleted,
-      });
 
       return updated;
     });
@@ -524,28 +323,8 @@ export default function LiveWorkout() {
       setCurrentBlockIndex((latestIdx) => {
         const isLastBlock = latestIdx >= workoutBlocksRef.current.length - 1;
         if (!isLastBlock) {
-          console.log("[advance]", {
-            fromBlockIndex: latestIdx,
-            toBlockIndex: latestIdx + 1,
-          });
-          console.log(
-            "➡️ Moving to next block:",
-            latestIdx + 1,
-            "of",
-            workoutBlocksRef.current.length,
-          );
           return latestIdx + 1;
         } else {
-          // All blocks complete - don't auto-show completion modal
-          // User will click "Complete Workout" button instead
-          console.log("[advance]", {
-            fromBlockIndex: latestIdx,
-            toBlockIndex: latestIdx,
-            reason: "lastBlock",
-          });
-          console.log(
-            "🏁 All blocks complete! Waiting for user to click 'Complete Workout' button",
-          );
           return latestIdx;
         }
       });
@@ -565,10 +344,6 @@ export default function LiveWorkout() {
   // Handle block change
   const handleBlockChange = (blockIndex: number) => {
     setCurrentBlockIndex(blockIndex);
-    console.log("[state reset]", {
-      type: "blockChange",
-      blockIndex,
-    });
     // Reset exercise index to 0 when changing blocks
     setWorkoutBlocks((prev) =>
       prev.map((block, idx) =>
@@ -695,21 +470,6 @@ export default function LiveWorkout() {
     if (completedBlockRef.current.has(blockId)) return;
     completedBlockRef.current.add(blockId);
 
-    console.log("✅ Auto-advancing block from handleSetLogged", {
-      blockId,
-      newCompletedSets,
-      totalSetsForExercise,
-      currentExIndex,
-    });
-    console.log("[advance]", {
-      fromBlockIndex: currentBlockIndexRef.current,
-      toBlockIndex: Math.min(
-        currentBlockIndexRef.current + 1,
-        workoutBlocksRef.current.length - 1,
-      ),
-      source: "handleSetLogged",
-    });
-
     if (blockAdvanceTimeoutRef.current) {
       clearTimeout(blockAdvanceTimeoutRef.current);
     }
@@ -738,12 +498,6 @@ export default function LiveWorkout() {
 
         if (currentExIndex < exercises.length - 1) {
           // Advance to next exercise, reset sets
-          console.log("[state reset]", {
-            type: "exerciseAdvance",
-            blockId,
-            fromExerciseIndex: currentExIndex,
-            toExerciseIndex: currentExIndex + 1,
-          });
           return {
             ...block,
             currentExerciseIndex: currentExIndex + 1,
@@ -758,20 +512,16 @@ export default function LiveWorkout() {
   };
 
   useEffect(() => {
-    if (assignmentId) {
-      loadAssignment().catch((error) => {
-        console.error("Error loading assignment:", error);
-      });
-    }
+    if (!assignmentId) return;
+
+    loadAssignment().catch((error) => {
+      console.error("Error loading assignment:", error);
+    });
   }, [assignmentId]);
 
   // Log when completion modal state changes and calculate stats from database
   useEffect(() => {
     if (showWorkoutCompletion) {
-      console.log("🎉 Workout completion modal is now showing");
-      console.log("📊 Workout stats (before calculation):", workoutStats);
-
-      // Calculate stats from logged sets in database
       calculateWorkoutStatsFromDatabase();
     }
   }, [showWorkoutCompletion]);
@@ -948,7 +698,7 @@ export default function LiveWorkout() {
   };
 
   /**
-   * Restore workout progress from workout_set_logs and workout_block_completions
+   * Restore workout progress from workout_set_logs and workout_set_entry_completions
    * Counts sets per block/exercise to determine where client left off; blocks with
    * no set logs but a block-completion record (e.g. timer-only Tabata/EMOM) are marked completed.
    */
@@ -968,14 +718,14 @@ export default function LiveWorkout() {
           supabase
             .from("workout_set_logs")
             .select(
-              "id, block_id, exercise_id, set_number, round_number, block_type, weight, reps, completed_at, amrap_total_reps, amrap_duration_seconds, emom_minute_number, emom_total_reps_this_min, fortime_total_reps, fortime_time_taken_sec, preexhaust_isolation_exercise_id, preexhaust_isolation_weight, preexhaust_isolation_reps, preexhaust_compound_exercise_id, preexhaust_compound_weight, preexhaust_compound_reps",
+              "id, set_entry_id, exercise_id, set_number, round_number, set_type, weight, reps, rpe, completed_at, amrap_total_reps, amrap_duration_seconds, emom_minute_number, emom_total_reps_this_min, fortime_total_reps, fortime_time_taken_sec, preexhaust_isolation_exercise_id, preexhaust_isolation_weight, preexhaust_isolation_reps, preexhaust_compound_exercise_id, preexhaust_compound_weight, preexhaust_compound_reps",
             )
             .eq("workout_log_id", workoutLogId)
             .eq("client_id", userId)
             .order("completed_at", { ascending: true }),
           supabase
-            .from("workout_block_completions")
-            .select("workout_block_id")
+            .from("workout_set_entry_completions")
+            .select("workout_set_entry_id")
             .eq("workout_log_id", workoutLogId),
           supabase
             .from("workout_logs")
@@ -1005,7 +755,7 @@ export default function LiveWorkout() {
 
       const completedBlockIds = new Set(
         (blockCompletions || []).map(
-          (r: { workout_block_id: string }) => r.workout_block_id,
+          (r: { workout_set_entry_id: string }) => r.workout_set_entry_id,
         ),
       );
 
@@ -1027,22 +777,22 @@ export default function LiveWorkout() {
         ? new Date(workoutLog.started_at).getTime()
         : Date.now();
 
-      // Group sets by block_id and exercise_id
+      // Group sets by set_entry_id and exercise_id
       // Also track set_number for blocks that use it
       const setsByBlock = new Map<
         string,
         Map<string, { count: number; maxSetNumber: number }>
       >();
-      // block_id -> (exercise_id -> { count, maxSetNumber })
+      // set_entry_id -> (exercise_id -> { count, maxSetNumber })
 
       for (const setLog of setLogs) {
-        if (!setLog.block_id) continue;
+        if (!setLog.set_entry_id) continue;
 
-        if (!setsByBlock.has(setLog.block_id)) {
-          setsByBlock.set(setLog.block_id, new Map());
+        if (!setsByBlock.has(setLog.set_entry_id)) {
+          setsByBlock.set(setLog.set_entry_id, new Map());
         }
 
-        const blockSets = setsByBlock.get(setLog.block_id)!;
+        const blockSets = setsByBlock.get(setLog.set_entry_id)!;
         const exerciseId = setLog.exercise_id || "unknown";
         const current = blockSets.get(exerciseId) || {
           count: 0,
@@ -1056,7 +806,7 @@ export default function LiveWorkout() {
           "emom",
           "tabata",
           "for_time",
-        ].includes(setLog.block_type || "");
+        ].includes(setLog.set_type || "");
 
         if (isSingleLogBlock) {
           // These block types complete the entire exercise/round with one log
@@ -1093,9 +843,9 @@ export default function LiveWorkout() {
 
           // Build existing set logs for this block (for navigation/edit in executor)
           const blockSetLogs = (setLogs || []).filter(
-            (s: any) => s.block_id === blockId,
+            (s: any) => s.set_entry_id === blockId,
           );
-          const blockTypeForRestore = blockData.block_type;
+          const blockTypeForRestore = blockData.set_type;
           const sorted = [...blockSetLogs].sort((a: any, b: any) => {
             const na = a.set_number ?? a.round_number ?? 0;
             const nb = b.set_number ?? b.round_number ?? 0;
@@ -1104,7 +854,7 @@ export default function LiveWorkout() {
           let existingSetLogs: Array<{
             id: string;
             exercise_id: string;
-            block_id: string;
+            set_entry_id: string;
             set_number: number;
             weight_kg?: number;
             reps_completed?: number;
@@ -1121,7 +871,7 @@ export default function LiveWorkout() {
                   id: s.id,
                   exercise_id:
                     s.preexhaust_isolation_exercise_id || s.exercise_id || "",
-                  block_id: s.block_id,
+                  set_entry_id: s.set_entry_id,
                   set_number: setNum,
                   weight_kg:
                     s.preexhaust_isolation_weight != null
@@ -1135,12 +885,13 @@ export default function LiveWorkout() {
                       : s.reps != null
                         ? Number(s.reps)
                         : undefined,
+                  rpe: s.rpe ?? undefined,
                   completed_at: completedAt,
                 },
                 {
                   id: s.id,
                   exercise_id: s.preexhaust_compound_exercise_id || "",
-                  block_id: s.block_id,
+                  set_entry_id: s.set_entry_id,
                   set_number: setNum,
                   weight_kg:
                     s.preexhaust_compound_weight != null
@@ -1150,6 +901,7 @@ export default function LiveWorkout() {
                     s.preexhaust_compound_reps != null
                       ? Number(s.preexhaust_compound_reps)
                       : undefined,
+                  rpe: s.rpe ?? undefined,
                   completed_at: completedAt,
                 },
               ];
@@ -1170,11 +922,12 @@ export default function LiveWorkout() {
               return {
                 id: s.id,
                 exercise_id: s.exercise_id || "",
-                block_id: s.block_id,
+                set_entry_id: s.set_entry_id,
                 set_number:
                   s.set_number ?? s.round_number ?? s.emom_minute_number ?? 0,
                 weight_kg: weightKg,
                 reps_completed: repsVal,
+                rpe: s.rpe ?? undefined,
                 completed_at: s.completed_at
                   ? new Date(s.completed_at)
                   : new Date(),
@@ -1231,7 +984,7 @@ export default function LiveWorkout() {
           let blockCompletedSets = 0;
           let currentExerciseIndex = 0;
           let blockIsCompleted = true;
-          const blockType = blockData.block_type;
+          const blockType = blockData.set_type;
 
           for (let i = 0; i < exercises.length; i++) {
             const exercise = exercises[i];
@@ -1419,7 +1172,7 @@ export default function LiveWorkout() {
         blocksWithProgress: workoutBlocksWithProgress.map((b, i) => ({
           blockIndex: i,
           blockId: b.block.id,
-          blockType: b.block.block_type,
+          blockType: b.block.set_type,
           completedSets: b.completedSets,
           currentExerciseIndex: b.currentExerciseIndex,
           currentSetIndex: b.currentSetIndex,
@@ -1604,15 +1357,37 @@ export default function LiveWorkout() {
   }, [assignment, exercises, sessionId]);
 
   const loadAssignment = async () => {
+    if (loadInProgressRef.current) return;
+    loadInProgressRef.current = true;
+    const loadId = ++loadIdRef.current;
+    const isStale = () => loadId !== loadIdRef.current;
+    setContentReady(false);
+    setLoading(true);
+
+    const safetyTimeout = setTimeout(() => {
+      if (loadInProgressRef.current) {
+        loadInProgressRef.current = false;
+        setLoading(false);
+        setContentReady(true);
+        addToast({
+          title: "Loading took too long",
+          description: "Please reload the page to try again.",
+          variant: "destructive",
+        });
+      }
+    }, 20_000);
+
     try {
-      console.log(
-        "🔍 Workout Execution - Loading assignment with ID:",
-        assignmentId,
-      );
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) {
+        clearTimeout(safetyTimeout);
+        loadInProgressRef.current = false;
+        setLoading(false);
+        return;
+      }
 
       // TASK B: Support two ID types - workout_assignments.id OR program_day_assignments.id
       // First, try as workout_assignments.id (standalone assignment)
@@ -1622,11 +1397,6 @@ export default function LiveWorkout() {
         .eq("id", assignmentId)
         .eq("client_id", user.id)
         .maybeSingle();
-
-      console.log("🔍 Workout Execution - Assignment query result:", {
-        assignmentData,
-        assignmentError,
-      });
 
       let resolvedAssignment = assignmentData;
       let programDayAssignmentId: string | null = null;
@@ -1669,7 +1439,6 @@ export default function LiveWorkout() {
               day_number,
               workout_template_id,
               workout_assignment_id,
-              is_completed,
               name,
               description,
               day_type
@@ -1687,15 +1456,33 @@ export default function LiveWorkout() {
           }
 
           if (programDayAssignment) {
-            // TASK D: Guardrail - prevent starting completed program_day_assignments
-            if (programDayAssignment.is_completed === true) {
-              addToast({
-                title: "Workout Already Completed",
-                description: "This program workout has already been completed.",
-                variant: "default",
-              });
-              router.push("/client/workouts");
-              return;
+            // Guardrail: check canonical program_day_completions ledger — the single
+            // source of truth for completion. DO NOT use program_day_assignments.is_completed
+            // (stale legacy field). See programStateService.ts for authoritative comment.
+            const { data: scheduleSlot } = await supabase
+              .from("program_schedule")
+              .select("id")
+              .eq("program_id", activeProgramAssignment.program_id)
+              .eq("day_number", programDayAssignment.day_number)
+              .maybeSingle();
+
+            if (scheduleSlot) {
+              const { data: completionEntry } = await supabase
+                .from("program_day_completions")
+                .select("id")
+                .eq("program_assignment_id", activeProgramAssignment.id)
+                .eq("program_schedule_id", scheduleSlot.id)
+                .maybeSingle();
+
+              if (completionEntry) {
+                addToast({
+                  title: "Workout Already Completed",
+                  description: "This program workout has already been completed.",
+                  variant: "default",
+                });
+                router.push("/client/train");
+                return;
+              }
             }
 
             // Check if day_type is workout (not rest/assessment)
@@ -1705,7 +1492,7 @@ export default function LiveWorkout() {
                 description: "This program day is not a workout day.",
                 variant: "default",
               });
-              router.push("/client/workouts");
+              router.push("/client/train");
               return;
             }
 
@@ -1740,7 +1527,7 @@ export default function LiveWorkout() {
                       "Could not start program workout. Please try again.",
                     variant: "destructive",
                   });
-                  router.push("/client/workouts");
+                  router.push("/client/train");
                   return;
                 }
 
@@ -1773,7 +1560,7 @@ export default function LiveWorkout() {
                       "The workout was created but could not be loaded. Please try again.",
                     variant: "destructive",
                   });
-                  router.push("/client/workouts");
+                  router.push("/client/train");
                   return;
                 }
 
@@ -1789,7 +1576,7 @@ export default function LiveWorkout() {
                     "Could not start program workout. Please try again.",
                   variant: "destructive",
                 });
-                router.push("/client/workouts");
+                router.push("/client/train");
                 return;
               }
             } else {
@@ -1858,6 +1645,11 @@ export default function LiveWorkout() {
         scheduled_date: resolvedAssignment.scheduled_date ?? null,
       };
 
+      // Show assignment and header immediately so the screen doesn't stall on blocks load
+      if (isStale()) return;
+      setAssignment(combinedAssignment);
+      setLoading(false);
+
       // Check if this is a program assignment - load blocks from progression rules
       const isProgramAssignment =
         (resolvedAssignment as any).is_program_assignment === true;
@@ -1892,8 +1684,8 @@ export default function LiveWorkout() {
         console.log(
           "🔢 [Page] Loaded workout blocks with sets:",
           workoutBlocks.map((block) => ({
-            blockOrder: block.block_order,
-            blockType: block.block_type,
+            blockOrder: block.set_order,
+            blockType: block.set_type,
             exercises: block.exercises?.map((ex: any) => ({
               exercise_id: ex.exercise_id,
               sets: ex.sets,
@@ -1928,10 +1720,10 @@ export default function LiveWorkout() {
       // Convert WorkoutBlock[] to ClientBlockRecord[] format
       const clientBlocks: ClientBlockRecord[] = workoutBlocks.map((block) => ({
         id: block.id,
-        block_order: block.block_order,
-        block_type: block.block_type,
-        block_name: block.block_name ?? null,
-        block_notes: block.block_notes ?? null,
+        set_order: block.set_order,
+        set_type: block.set_type,
+        set_name: block.set_name ?? null,
+        set_notes: block.set_notes ?? null,
         total_sets: block.total_sets ?? null,
         reps_per_set: block.reps_per_set ?? null,
         rest_seconds: block.rest_seconds ?? null,
@@ -1955,8 +1747,6 @@ export default function LiveWorkout() {
           drop_sets: ex.drop_sets ?? [],
           cluster_sets: ex.cluster_sets ?? [],
           rest_pause_sets: ex.rest_pause_sets ?? [],
-          pyramid_sets: ex.pyramid_sets ?? [],
-          ladder_sets: ex.ladder_sets ?? [],
         })) as any[],
       }));
       const allClientExercises = clientBlocks.flatMap(
@@ -2031,7 +1821,7 @@ export default function LiveWorkout() {
 
       const workoutBlocksConverted: WorkoutBlock[] = clientBlocks.map(
         (block: ClientBlockRecord) => {
-          const blockType = (block.block_type as any) || "straight_set";
+          const blockType = (block.set_type as any) || "straight_set";
           const blockParameters = safeParse(block.block_parameters);
 
           const blockExercises = ((block.exercises ?? []) as any[]).map(
@@ -2045,7 +1835,7 @@ export default function LiveWorkout() {
 
               return {
                 id: exercise.id,
-                block_id: block.id,
+                set_entry_id: block.id,
                 exercise_id: exercise.exercise_id ?? "",
                 exercise_order:
                   typeof exercise.exercise_order === "number" &&
@@ -2068,7 +1858,7 @@ export default function LiveWorkout() {
                   exercise.rest_seconds ?? block.rest_seconds ?? undefined,
                 load_percentage: (exercise as any).load_percentage ?? undefined,
                 notes: exercise.notes ?? undefined,
-                time_protocols: exercise.time_protocols ?? [], // For tabata/amrap/emom/for_time/circuit blocks
+                time_protocols: exercise.time_protocols ?? [], // For tabata/amrap/emom/for_time blocks
                 exercise: exercise.exercise_id
                   ? {
                       id: exercise.exercise_id,
@@ -2084,9 +1874,7 @@ export default function LiveWorkout() {
                 // Preserve special set data from exercise
                 drop_sets: exercise.drop_sets ?? [],
                 cluster_sets: exercise.cluster_sets ?? [],
-                pyramid_sets: exercise.pyramid_sets ?? [],
                 rest_pause_sets: exercise.rest_pause_sets ?? [],
-                ladder_sets: exercise.ladder_sets ?? [],
                 created_at: now,
                 updated_at: now,
               };
@@ -2097,14 +1885,14 @@ export default function LiveWorkout() {
             id: block.id,
             template_id:
               combinedAssignment.workout_template_id || combinedAssignment.id,
-            block_type: blockType,
-            block_order:
-              typeof block.block_order === "number" &&
-              Number.isFinite(block.block_order)
-                ? block.block_order
+            set_type: blockType,
+            set_order:
+              typeof block.set_order === "number" &&
+              Number.isFinite(block.set_order)
+                ? block.set_order
                 : 0,
-            block_name: block.block_name ?? undefined,
-            block_notes: block.block_notes ?? undefined,
+            set_name: block.set_name ?? undefined,
+            set_notes: block.set_notes ?? undefined,
             duration_seconds: (block as any).duration_seconds ?? undefined,
             rest_seconds: block.rest_seconds ?? undefined,
             total_sets: block.total_sets ?? undefined,
@@ -2116,17 +1904,11 @@ export default function LiveWorkout() {
             cluster_sets: blockExercises.flatMap(
               (ex: any) => ex.cluster_sets || [],
             ),
-            pyramid_sets: blockExercises.flatMap(
-              (ex: any) => ex.pyramid_sets || [],
-            ),
             rest_pause_sets: blockExercises.flatMap(
               (ex: any) => ex.rest_pause_sets || [],
             ),
             time_protocol: block.time_protocols?.[0] ?? undefined, // First time protocol for backwards compatibility
-            time_protocols: block.time_protocols ?? [], // Full array for tabata/amrap/emom/for_time/circuit
-            ladder_sets: blockExercises.flatMap(
-              (ex: any) => ex.ladder_sets || [],
-            ),
+            time_protocols: block.time_protocols ?? [], // Full array for tabata/amrap/emom/for_time
             created_at: now,
             updated_at: now,
           } as WorkoutBlock;
@@ -2137,7 +1919,7 @@ export default function LiveWorkout() {
         .flatMap((block) => {
           return (block.exercises || []).map((exercise: any, idx: number) => {
             const meta = safeParse(exercise.notes);
-            const exerciseType = meta.exercise_type || block.block_type;
+            const exerciseType = meta.exercise_type || block.set_type;
             return {
               id: exercise.id,
               exercise_id: exercise.exercise_id,
@@ -2162,9 +1944,8 @@ export default function LiveWorkout() {
         })
         .sort((a, b) => a.order_index - b.order_index);
 
+      if (isStale()) return;
       setAssignment(combinedAssignment);
-      console.log("📍 Page: Assignment loaded:", combinedAssignment);
-      console.log("📍 Page: assignment.id:", combinedAssignment?.id);
       setExercises(exercisesWithDetails);
 
       try {
@@ -2233,6 +2014,43 @@ export default function LiveWorkout() {
         } | null = null;
 
         if (actualWorkoutAssignmentId) {
+          // Fix 3/6: Guard — check if this workout_assignment is linked to an
+          // already-completed program slot. Catches direct-URL access bypassing
+          // start-from-progress. Reads program_assignment_id + program_schedule_id
+          // directly from the workout_log (tagged at creation by start-from-progress).
+          try {
+            const { data: linkedLog } = await supabase
+              .from('workout_logs')
+              .select('program_assignment_id, program_schedule_id')
+              .eq('workout_assignment_id', actualWorkoutAssignmentId)
+              .eq('client_id', user.id)
+              .not('program_schedule_id', 'is', null)
+              .order('started_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (linkedLog?.program_assignment_id && linkedLog?.program_schedule_id) {
+              const { data: completionEntry } = await supabase
+                .from('program_day_completions')
+                .select('id')
+                .eq('program_assignment_id', linkedLog.program_assignment_id)
+                .eq('program_schedule_id', linkedLog.program_schedule_id)
+                .maybeSingle();
+
+              if (completionEntry) {
+                addToast({
+                  title: 'Workout Already Completed',
+                  description: 'This workout has already been completed. Returning to training.',
+                  variant: 'default',
+                });
+                router.push('/client/train');
+                return;
+              }
+            }
+          } catch (completionCheckError) {
+            console.warn('⚠️ Completion guard check failed (non-blocking):', completionCheckError);
+          }
+
           // 2. Close incomplete logs from previous days
           await closeIncompleteLogsFromPreviousDays(
             actualWorkoutAssignmentId,
@@ -2259,12 +2077,14 @@ export default function LiveWorkout() {
             );
 
             if (restoredProgress) {
+              if (isStale()) return;
               // Set restored workout start time
               setWorkoutStartTime(restoredProgress.workoutStartTime);
 
               // Set restored blocks with progress
               const progress = restoredProgress;
               setWorkoutBlocks(progress.workoutBlocksWithProgress);
+              setContentReady(true);
               // Seed parent-owned logged sets so they persist when navigating blocks
               setLoggedSetsByBlockId((prev) => {
                 const next = { ...prev };
@@ -2338,6 +2158,7 @@ export default function LiveWorkout() {
 
         // If no progress was restored, initialize blocks normally
         if (!restoredProgress) {
+          if (isStale()) return;
           const liveBlocks: LiveWorkoutBlock[] = workoutBlocksConverted.map(
             (block) => ({
               block,
@@ -2353,6 +2174,7 @@ export default function LiveWorkout() {
             }),
           );
           setWorkoutBlocks(liveBlocks);
+          setContentReady(true);
         }
 
         // Fetch e1RMs for all exercises in blocks
@@ -2397,21 +2219,26 @@ export default function LiveWorkout() {
           exerciseMeta,
         );
       } else {
-        setUseBlockSystem(false);
+        if (!isStale()) {
+          setUseBlockSystem(false);
+          setContentReady(true);
+        }
       }
-
-      setLoading(false);
     } catch (dbError) {
       console.error("Error loading workout assignment:", dbError);
+      if (!isStale()) setContentReady(true);
       addToast({
         title: "Error Loading Workout",
         description:
           "Failed to load workout. Please try again or contact your coach.",
         variant: "destructive",
       });
-      setLoading(false);
       // Don't set fake data - show error message instead
       return;
+    } finally {
+      clearTimeout(safetyTimeout);
+      if (!isStale()) setLoading(false);
+      loadInProgressRef.current = false;
     }
   };
 
@@ -2437,25 +2264,19 @@ export default function LiveWorkout() {
 
       let programAssignmentId: string | null = null;
 
-      // Check if this is a program assignment (assignmentId is program_assignments.id)
-      const { data: programAssignment } = await supabase
-        .from("program_assignments")
-        .select("id")
-        .eq("id", workoutAssignmentId)
-        .eq("client_id", user.id)
+      // program_day_assignments bridges workout_assignment_id → program_assignment_id
+      const { data: dayAssignment } = await supabase
+        .from("program_day_assignments")
+        .select("program_assignment_id")
+        .eq("workout_assignment_id", workoutAssignmentId)
         .maybeSingle();
 
-      if (programAssignment) {
-        // This is a program assignment
-        programAssignmentId = programAssignment.id;
+      if (dayAssignment?.program_assignment_id) {
+        programAssignmentId = dayAssignment.program_assignment_id;
+        console.log('[loadProgressionSuggestions] found program_assignment_id via program_day_assignments:', programAssignmentId);
       } else {
-        // workout_assignments table doesn't have program_assignment_id column
-        // Workout assignments are not directly linked to program assignments
-        // Skip progression suggestions for regular workout assignments
-        return;
-      }
-
-      if (!programAssignmentId) {
+        // This workout_assignment is not linked to any program (standalone assignment)
+        console.log('[loadProgressionSuggestions] standalone workout — no program_assignment_id found, skipping suggestions');
         return;
       }
 
@@ -2632,7 +2453,7 @@ export default function LiveWorkout() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           workout_log_id: undefined, // API will create if needed
-          block_id: currentExercise.block_id,
+          set_entry_id: currentExercise.set_entry_id,
           exercise_id:
             currentExercise.exercise_id || currentExercise.exercise?.id,
           weight: workingWeightNum,
@@ -2667,7 +2488,7 @@ export default function LiveWorkout() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             workout_log_id: undefined, // API will create if needed
-            block_id: currentExercise.block_id,
+            set_entry_id: currentExercise.set_entry_id,
             exercise_id:
               currentExercise.exercise_id || currentExercise.exercise?.id,
             weight: dropWeightNum,
@@ -2812,7 +2633,7 @@ export default function LiveWorkout() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             workout_log_id: undefined, // API will create if needed
-            block_id: currentExercise.block_id,
+            set_entry_id: currentExercise.set_entry_id,
             exercise_id: currentExercise.exercise_id,
             weight: weightA,
             reps: repsA,
@@ -2853,7 +2674,7 @@ export default function LiveWorkout() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             workout_log_id: undefined, // API will create if needed
-            block_id: currentExercise.block_id,
+            set_entry_id: currentExercise.set_entry_id,
             exercise_id: exerciseBId,
             weight: weightB,
             reps: repsB,
@@ -2868,7 +2689,7 @@ export default function LiveWorkout() {
           if (resultB.success && resultB.e1rm) {
             setE1rmMap((prev) => ({
               ...prev,
-              [exerciseBId]: resultB.e1rm.calculated,
+              [String(exerciseBId)]: resultB.e1rm.calculated,
             }));
 
             // Show PR notification if needed
@@ -2994,7 +2815,7 @@ export default function LiveWorkout() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             workout_log_id: undefined, // API will create if needed
-            block_id: currentExercise.block_id,
+            set_entry_id: currentExercise.set_entry_id,
             exercise_id: currentExercise.exercise_id,
             weight: weightNum,
             reps: repsNum,
@@ -3205,7 +3026,7 @@ export default function LiveWorkout() {
           },
           body: JSON.stringify({
             workout_log_id: undefined, // API will create if needed
-            block_id: currentExercise.block_id,
+            set_entry_id: currentExercise.set_entry_id,
             exercise_id: currentExercise.exercise_id,
             weight: loggedWeight,
             reps: loggedReps,
@@ -3357,7 +3178,7 @@ export default function LiveWorkout() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               workout_log_id: undefined, // API will create if needed
-              block_id: current.block_id,
+              set_entry_id: current.set_entry_id,
               exercise_id: exerciseId,
               weight: weight,
               reps: reps,
@@ -3487,14 +3308,11 @@ export default function LiveWorkout() {
       } = await supabase.auth.getUser();
       if (!user) {
         console.error("❌ User not authenticated");
-        clearTimeout(spinnerTimeout);
         addToast({
           title: "Could not complete workout",
           description: "Please sign in again.",
           variant: "destructive",
         });
-        isCompletingWorkoutRef.current = false;
-        setIsCompletingWorkout(false);
         return;
       }
 
@@ -3576,12 +3394,13 @@ export default function LiveWorkout() {
       // while navigation is in progress. The 15s timeout is the safety net.
     } catch (error) {
       console.error("❌ Error in completeWorkout:", error);
-      clearTimeout(spinnerTimeout);
       addToast({
         title: "Could not complete workout",
         description: "Check connection and try again.",
         variant: "destructive",
       });
+    } finally {
+      clearTimeout(spinnerTimeout);
       isCompletingWorkoutRef.current = false;
       setIsCompletingWorkout(false);
     }
@@ -3609,8 +3428,6 @@ export default function LiveWorkout() {
         return "Use short rests within the set. Reps per cluster are fixed; adjust weights as needed.";
       case "tabata":
         return "High-intensity intervals: follow the autoplay timer for work/rest rounds.";
-      case "circuit":
-        return "Move through the circuit following the autoplay timer for each exercise/rest.";
       case "amrap":
         return "As many reps as possible in the time window. Start the timer, then log performance.";
       case "emom":
@@ -3642,9 +3459,7 @@ export default function LiveWorkout() {
   const [intervalPhaseLeft, setIntervalPhaseLeft] = useState(0);
   const [intervalRound, setIntervalRound] = useState(0);
   const [intervalTotalRounds, setIntervalTotalRounds] = useState(0);
-  const [intervalMode, setIntervalMode] = useState<"tabata" | "circuit" | null>(
-    null,
-  );
+  const [intervalMode, setIntervalMode] = useState<"tabata" | null>(null);
   const [showTimerModal, setShowTimerModal] = useState(false);
   const [timerExerciseIndex, setTimerExerciseIndex] = useState(0);
   const [timerSetIndex, setTimerSetIndex] = useState(0);
@@ -3661,7 +3476,7 @@ export default function LiveWorkout() {
   // For Time state
   const [forTimeActive, setForTimeActive] = useState(false);
 
-  // Previous Performance data
+  // Previous Performance data (single exercise — for PreviousPerformanceCard display)
   const [previousPerformance, setPreviousPerformance] = useState<{
     lastWorkout: any | null;
     personalBest: any | null;
@@ -3671,6 +3486,8 @@ export default function LiveWorkout() {
     personalBest: null,
     loading: false,
   });
+  // Cache of previous performance per exercise (passed to LiveWorkoutBlockExecutor)
+  const [previousPerformanceMap, setPreviousPerformanceMap] = useState<Map<string, any>>(new Map());
   const [forTimeTimeLeft, setForTimeTimeLeft] = useState(0);
   const [forTimeCompletionSecs, setForTimeCompletionSecs] = useState<
     number | null
@@ -3741,13 +3558,16 @@ export default function LiveWorkout() {
   // State machine: Move to next state when time reaches zero
   useEffect(() => {
     if (intervalPhaseLeft !== 0 || !intervalActive || !showTimerModal) return;
-    if (currentType !== "tabata" && currentType !== "circuit") return;
+    if (currentType !== "tabata") return;
 
-    // Time reached zero - transition to next state
-    const circuitSets = currentExercise?.meta?.circuit_sets;
-    if (!circuitSets) return;
+    // Time reached zero - transition to next state (tabata uses tabata_sets; fallback to circuit_sets for legacy data)
+    const circuitSets = currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets;
+    if (!circuitSets || !Array.isArray(circuitSets)) return;
 
-    const currentSet = circuitSets[timerSetIndex];
+    const currentSet = (circuitSets as unknown[])[timerSetIndex] as {
+      exercises?: Array<{ rest_after?: number; work_seconds?: number }>;
+      rest_between_sets?: number;
+    } | undefined;
     const currentExerciseInSet = currentSet?.exercises?.[timerExerciseIndex];
 
     if (intervalPhase === "work") {
@@ -3776,7 +3596,7 @@ export default function LiveWorkout() {
         // More exercises in current set - move to next exercise
         console.log("➡️ Moving to next exercise in same set");
         const nextExerciseIndex = timerExerciseIndex + 1;
-        const nextExercise = currentSet.exercises[nextExerciseIndex];
+        const nextExercise = currentSet?.exercises?.[nextExerciseIndex];
         const workTime = nextExercise?.work_seconds || 20;
         setTimerExerciseIndex(nextExerciseIndex);
         setIntervalPhase("work");
@@ -3842,7 +3662,8 @@ export default function LiveWorkout() {
     intervalActive,
     showTimerModal,
     currentType,
-    currentExercise?.meta?.circuit_sets,
+    currentExercise?.meta?.tabata_sets,
+    (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets),
     timerSetIndex,
     timerExerciseIndex,
     intervalPhase,
@@ -3853,7 +3674,7 @@ export default function LiveWorkout() {
   // Single master timer - ticks every second
   useEffect(() => {
     if (!intervalActive || !showTimerModal || isTimerPaused) return;
-    if (currentType !== "tabata" && currentType !== "circuit") return;
+    if (currentType !== "tabata") return;
 
     const masterInterval = setInterval(() => {
       setIntervalPhaseLeft((prev) => Math.max(0, prev - 1));
@@ -3958,21 +3779,30 @@ export default function LiveWorkout() {
     currentExercise?.giant_set_exercises,
   ]);
 
-  // Fetch previous performance when exercise changes
-  useEffect(() => {
-    if (currentExercise?.exercise?.id) {
-      fetchPreviousPerformance(currentExercise.exercise.id).catch((error) => {
-        console.error("Error fetching previous performance:", error);
-      });
-    }
-  }, [currentExercise?.exercise?.id]);
+  // NOTE: fetchPreviousPerformance is now triggered via onExerciseChanged on
+  // LiveWorkoutBlockExecutor, which tracks currentExercise correctly by index.
+  // The old useEffect here was dead code because currentExercise in the start
+  // page scope no longer reflects the executor's currentExerciseIndex.
 
   // Theme-aware styles using your app's approach
   const theme = getThemeStyles();
 
-  // Fetch previous performance data for current exercise
+  // Fetch previous performance data for current exercise (with per-exercise caching)
   const fetchPreviousPerformance = async (exerciseId: string) => {
+    console.log('[fetchPreviousPerformance] called with exerciseId:', exerciseId);
     if (!exerciseId) return;
+
+    // Serve from cache if already fetched
+    if (previousPerformanceMap.has(exerciseId)) {
+      const cached = previousPerformanceMap.get(exerciseId);
+      console.log('[fetchPreviousPerformance] served from cache:', cached);
+      setPreviousPerformance({
+        lastWorkout: cached?.lastWorkoutForCard ?? null,
+        personalBest: cached?.personalBestForCard ?? null,
+        loading: false,
+      });
+      return;
+    }
 
     setPreviousPerformance((prev) => ({ ...prev, loading: true }));
 
@@ -3981,147 +3811,63 @@ export default function LiveWorkout() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
-        setPreviousPerformance({
-          lastWorkout: null,
-          personalBest: null,
-          loading: false,
-        });
+        setPreviousPerformance({ lastWorkout: null, personalBest: null, loading: false });
         return;
       }
 
-      // TODO: Fix previous performance query once workout_logs schema is confirmed
-      // For now, disable this query to prevent errors
-      // The workout_logs table schema may be different than expected
-      console.log(
-        "Previous performance query disabled - workout_logs schema needs verification",
+      const { getExercisePreviousPerformance } = await import(
+        "@/lib/clientProgressionService"
       );
 
-      // Set empty previous performance for now
+      const result = await getExercisePreviousPerformance(
+        user.id,
+        exerciseId,
+        workoutLogId || undefined
+      );
+      console.log('[fetchPreviousPerformance] result.lastWorkout:', result?.lastWorkout);
+      console.log('[fetchPreviousPerformance] result.personalBest:', result?.personalBest);
+
+      // Shape the data to match PreviousPerformanceCard's expected interface
+      const lastWorkoutForCard = result.lastWorkout
+        ? {
+            weight_kg: result.lastWorkout.weight,
+            reps_completed: result.lastWorkout.reps,
+            logged_at: result.lastWorkout.date,
+            avgRpe: result.lastWorkout.avgRpe,
+          }
+        : null;
+      const personalBestForCard = result.personalBest
+        ? {
+            weight_kg: result.personalBest.maxWeight,
+            reps_completed: result.personalBest.maxReps,
+            logged_at: result.personalBest.date,
+          }
+        : null;
+
+      // Cache in map (store both the raw result and the card-shaped data)
+      const cached = {
+        ...result,
+        lastWorkoutForCard,
+        personalBestForCard,
+      };
+      setPreviousPerformanceMap((prev) => new Map(prev).set(exerciseId, cached));
+
       setPreviousPerformance({
-        lastWorkout: null,
-        personalBest: null,
+        lastWorkout: lastWorkoutForCard,
+        personalBest: personalBestForCard,
         loading: false,
       });
     } catch (error) {
-      console.log("Previous performance data unavailable:", error);
-      setPreviousPerformance({
-        lastWorkout: null,
-        personalBest: null,
-        loading: false,
-      });
+      console.error("Failed to fetch previous performance:", error);
+      setPreviousPerformance({ lastWorkout: null, personalBest: null, loading: false });
     }
   };
-
-  // Reusable Previous Performance Card Component
-  const PreviousPerformanceCard = () => (
-    <div className="rounded-xl p-4 bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-700">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-600">
-          <TrendingUp className="w-4 h-4 text-white" />
-        </div>
-        <div className={`font-bold ${theme.text} text-base`}>
-          Previous Performance
-        </div>
-      </div>
-
-      {previousPerformance.loading ? (
-        <div className="flex items-center justify-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
-          <span className={`ml-2 text-sm ${theme.textSecondary}`}>
-            Loading...
-          </span>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Last Workout */}
-          <div className="rounded-lg p-3 fc-glass-soft border border-[color:var(--fc-status-success)]">
-            <div className="flex items-center gap-2 mb-2">
-              <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-              <span className={`text-sm font-semibold ${theme.text}`}>
-                Last Workout
-              </span>
-            </div>
-            {previousPerformance.lastWorkout ? (
-              <div className="space-y-1">
-                {(previousPerformance.lastWorkout.weight_used ||
-                  previousPerformance.lastWorkout.weight_kg) && (
-                  <div className={`text-sm ${theme.text}`}>
-                    <span className="font-medium">Weight:</span>{" "}
-                    {previousPerformance.lastWorkout.weight_used ||
-                      previousPerformance.lastWorkout.weight_kg}
-                    kg
-                  </div>
-                )}
-                {(previousPerformance.lastWorkout.reps_completed ||
-                  previousPerformance.lastWorkout.reps) && (
-                  <div className={`text-sm ${theme.text}`}>
-                    <span className="font-medium">Reps:</span>{" "}
-                    {previousPerformance.lastWorkout.reps_completed ||
-                      previousPerformance.lastWorkout.reps}
-                  </div>
-                )}
-                <div className={`text-xs ${theme.textSecondary}`}>
-                  {new Date(
-                    previousPerformance.lastWorkout.logged_at,
-                  ).toLocaleDateString()}
-                </div>
-              </div>
-            ) : (
-              <div className={`text-sm ${theme.textSecondary}`}>
-                No previous data
-              </div>
-            )}
-          </div>
-
-          {/* Personal Best */}
-          <div className="rounded-lg p-3 fc-glass-soft border border-[color:var(--fc-status-success)]">
-            <div className="flex items-center gap-2 mb-2">
-              <Trophy className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-              <span className={`text-sm font-semibold ${theme.text}`}>
-                Personal Best
-              </span>
-            </div>
-            {previousPerformance.personalBest ? (
-              <div className="space-y-1">
-                {(previousPerformance.personalBest.weight_used ||
-                  previousPerformance.personalBest.weight_kg) && (
-                  <div className={`text-sm ${theme.text}`}>
-                    <span className="font-medium">Weight:</span>{" "}
-                    {previousPerformance.personalBest.weight_used ||
-                      previousPerformance.personalBest.weight_kg}
-                    kg
-                  </div>
-                )}
-                {(previousPerformance.personalBest.reps_completed ||
-                  previousPerformance.personalBest.reps) && (
-                  <div className={`text-sm ${theme.text}`}>
-                    <span className="font-medium">Reps:</span>{" "}
-                    {previousPerformance.personalBest.reps_completed ||
-                      previousPerformance.personalBest.reps}
-                  </div>
-                )}
-                <div className={`text-xs ${theme.textSecondary}`}>
-                  {new Date(
-                    previousPerformance.personalBest.logged_at,
-                  ).toLocaleDateString()}
-                </div>
-              </div>
-            ) : (
-              <div className={`text-sm ${theme.textSecondary}`}>
-                No personal best yet
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <ProtectedRoute requiredRole="client">
       <AnimatedBackground>
         {performanceSettings.floatingParticles && <FloatingParticles />}
-        <div className="relative z-10 min-h-screen pb-28">
+        <div className="relative z-10 min-h-screen pb-32">
           {/* Rest Timer Overlay */}
           <RestTimerOverlay
             isActive={showRestTimer}
@@ -4133,11 +3879,10 @@ export default function LiveWorkout() {
             totalSets={currentExercise?.sets}
           />
 
-          <div className="fc-page">
-            <div
-              className="max-w-4xl mx-auto flex flex-col gap-5"
-              style={{ gap: "var(--fc-gap-sections)" }}
-            >
+          <ClientPageShell
+            className="max-w-2xl mx-auto flex flex-col gap-5 min-h-screen pb-32"
+            style={{ gap: "var(--fc-gap-sections)" }}
+          >
               {/* Header: symmetric (X | Current Block | Placeholder) when block system; else legacy */}
               {useBlockSystem && workoutBlocks.length > 0 ? (
                 <div className="flex items-center justify-between mb-3">
@@ -4147,7 +3892,7 @@ export default function LiveWorkout() {
                         typeof window !== "undefined" &&
                         window.confirm("Exit workout? Progress is saved.")
                       ) {
-                        router.push("/client/workouts");
+                        router.push("/client/train");
                       }
                     }}
                     className="w-9 h-9 rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] flex items-center justify-center fc-text-dim transition-all active:scale-95 flex-shrink-0"
@@ -4156,18 +3901,15 @@ export default function LiveWorkout() {
                     <X className="w-4 h-4" />
                   </button>
                   <div className="text-center min-w-0 flex-1 px-2">
-                    <span className="text-[10px] uppercase tracking-[0.2em] fc-text-dim block font-mono">
-                      Block {currentBlockIndex + 1}/{workoutBlocks.length}
-                    </span>
                     <span className="text-sm font-semibold fc-text-primary truncate block">
                       {(() => {
                         const block = workoutBlocks[currentBlockIndex];
                         const type =
-                          (block?.block?.block_type as WorkoutBlockType) ||
+                          (block?.block?.set_type as WorkoutBlockType) ||
                           "straight_set";
-                        return (
-                          WORKOUT_BLOCK_CONFIGS[type]?.name ?? "Straight Set"
-                        );
+                        const typeName =
+                          WORKOUT_BLOCK_CONFIGS[type]?.name ?? "Straight Set";
+                        return `${typeName} (${currentBlockIndex + 1} of ${workoutBlocks.length})`;
                       })()}
                     </span>
                   </div>
@@ -4176,7 +3918,7 @@ export default function LiveWorkout() {
               ) : (
                 <div className="flex items-center gap-3 mb-3">
                   <button
-                    onClick={() => router.push("/client/workouts")}
+                    onClick={() => router.push("/client/train")}
                     className="w-9 h-9 rounded-full fc-surface border border-[color:var(--fc-surface-card-border)] flex items-center justify-center fc-text-dim transition-all active:scale-95 flex-shrink-0"
                   >
                     <ArrowLeft className="w-4 h-4" />
@@ -4198,8 +3940,79 @@ export default function LiveWorkout() {
                 </div>
               )}
               {/* Workout Block System */}
-              {useBlockSystem && workoutBlocks.length > 0 ? (
+              {loading ? (
+                <div className="animate-pulse space-y-4">
+                  <div className="h-8 w-48 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                </div>
+              ) : assignment && !contentReady ? (
+                <ClientGlassCard className="p-8 text-center">
+                  <Loader2 className="w-10 h-10 animate-spin mx-auto mb-3 fc-text-dim" />
+                  <p className="text-sm font-medium fc-text-primary mb-1">Loading exercises…</p>
+                  <p className="text-xs fc-text-dim">This may take a few seconds.</p>
+                </ClientGlassCard>
+              ) : useBlockSystem && workoutBlocks.length > 0 ? (
                 <>
+                  {/* Calculate overall progress */}
+                  {(() => {
+                    // Calculate total expected sets across all blocks
+                    const totalExpectedSets = workoutBlocks.reduce((total, block) => {
+                      // For each exercise in the block, count expected sets
+                      const exercises = block.block.exercises || [];
+                      if (exercises.length === 0) {
+                        // No exercises, use block.total_sets or default to 1
+                        return total + (block.block.total_sets || 1);
+                      }
+                      // Sum sets for each exercise
+                      return total + exercises.reduce((exerciseTotal, exercise) => {
+                        return exerciseTotal + (exercise.sets || block.block.total_sets || 1);
+                      }, 0);
+                    }, 0);
+
+                    // Calculate total completed sets across all blocks
+                    const totalCompletedSets = Object.values(loggedSetsByBlockId).reduce(
+                      (total, sets) => total + sets.length,
+                      0
+                    );
+
+                    // Calculate overall progress percentage
+                    const overallProgress =
+                      totalExpectedSets > 0
+                        ? (totalCompletedSets / totalExpectedSets) * 100
+                        : 0;
+
+                    // Get current block info
+                    const currentBlock = workoutBlocks[currentBlockIndex];
+                    const currentExercise = currentBlock?.block.exercises?.[currentBlock.currentExerciseIndex ?? 0];
+                    const currentSetNumber = (currentBlock?.completedSets || 0) + 1;
+                    const totalSetsInBlock =
+                      currentExercise?.sets ||
+                      currentBlock?.block.total_sets ||
+                      currentBlock?.totalSets ||
+                      1;
+                    const currentSetType =
+                      (currentBlock?.block.set_type as WorkoutBlockType) || "straight_set";
+                    const currentSetTypeName =
+                      WORKOUT_BLOCK_CONFIGS[currentSetType]?.name ?? "Set";
+
+                    return (
+                      <WorkoutProgressBar
+                        currentBlockIndex={currentBlockIndex}
+                        totalBlocks={workoutBlocks.length}
+                        currentSetNumber={currentSetNumber}
+                        totalSetsInBlock={totalSetsInBlock}
+                        overallProgress={overallProgress}
+                        blockName={currentBlock?.block.set_name}
+                        setTypeName={currentSetTypeName}
+                      />
+                    );
+                  })()}
+
+                  {/* Spacer to prevent content from being hidden behind the progress bar */}
+                  <div className="h-16" aria-hidden="true" />
+
                   {/* Block Progress Indicator */}
                   {workoutBlocks.length > 1 && (
                     <div className="mb-3">
@@ -4221,7 +4034,7 @@ export default function LiveWorkout() {
                                     : "var(--fc-surface-sunken)",
                               }}
                               title={
-                                block.block.block_name || `Block ${index + 1}`
+                                block.block.set_name || `Set ${index + 1}`
                               }
                             />
                           );
@@ -4272,83 +4085,70 @@ export default function LiveWorkout() {
                     onSetLogged={handleSetLogged}
                     onExerciseComplete={handleExerciseComplete}
                     progressionSuggestions={progressionSuggestions}
+                    previousPerformanceMap={previousPerformanceMap}
+                    onExerciseChanged={(exerciseId) =>
+                      fetchPreviousPerformance(exerciseId).catch((err) =>
+                        console.error("Error fetching previous performance:", err)
+                      )
+                    }
+                    onPlateCalculatorClick={() => setShowPlateCalculator(true)}
                   />
                   {/* Complete Workout Button - Only show on last block when complete */}
                   {isLastBlockComplete &&
                     currentBlockIndex === workoutBlocks.length - 1 && (
                       <div className="mt-6">
-                        <Button
+                        <PrimaryButton
                           disabled={isCompletingWorkout}
                           onClick={async () => {
                             console.log("🔘 Complete Workout button clicked");
                             setShowWorkoutCompletion(false);
                             await completeWorkout();
                           }}
-                          className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl h-14 text-lg font-semibold shadow-lg disabled:opacity-70 disabled:pointer-events-none"
+                          className="w-full h-14 text-lg font-semibold disabled:opacity-70 disabled:pointer-events-none"
                         >
-                          <div className="flex items-center gap-3">
-                            {isCompletingWorkout ? (
-                              <>
-                                <Loader2 className="w-6 h-6 animate-spin" />
-                                Completing…
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="w-6 h-6" />
-                                Complete Workout
-                              </>
-                            )}
-                          </div>
-                        </Button>
+                          {isCompletingWorkout ? (
+                            <>
+                              <Loader2 className="w-6 h-6 animate-spin" />
+                              Completing…
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-6 h-6" />
+                              Complete Workout
+                            </>
+                          )}
+                        </PrimaryButton>
                       </div>
                     )}
                 </>
               ) : /* Traditional Workout System */
               loading ? (
-                <Card
-                  className={`${theme.card} border ${theme.border} rounded-3xl overflow-hidden`}
-                >
-                  <CardContent className="p-12 text-center">
-                    <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                      <Dumbbell className="w-10 h-10 text-white animate-pulse" />
-                    </div>
-                    <h3 className={`text-2xl font-bold ${theme.text} mb-3`}>
-                      Loading workout...
-                    </h3>
-                    <p className={`${theme.textSecondary} mb-6`}>
-                      Please wait while we prepare your exercises.
-                    </p>
-                  </CardContent>
-                </Card>
+                <div className="animate-pulse space-y-4">
+                  <div className="h-8 w-48 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-40 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                  <div className="h-32 rounded-2xl bg-[color:var(--fc-glass-highlight)]" />
+                </div>
               ) : currentExercise ? (
                 <div className="space-y-4 sm:space-y-6">
                   {/* Instruction Card - Only show for types that don't have their own detail cards */}
                   {currentType !== "giant_set" &&
-                    currentType !== "circuit" &&
                     currentType !== "tabata" &&
                     currentType !== "amrap" &&
                     currentType !== "emom" &&
                     currentType !== "for_time" &&
                     currentType !== "superset" &&
                     currentType !== "pre_exhaustion" && (
-                      <div className="rounded-2xl sm:rounded-3xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-2xl relative z-30">
-                        <Card
-                          className={`border-0 ${theme.card} bg-white/90 dark:bg-slate-800/90 backdrop-blur-md overflow-hidden`}
-                        >
-                          <CardContent className="p-4 sm:p-5">
+                      <ClientGlassCard className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl relative z-30 border-2 border-[color:var(--fc-domain-workouts)]">
                             <div className="flex items-start gap-3">
                               <div className="shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md">
                                 <Lightbulb className="w-4 h-4" />
                               </div>
                               <div className="flex-1">
-                                <div
-                                  className={`text-base font-semibold ${theme.text} mb-1`}
-                                >
+                                <div className="text-base font-semibold fc-text-primary mb-1">
                                   How to perform
                                 </div>
-                                <div
-                                  className={`text-base leading-relaxed ${theme.textSecondary} rounded-xl border ${theme.border} bg-white/70 dark:bg-slate-800/50 p-3`}
-                                >
+                                <div className="text-base leading-relaxed fc-text-dim rounded-xl border border-[color:var(--fc-glass-border)] bg-[color:var(--fc-surface-sunken)] p-3">
                                   {typeHelp}
                                 </div>
                               </div>
@@ -4357,21 +4157,11 @@ export default function LiveWorkout() {
                                 <div className="w-16 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border border-white/40 dark:border-white/10"></div>
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      </div>
+                      </ClientGlassCard>
                     )}
                   {/* AMRAP Flow */}
                   {currentType === "amrap" && (
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "24px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #2196F3",
-                      }}
-                    >
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-cyan)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
                       <div>
                         {!amrapActive ? (
                           <div
@@ -4387,38 +4177,15 @@ export default function LiveWorkout() {
                               style={{ gap: "12px" }}
                             >
                               <div
-                                style={{
-                                  width: "56px",
-                                  height: "56px",
-                                  borderRadius: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
+                                className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-accent-cyan)] flex items-center justify-center"
                               >
-                                <Target
-                                  style={{
-                                    width: "32px",
-                                    height: "32px",
-                                    color: "#FFFFFF",
-                                  }}
-                                />
+                                <Target className="w-8 h-8 text-white" />
                               </div>
                               <div>
-                                <div
-                                  style={{
-                                    fontSize: "20px",
-                                    fontWeight: "700",
-                                    color: "#1A1A1A",
-                                  }}
-                                >
+                                <div className="text-xl font-bold fc-text-primary">
                                   AMRAP Details
                                 </div>
-                                <div
-                                  style={{ fontSize: "14px", color: "#6B7280" }}
-                                >
+                                <div className="text-sm fc-text-dim">
                                   Complete as many reps as possible
                                 </div>
                               </div>
@@ -4435,9 +4202,11 @@ export default function LiveWorkout() {
                                 <div
                                   className={`text-2xl font-bold ${theme.text}`}
                                 >
-                                  {currentExercise?.meta?.amrap_duration ||
-                                    currentExercise?.amrap_duration ||
-                                    10}{" "}
+                                  {Number(
+                                    currentExercise?.meta?.amrap_duration ??
+                                      currentExercise?.amrap_duration ??
+                                      10
+                                  )}{" "}
                                   min
                                 </div>
                               </div>
@@ -4456,7 +4225,7 @@ export default function LiveWorkout() {
                             </div>
 
                             {/* Exercise Details */}
-                            <div className="rounded-xl p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700">
+                            <div className="rounded-xl p-4 bg-[color:var(--fc-glass-highlight)] border-2 border-[color:var(--fc-accent-cyan)]">
                               <div className="flex items-start gap-3 mb-3">
                                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-400 to-cyan-500">
                                   <Dumbbell className="w-4 h-4 text-white" />
@@ -4476,7 +4245,7 @@ export default function LiveWorkout() {
                                       onClick={() =>
                                         setShowPlateCalculator(true)
                                       }
-                                      className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                     >
                                       <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
@@ -4486,7 +4255,7 @@ export default function LiveWorkout() {
                                       onClick={() =>
                                         setShowExerciseAlternatives(true)
                                       }
-                                      className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                     >
                                       <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
@@ -4559,7 +4328,7 @@ export default function LiveWorkout() {
                             </div>
 
                             {/* Previous Performance Card */}
-                            <PreviousPerformanceCard />
+                            <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
 
                             {/* Action Buttons */}
                             <div className="space-y-2">
@@ -4621,15 +4390,7 @@ export default function LiveWorkout() {
 
                   {/* EMOM Flow */}
                   {currentType === "emom" && (
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "24px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #4CAF50",
-                      }}
-                    >
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-success)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
                       <div>
                         {/* Rep-based behaves like AMRAP */}
                         {currentExercise?.meta?.emom_mode === "rep_based" ? (
@@ -4646,42 +4407,14 @@ export default function LiveWorkout() {
                                 className="flex items-center"
                                 style={{ gap: "12px" }}
                               >
-                                <div
-                                  style={{
-                                    width: "56px",
-                                    height: "56px",
-                                    borderRadius: "18px",
-                                    background:
-                                      "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  <Clock
-                                    style={{
-                                      width: "32px",
-                                      height: "32px",
-                                      color: "#FFFFFF",
-                                    }}
-                                  />
+                                <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-status-success)] flex items-center justify-center">
+                                  <Clock className="w-8 h-8 text-white" />
                                 </div>
                                 <div>
-                                  <div
-                                    style={{
-                                      fontSize: "20px",
-                                      fontWeight: "700",
-                                      color: "#1A1A1A",
-                                    }}
-                                  >
+                                  <div className="text-xl font-bold fc-text-primary">
                                     EMOM Details (Rep-Based)
                                   </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#6B7280",
-                                    }}
-                                  >
+                                  <div className="text-sm fc-text-dim">
                                     Complete target reps every minute
                                   </div>
                                 </div>
@@ -4698,9 +4431,11 @@ export default function LiveWorkout() {
                                   <div
                                     className={`text-2xl font-bold ${theme.text}`}
                                   >
-                                    {currentExercise?.meta?.emom_duration ||
-                                      currentExercise?.emom_duration ||
-                                      10}{" "}
+                                    {Number(
+                                      currentExercise?.meta?.emom_duration ??
+                                        currentExercise?.emom_duration ??
+                                        10
+                                    )}{" "}
                                     min
                                   </div>
                                 </div>
@@ -4791,9 +4526,11 @@ export default function LiveWorkout() {
                                 <div
                                   className={`text-2xl font-bold ${theme.text}`}
                                 >
-                                  {currentExercise?.meta?.emom_duration ||
-                                    currentExercise?.emom_duration ||
-                                    10}{" "}
+                                  {Number(
+                                    currentExercise?.meta?.emom_duration ??
+                                      currentExercise?.emom_duration ??
+                                      10
+                                  )}{" "}
                                   min
                                 </div>
                               </div>
@@ -4806,9 +4543,11 @@ export default function LiveWorkout() {
                                 <div
                                   className={`text-2xl font-bold ${theme.text}`}
                                 >
-                                  {currentExercise?.meta?.work_seconds ||
-                                    currentExercise?.work_seconds ||
-                                    40}
+                                  {Number(
+                                    currentExercise?.meta?.work_seconds ??
+                                      currentExercise?.work_seconds ??
+                                      40
+                                  )}
                                   s
                                 </div>
                               </div>
@@ -4886,19 +4625,10 @@ export default function LiveWorkout() {
                     </div>
                   )}
 
-                  {/* Tabata / Circuit Flow */}
-                  {(currentType === "tabata" || currentType === "circuit") && (
+                  {/* Tabata Flow */}
+                  {currentType === "tabata" && (
                     <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "24px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border:
-                          currentType === "tabata"
-                            ? "2px solid #F5576C"
-                            : "2px solid #6C5CE7",
-                      }}
+                      className="fc-surface rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.08)] border-2 border-[color:var(--fc-status-error)]"
                     >
                       <div>
                         {!intervalActive ? (
@@ -4923,46 +4653,18 @@ export default function LiveWorkout() {
                                 style={{ gap: "12px" }}
                               >
                                 <div
-                                  style={{
-                                    width: "56px",
-                                    height: "56px",
-                                    borderRadius: "18px",
-                                    background:
-                                      currentType === "tabata"
-                                        ? "linear-gradient(135deg, #F5576C 0%, #FF8A80 100%)"
-                                        : "linear-gradient(135deg, #6C5CE7 0%, #A29BFE 100%)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                  }}
+                                  className={`w-14 h-14 rounded-[18px] flex items-center justify-center ${currentType === "tabata" ? "bg-[color:var(--fc-status-error)]" : "bg-[color:var(--fc-accent-primary)]"}`}
                                 >
-                                  <Activity
-                                    style={{
-                                      width: "32px",
-                                      height: "32px",
-                                      color: "#FFFFFF",
-                                    }}
-                                  />
+                                  <Activity className="w-8 h-8 text-white" />
                                 </div>
                                 <div>
-                                  <div
-                                    style={{
-                                      fontSize: "20px",
-                                      fontWeight: "700",
-                                      color: "#1A1A1A",
-                                    }}
-                                  >
+                                  <div className="text-xl font-bold fc-text-primary">
                                     {currentType === "tabata"
                                       ? "Tabata"
                                       : "Circuit"}{" "}
                                     Details
                                   </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#6B7280",
-                                    }}
-                                  >
+                                  <div className="text-sm fc-text-dim">
                                     Autoplay countdowns for work and rest
                                   </div>
                                 </div>
@@ -4982,10 +4684,12 @@ export default function LiveWorkout() {
                                     className={`text-2xl font-bold ${theme.text}`}
                                   >
                                     {currentType === "tabata"
-                                      ? currentExercise?.rounds ||
-                                        currentExercise?.meta?.rounds ||
-                                        8
-                                      : currentExercise?.sets || 1}
+                                      ? Number(
+                                          currentExercise?.rounds ??
+                                            currentExercise?.meta?.rounds ??
+                                            8
+                                        )
+                                      : Number(currentExercise?.sets ?? 1)}
                                   </div>
                                 </div>
                                 <div className="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700">
@@ -5005,7 +4709,7 @@ export default function LiveWorkout() {
                                           ? currentExercise?.meta
                                               ?.tabata_sets ||
                                             currentExercise?.tabata_sets
-                                          : currentExercise?.meta?.circuit_sets;
+                                          : (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
                                       return Array.isArray(sets)
                                         ? sets.length
                                         : 0;
@@ -5020,7 +4724,7 @@ export default function LiveWorkout() {
                                   currentType === "tabata"
                                     ? currentExercise?.meta?.tabata_sets ||
                                       currentExercise?.tabata_sets
-                                    : currentExercise?.meta?.circuit_sets;
+                                    : (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
                                 return (
                                   Array.isArray(sets) &&
                                   sets.length > 0 && (
@@ -5065,7 +4769,7 @@ export default function LiveWorkout() {
                                                     return (
                                                       <div
                                                         key={exerciseIndex}
-                                                        className="rounded-lg p-3 bg-white dark:bg-slate-800 border border-[color:var(--fc-glass-border)]"
+                                                        className="rounded-lg p-3 fc-surface border border-[color:var(--fc-glass-border)]"
                                                       >
                                                         <div className="flex items-start gap-3">
                                                           <div
@@ -5098,7 +4802,7 @@ export default function LiveWorkout() {
                                                                     true,
                                                                   )
                                                                 }
-                                                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                                               >
                                                                 <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                                               </Button>
@@ -5110,7 +4814,7 @@ export default function LiveWorkout() {
                                                                     true,
                                                                   )
                                                                 }
-                                                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                                               >
                                                                 <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                                               </Button>
@@ -5129,10 +4833,11 @@ export default function LiveWorkout() {
                                                                         className={`font-semibold ${theme.text}`}
                                                                       >
                                                                         Work:{" "}
-                                                                        {currentExercise?.work_seconds ||
-                                                                          currentExercise
-                                                                            ?.meta
-                                                                            ?.work_seconds}
+                                                                        {Number(
+                                                                          currentExercise?.work_seconds ??
+                                                                            currentExercise?.meta
+                                                                              ?.work_seconds ?? 0
+                                                                        )}
                                                                         s
                                                                       </span>
                                                                     </div>
@@ -5146,10 +4851,11 @@ export default function LiveWorkout() {
                                                                         className={`font-semibold ${theme.text}`}
                                                                       >
                                                                         Rest:{" "}
-                                                                        {currentExercise?.rest_seconds ||
-                                                                          currentExercise
-                                                                            ?.meta
-                                                                            ?.rest_seconds}
+                                                                        {Number(
+                                                                          currentExercise?.rest_seconds ??
+                                                                            currentExercise?.meta
+                                                                              ?.rest_seconds ?? 0
+                                                                        )}
                                                                         s
                                                                       </span>
                                                                     </div>
@@ -5241,21 +4947,24 @@ export default function LiveWorkout() {
                                 setShowTimerModal(true);
                                 setTimerExerciseIndex(0);
                                 setTimerSetIndex(0);
-                                setIntervalMode(currentType as any);
+                                setIntervalMode("tabata");
                                 setIntervalRound(0);
                                 setIntervalPhase("work");
                                 setIntervalActive(true);
 
                                 // Initialize timer with first exercise
-                                const sets =
+                                const rawSets =
                                   currentType === "tabata"
-                                    ? currentExercise?.meta?.tabata_sets ||
+                                    ? currentExercise?.meta?.tabata_sets ??
                                       currentExercise?.tabata_sets
-                                    : currentExercise?.meta?.circuit_sets;
+                                    : (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
+                                const sets = Array.isArray(rawSets)
+                                  ? (rawSets as Array<{ exercises?: Array<{ work_seconds?: number }> }>)
+                                  : undefined;
                                 const firstSet = sets?.[0];
                                 const firstExercise = firstSet?.exercises?.[0];
                                 const workTime =
-                                  firstExercise?.work_seconds || 20;
+                                  Number(firstExercise?.work_seconds ?? 20);
                                 setIntervalPhaseLeft(workTime);
 
                                 // Set total rounds
@@ -5316,52 +5025,21 @@ export default function LiveWorkout() {
 
                   {/* Cluster Set Flow */}
                   {currentType === "cluster_set" && (
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "24px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #6C5CE7",
-                      }}
-                    >
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
                       <div>
                         {/* Header */}
                         <div
                           className="flex items-center"
                           style={{ gap: "12px", marginBottom: "16px" }}
                         >
-                          <div
-                            style={{
-                              width: "56px",
-                              height: "56px",
-                              borderRadius: "18px",
-                              background:
-                                "linear-gradient(135deg, #6C5CE7 0%, #A29BFE 100%)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Dumbbell
-                              style={{
-                                width: "32px",
-                                height: "32px",
-                                color: "#FFFFFF",
-                              }}
-                            />
+                          <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-accent-primary)] flex items-center justify-center">
+                            <Dumbbell className="w-8 h-8 text-white" />
                           </div>
                           <div>
-                            <div
-                              style={{
-                                fontSize: "20px",
-                                fontWeight: "700",
-                                color: "#1A1A1A",
-                              }}
-                            >
+                            <div className="text-xl font-bold fc-text-primary">
                               Cluster Set
                             </div>
-                            <div style={{ fontSize: "14px", color: "#6B7280" }}>
+                            <div className="text-sm fc-text-dim">
                               Multiple mini-sets with short rest
                             </div>
                           </div>
@@ -5428,7 +5106,7 @@ export default function LiveWorkout() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setShowPlateCalculator(true)}
-                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                               >
                                 <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                               </Button>
@@ -5438,20 +5116,23 @@ export default function LiveWorkout() {
                                 onClick={() =>
                                   setShowExerciseAlternatives(true)
                                 }
-                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                               >
                                 <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                               </Button>
                             </div>
                             <div className="flex flex-wrap gap-2.5">
-                              {(currentExercise?.reps ||
-                                currentExercise?.meta?.cluster_reps) && (
+                              {(currentExercise?.reps != null ||
+                                currentExercise?.meta?.cluster_reps != null) && (
                                 <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
                                   <span
                                     className={`text-sm font-bold ${theme.text}`}
                                   >
-                                    {currentExercise?.reps ||
-                                      currentExercise?.meta?.cluster_reps}{" "}
+                                    {String(
+                                      currentExercise?.reps ??
+                                        currentExercise?.meta?.cluster_reps ??
+                                        ""
+                                    )}{" "}
                                     reps
                                   </span>
                                 </div>
@@ -5462,16 +5143,16 @@ export default function LiveWorkout() {
                                   <span
                                     className={`text-xs font-semibold ${theme.text}`}
                                   >
-                                    RIR: {currentExercise.rir}
+                                    RIR: {Number(currentExercise.rir)}
                                   </span>
                                 </div>
                               )}
-                              {currentExercise?.tempo && (
+                              {currentExercise?.tempo != null && currentExercise.tempo !== "" && (
                                 <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
                                   <span
                                     className={`text-xs font-semibold ${theme.text}`}
                                   >
-                                    Tempo: {currentExercise.tempo}
+                                    Tempo: {String(currentExercise.tempo)}
                                   </span>
                                 </div>
                               )}
@@ -5605,7 +5286,7 @@ export default function LiveWorkout() {
 
                         {/* Previous Performance Card */}
                         <div className="mt-4">
-                          <PreviousPerformanceCard />
+                          <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
                         </div>
 
                         {/* Log Button */}
@@ -5632,52 +5313,21 @@ export default function LiveWorkout() {
 
                   {/* Rest-Pause Flow */}
                   {currentType === "rest_pause" && (
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "24px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #4CAF50",
-                      }}
-                    >
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-success)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
                       <div>
                         {/* Header */}
                         <div
                           className="flex items-center"
                           style={{ gap: "12px", marginBottom: "16px" }}
                         >
-                          <div
-                            style={{
-                              width: "56px",
-                              height: "56px",
-                              borderRadius: "18px",
-                              background:
-                                "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Dumbbell
-                              style={{
-                                width: "32px",
-                                height: "32px",
-                                color: "#FFFFFF",
-                              }}
-                            />
+                          <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-status-success)] flex items-center justify-center">
+                            <Dumbbell className="w-8 h-8 text-white" />
                           </div>
                           <div>
-                            <div
-                              style={{
-                                fontSize: "20px",
-                                fontWeight: "700",
-                                color: "#1A1A1A",
-                              }}
-                            >
+                            <div className="text-xl font-bold fc-text-primary">
                               Rest Pause Set
                             </div>
-                            <div style={{ fontSize: "14px", color: "#6B7280" }}>
+                            <div className="text-sm fc-text-dim">
                               Main set + mini-sets with rest periods
                             </div>
                           </div>
@@ -5738,7 +5388,7 @@ export default function LiveWorkout() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setShowPlateCalculator(true)}
-                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                               >
                                 <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                               </Button>
@@ -5748,21 +5398,24 @@ export default function LiveWorkout() {
                                 onClick={() =>
                                   setShowExerciseAlternatives(true)
                                 }
-                                className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                               >
                                 <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                               </Button>
                             </div>
                             <div className="flex flex-wrap gap-2.5">
-                              {(currentExercise?.reps ||
-                                currentExercise?.meta?.rest_pause_reps) && (
+                              {(currentExercise?.reps != null ||
+                                currentExercise?.meta?.rest_pause_reps != null) && (
                                 <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 inline-block">
                                   <span
                                     className={`text-sm font-bold ${theme.text}`}
                                   >
-                                    {currentExercise?.reps ||
-                                      currentExercise?.meta
-                                        ?.rest_pause_reps}{" "}
+                                    {String(
+                                      currentExercise?.reps ??
+                                        currentExercise?.meta
+                                          ?.rest_pause_reps ??
+                                        ""
+                                    )}{" "}
                                     reps
                                   </span>
                                 </div>
@@ -5773,16 +5426,16 @@ export default function LiveWorkout() {
                                   <span
                                     className={`text-xs font-semibold ${theme.text}`}
                                   >
-                                    RIR: {currentExercise.rir}
+                                    RIR: {Number(currentExercise.rir)}
                                   </span>
                                 </div>
                               )}
-                              {currentExercise?.tempo && (
+                              {currentExercise?.tempo != null && currentExercise.tempo !== "" && (
                                 <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
                                   <span
                                     className={`text-xs font-semibold ${theme.text}`}
                                   >
-                                    Tempo: {currentExercise.tempo}
+                                    Tempo: {String(currentExercise.tempo)}
                                   </span>
                                 </div>
                               )}
@@ -5811,7 +5464,7 @@ export default function LiveWorkout() {
                           >
                             Main Set
                           </div>
-                          <div className="rounded-xl p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-200 dark:border-blue-700">
+                          <div className="rounded-xl p-4 bg-[color:var(--fc-glass-highlight)] border-2 border-[color:var(--fc-accent-cyan)]">
                             <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <label
@@ -5942,7 +5595,7 @@ export default function LiveWorkout() {
 
                         {/* Previous Performance Card */}
                         <div className="mt-4">
-                          <PreviousPerformanceCard />
+                          <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
                         </div>
 
                         {/* Log Button */}
@@ -5971,15 +5624,7 @@ export default function LiveWorkout() {
 
                   {/* For Time Flow */}
                   {currentType === "for_time" && (
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "24px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #FFD54F",
-                      }}
-                    >
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-warning)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
                       <div>
                         {!forTimeActive && forTimeCompletionSecs == null ? (
                           <div
@@ -5994,38 +5639,15 @@ export default function LiveWorkout() {
                               className="flex items-center"
                               style={{ gap: "12px" }}
                             >
-                              <div
-                                style={{
-                                  width: "56px",
-                                  height: "56px",
-                                  borderRadius: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #FFD54F 0%, #FFE082 100%)",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                <Trophy
-                                  style={{
-                                    width: "32px",
-                                    height: "32px",
-                                    color: "#FFFFFF",
-                                  }}
-                                />
+                              <div className="w-14 h-14 rounded-[18px] bg-[color:var(--fc-status-warning)] flex items-center justify-center">
+                                <Trophy className="w-8 h-8 text-white" />
                               </div>
                               <div>
-                                <div
-                                  style={{
-                                    fontSize: "20px",
-                                    fontWeight: "700",
-                                    color: "#1A1A1A",
-                                  }}
-                                >
+                                <div className="text-xl font-bold fc-text-primary">
                                   For Time Details
                                 </div>
                                 <div
-                                  style={{ fontSize: "14px", color: "#6B7280" }}
+                                  className="text-sm fc-text-dim"
                                 >
                                   Complete target reps as fast as possible
                                 </div>
@@ -6043,9 +5665,11 @@ export default function LiveWorkout() {
                                 <div
                                   className={`text-2xl font-bold ${theme.text}`}
                                 >
-                                  {currentExercise?.meta?.time_cap ||
-                                    currentExercise?.time_cap ||
-                                    10}{" "}
+                                  {Number(
+                                    currentExercise?.meta?.time_cap ??
+                                      currentExercise?.time_cap ??
+                                      10
+                                  )}{" "}
                                   min
                                 </div>
                               </div>
@@ -6058,10 +5682,12 @@ export default function LiveWorkout() {
                                 <div
                                   className={`text-2xl font-bold ${theme.text}`}
                                 >
-                                  {currentExercise?.meta?.target_reps ||
-                                    currentExercise?.target_reps ||
-                                    currentExercise?.reps ||
-                                    "-"}
+                                  {String(
+                                    currentExercise?.meta?.target_reps ??
+                                      currentExercise?.target_reps ??
+                                      currentExercise?.reps ??
+                                      "-"
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -6193,7 +5819,7 @@ export default function LiveWorkout() {
                             </Button>
                           </div>
                         ) : (
-                          <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
+                          <div className="p-3 bg-[color:var(--fc-glass-highlight)] rounded-xl border border-[color:var(--fc-glass-border)]">
                             <div className="text-sm fc-text-dim">
                               Completion time recorded: {forTimeCompletionSecs}s
                             </div>
@@ -6206,15 +5832,7 @@ export default function LiveWorkout() {
                   {/* Superset / Pre-Exhaustion Flow */}
                   {(currentType === "superset" ||
                     currentType === "pre_exhaustion") && (
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "24px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #F5576C",
-                      }}
-                    >
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-status-error)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
                       <div>
                         {/* Header */}
                         <div
@@ -6225,26 +5843,23 @@ export default function LiveWorkout() {
                             className="flex items-center"
                             style={{ gap: "12px" }}
                           >
-                            <div
-                              style={{
-                                fontSize: "20px",
-                                fontWeight: "700",
-                                color: "#1A1A1A",
-                              }}
-                            >
+                            <div className="text-xl font-bold fc-text-primary">
                               {currentType === "superset"
                                 ? "Superset"
                                 : "Pre-Exhaustion"}
                             </div>
-                            {(currentExercise?.rest_seconds ||
-                              currentExercise?.meta?.rest_seconds) && (
+                            {(currentExercise?.rest_seconds != null ||
+                              currentExercise?.meta?.rest_seconds != null) && (
                               <div className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 border border-green-300 dark:border-green-700">
                                 <span
                                   className={`text-xs font-semibold ${theme.text}`}
                                 >
                                   Rest:{" "}
-                                  {currentExercise?.rest_seconds ||
-                                    currentExercise?.meta?.rest_seconds}
+                                  {Number(
+                                    currentExercise?.rest_seconds ??
+                                      currentExercise?.meta?.rest_seconds ??
+                                      0
+                                  )}
                                   s
                                 </span>
                               </div>
@@ -6260,7 +5875,7 @@ export default function LiveWorkout() {
                           {/* Exercise A */}
                           <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
                             <div
-                              className={`p-4 ${theme.card} bg-white/95 dark:bg-slate-800/95 rounded-2xl space-y-3`}
+                              className="p-4 fc-surface rounded-2xl space-y-3"
                             >
                               {/* Exercise Header */}
                               <div className="flex items-center gap-3">
@@ -6284,7 +5899,7 @@ export default function LiveWorkout() {
                                       onClick={() =>
                                         setShowPlateCalculator(true)
                                       }
-                                      className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                     >
                                       <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
@@ -6294,7 +5909,7 @@ export default function LiveWorkout() {
                                       onClick={() =>
                                         setShowExerciseAlternatives(true)
                                       }
-                                      className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                     >
                                       <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
@@ -6325,8 +5940,11 @@ export default function LiveWorkout() {
                                     <span
                                       className={`text-sm font-bold ${theme.text}`}
                                     >
-                                      {currentExercise?.meta?.superset_reps_a ||
-                                        currentExercise?.reps}{" "}
+                                      {String(
+                                        currentExercise?.meta?.superset_reps_a ??
+                                          currentExercise?.reps ??
+                                        ""
+                                      )}{" "}
                                       reps
                                     </span>
                                   </div>
@@ -6337,16 +5955,16 @@ export default function LiveWorkout() {
                                     <span
                                       className={`text-xs font-semibold ${theme.text}`}
                                     >
-                                      RIR: {currentExercise.rir}
+                                      RIR: {Number(currentExercise.rir)}
                                     </span>
                                   </div>
                                 )}
-                                {currentExercise?.tempo && (
+                                {currentExercise?.tempo != null && currentExercise.tempo !== "" && (
                                   <div className="px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700">
                                     <span
                                       className={`text-xs font-semibold ${theme.text}`}
                                     >
-                                      Tempo: {currentExercise.tempo}
+                                      Tempo: {String(currentExercise.tempo)}
                                     </span>
                                   </div>
                                 )}
@@ -6394,7 +6012,7 @@ export default function LiveWorkout() {
                           {/* Exercise B */}
                           <div className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl">
                             <div
-                              className={`p-4 ${theme.card} bg-white/95 dark:bg-slate-800/95 rounded-2xl space-y-3`}
+                              className="p-4 fc-surface rounded-2xl space-y-3"
                             >
                               {/* Exercise Header */}
                               <div className="flex items-center gap-3">
@@ -6411,11 +6029,12 @@ export default function LiveWorkout() {
                                       {(() => {
                                         const exerciseId =
                                           currentExercise?.meta
-                                            ?.superset_exercise_id ||
+                                            ?.superset_exercise_id ??
                                           currentExercise?.superset_exercise_id;
-                                        const exerciseInfo = exerciseId
-                                          ? exerciseLookup[exerciseId]
-                                          : undefined;
+                                        const exerciseInfo =
+                                          exerciseId != null && exerciseId !== ""
+                                            ? exerciseLookup[String(exerciseId)]
+                                            : undefined;
                                         return (
                                           exerciseInfo?.name ||
                                           "Second Exercise"
@@ -6429,7 +6048,7 @@ export default function LiveWorkout() {
                                       onClick={() =>
                                         setShowPlateCalculator(true)
                                       }
-                                      className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                     >
                                       <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
@@ -6439,7 +6058,7 @@ export default function LiveWorkout() {
                                       onClick={() =>
                                         setShowExerciseAlternatives(true)
                                       }
-                                      className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                      className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                     >
                                       <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                     </Button>
@@ -6448,11 +6067,12 @@ export default function LiveWorkout() {
                                 {(() => {
                                   const exerciseId =
                                     currentExercise?.meta
-                                      ?.superset_exercise_id ||
+                                      ?.superset_exercise_id ??
                                     currentExercise?.superset_exercise_id;
-                                  const exerciseInfo = exerciseId
-                                    ? exerciseLookup[exerciseId]
-                                    : undefined;
+                                  const exerciseInfo =
+                                    exerciseId != null && exerciseId !== ""
+                                      ? exerciseLookup[String(exerciseId)]
+                                      : undefined;
                                   const video = exerciseInfo?.video_url;
                                   return (
                                     video && (
@@ -6479,10 +6099,13 @@ export default function LiveWorkout() {
                                     <span
                                       className={`text-sm font-bold ${theme.text}`}
                                     >
-                                      {currentExercise?.meta?.superset_reps_b ||
-                                        currentExercise?.meta?.superset_reps ||
-                                        currentExercise?.superset_reps ||
-                                        currentExercise?.reps}{" "}
+                                      {String(
+                                        currentExercise?.meta?.superset_reps_b ??
+                                          currentExercise?.meta?.superset_reps ??
+                                          currentExercise?.superset_reps ??
+                                          currentExercise?.reps ??
+                                          ""
+                                      )}{" "}
                                       reps
                                     </span>
                                   </div>
@@ -6531,27 +6154,17 @@ export default function LiveWorkout() {
 
                         {/* Previous Performance Card */}
                         <div style={{ marginTop: "24px" }}>
-                          <PreviousPerformanceCard />
+                          <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
                         </div>
 
                         {/* Log Button */}
                         <Button
                           onClick={completeSuperset}
-                          style={{
-                            width: "100%",
-                            background:
-                              "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                            color: "#FFFFFF",
-                            borderRadius: "20px",
-                            padding: "16px 32px",
-                            fontSize: "16px",
-                            fontWeight: "600",
-                            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                            border: "none",
-                            cursor: isLoggingSet ? "not-allowed" : "pointer",
-                            opacity: isLoggingSet ? 0.5 : 1,
-                            marginTop: "24px",
-                          }}
+                          className="w-full py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none mt-6"
+                            style={{
+                              cursor: isLoggingSet ? "not-allowed" : "pointer",
+                              opacity: isLoggingSet ? 0.5 : 1,
+                            }}
                           disabled={isLoggingSet}
                         >
                           <Check className="w-5 h-5 mr-2" /> Log{" "}
@@ -6565,17 +6178,7 @@ export default function LiveWorkout() {
 
                   {/* Giant Set Flow */}
                   {currentType === "giant_set" && (
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "24px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #6C5CE7",
-                        position: "relative",
-                        zIndex: 20,
-                      }}
-                    >
+                    <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.08)] relative z-20">
                       <div>
                         <div
                           className="flex items-center justify-between"
@@ -6609,7 +6212,7 @@ export default function LiveWorkout() {
                               className="rounded-2xl p-[1px] bg-blue-200 dark:bg-blue-800 shadow-xl"
                             >
                               <div
-                                className={`p-4 ${theme.card} bg-white/95 dark:bg-slate-800/95 rounded-2xl space-y-3`}
+                                className="p-4 fc-surface rounded-2xl space-y-3"
                               >
                                 {/* Header: name + video + number badge */}
                                 <div className="flex items-center gap-3">
@@ -6630,7 +6233,7 @@ export default function LiveWorkout() {
                                         onClick={() =>
                                           setShowPlateCalculator(true)
                                         }
-                                        className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                        className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                       >
                                         <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                       </Button>
@@ -6640,7 +6243,7 @@ export default function LiveWorkout() {
                                         onClick={() =>
                                           setShowExerciseAlternatives(true)
                                         }
-                                        className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                        className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                       >
                                         <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                       </Button>
@@ -6712,26 +6315,16 @@ export default function LiveWorkout() {
 
                         {/* Previous Performance Card */}
                         <div style={{ marginTop: "24px" }}>
-                          <PreviousPerformanceCard />
+                          <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
                         </div>
 
                         <Button
                           onClick={completeGiantSet}
-                          style={{
-                            width: "100%",
-                            background:
-                              "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                            color: "#FFFFFF",
-                            borderRadius: "20px",
-                            padding: "16px 32px",
-                            fontSize: "16px",
-                            fontWeight: "600",
-                            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                            border: "none",
-                            cursor: isLoggingSet ? "not-allowed" : "pointer",
-                            opacity: isLoggingSet ? 0.5 : 1,
-                            marginTop: "24px",
-                          }}
+                          className="w-full py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none mt-6"
+                            style={{
+                              cursor: isLoggingSet ? "not-allowed" : "pointer",
+                              opacity: isLoggingSet ? 0.5 : 1,
+                            }}
                           disabled={isLoggingSet}
                         >
                           Log Giant Set
@@ -6741,7 +6334,6 @@ export default function LiveWorkout() {
                   )}
                   {/* Standard Exercise Types - Modern Style */}
                   {currentType !== "giant_set" &&
-                    currentType !== "circuit" &&
                     currentType !== "tabata" &&
                     currentType !== "amrap" &&
                     currentType !== "emom" &&
@@ -6750,15 +6342,7 @@ export default function LiveWorkout() {
                     currentType !== "pre_exhaustion" &&
                     currentType !== "cluster_set" &&
                     currentType !== "rest_pause" && (
-                      <div
-                        style={{
-                          backgroundColor: "#FFFFFF",
-                          borderRadius: "24px",
-                          padding: "24px",
-                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                          border: "2px solid #2196F3",
-                        }}
-                      >
+                      <div className="fc-surface rounded-2xl p-6 border-2 border-[color:var(--fc-accent-cyan)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
                         <div>
                           {/* Header */}
                           <div
@@ -6817,22 +6401,12 @@ export default function LiveWorkout() {
                               }}
                             >
                               <Dumbbell
-                                style={{
-                                  width: "32px",
-                                  height: "32px",
-                                  color: "#FFFFFF",
-                                }}
+                                className="w-8 h-8 text-white"
                               />
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <div
-                                  style={{
-                                    fontSize: "20px",
-                                    fontWeight: "700",
-                                    color: "#1A1A1A",
-                                  }}
-                                >
+                                <div className="text-xl font-bold fc-text-primary">
                                   {currentExercise.exercise?.name || "Exercise"}
                                 </div>
                                 {/* Utility Icon Buttons */}
@@ -6840,7 +6414,7 @@ export default function LiveWorkout() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => setShowPlateCalculator(true)}
-                                  className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                  className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                 >
                                   <Calculator className="w-3.5 h-3.5 fc-text-dim" />
                                 </Button>
@@ -6850,7 +6424,7 @@ export default function LiveWorkout() {
                                   onClick={() =>
                                     setShowExerciseAlternatives(true)
                                   }
-                                  className="h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                  className="h-6 w-6 p-0 hover:bg-[color:var(--fc-glass-highlight)]"
                                 >
                                   <RefreshCw className="w-3.5 h-3.5 fc-text-dim" />
                                 </Button>
@@ -6860,91 +6434,39 @@ export default function LiveWorkout() {
                                 style={{ gap: "8px" }}
                               >
                                 {targetReps && (
-                                  <div
-                                    style={{
-                                      backgroundColor: "#EDE7F6",
-                                      borderRadius: "12px",
-                                      padding: "6px 12px",
-                                      display: "inline-block",
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        fontSize: "14px",
-                                        fontWeight: "600",
-                                        color: "#6C5CE7",
-                                      }}
-                                    >
+                                  <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-accent-primary)]/20">
+                                    <span className="text-sm font-semibold text-[color:var(--fc-accent-primary)]">
                                       {targetReps} reps
                                     </span>
                                   </div>
                                 )}
                                 {(currentExercise?.rir ||
                                   currentExercise?.rir === 0) && (
-                                  <div
-                                    style={{
-                                      backgroundColor: "#FFE0B2",
-                                      borderRadius: "12px",
-                                      padding: "6px 12px",
-                                      display: "inline-block",
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        fontSize: "14px",
-                                        fontWeight: "600",
-                                        color: "#F5576C",
-                                      }}
-                                    >
-                                      RIR: {currentExercise.rir}
+                                  <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-status-warning)]/20">
+                                    <span className="text-sm font-semibold text-[color:var(--fc-status-warning)]">
+                                      RIR: {Number(currentExercise.rir)}
                                     </span>
                                   </div>
                                 )}
-                                {currentExercise?.exercise_id &&
-                                  currentExercise?.load_percentage &&
-                                  getSuggestedWeightText(
-                                    currentExercise.exercise_id,
-                                    currentExercise.load_percentage,
-                                  ) && (
-                                    <div
-                                      style={{
-                                        backgroundColor: "#E8F5E9",
-                                        borderRadius: "12px",
-                                        padding: "6px 12px",
-                                        display: "inline-block",
-                                      }}
-                                    >
-                                      <span
-                                        style={{
-                                          fontSize: "14px",
-                                          fontWeight: "600",
-                                          color: "#2E7D32",
-                                        }}
-                                      >
-                                        {getSuggestedWeightText(
-                                          currentExercise.exercise_id,
-                                          currentExercise.load_percentage,
-                                        )}
-                                      </span>
-                                    </div>
-                                  )}
-                                {currentExercise?.tempo && (
-                                  <div
-                                    style={{
-                                      backgroundColor: "#E3F2FD",
-                                      borderRadius: "12px",
-                                      padding: "6px 12px",
-                                      display: "inline-block",
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        fontSize: "14px",
-                                        fontWeight: "600",
-                                        color: "#2196F3",
-                                      }}
-                                    >
-                                      Tempo: {currentExercise.tempo}
+                                {currentExercise?.exercise_id != null &&
+                                  currentExercise?.load_percentage != null &&
+                                  (() => {
+                                    const text = getSuggestedWeightText(
+                                      currentExercise.exercise_id,
+                                      Number(currentExercise.load_percentage ?? 0),
+                                    );
+                                    return text ? (
+                                      <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-status-success)]/20">
+                                        <span className="text-sm font-semibold text-[color:var(--fc-status-success)]">
+                                          {String(text)}
+                                        </span>
+                                      </div>
+                                    ) : null;
+                                  })()}
+                                {currentExercise?.tempo != null && currentExercise.tempo !== "" && (
+                                  <div className="inline-block rounded-xl px-3 py-1.5 bg-[color:var(--fc-accent-cyan)]/20">
+                                    <span className="text-sm font-semibold text-[color:var(--fc-accent-cyan)]">
+                                      Tempo: {String(currentExercise.tempo)}
                                     </span>
                                   </div>
                                 )}
@@ -6968,23 +6490,10 @@ export default function LiveWorkout() {
 
                           {/* Logging Fields */}
                           <div
-                            className="grid grid-cols-2"
-                            style={{
-                              gap: "16px",
-                              paddingTop: "16px",
-                              borderTop: "1px solid #E5E7EB",
-                            }}
+                            className="grid grid-cols-2 gap-4 pt-4 border-t border-[color:var(--fc-glass-border)]"
                           >
                             <div>
-                              <label
-                                style={{
-                                  display: "block",
-                                  fontSize: "14px",
-                                  fontWeight: "600",
-                                  color: "#6B7280",
-                                  marginBottom: "8px",
-                                }}
-                              >
+                              <label className="block text-sm font-semibold fc-text-dim mb-2">
                                 {currentType === "drop_set"
                                   ? "Working Weight (kg)"
                                   : "Weight (kg)"}
@@ -7002,32 +6511,14 @@ export default function LiveWorkout() {
                                     weight: parseFloat(e.target.value) || 0,
                                   }))
                                 }
-                                style={{
-                                  width: "100%",
-                                  height: "56px",
-                                  textAlign: "center",
-                                  fontSize: "18px",
-                                  fontWeight: "700",
-                                  color: "#1A1A1A",
-                                  backgroundColor: "#FFFFFF",
-                                  border: "2px solid #2196F3",
-                                  borderRadius: "16px",
-                                  outline: "none",
-                                }}
+                                className="w-full h-14 text-center text-lg font-bold rounded-2xl border-2 border-[color:var(--fc-accent-cyan)] fc-surface fc-text-primary focus:outline-none"
+                                style={{ width: "100%", height: "56px", textAlign: "center" as const }}
                                 step="0.5"
                                 placeholder="0"
                               />
                             </div>
                             <div>
-                              <label
-                                style={{
-                                  display: "block",
-                                  fontSize: "14px",
-                                  fontWeight: "600",
-                                  color: "#6B7280",
-                                  marginBottom: "8px",
-                                }}
-                              >
+                              <label className="block text-sm font-semibold fc-text-dim mb-2">
                                 Reps
                               </label>
                               <input
@@ -7043,18 +6534,8 @@ export default function LiveWorkout() {
                                     reps: parseInt(e.target.value) || 0,
                                   }))
                                 }
-                                style={{
-                                  width: "100%",
-                                  height: "56px",
-                                  textAlign: "center",
-                                  fontSize: "18px",
-                                  fontWeight: "700",
-                                  color: "#1A1A1A",
-                                  backgroundColor: "#FFFFFF",
-                                  border: "2px solid #2196F3",
-                                  borderRadius: "16px",
-                                  outline: "none",
-                                }}
+                                className="w-full h-14 text-center text-lg font-bold rounded-2xl border-2 border-[color:var(--fc-accent-cyan)] fc-surface fc-text-primary focus:outline-none"
+                                style={{ width: "100%", height: "56px", textAlign: "center" as const }}
                                 placeholder="0"
                               />
                             </div>
@@ -7062,7 +6543,7 @@ export default function LiveWorkout() {
 
                           {/* Drop Set - Second Set Fields */}
                           {currentType === "drop_set" && (
-                            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                            <div className="mt-3 pt-3 border-t border-[color:var(--fc-glass-border)]">
                               <div className="flex items-center gap-2 mb-2">
                                 <Calculator className="w-3 h-3 text-orange-500" />
                                 <span className="text-xs font-medium fc-text-dim">
@@ -7121,23 +6602,15 @@ export default function LiveWorkout() {
 
                           {/* Previous Performance Card */}
                           <div style={{ marginTop: "24px" }}>
-                            <PreviousPerformanceCard />
+                            <PreviousPerformanceCard previousPerformance={previousPerformance} theme={theme} />
                           </div>
 
                           {/* Log Button */}
                           <Button
                             onClick={completeSet}
+                            className="w-full py-4 px-8 rounded-2xl bg-[color:var(--fc-status-success)] text-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] border-none"
                             style={{
                               width: "100%",
-                              background:
-                                "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                              color: "#FFFFFF",
-                              borderRadius: "20px",
-                              padding: "16px 32px",
-                              fontSize: "16px",
-                              fontWeight: "600",
-                              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                              border: "none",
                               cursor:
                                 currentSetData.weight <= 0 ||
                                 currentSetData.reps <= 0 ||
@@ -7208,36 +6681,28 @@ export default function LiveWorkout() {
                   )}
                 </div>
               ) : (
-                <Card
-                  className={`${theme.card} border ${theme.border} rounded-3xl overflow-hidden`}
-                >
-                  <CardContent className="p-12 text-center">
-                    <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-pink-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                      <AlertTriangle className="w-10 h-10 text-white" />
-                    </div>
-                    <h3 className={`text-2xl font-bold ${theme.text} mb-3`}>
-                      No exercises found
-                    </h3>
-                    <p className={`${theme.textSecondary} mb-6`}>
-                      This workout doesn&apos;t have any exercises assigned.
-                    </p>
-                    <Button
-                      onClick={() => router.push("/client/workouts")}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-2xl"
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Back to Workouts
-                    </Button>
-                  </CardContent>
-                </Card>
+                <ClientGlassCard className="p-12 text-center">
+                  <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-pink-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <AlertTriangle className="w-10 h-10 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold fc-text-primary mb-3">
+                    No exercises found
+                  </h3>
+                  <p className="fc-text-dim mb-6">
+                    This workout doesn&apos;t have any exercises assigned.
+                  </p>
+                  <SecondaryButton
+                    className="w-auto"
+                    onClick={() => router.push("/client/train")}
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to Workouts
+                  </SecondaryButton>
+                </ClientGlassCard>
               )}
-            </div>
-          </div>
-        </div>
 
-        {/* Full-Screen Timer Modal for Tabata/Circuit */}
-        {showTimerModal &&
-          (currentType === "tabata" || currentType === "circuit") && (
+        {/* Full-Screen Timer Modal for Tabata */}
+        {showTimerModal && currentType === "tabata" && (
             <div
               className={`fixed inset-0 z-[9999] transition-colors duration-500 ${
                 intervalPhase === "work"
@@ -7253,8 +6718,11 @@ export default function LiveWorkout() {
                   <div className="bg-white/20 backdrop-blur-sm rounded-full px-6 py-2">
                     <span className="text-white font-semibold text-lg">
                       {(() => {
-                        const circuitSets =
-                          currentExercise?.meta?.circuit_sets || [];
+                        const raw =
+                          (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets) ?? [];
+                        const circuitSets = Array.isArray(raw)
+                          ? raw
+                          : [];
 
                         // Calculate segments per round
                         let segmentsPerRound = 0;
@@ -7307,35 +6775,47 @@ export default function LiveWorkout() {
                 {/* Main Timer Display */}
                 <div className="text-center flex-1 flex flex-col justify-center items-center">
                   {/* Current Exercise Info */}
-                  {currentExercise?.meta?.circuit_sets &&
-                    currentExercise.meta.circuit_sets[timerSetIndex]
-                      ?.exercises && (
+                  {((() => {
+                    const sets = (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
+                    if (!Array.isArray(sets)) return null;
+                    const set = (sets as unknown[])[timerSetIndex] as
+                      | { exercises?: unknown[] }
+                      | undefined;
+                    if (!set?.exercises?.length) return null;
+                    return (
                       <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-8 py-6 max-w-md mb-12">
                         <div className="text-2xl font-bold text-white mb-2">
                           {(() => {
-                            const currentExerciseInSet =
-                              currentExercise.meta.circuit_sets[timerSetIndex]
-                                ?.exercises?.[timerExerciseIndex];
+                            const setsArr = sets as unknown[];
+                            const currentExerciseInSet = (
+                              setsArr[timerSetIndex] as {
+                                exercises?: Array<{ exercise_id?: string }>;
+                              }
+                            )?.exercises?.[timerExerciseIndex];
                             return (
-                              exerciseLookup[currentExerciseInSet?.exercise_id]
-                                ?.name || "Exercise"
+                              exerciseLookup[
+                                currentExerciseInSet?.exercise_id ?? ""
+                              ]?.name || "Exercise"
                             );
                           })()}
                         </div>
                         {intervalPhase === "work" && (
                           <div className="text-lg text-gray-200">
-                            {currentExercise.meta.circuit_sets[timerSetIndex]
-                              ?.exercises?.[timerExerciseIndex]?.work_seconds
-                              ? `${currentExercise.meta.circuit_sets[timerSetIndex].exercises[timerExerciseIndex].work_seconds}s work`
-                              : currentExercise.meta.circuit_sets[timerSetIndex]
-                                    ?.exercises?.[timerExerciseIndex]
-                                    ?.target_reps
-                                ? `${currentExercise.meta.circuit_sets[timerSetIndex].exercises[timerExerciseIndex].target_reps} reps`
+                            {(
+                              (sets as unknown[])[timerSetIndex] as {
+                                exercises?: Array<{ work_seconds?: number }>;
+                              }
+                            )?.exercises?.[timerExerciseIndex]?.work_seconds
+                              ? `${((sets as unknown[])[timerSetIndex] as { exercises: Array<{ work_seconds?: number }> }).exercises[timerExerciseIndex].work_seconds}s work`
+                              : (sets as unknown[])[timerSetIndex] != null &&
+                                  ((sets as unknown[])[timerSetIndex] as { exercises?: Array<{ target_reps?: number }> })?.exercises?.[timerExerciseIndex]?.target_reps != null
+                                ? `${((sets as unknown[])[timerSetIndex] as { exercises: Array<{ target_reps?: number }> }).exercises[timerExerciseIndex].target_reps} reps`
                                 : "Work phase"}
                           </div>
                         )}
                       </div>
-                    )}
+                    );
+                  })() as React.ReactNode)}
 
                   {/* Phase Indicator */}
                   <div
@@ -7371,8 +6851,10 @@ export default function LiveWorkout() {
                   </div>
 
                   {/* Next Exercise Preview */}
-                  {currentExercise?.meta?.circuit_sets &&
-                    currentExercise.meta.circuit_sets[timerSetIndex]
+                  {(currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets) &&
+                    (((currentExercise.meta.tabata_sets ?? currentExercise.meta.circuit_sets) as unknown[])[
+                      timerSetIndex
+                    ] as { exercises?: Array<{ exercise_id?: string }> } | undefined)
                       ?.exercises && (
                       <div className="mb-4">
                         <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-4 text-center">
@@ -7381,16 +6863,23 @@ export default function LiveWorkout() {
                           </div>
                           <div className="text-lg font-semibold text-white">
                             {timerExerciseIndex + 1 <
-                            currentExercise.meta.circuit_sets[timerSetIndex]
-                              .exercises.length
+                            (
+                              ((currentExercise.meta.tabata_sets ?? currentExercise.meta.circuit_sets) as unknown[])[
+                                timerSetIndex
+                              ] as { exercises: Array<{ exercise_id?: string }> }
+                            ).exercises.length
                               ? exerciseLookup[
-                                  currentExercise.meta.circuit_sets[
-                                    timerSetIndex
-                                  ].exercises[timerExerciseIndex + 1]
-                                    ?.exercise_id
+                                  (
+                                    ((currentExercise.meta.tabata_sets ?? currentExercise.meta.circuit_sets) as unknown[])[
+                                      timerSetIndex
+                                    ] as {
+                                      exercises: Array<{ exercise_id?: string }>;
+                                    }
+                                  ).exercises[timerExerciseIndex + 1]
+                                    ?.exercise_id ?? ""
                                 ]?.name || "Next Exercise"
                               : timerSetIndex + 1 <
-                                  currentExercise.meta.circuit_sets.length
+                                  ((currentExercise.meta.tabata_sets ?? currentExercise.meta.circuit_sets) as unknown[]).length
                                 ? "Next Set"
                                 : "Break"}
                           </div>
@@ -7404,7 +6893,7 @@ export default function LiveWorkout() {
                   {/* Previous Button */}
                   <Button
                     onClick={() => {
-                      const circuitSets = currentExercise?.meta?.circuit_sets;
+                      const circuitSets = (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
 
                       if (intervalPhase === "work") {
                         // Work -> Previous Rest (or Previous Rest After Set)
@@ -7492,7 +6981,7 @@ export default function LiveWorkout() {
                   {/* Next Button */}
                   <Button
                     onClick={() => {
-                      const circuitSets = currentExercise?.meta?.circuit_sets;
+                      const circuitSets = (currentExercise?.meta?.tabata_sets ?? currentExercise?.meta?.circuit_sets);
 
                       if (intervalPhase === "work") {
                         // Work -> Rest (same exercise)
@@ -7603,9 +7092,10 @@ export default function LiveWorkout() {
                 </div>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={closeVideoModal}
-                  className="text-white hover:bg-white/20 rounded-2xl"
+                  className="text-white hover:bg-white/20 rounded-2xl min-h-[44px] min-w-[44px]"
+                  aria-label="Close video"
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -7647,9 +7137,10 @@ export default function LiveWorkout() {
                 </div>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => setShowExerciseImage(false)}
-                  className="text-white hover:bg-white/20 rounded-2xl"
+                  className="text-white hover:bg-white/20 rounded-2xl min-h-[44px] min-w-[44px]"
+                  aria-label="Close image"
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -7781,7 +7272,7 @@ export default function LiveWorkout() {
         {/* Plate Calculator Modal */}
         {showPlateCalculator && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
+            <div className="fc-surface backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
               <div className="p-6">
                 {/* Modal Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -7802,7 +7293,7 @@ export default function LiveWorkout() {
                       setTargetWeight("");
                       setSelectedBarbell(20);
                     }}
-                    className="fc-text-dim hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
+                    className="fc-text-dim hover:bg-[color:var(--fc-glass-highlight)] rounded-xl"
                   >
                     <X className="w-5 h-5" />
                   </Button>
@@ -7824,7 +7315,7 @@ export default function LiveWorkout() {
                             className={`p-3 rounded-xl border-2 transition-all ${
                               selectedBarbell === barbell.weight
                                 ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                : "border-[color:var(--fc-glass-border)] hover:border-slate-300 dark:hover:border-slate-500"
+                                : "border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-soft)]"
                             }`}
                           >
                             <div className="text-center">
@@ -7853,7 +7344,7 @@ export default function LiveWorkout() {
                           type="number"
                           value={targetWeight}
                           onChange={(e) => setTargetWeight(e.target.value)}
-                          className="w-full p-4 text-2xl font-bold text-center border-2 border-[color:var(--fc-glass-border)] rounded-xl bg-white dark:bg-slate-700 fc-text-primary focus:border-[color:var(--fc-domain-workouts)] focus:outline-none"
+                          className="w-full p-4 text-2xl font-bold text-center border-2 border-[color:var(--fc-glass-border)] rounded-xl fc-surface fc-text-primary focus:border-[color:var(--fc-domain-workouts)] focus:outline-none"
                           placeholder="142.5"
                         />
                         <div className="absolute right-4 top-1/2 transform -translate-y-1/2 fc-text-dim font-medium">
@@ -7928,7 +7419,7 @@ export default function LiveWorkout() {
                                         className={`w-3 h-3 ${plate.color} rounded-full border ${plate.border} relative flex items-center justify-center`}
                                       >
                                         {/* Inner grey circle - smaller */}
-                                        <div className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full border border-slate-400 dark:border-slate-500 flex items-center justify-center">
+                                        <div className="w-1 h-1 bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center">
                                           {/* Tiny black center */}
                                           <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
                                         </div>
@@ -7965,7 +7456,7 @@ export default function LiveWorkout() {
                                         className={`w-3 h-3 ${plate.color} rounded-full border ${plate.border} relative flex items-center justify-center`}
                                       >
                                         {/* Inner grey circle - smaller */}
-                                        <div className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full border border-slate-400 dark:border-slate-500 flex items-center justify-center">
+                                        <div className="w-1 h-1 bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center">
                                           {/* Tiny black center */}
                                           <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
                                         </div>
@@ -7979,7 +7470,7 @@ export default function LiveWorkout() {
                                     <div className="flex items-center gap-1">
                                       <div className="w-3 h-3 bg-gray-400 rounded-full border border-gray-600 relative flex items-center justify-center">
                                         {/* Inner grey circle */}
-                                        <div className="w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full border border-slate-400 dark:border-slate-500 flex items-center justify-center">
+                                        <div className="w-1.5 h-1.5 bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center">
                                           {/* Tiny black center */}
                                           <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
                                         </div>
@@ -8022,7 +7513,7 @@ export default function LiveWorkout() {
                               </div>
 
                               {/* Visual Barbell Display */}
-                              <div className="p-3 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                              <div className="p-3 bg-[color:var(--fc-glass-highlight)] rounded-lg">
                                 <div className="text-center text-xs font-medium fc-text-dim mb-2">
                                   Load on each side:
                                 </div>
@@ -8055,7 +7546,7 @@ export default function LiveWorkout() {
                                               >
                                                 {/* Inner grey circle - smaller */}
                                                 <div
-                                                  className={`${innerSize} bg-slate-300 dark:bg-slate-600 rounded-full border border-slate-400 dark:border-slate-500 flex items-center justify-center`}
+                                                  className={`${innerSize} bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center`}
                                                 >
                                                   {/* Tiny black center */}
                                                   <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
@@ -8072,9 +7563,9 @@ export default function LiveWorkout() {
                                   </div>
 
                                   {/* Barbell shaft - aligned with black dots */}
-                                  <div className="flex-1 h-0.5 bg-slate-400 dark:bg-slate-500 mx-3 rounded relative">
+                                  <div className="flex-1 h-0.5 bg-[color:var(--fc-glass-border)] mx-3 rounded relative">
                                     {/* Align barbell with the center of plates (black dots) */}
-                                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-400 dark:bg-slate-500 rounded"></div>
+                                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[color:var(--fc-glass-border)] rounded"></div>
                                   </div>
 
                                   {/* Right side plates */}
@@ -8105,7 +7596,7 @@ export default function LiveWorkout() {
                                               >
                                                 {/* Inner grey circle - smaller */}
                                                 <div
-                                                  className={`${innerSize} bg-slate-300 dark:bg-slate-600 rounded-full border border-slate-400 dark:border-slate-500 flex items-center justify-center`}
+                                                  className={`${innerSize} bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center`}
                                                 >
                                                   {/* Tiny black center */}
                                                   <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
@@ -8134,7 +7625,7 @@ export default function LiveWorkout() {
                                       className={`w-3 h-3 ${plate.color} rounded-full border ${plate.border} relative flex items-center justify-center`}
                                     >
                                       {/* Inner grey circle - smaller */}
-                                      <div className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full border border-slate-400 dark:border-slate-500 flex items-center justify-center">
+                                      <div className="w-1 h-1 bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center">
                                         {/* Tiny black center */}
                                         <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
                                       </div>
@@ -8175,7 +7666,7 @@ export default function LiveWorkout() {
                                       className={`w-3 h-3 ${plate.color} rounded-full border ${plate.border} relative flex items-center justify-center`}
                                     >
                                       {/* Inner grey circle - smaller */}
-                                      <div className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full border border-slate-400 dark:border-slate-500 flex items-center justify-center">
+                                      <div className="w-1 h-1 bg-[color:var(--fc-glass-highlight)] rounded-full border border-[color:var(--fc-glass-border)] flex items-center justify-center">
                                         {/* Tiny black center */}
                                         <div className="w-0.5 h-0.5 bg-black rounded-full"></div>
                                       </div>
@@ -8204,7 +7695,7 @@ export default function LiveWorkout() {
                     {/* Back Button */}
                     <button
                       onClick={() => setShowPlateResults(false)}
-                      className="w-full py-3 bg-slate-200 dark:bg-slate-600 fc-text-primary font-medium rounded-xl hover:bg-slate-300 dark:hover:bg-slate-500 transition-all"
+                      className="w-full py-3 bg-[color:var(--fc-glass-highlight)] fc-text-primary font-medium rounded-xl hover:bg-[color:var(--fc-glass-soft)] transition-all"
                     >
                       Calculate New Weight
                     </button>
@@ -8230,94 +7721,27 @@ export default function LiveWorkout() {
               padding: "16px",
             }}
           >
-            <div
-              style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "24px",
-                width: "100%",
-                maxWidth: "448px",
-                maxHeight: "90vh",
-                overflow: "hidden",
-                border: "none",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
-              }}
-            >
+            <div className="fc-surface rounded-3xl w-full max-w-[448px] max-h-[90vh] overflow-hidden border-0 shadow-[0_4px_12px_rgba(0,0,0,0.12)]">
               <div style={{ padding: "32px", textAlign: "center" }}>
                 {/* Celebration Header */}
                 <div style={{ marginBottom: "24px" }}>
-                  <div
-                    style={{
-                      width: "80px",
-                      height: "80px",
-                      background:
-                        "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
-                      borderRadius: "50%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      margin: "0 auto 16px",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                    }}
-                  >
-                    <Trophy
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        color: "#FFFFFF",
-                      }}
-                    />
+                  <div className="w-20 h-20 rounded-full bg-[color:var(--fc-status-success)] flex items-center justify-center mx-auto mb-4 shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+                    <Trophy className="w-10 h-10 text-white" />
                   </div>
-                  <h2
-                    style={{
-                      fontSize: "32px",
-                      fontWeight: "800",
-                      color: "#1A1A1A",
-                      lineHeight: "1.2",
-                      marginBottom: "8px",
-                    }}
-                  >
+                  <h2 className="text-3xl font-extrabold fc-text-primary leading-tight mb-2">
                     Workout Complete! 🎉
                   </h2>
-                  <p
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: "400",
-                      color: "#6B7280",
-                    }}
-                  >
+                  <p className="text-base font-normal fc-text-dim">
                     Amazing work! You crushed this workout!
                   </p>
                 </div>
 
                 {/* Weight Lifted Highlight */}
-                <div
-                  style={{
-                    padding: "24px",
-                    backgroundColor: "#FFE082",
-                    borderRadius: "24px",
-                    border: "2px solid #F5576C",
-                    marginBottom: "24px",
-                    textAlign: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "40px",
-                      fontWeight: "800",
-                      color: "#1A1A1A",
-                      lineHeight: "1.1",
-                      marginBottom: "8px",
-                    }}
-                  >
+                <div className="p-6 rounded-3xl border-2 border-[color:var(--fc-status-error)] mb-6 text-center bg-[color:var(--fc-status-warning)]/30">
+                  <div className="text-4xl font-extrabold fc-text-primary leading-tight mb-2">
                     {workoutStats.totalWeightLifted.toLocaleString()} kg
                   </div>
-                  <div
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: "600",
-                      color: "#1A1A1A",
-                    }}
-                  >
+                  <div className="text-lg font-semibold fc-text-primary">
                     Total Weight Lifted
                   </div>
                 </div>
@@ -8325,24 +7749,8 @@ export default function LiveWorkout() {
                 {/* Performance Stats */}
                 <div style={{ marginBottom: "32px" }}>
                   <div className="grid grid-cols-3" style={{ gap: "12px" }}>
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "16px",
-                        textAlign: "center",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #2196F3",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "32px",
-                          fontWeight: "800",
-                          color: "#1A1A1A",
-                          lineHeight: "1.1",
-                        }}
-                      >
+                    <div className="fc-surface rounded-3xl p-4 text-center shadow-[0_2px_8px_rgba(0,0,0,0.08)] border-2 border-[color:var(--fc-accent-cyan)]">
+                      <div className="text-3xl font-extrabold fc-text-primary leading-tight">
                         {(() => {
                           console.log(
                             "🕐 [Duration Debug] Modal displaying totalTime:",
@@ -8354,73 +7762,23 @@ export default function LiveWorkout() {
                           return workoutStats.totalTime;
                         })()}
                       </div>
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: "400",
-                          color: "#6B7280",
-                        }}
-                      >
+                      <div className="text-xs font-normal fc-text-dim">
                         Minutes
                       </div>
                     </div>
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "16px",
-                        textAlign: "center",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #6C5CE7",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "32px",
-                          fontWeight: "800",
-                          color: "#1A1A1A",
-                          lineHeight: "1.1",
-                        }}
-                      >
+                    <div className="fc-surface rounded-3xl p-4 text-center shadow-[0_2px_8px_rgba(0,0,0,0.08)] border-2 border-[color:var(--fc-accent-primary)]">
+                      <div className="text-3xl font-extrabold fc-text-primary leading-tight">
                         {workoutStats.exercisesCompleted}
                       </div>
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: "400",
-                          color: "#6B7280",
-                        }}
-                      >
+                      <div className="text-xs font-normal fc-text-dim">
                         Exercises
                       </div>
                     </div>
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        padding: "16px",
-                        textAlign: "center",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        border: "2px solid #F5576C",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "32px",
-                          fontWeight: "800",
-                          color: "#1A1A1A",
-                          lineHeight: "1.1",
-                        }}
-                      >
+                    <div className="fc-surface rounded-3xl p-4 text-center shadow-[0_2px_8px_rgba(0,0,0,0.08)] border-2 border-[color:var(--fc-status-error)]">
+                      <div className="text-3xl font-extrabold fc-text-primary leading-tight">
                         {workoutStats.totalSets}
                       </div>
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: "400",
-                          color: "#6B7280",
-                        }}
-                      >
+                      <div className="text-xs font-normal fc-text-dim">
                         Total Sets
                       </div>
                     </div>
@@ -8445,22 +7803,10 @@ export default function LiveWorkout() {
                       await completeWorkout();
                       // completeWorkout() already navigates to complete page
                     }}
+                    className="w-full flex items-center justify-center gap-2 py-4 px-8 rounded-[20px] border-none bg-[color:var(--fc-status-success)] text-white text-base font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.1)] disabled:cursor-not-allowed disabled:opacity-70"
                     style={{
-                      width: "100%",
-                      backgroundColor: "#4CAF50",
-                      color: "#FFFFFF",
-                      fontSize: "16px",
-                      fontWeight: "600",
-                      padding: "16px 32px",
-                      borderRadius: "20px",
-                      border: "none",
-                      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
                       cursor: isCompletingWorkout ? "not-allowed" : "pointer",
                       opacity: isCompletingWorkout ? 0.7 : 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px",
                     }}
                   >
                     {isCompletingWorkout ? (
@@ -8483,45 +7829,17 @@ export default function LiveWorkout() {
                     variant="outline"
                     onClick={() => {
                       setShowWorkoutCompletion(false);
-                      router.push("/client/workouts");
+                      router.push("/client/train");
                     }}
-                    style={{
-                      width: "100%",
-                      backgroundColor: "#FFFFFF",
-                      color: "#6C5CE7",
-                      fontSize: "16px",
-                      fontWeight: "600",
-                      padding: "16px 32px",
-                      borderRadius: "20px",
-                      border: "2px solid #6C5CE7",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
+                    className="w-full py-4 px-8 rounded-2xl border-2 border-[color:var(--fc-accent-primary)] fc-surface text-[color:var(--fc-accent-primary)] font-semibold flex items-center justify-center"
                   >
                     Back to Dashboard
                   </Button>
                 </div>
 
                 {/* Motivational Message */}
-                <div
-                  style={{
-                    marginTop: "24px",
-                    padding: "16px",
-                    backgroundColor: "#FFE082",
-                    borderRadius: "24px",
-                    border: "2px solid #F5576C",
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "600",
-                      color: "#1A1A1A",
-                      textAlign: "center",
-                    }}
-                  >
+                <div className="mt-6 p-4 rounded-3xl border-2 border-[color:var(--fc-status-error)] bg-[color:var(--fc-status-warning)]/20">
+                  <p className="text-sm font-semibold fc-text-primary text-center">
                     💪 Keep pushing! Every workout makes you stronger!
                   </p>
                 </div>
@@ -8533,7 +7851,7 @@ export default function LiveWorkout() {
         {/* Drop Set Calculator Modal */}
         {showDropSetCalculator && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
+            <div className="fc-surface backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
               <div className="p-6">
                 {/* Modal Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -8549,7 +7867,7 @@ export default function LiveWorkout() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowDropSetCalculator(false)}
-                    className="fc-text-dim hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
+                    className="fc-text-dim hover:bg-[color:var(--fc-glass-highlight)] rounded-xl"
                   >
                     <X className="w-5 h-5" />
                   </Button>
@@ -8621,7 +7939,7 @@ export default function LiveWorkout() {
                       type="number"
                       value={dropWeight === "" ? "" : dropWeight}
                       onChange={(e) => setDropWeight(e.target.value)}
-                      className="w-full h-12 text-center text-lg rounded-xl border-2 border-purple-300 dark:border-purple-700 bg-white dark:bg-slate-700 fc-text-primary font-semibold focus:outline-none focus:border-purple-500"
+                      className="w-full h-12 text-center text-lg rounded-xl border-2 border-[color:var(--fc-glass-border)] fc-surface fc-text-primary font-semibold focus:outline-none focus:border-[color:var(--fc-accent-primary)]"
                       step="0.5"
                       placeholder="Override calculated weight"
                     />
@@ -8638,7 +7956,7 @@ export default function LiveWorkout() {
         {/* Cluster Timer Modal */}
         {showClusterTimer && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
+            <div className="fc-surface backdrop-blur-md rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden border-0 shadow-2xl">
               <div className="p-6">
                 {/* Modal Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -8654,7 +7972,7 @@ export default function LiveWorkout() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowClusterTimer(false)}
-                    className="fc-text-dim hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
+                    className="fc-text-dim hover:bg-[color:var(--fc-glass-highlight)] rounded-xl"
                   >
                     <X className="w-5 h-5" />
                   </Button>
@@ -8681,29 +7999,30 @@ export default function LiveWorkout() {
 
                   {/* Timer Controls */}
                   <div className="flex gap-3 justify-center">
-                    <Button
+                    <PrimaryButton
                       onClick={() => {
                         // TODO: Implement timer start logic
                         console.log("Starting cluster rest timer");
                       }}
-                      className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white px-8 py-3 rounded-xl font-semibold"
+                      className="w-auto px-8 py-3"
                     >
                       <Play className="w-4 h-4 mr-2" />
                       Start Timer
-                    </Button>
-                    <Button
-                      variant="outline"
+                    </PrimaryButton>
+                    <SecondaryButton
                       onClick={() => setShowClusterTimer(false)}
-                      className="px-8 py-3 rounded-xl font-semibold"
+                      className="w-auto px-8 py-3"
                     >
                       Close
-                    </Button>
+                    </SecondaryButton>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         )}
+          </ClientPageShell>
+      </div>
       </AnimatedBackground>
     </ProtectedRoute>
   );

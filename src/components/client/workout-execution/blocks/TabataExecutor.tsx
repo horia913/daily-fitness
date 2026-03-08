@@ -114,7 +114,7 @@ export function TabataExecutor({
 
   const instructions =
     currentExercise?.notes ||
-    block.block.block_notes ||
+    block.block.set_notes ||
     "Complete all exercises following the timer.";
 
   const handleComplete = () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { FloatingParticles } from '@/components/ui/FloatingParticles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,7 +47,6 @@ import {
   CheckCircle
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 interface ReportTemplate {
   id: string
@@ -94,6 +93,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
   const theme = getThemeStyles()
 
   const [loading, setLoading] = useState(true)
+  const loadingRef = useRef(false)
   const [selectedClient, setSelectedClient] = useState<string>('')
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [selectedSections, setSelectedSections] = useState<string[]>([])
@@ -105,6 +105,45 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
   const [isGenerating, setIsGenerating] = useState(false)
 
   const [clients, setClients] = useState<ClientData[]>([])
+  const didLoadRef = useRef(false)
+
+  const loadData = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!coachId) {
+        setClients([])
+        setLoading(false)
+        return
+      }
+      if (didLoadRef.current) return
+      if (loadingRef.current) return
+      didLoadRef.current = true
+      loadingRef.current = true
+      setLoading(true)
+      try {
+        const res = await fetch('/api/coach/reports/clients', {
+          signal: signal ?? null,
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body?.error ?? `HTTP ${res.status}`)
+        }
+        const data = await res.json()
+        setClients(data.clients ?? [])
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          didLoadRef.current = false
+          return
+        }
+        console.error('Error loading report clients:', err)
+        didLoadRef.current = false
+        setClients([])
+      } finally {
+        setLoading(false)
+        loadingRef.current = false
+      }
+    },
+    [coachId]
+  )
 
   useEffect(() => {
     if (!coachId) {
@@ -112,60 +151,14 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
       setLoading(false)
       return
     }
-    let cancelled = false
-    setLoading(true)
-    ;(async () => {
-      try {
-        const { getCoachClientIds, getPeriodBounds, getSuccessRate } = await import('@/lib/metrics')
-        const { getTotalWorkouts } = await import('@/lib/metrics/workout')
-        const period = getPeriodBounds('this_month')
-        const clientIds = await getCoachClientIds(coachId, false)
-        if (clientIds.length === 0 || cancelled) {
-          setClients([])
-          return
-        }
-        const { data: clientsRows, error: clientsError } = await supabase
-          .from('clients')
-          .select('id, client_id, created_at')
-          .eq('coach_id', coachId)
-          .in('client_id', clientIds)
-        if (clientsError || !clientsRows?.length) {
-          setClients([])
-          return
-        }
-        const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name').in('id', clientIds)
-        const { data: bodyRows } = await supabase.from('body_metrics').select('client_id, weight_kg, body_fat_percentage').in('client_id', clientIds).order('measured_date', { ascending: false })
-        const [totalWorkouts, successRate] = await Promise.all([getTotalWorkouts(clientIds, period), getSuccessRate(clientIds, period)])
-        const profileMap = new Map((profiles || []).map((p: { id: string; first_name?: string; last_name?: string }) => [p.id, p]))
-        const latestBody: Record<string, { weight_kg: number | null; body_fat_percentage: number | null }> = {}
-        ;(bodyRows || []).forEach((r: { client_id: string; weight_kg: number | null; body_fat_percentage: number | null }) => {
-          if (!latestBody[r.client_id]) latestBody[r.client_id] = { weight_kg: r.weight_kg, body_fat_percentage: r.body_fat_percentage }
-        })
-        const workoutsPerClient = clientIds.length > 0 ? Math.round(totalWorkouts / clientIds.length) : 0
-        const list: ClientData[] = clientsRows.map((row: { id: string; client_id: string; created_at?: string }) => {
-          const profile = profileMap.get(row.client_id)
-          const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Client'
-          const body = latestBody[row.client_id]
-          return {
-            id: row.id,
-            name,
-            avatar: name.slice(0, 2).toUpperCase() || '?',
-            program: 'General Fitness',
-            startDate: row.created_at?.split('T')[0] ?? '',
-            lastActive: new Date().toISOString().split('T')[0],
-            metrics: { weight: body?.weight_kg ?? 0, bodyFat: body?.body_fat_percentage ?? 0, strength: successRate.ratePercent, endurance: workoutsPerClient, adherence: successRate.ratePercent }
-          }
-        })
-        if (!cancelled) setClients(list)
-      } catch (e) {
-        console.error('Error loading report clients:', e)
-        if (!cancelled) setClients([])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    return () => { cancelled = true }
-  }, [coachId])
+    const ac = new AbortController()
+    loadData(ac.signal)
+    return () => {
+      didLoadRef.current = false
+      loadingRef.current = false
+      ac.abort()
+    }
+  }, [coachId, loadData])
 
   const reportTemplates: ReportTemplate[] = [
     {
@@ -396,9 +389,9 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
       <div className={`min-h-screen ${theme.background}`}>
         <div className="animate-pulse">
           <div className="h-64 bg-[color:var(--fc-glass-highlight)]"></div>
-          <div className="p-6 space-y-6">
-            <div className="max-w-7xl mx-auto space-y-6">
-              <div className="fc-glass fc-card rounded-2xl p-6">
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+              <div className="fc-glass fc-card rounded-2xl p-3 sm:p-4 md:p-6">
                 <div className="h-8 bg-[color:var(--fc-glass-highlight)] rounded mb-4"></div>
                 <div className="space-y-4">
                   <div className="h-16 bg-[color:var(--fc-glass-highlight)] rounded-xl"></div>
@@ -417,50 +410,55 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
     <AnimatedBackground>
       {performanceSettings.floatingParticles && <FloatingParticles />}
       <div className="min-h-screen">
-        {/* Enhanced Header */}
-        <div className={`p-6 ${theme.background} relative overflow-hidden`}>
-          {/* Floating background elements */}
-          <div className="absolute inset-0 overflow-hidden">
+        {/* Enhanced Header — single padding level on mobile */}
+        <div className={`p-3 sm:p-4 md:p-6 ${theme.background} relative overflow-hidden`}>
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-[color:var(--fc-accent-cyan)]/10 rounded-full blur-3xl"></div>
             <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[color:var(--fc-accent-purple)]/10 rounded-full blur-3xl"></div>
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[color:var(--fc-domain-meals)]/10 rounded-full blur-2xl"></div>
           </div>
 
           <div className="max-w-7xl mx-auto relative z-10">
-            <Card className="fc-glass fc-card rounded-3xl border border-[color:var(--fc-glass-border)]">
-              <CardContent className="p-5 sm:p-6 space-y-4">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div className="flex items-center gap-4">
+            <Card className="fc-glass fc-card rounded-2xl sm:rounded-3xl border border-[color:var(--fc-glass-border)]">
+              <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                     <Button
                       variant="ghost"
                       onClick={() => router.push('/coach')}
-                      className="fc-btn fc-btn-ghost h-10 w-10"
+                      className="fc-btn fc-btn-ghost h-10 w-10 flex-shrink-0"
                     >
                       <ArrowLeft className="w-5 h-5" />
                     </Button>
-                    <div className="space-y-2">
+                    <div className="space-y-1 sm:space-y-2 min-w-0">
                       <Badge className="fc-badge">Report Builder</Badge>
-                      <h1 className="text-3xl font-bold text-[color:var(--fc-text-primary)]">
+                      <h1 className="text-2xl font-bold text-[color:var(--fc-text-primary)]">
                         Detailed Reports 📋
                       </h1>
-                      <p className="text-lg text-[color:var(--fc-text-dim)]">
+                      <p className="text-sm sm:text-base md:text-lg text-[color:var(--fc-text-dim)]">
                         Generate professional client progress reports with comprehensive insights
                       </p>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 flex-shrink-0">
                     <Button
                       variant="outline"
                       onClick={() => setShowPreview(!showPreview)}
-                      className="fc-btn fc-btn-ghost flex items-center gap-2"
+                      className="fc-btn fc-btn-ghost flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px]"
                     >
                       <Eye className="w-4 h-4" />
                       {showPreview ? 'Hide Preview' : 'Show Preview'}
                     </Button>
                     <Button
                       variant="outline"
-                      className="fc-btn fc-btn-ghost flex items-center gap-2"
+                      className="fc-btn fc-btn-ghost flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px]"
+                      onClick={() => {
+                        if (coachId) {
+                          didLoadRef.current = false
+                          loadData()
+                        }
+                      }}
                     >
                       <RefreshCw className="w-4 h-4" />
                       Refresh
@@ -472,26 +470,26 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
           </div>
         </div>
 
-      {/* Main Content */}
-      <div className="p-6">
+      {/* Main Content — single padding level on mobile (p-3 = 24px total horizontal) */}
+      <div className="p-3 sm:p-4 md:p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Report Configuration */}
-            <div className="lg:col-span-2 space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
+            {/* Report Configuration — reduced nesting: Card padding only on content */}
+            <div className="lg:col-span-2 space-y-4 sm:space-y-6 md:space-y-8">
               {/* Client Selection */}
               <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                      <User className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
+                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
+                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                      <User className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-workouts)]" />
                     </div>
                     Client Selection
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
+                <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+                  <div className="space-y-3 sm:space-y-4">
                     <Select value={selectedClient} onValueChange={setSelectedClient}>
-                      <SelectTrigger className="fc-select w-full">
+                      <SelectTrigger className="fc-select w-full min-h-[44px]">
                         <SelectValue placeholder="Select a client for the report" />
                       </SelectTrigger>
                       <SelectContent>
@@ -512,8 +510,8 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                     </Select>
 
                     {selectedClientData && (
-                      <div className="fc-glass rounded-xl p-4 border border-[color:var(--fc-glass-border)]">
-                        <div className="flex items-center gap-4">
+                      <div className="fc-glass rounded-xl p-3 sm:p-4 border border-[color:var(--fc-glass-border)]">
+                        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
                           <div className="w-12 h-12 rounded-full bg-[color:var(--fc-accent-cyan)]/20 text-[color:var(--fc-accent-cyan)] flex items-center justify-center font-bold text-lg">
                             {selectedClientData.avatar}
                           </div>
@@ -538,16 +536,16 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
 
               {/* Report Templates */}
               <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                      <FileText className="w-5 h-5 text-[color:var(--fc-domain-meals)]" />
+                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
+                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                      <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-meals)]" />
                     </div>
                     Report Templates
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     {reportTemplates.map(template => {
                       const Icon = template.icon
                       const isSelected = selectedTemplate === template.id
@@ -555,7 +553,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                       return (
                         <div
                           key={template.id}
-                          className={`fc-glass rounded-xl p-4 border cursor-pointer transition-all duration-300 ${
+                          className={`fc-glass rounded-xl p-3 sm:p-4 border cursor-pointer transition-all duration-300 ${
                             isSelected 
                               ? 'border-[color:var(--fc-accent-cyan)]/50 bg-[color:var(--fc-glass-soft)]' 
                               : 'border-[color:var(--fc-glass-border)] hover:border-[color:var(--fc-glass-border-strong)]'
@@ -604,25 +602,25 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
 
               {/* Report Customization */}
               <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                      <Settings className="w-5 h-5 text-[color:var(--fc-accent-purple)]" />
+                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
+                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                      <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-accent-purple)]" />
                     </div>
                     Report Customization
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="p-3 sm:p-4 md:p-6 pt-0 space-y-4 sm:space-y-6">
                   {/* Date Range */}
                   <div>
-                    <h4 className="font-semibold text-[color:var(--fc-text-primary)] mb-3">Date Range</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <h4 className="font-semibold text-sm sm:text-base text-[color:var(--fc-text-primary)] mb-2 sm:mb-3">Date Range</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
                       {(['month', 'quarter', 'year', 'custom'] as const).map(range => (
                         <Button
                           key={range}
                           variant={dateRange === range ? 'default' : 'outline'}
                           onClick={() => setDateRange(range)}
-                          className={dateRange === range ? 'fc-btn fc-btn-primary h-12' : 'fc-btn fc-btn-ghost h-12'}
+                          className={dateRange === range ? 'fc-btn fc-btn-primary min-h-[44px]' : 'fc-btn fc-btn-ghost min-h-[44px]'}
                         >
                           {range.charAt(0).toUpperCase() + range.slice(1)}
                         </Button>
@@ -722,18 +720,18 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
             </div>
 
             {/* Report Preview & Actions */}
-            <div className="space-y-8">
+            <div className="space-y-4 sm:space-y-6 md:space-y-8">
               {/* Report Summary */}
               <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                      <Eye className="w-5 h-5 text-[color:var(--fc-status-warning)]" />
+                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
+                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                      <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-status-warning)]" />
                     </div>
                     Report Summary
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="p-3 sm:p-4 md:p-6 pt-0 space-y-3 sm:space-y-4">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-[color:var(--fc-text-dim)]">Client:</span>
@@ -761,11 +759,11 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                     </div>
                   </div>
                   
-                  <div className="pt-4 border-t border-[color:var(--fc-glass-border)]">
+                  <div className="pt-3 sm:pt-4 border-t border-[color:var(--fc-glass-border)]">
                     <Button
                       onClick={generateReport}
                       disabled={!selectedClient || !selectedTemplate || selectedSections.length === 0 || isGenerating}
-                      className="fc-btn fc-btn-primary w-full"
+                      className="fc-btn fc-btn-primary w-full min-h-[44px]"
                     >
                       {isGenerating ? (
                         <>
@@ -785,20 +783,20 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
 
               {/* Export Options */}
               <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                      <Download className="w-5 h-5 text-[color:var(--fc-domain-meals)]" />
+                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
+                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                      <Download className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-meals)]" />
                     </div>
                     Export Options
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
+                <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+                  <div className="space-y-2 sm:space-y-3">
                     <Button
                       variant="outline"
                       onClick={() => exportReport('pdf')}
-                      className="fc-btn fc-btn-ghost w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
                     >
                       <FileText className="w-4 h-4 mr-2" />
                       Export as PDF
@@ -806,7 +804,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                     <Button
                       variant="outline"
                       onClick={() => exportReport('excel')}
-                      className="fc-btn fc-btn-ghost w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
                     >
                       <BarChart3 className="w-4 h-4 mr-2" />
                       Export as Excel
@@ -814,7 +812,7 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
                     <Button
                       variant="outline"
                       onClick={() => exportReport('csv')}
-                      className="fc-btn fc-btn-ghost w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
                     >
                       <Download className="w-4 h-4 mr-2" />
                       Export as CSV
@@ -825,34 +823,34 @@ export default function OptimizedDetailedReports({ coachId }: OptimizedDetailedR
 
               {/* Share Options */}
               <Card className="fc-glass fc-card rounded-2xl border border-[color:var(--fc-glass-border)]">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-[color:var(--fc-text-primary)]">
-                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg">
-                      <Share2 className="w-5 h-5 text-[color:var(--fc-domain-workouts)]" />
+                <CardHeader className="p-3 sm:p-4 md:p-6 pb-2">
+                  <CardTitle className="flex items-center gap-2 sm:gap-3 text-[color:var(--fc-text-primary)] text-base sm:text-lg">
+                    <div className="p-2 bg-[color:var(--fc-glass-soft)] rounded-lg flex-shrink-0">
+                      <Share2 className="w-4 h-4 sm:w-5 sm:h-5 text-[color:var(--fc-domain-workouts)]" />
                     </div>
                     Share Options
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
+                <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+                  <div className="space-y-2 sm:space-y-3">
                     <Button
                       variant="outline"
                       onClick={shareReport}
-                      className="fc-btn fc-btn-ghost w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
                     >
                       <Mail className="w-4 h-4 mr-2" />
                       Email to Client
                     </Button>
                     <Button
                       variant="outline"
-                      className="fc-btn fc-btn-ghost w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
                     >
                       <Send className="w-4 h-4 mr-2" />
                       Send via App
                     </Button>
                     <Button
                       variant="outline"
-                      className="fc-btn fc-btn-ghost w-full justify-start"
+                      className="fc-btn fc-btn-ghost w-full justify-start min-h-[44px]"
                     >
                       <Printer className="w-4 h-4 mr-2" />
                       Print Report
